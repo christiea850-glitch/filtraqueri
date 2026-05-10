@@ -2,11 +2,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+import csv
+import io
 import re
 import shutil
 
 import duckdb
 from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -64,20 +67,22 @@ class FilterDefinition(BaseModel):
     end: str | None = None
 
 
+class SortDefinition(BaseModel):
+    column: str
+    direction: str = "ASC"
+
+
 class FilterRequest(BaseModel):
     filters: list[FilterDefinition] = Field(default_factory=list)
     limit: int = Field(DEFAULT_PREVIEW_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
+    page: int = Field(1, ge=1)
+    order_by: SortDefinition | None = None
 
 
 class AggregationDefinition(BaseModel):
     function: str
     column: str | None = None
     alias: str | None = None
-
-
-class SortDefinition(BaseModel):
-    column: str
-    direction: str = "ASC"
 
 
 class QueryBuilderRequest(BaseModel):
@@ -87,6 +92,15 @@ class QueryBuilderRequest(BaseModel):
     filters: list[FilterDefinition] = Field(default_factory=list)
     order_by: SortDefinition | None = None
     limit: int = Field(DEFAULT_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
+    page: int = Field(1, ge=1)
+
+
+class ExportRequest(BaseModel):
+    source: str = "filter"
+    filters: list[FilterDefinition] = Field(default_factory=list)
+    query_builder: QueryBuilderRequest | None = None
+    order_by: SortDefinition | None = None
+    limit: int = Field(MAX_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
 
 
 def sanitize_filename(filename: str) -> str:
@@ -192,8 +206,16 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
 def fetch_preview(
     connection: duckdb.DuckDBPyConnection,
     limit: int = DEFAULT_PREVIEW_LIMIT,
+    page: int = 1,
+    order_by: SortDefinition | None = None,
+    valid_columns: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    result = connection.execute(f"SELECT * FROM {TABLE_NAME} LIMIT ?", [limit])
+    params: list[Any] = [limit, (page - 1) * limit]
+    order_clause = build_order_clause(order_by, valid_columns or set())
+    result = connection.execute(
+        f"SELECT * FROM {TABLE_NAME} {order_clause} LIMIT ? OFFSET ?",
+        params,
+    )
     columns = [description[0] for description in result.description]
     rows = result.fetchall()
     return [dict(zip(columns, row)) for row in rows]
@@ -253,10 +275,43 @@ def build_filter_where_clause(
     return f"WHERE {' AND '.join(conditions)}", params
 
 
+def build_order_clause(order_by: SortDefinition | None, valid_columns: set[str]) -> str:
+    if not order_by or not order_by.column:
+        return ""
+
+    sort_direction = order_by.direction.upper()
+    if sort_direction not in ALLOWED_SORT_DIRECTIONS:
+        raise HTTPException(status_code=400, detail="Sort direction must be ASC or DESC")
+
+    if valid_columns and order_by.column not in valid_columns:
+        raise HTTPException(status_code=400, detail=f"Unknown sort column: {order_by.column}")
+
+    return f"ORDER BY {quote_identifier(order_by.column)} {sort_direction}"
+
+
+def rows_to_dicts(result: duckdb.DuckDBPyConnection) -> tuple[list[str], list[dict[str, Any]]]:
+    columns = [description[0] for description in result.description]
+    rows = result.fetchall()
+    return columns, [dict(zip(columns, row)) for row in rows]
+
+
+def csv_response(columns: list[str], rows: list[dict[str, Any]], filename: str) -> Response:
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(rows)
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 def build_query_builder_sql(
     request: QueryBuilderRequest,
     valid_columns: set[str],
-) -> tuple[str, list[Any]]:
+) -> tuple[str, str, list[Any], list[Any]]:
     selected_columns = list(dict.fromkeys(request.selected_columns))
     group_by = list(dict.fromkeys(request.group_by))
 
@@ -318,6 +373,9 @@ def build_query_builder_sql(
             "GROUP BY " + ", ".join(quote_identifier(column) for column in group_by)
         )
 
+    count_sql = f"SELECT COUNT(*) FROM ({' '.join(part for part in sql_parts if part)}) AS query_builder_count"
+    count_params = [*params]
+
     if request.order_by:
         sort_column = request.order_by.column
         sort_direction = request.order_by.direction.upper()
@@ -330,10 +388,11 @@ def build_query_builder_sql(
 
         sql_parts.append(f"ORDER BY {quote_identifier(sort_column)} {sort_direction}")
 
-    sql_parts.append("LIMIT ?")
+    sql_parts.append("LIMIT ? OFFSET ?")
     params.append(request.limit)
+    params.append((request.page - 1) * request.limit)
 
-    return " ".join(part for part in sql_parts if part), params
+    return " ".join(part for part in sql_parts if part), count_sql, params, count_params
 
 
 def normalize_query(sql: str) -> str:
@@ -448,21 +507,31 @@ def get_dataset(dataset_id: str) -> dict[str, Any]:
 def get_dataset_preview(
     dataset_id: str,
     limit: int = DEFAULT_PREVIEW_LIMIT,
+    page: int = 1,
+    sort_by: str | None = None,
+    sort_direction: str = "ASC",
 ) -> dict[str, Any]:
     if limit < 1 or limit > MAX_QUERY_LIMIT:
         raise HTTPException(
             status_code=400,
             detail=f"Preview limit must be between 1 and {MAX_QUERY_LIMIT}",
         )
+    if page < 1:
+        raise HTTPException(status_code=400, detail="Page must be 1 or greater")
 
+    metadata = get_dataset_metadata(dataset_id)
+    valid_columns = {column["name"] for column in metadata["schema"]}
+    order_by = SortDefinition(column=sort_by, direction=sort_direction) if sort_by else None
     with get_connection(dataset_id) as connection:
-        rows = fetch_preview(connection, limit)
+        rows = fetch_preview(connection, limit, page, order_by, valid_columns)
 
     return {
         "dataset_id": dataset_id,
         "rows": rows,
         "row_count": len(rows),
+        "total_count": metadata["row_count"],
         "limit": limit,
+        "page": page,
     }
 
 
@@ -487,11 +556,14 @@ def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
     with get_connection(dataset_id) as connection:
         try:
             where_clause, params = build_filter_where_clause(request.filters, valid_columns)
-            query = f"SELECT * FROM {TABLE_NAME} {where_clause} LIMIT ?"
+            order_clause = build_order_clause(request.order_by, valid_columns)
+            query = f"SELECT * FROM {TABLE_NAME} {where_clause} {order_clause} LIMIT ? OFFSET ?"
             count_query = f"SELECT COUNT(*) FROM {TABLE_NAME} {where_clause}"
-            preview_result = connection.execute(query, [*params, request.limit])
-            columns = [description[0] for description in preview_result.description]
-            rows = preview_result.fetchall()
+            preview_result = connection.execute(
+                query,
+                [*params, request.limit, (request.page - 1) * request.limit],
+            )
+            columns, rows = rows_to_dicts(preview_result)
             filtered_count = connection.execute(count_query, params).fetchone()[0]
         except duckdb.Error as error:
             raise HTTPException(status_code=400, detail=f"Filter failed: {error}") from error
@@ -499,10 +571,12 @@ def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
     return {
         "dataset_id": dataset_id,
         "columns": columns,
-        "rows": [dict(zip(columns, row)) for row in rows],
+        "rows": rows,
         "row_count": len(rows),
         "filtered_count": filtered_count,
+        "total_count": filtered_count,
         "limit": request.limit,
+        "page": request.page,
     }
 
 
@@ -513,20 +587,56 @@ def query_builder_dataset(dataset_id: str, request: QueryBuilderRequest) -> dict
 
     with get_connection(dataset_id) as connection:
         try:
-            sql, params = build_query_builder_sql(request, valid_columns)
+            sql, count_sql, params, count_params = build_query_builder_sql(request, valid_columns)
             result = connection.execute(sql, params)
-            columns = [description[0] for description in result.description]
-            rows = result.fetchall()
+            columns, rows = rows_to_dicts(result)
+            total_count = connection.execute(count_sql, count_params).fetchone()[0]
         except duckdb.Error as error:
             raise HTTPException(status_code=400, detail=f"Query builder failed: {error}") from error
 
     return {
         "dataset_id": dataset_id,
         "columns": columns,
-        "rows": [dict(zip(columns, row)) for row in rows],
+        "rows": rows,
         "row_count": len(rows),
+        "total_count": total_count,
         "limit": request.limit,
+        "page": request.page,
     }
+
+
+@app.post("/datasets/{dataset_id}/export")
+def export_dataset(dataset_id: str, request: ExportRequest) -> Response:
+    metadata = get_dataset_metadata(dataset_id)
+    valid_columns = {column["name"] for column in metadata["schema"]}
+    source = request.source.lower()
+
+    with get_connection(dataset_id) as connection:
+        try:
+            if source == "query_builder":
+                if not request.query_builder:
+                    raise HTTPException(status_code=400, detail="Query builder definition is required")
+
+                export_query = request.query_builder.model_copy(
+                    update={"page": 1, "limit": request.limit}
+                )
+                sql, _, params, _ = build_query_builder_sql(export_query, valid_columns)
+                result = connection.execute(sql, params)
+
+            elif source in ("preview", "filter"):
+                where_clause, params = build_filter_where_clause(request.filters, valid_columns)
+                order_clause = build_order_clause(request.order_by, valid_columns)
+                sql = f"SELECT * FROM {TABLE_NAME} {where_clause} {order_clause} LIMIT ?"
+                result = connection.execute(sql, [*params, request.limit])
+
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported export source")
+
+            columns, rows = rows_to_dicts(result)
+        except duckdb.Error as error:
+            raise HTTPException(status_code=400, detail=f"Export failed: {error}") from error
+
+    return csv_response(columns, rows, f"{metadata['filename']}_export.csv")
 
 
 @app.post("/datasets/{dataset_id}/query")

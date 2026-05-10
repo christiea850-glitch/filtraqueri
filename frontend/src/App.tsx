@@ -2,6 +2,7 @@ import { type ChangeEvent, useState } from "react";
 import "./App.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
+const MAX_QUERY_LIMIT = 1000;
 
 type SchemaColumn = {
   name: string;
@@ -43,6 +44,9 @@ type FilterResponse = {
   columns: string[];
   rows: Record<string, unknown>[];
   filtered_count: number;
+  total_count: number;
+  page: number;
+  limit: number;
 };
 
 type AggregationState = {
@@ -54,6 +58,19 @@ type AggregationState = {
 type QueryBuilderResponse = {
   columns: string[];
   rows: Record<string, unknown>[];
+  total_count: number;
+  page: number;
+  limit: number;
+};
+
+type SortDirection = "ASC" | "DESC";
+
+type HistoryItem = {
+  id: number;
+  timestamp: string;
+  action: string;
+  detail: string;
+  resultCount: number;
 };
 
 function App() {
@@ -63,19 +80,30 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
   const [isRunningQuery, setIsRunningQuery] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [filteredCount, setFilteredCount] = useState<number | null>(null);
   const [filterValues, setFilterValues] = useState<Record<string, FilterState>>({});
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewRowsPerPage, setPreviewRowsPerPage] = useState(25);
+  const [previewSortColumn, setPreviewSortColumn] = useState("");
+  const [previewSortDirection, setPreviewSortDirection] = useState<SortDirection>("ASC");
+  const [previewTotalCount, setPreviewTotalCount] = useState(0);
   const [querySelectedColumns, setQuerySelectedColumns] = useState<string[]>([]);
   const [queryGroupBy, setQueryGroupBy] = useState<string[]>([]);
   const [queryAggregations, setQueryAggregations] = useState<AggregationState[]>([
     { id: 1, function: "COUNT", column: "" },
   ]);
   const [querySortColumn, setQuerySortColumn] = useState("");
-  const [querySortDirection, setQuerySortDirection] = useState<"ASC" | "DESC">("ASC");
+  const [querySortDirection, setQuerySortDirection] = useState<SortDirection>("ASC");
   const [queryLimit, setQueryLimit] = useState("100");
   const [queryResultColumns, setQueryResultColumns] = useState<string[]>([]);
   const [queryResultRows, setQueryResultRows] = useState<Record<string, unknown>[]>([]);
+  const [queryPage, setQueryPage] = useState(1);
+  const [queryRowsPerPage, setQueryRowsPerPage] = useState(25);
+  const [queryTotalCount, setQueryTotalCount] = useState(0);
   const [hasRunQuery, setHasRunQuery] = useState(false);
+  const [activeResultSource, setActiveResultSource] = useState<"preview" | "query">("preview");
+  const [queryHistory, setQueryHistory] = useState<HistoryItem[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -90,6 +118,11 @@ function App() {
     setColumns([]);
     setFilterValues({});
     setFilteredCount(null);
+    setPreviewPage(1);
+    setPreviewRowsPerPage(25);
+    setPreviewSortColumn("");
+    setPreviewSortDirection("ASC");
+    setPreviewTotalCount(0);
     setQuerySelectedColumns([]);
     setQueryGroupBy([]);
     setQueryAggregations([{ id: 1, function: "COUNT", column: "" }]);
@@ -97,7 +130,12 @@ function App() {
     setQuerySortDirection("ASC");
     setQueryResultColumns([]);
     setQueryResultRows([]);
+    setQueryPage(1);
+    setQueryRowsPerPage(25);
+    setQueryTotalCount(0);
     setHasRunQuery(false);
+    setActiveResultSource("preview");
+    setQueryHistory([]);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -119,6 +157,7 @@ function App() {
       setData(uploadResult.preview);
       setColumns(uploadResult.dataset.schema.map((column) => column.name));
       setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
+      setPreviewTotalCount(uploadResult.dataset.row_count);
       setFilteredCount(null);
     } catch (error) {
       const message =
@@ -164,6 +203,19 @@ function App() {
     ...(activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns),
     ...activeAggregations.map(aggregationAlias),
   ];
+
+  const addHistory = (action: string, detail: string, resultCount: number) => {
+    setQueryHistory((currentHistory) => [
+      {
+        id: Date.now(),
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        action,
+        detail,
+        resultCount,
+      },
+      ...currentHistory.slice(0, 7),
+    ]);
+  };
 
   const buildBackendFilters = () => {
     if (!dataset) return [];
@@ -216,6 +268,38 @@ function App() {
       );
   };
 
+  const activeFilters = buildBackendFilters();
+
+  const activeFilterLabels = activeFilters.map((filter) => {
+    if ("values" in filter && Array.isArray(filter.values) && filter.values.length > 0) {
+      return `${filter.column}: ${filter.values.join(", ")}`;
+    }
+    if ("value" in filter && filter.value !== null) return `${filter.column}: ${filter.value}`;
+    if ("start" in filter || "end" in filter) {
+      return `${filter.column}: ${filter.start || "any"} to ${filter.end || "any"}`;
+    }
+    if ("min" in filter || "max" in filter) {
+      return `${filter.column}: ${filter.min || "min"} to ${filter.max || "max"}`;
+    }
+    return filter.column;
+  });
+
+  const schemaTypeSummary = dataset
+    ? dataset.schema.reduce<Record<string, number>>((summary, column) => {
+        summary[column.inferred_type] = (summary[column.inferred_type] || 0) + 1;
+        return summary;
+      }, {})
+    : {};
+
+  const resultRows = activeResultSource === "query" ? queryResultRows : data;
+  const resultColumns = activeResultSource === "query" ? queryResultColumns : columns;
+  const resultPage = activeResultSource === "query" ? queryPage : previewPage;
+  const resultRowsPerPage =
+    activeResultSource === "query" ? queryRowsPerPage : previewRowsPerPage;
+  const resultTotalCount =
+    activeResultSource === "query" ? queryTotalCount : filteredCount ?? previewTotalCount;
+  const resultTotalPages = Math.max(1, Math.ceil((resultTotalCount || 0) / resultRowsPerPage));
+
   const applyFilters = async () => {
     if (!dataset) return;
 
@@ -230,7 +314,14 @@ function App() {
         },
         body: JSON.stringify({
           filters: buildBackendFilters(),
-          limit: 25,
+          limit: previewRowsPerPage,
+          page: 1,
+          order_by: previewSortColumn
+            ? {
+                column: previewSortColumn,
+                direction: previewSortDirection,
+              }
+            : null,
         }),
       });
       const payload = await response.json();
@@ -243,6 +334,14 @@ function App() {
       setData(filterResult.rows);
       setColumns(filterResult.columns);
       setFilteredCount(filterResult.filtered_count);
+      setPreviewTotalCount(filterResult.total_count);
+      setPreviewPage(1);
+      setActiveResultSource("preview");
+      addHistory(
+        "Filters",
+        activeFilterLabels.length > 0 ? activeFilterLabels.join("; ") : "No filters",
+        filterResult.filtered_count,
+      );
     } catch (error) {
       const message =
         error instanceof Error
@@ -271,7 +370,8 @@ function App() {
         },
         body: JSON.stringify({
           filters: [],
-          limit: 25,
+          limit: previewRowsPerPage,
+          page: 1,
         }),
       });
       const payload = await response.json();
@@ -284,11 +384,70 @@ function App() {
       setData(filterResult.rows);
       setColumns(filterResult.columns);
       setFilteredCount(null);
+      setPreviewTotalCount(filterResult.total_count);
+      setPreviewPage(1);
+      setActiveResultSource("preview");
+      addHistory("Reset", "Cleared all filters", filterResult.total_count);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : "We could not reset the filters. Please try again.";
+
+      setErrorMessage(message);
+    } finally {
+      setIsFiltering(false);
+    }
+  };
+
+  const loadPreviewPage = async (
+    page: number,
+    rowsPerPage = previewRowsPerPage,
+    sortColumn = previewSortColumn,
+    sortDirection = previewSortDirection,
+  ) => {
+    if (!dataset) return;
+
+    setIsFiltering(true);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/filter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          filters: buildBackendFilters(),
+          limit: rowsPerPage,
+          page,
+          order_by: sortColumn
+            ? {
+                column: sortColumn,
+                direction: sortDirection,
+              }
+            : null,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.detail || "Preview could not be loaded.");
+      }
+
+      const filterResult = payload as FilterResponse;
+      setData(filterResult.rows);
+      setColumns(filterResult.columns);
+      setFilteredCount(filterResult.filtered_count);
+      setPreviewTotalCount(filterResult.total_count);
+      setPreviewPage(filterResult.page);
+      setPreviewRowsPerPage(filterResult.limit);
+      setActiveResultSource("preview");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "We could not load that page. Please try again.";
 
       setErrorMessage(message);
     } finally {
@@ -323,7 +482,8 @@ function App() {
                 direction: querySortDirection,
               }
             : null,
-          limit: Number(queryLimit) || 100,
+          limit: Number(queryLimit) || queryRowsPerPage,
+          page: 1,
         }),
       });
       const payload = await response.json();
@@ -335,6 +495,17 @@ function App() {
       const queryResult = payload as QueryBuilderResponse;
       setQueryResultColumns(queryResult.columns);
       setQueryResultRows(queryResult.rows);
+      setQueryTotalCount(queryResult.total_count);
+      setQueryPage(1);
+      setQueryRowsPerPage(queryResult.limit);
+      setActiveResultSource("query");
+      addHistory(
+        "Query builder",
+        activeAggregations.length > 0
+          ? `${activeAggregations.length} aggregation${activeAggregations.length === 1 ? "" : "s"}`
+          : `${querySelectedColumns.length} visible columns`,
+        queryResult.total_count,
+      );
     } catch (error) {
       const message =
         error instanceof Error
@@ -366,6 +537,180 @@ function App() {
     setQueryAggregations((currentAggregations) =>
       currentAggregations.filter((aggregation) => aggregation.id !== id),
     );
+  };
+
+  const loadQueryPage = async (
+    page: number,
+    rowsPerPage = queryRowsPerPage,
+    sortColumn = querySortColumn,
+    sortDirection = querySortDirection,
+  ) => {
+    if (!dataset) return;
+
+    setIsRunningQuery(true);
+    setErrorMessage("");
+    setHasRunQuery(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/query-builder`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
+          group_by: queryGroupBy,
+          aggregations: activeAggregations.map((aggregation) => ({
+            function: aggregation.function,
+            column: aggregation.column || null,
+          })),
+          filters: buildBackendFilters(),
+          order_by: sortColumn
+            ? {
+                column: sortColumn,
+                direction: sortDirection,
+              }
+            : null,
+          limit: rowsPerPage,
+          page,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.detail || "Query page could not be loaded.");
+      }
+
+      const queryResult = payload as QueryBuilderResponse;
+      setQueryResultColumns(queryResult.columns);
+      setQueryResultRows(queryResult.rows);
+      setQueryTotalCount(queryResult.total_count);
+      setQueryPage(queryResult.page);
+      setQueryRowsPerPage(queryResult.limit);
+      setActiveResultSource("query");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "We could not load that query page. Please try again.";
+
+      setErrorMessage(message);
+    } finally {
+      setIsRunningQuery(false);
+    }
+  };
+
+  const exportCurrentResults = async () => {
+    if (!dataset) return;
+
+    setIsExporting(true);
+    setErrorMessage("");
+
+    try {
+      const isQueryExport = activeResultSource === "query" && hasRunQuery;
+      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/export`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(
+          isQueryExport
+            ? {
+                source: "query_builder",
+                limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
+                query_builder: {
+                  selected_columns:
+                    activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
+                  group_by: queryGroupBy,
+                  aggregations: activeAggregations.map((aggregation) => ({
+                    function: aggregation.function,
+                    column: aggregation.column || null,
+                  })),
+                  filters: buildBackendFilters(),
+                  order_by: querySortColumn
+                    ? {
+                        column: querySortColumn,
+                        direction: querySortDirection,
+                      }
+                    : null,
+                  limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
+                  page: 1,
+                },
+              }
+            : {
+                source: "filter",
+                filters: buildBackendFilters(),
+                order_by: previewSortColumn
+                  ? {
+                      column: previewSortColumn,
+                      direction: previewSortDirection,
+                    }
+                  : null,
+                limit: MAX_QUERY_LIMIT,
+              },
+        ),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload.detail || "Export could not be created.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${dataset.filename.replace(/\.csv$/i, "")}_export.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      addHistory("Export", isQueryExport ? "Exported query result" : "Exported filtered result", resultTotalCount);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "We could not export the current results.";
+
+      setErrorMessage(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const sortWorkspaceColumn = (column: string) => {
+    if (activeResultSource === "query") {
+      const nextDirection =
+        querySortColumn === column && querySortDirection === "ASC" ? "DESC" : "ASC";
+      setQuerySortColumn(column);
+      setQuerySortDirection(nextDirection);
+      loadQueryPage(1, queryRowsPerPage, column, nextDirection);
+      return;
+    }
+
+    const nextDirection =
+      previewSortColumn === column && previewSortDirection === "ASC" ? "DESC" : "ASC";
+    setPreviewSortColumn(column);
+    setPreviewSortDirection(nextDirection);
+    loadPreviewPage(1, previewRowsPerPage, column, nextDirection);
+  };
+
+  const changeWorkspacePage = (page: number) => {
+    const nextPage = Math.min(Math.max(page, 1), resultTotalPages);
+    if (activeResultSource === "query") {
+      loadQueryPage(nextPage);
+      return;
+    }
+
+    loadPreviewPage(nextPage);
+  };
+
+  const changeWorkspaceRowsPerPage = (rowsPerPage: number) => {
+    if (activeResultSource === "query") {
+      setQueryRowsPerPage(rowsPerPage);
+      setQueryLimit(String(rowsPerPage));
+      loadQueryPage(1, rowsPerPage);
+      return;
+    }
+
+    setPreviewRowsPerPage(rowsPerPage);
+    loadPreviewPage(1, rowsPerPage);
   };
 
   return (
@@ -717,85 +1062,197 @@ function App() {
           </section>
         )}
 
-        {hasRunQuery && !isRunningQuery && queryResultRows.length === 0 && (
-          <section className="empty-state" aria-label="No query results">
-            <p className="section-label">Query results</p>
-            <h2>No rows returned</h2>
-            <p>Try selecting more columns, broadening filters, or increasing the row limit.</p>
-          </section>
-        )}
+        {dataset && (
+          <section className="workspace-grid" aria-label="Data exploration workspace">
+            <aside className="session-panel">
+              <div>
+                <p className="section-label">Session</p>
+                <h2>{dataset.original_filename}</h2>
+              </div>
+              <div className="session-stat-list">
+                <span>{dataset.table_name}</span>
+                <strong>{dataset.row_count.toLocaleString()} rows</strong>
+                <strong>{dataset.column_count.toLocaleString()} columns</strong>
+              </div>
+              <div className="schema-type-list">
+                {Object.entries(schemaTypeSummary).map(([type, count]) => (
+                  <span key={type}>
+                    {type}
+                    <strong>{count}</strong>
+                  </span>
+                ))}
+              </div>
+              <div className="active-context">
+                <p>Active filters</p>
+                {activeFilterLabels.length > 0 ? (
+                  activeFilterLabels.map((label) => <span key={label}>{label}</span>)
+                ) : (
+                  <small>No filters applied</small>
+                )}
+              </div>
+              <div className="active-context">
+                <p>Active groupings</p>
+                {queryGroupBy.length > 0 ? (
+                  queryGroupBy.map((column) => <span key={column}>{column}</span>)
+                ) : (
+                  <small>No grouped query active</small>
+                )}
+              </div>
+            </aside>
 
-        {queryResultRows.length > 0 && (
-          <section className="preview-section" aria-label="Query results">
-            <div className="preview-heading">
-              <p className="section-label">Query results</p>
-              <p>Showing {queryResultRows.length.toLocaleString()} generated rows</p>
-            </div>
+            <section className="data-grid-section">
+              <div className="data-grid-toolbar">
+                <div>
+                  <p className="section-label">Data grid</p>
+                  <h2>{activeResultSource === "query" ? "Query results" : "Dataset preview"}</h2>
+                  <p>
+                    {resultTotalCount.toLocaleString()} rows available, showing{" "}
+                    {resultRows.length.toLocaleString()}
+                  </p>
+                </div>
+                <div className="workspace-actions">
+                  <div className="result-toggle" aria-label="Result source">
+                    <button
+                      type="button"
+                      className={activeResultSource === "preview" ? "is-active" : ""}
+                      onClick={() => setActiveResultSource("preview")}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className={activeResultSource === "query" ? "is-active" : ""}
+                      onClick={() => setActiveResultSource("query")}
+                      disabled={!hasRunQuery}
+                    >
+                      Query
+                    </button>
+                  </div>
+                  <button type="button" className="secondary-button" onClick={exportCurrentResults}>
+                    {isExporting ? "Exporting..." : "Export CSV"}
+                  </button>
+                </div>
+              </div>
 
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    {queryResultColumns.map((column) => (
-                      <th key={column}>{column}</th>
-                    ))}
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {queryResultRows.map((row, index) => (
-                    <tr key={index}>
-                      {queryResultColumns.map((column) => (
-                        <td key={column}>{String(row[column] ?? "")}</td>
-                      ))}
-                    </tr>
+              {activeFilterLabels.length > 0 && (
+                <div className="active-filter-bar">
+                  {activeFilterLabels.map((label) => (
+                    <span key={label}>{label}</span>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                </div>
+              )}
 
-        {dataset && data.length === 0 && !isFiltering && (
-          <section className="empty-state" aria-label="No matching rows">
-            <p className="section-label">Preview</p>
-            <h2>No rows match the current filters</h2>
-            <p>Reset the filters or broaden your selections to see preview rows.</p>
-          </section>
-        )}
+              {(isFiltering || isRunningQuery) && (
+                <p className="status-message">Loading rows from DuckDB...</p>
+              )}
 
-        {data.length > 0 && (
-          <section className="preview-section" aria-label="Dataset preview">
-            <div className="preview-heading">
-              <p className="section-label">Preview</p>
-              <p>
-                Showing {data.length.toLocaleString()} backend-generated rows
-                {filteredCount !== null &&
-                  ` from ${filteredCount.toLocaleString()} matching rows`}
-              </p>
-            </div>
+              {resultRows.length === 0 && !isFiltering && !isRunningQuery ? (
+                <div className="empty-state compact-empty">
+                  <p className="section-label">
+                    {activeResultSource === "query" ? "Query results" : "Preview"}
+                  </p>
+                  <h2>No rows returned</h2>
+                  <p>Adjust filters, sorting, or query builder settings and try again.</p>
+                </div>
+              ) : (
+                <div className="table-container data-grid-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        {resultColumns.map((column) => {
+                          const activeSortColumn =
+                            activeResultSource === "query" ? querySortColumn : previewSortColumn;
+                          const activeSortDirection =
+                            activeResultSource === "query"
+                              ? querySortDirection
+                              : previewSortDirection;
 
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    {columns.map((column) => (
-                      <th key={column}>{column}</th>
-                    ))}
-                  </tr>
-                </thead>
+                          return (
+                            <th key={column}>
+                              <button type="button" onClick={() => sortWorkspaceColumn(column)}>
+                                {column}
+                                {activeSortColumn === column && (
+                                  <span>{activeSortDirection === "ASC" ? " ↑" : " ↓"}</span>
+                                )}
+                              </button>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
 
-                <tbody>
-                  {data.map((row, index) => (
-                    <tr key={index}>
-                      {columns.map((column) => (
-                        <td key={column}>{String(row[column] ?? "")}</td>
+                    <tbody>
+                      {resultRows.map((row, index) => (
+                        <tr key={index}>
+                          {resultColumns.map((column) => (
+                            <td key={column}>{String(row[column] ?? "")}</td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="pagination-bar">
+                <div>
+                  <span>Rows per page</span>
+                  <select
+                    value={resultRowsPerPage}
+                    onChange={(event) => changeWorkspaceRowsPerPage(Number(event.target.value))}
+                  >
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+                <div className="page-controls">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => changeWorkspacePage(resultPage - 1)}
+                    disabled={resultPage <= 1}
+                  >
+                    Previous
+                  </button>
+                  <span>
+                    Page {resultPage} of {resultTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => changeWorkspacePage(resultPage + 1)}
+                    disabled={resultPage >= resultTotalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <aside className="history-panel">
+              <div>
+                <p className="section-label">History</p>
+                <h2>Query activity</h2>
+              </div>
+              {queryHistory.length === 0 ? (
+                <p className="history-empty">Run filters or queries to build a session trail.</p>
+              ) : (
+                <div className="history-list">
+                  {queryHistory.map((item) => (
+                    <article key={item.id}>
+                      <div>
+                        <strong>{item.action}</strong>
+                        <time>{item.timestamp}</time>
+                      </div>
+                      <p>{item.detail}</p>
+                      <span>{item.resultCount.toLocaleString()} rows</span>
+                    </article>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              )}
+            </aside>
           </section>
         )}
       </div>
