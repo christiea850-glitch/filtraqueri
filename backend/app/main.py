@@ -29,6 +29,8 @@ BLOCKED_SQL_KEYWORDS = (
     "copy",
     "attach",
 )
+ALLOWED_AGGREGATIONS = {"COUNT", "SUM", "AVG", "MIN", "MAX"}
+ALLOWED_SORT_DIRECTIONS = {"ASC", "DESC"}
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,6 +69,26 @@ class FilterRequest(BaseModel):
     limit: int = Field(DEFAULT_PREVIEW_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
 
 
+class AggregationDefinition(BaseModel):
+    function: str
+    column: str | None = None
+    alias: str | None = None
+
+
+class SortDefinition(BaseModel):
+    column: str
+    direction: str = "ASC"
+
+
+class QueryBuilderRequest(BaseModel):
+    selected_columns: list[str] = Field(default_factory=list)
+    group_by: list[str] = Field(default_factory=list)
+    aggregations: list[AggregationDefinition] = Field(default_factory=list)
+    filters: list[FilterDefinition] = Field(default_factory=list)
+    order_by: SortDefinition | None = None
+    limit: int = Field(DEFAULT_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
+
+
 def sanitize_filename(filename: str) -> str:
     clean_name = Path(filename).name
     return re.sub(r"[^A-Za-z0-9._-]", "_", clean_name) or "dataset.csv"
@@ -75,6 +97,10 @@ def sanitize_filename(filename: str) -> str:
 def quote_identifier(identifier: str) -> str:
     escaped_identifier = identifier.replace('"', '""')
     return f'"{escaped_identifier}"'
+
+
+def safe_alias(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_]", "_", value).strip("_").lower() or "result"
 
 
 def get_connection(dataset_id: str) -> duckdb.DuckDBPyConnection:
@@ -225,6 +251,89 @@ def build_filter_where_clause(
         return "", []
 
     return f"WHERE {' AND '.join(conditions)}", params
+
+
+def build_query_builder_sql(
+    request: QueryBuilderRequest,
+    valid_columns: set[str],
+) -> tuple[str, list[Any]]:
+    selected_columns = list(dict.fromkeys(request.selected_columns))
+    group_by = list(dict.fromkeys(request.group_by))
+
+    for column in [*selected_columns, *group_by]:
+        if column not in valid_columns:
+            raise HTTPException(status_code=400, detail=f"Unknown column: {column}")
+
+    select_parts: list[str] = []
+    output_columns: set[str] = set()
+
+    for column in selected_columns:
+        select_parts.append(quote_identifier(column))
+        output_columns.add(column)
+
+    for column in group_by:
+        if column not in output_columns:
+            select_parts.append(quote_identifier(column))
+            output_columns.add(column)
+
+    for index, aggregation in enumerate(request.aggregations):
+        function = aggregation.function.upper()
+
+        if function not in ALLOWED_AGGREGATIONS:
+            raise HTTPException(status_code=400, detail=f"Unsupported aggregation: {function}")
+
+        if function == "COUNT" and not aggregation.column:
+            expression = "COUNT(*)"
+            default_alias = "count_rows"
+        else:
+            if not aggregation.column or aggregation.column not in valid_columns:
+                raise HTTPException(status_code=400, detail="Aggregation column is required")
+
+            expression = f"{function}({quote_identifier(aggregation.column)})"
+            default_alias = f"{function.lower()}_{safe_alias(aggregation.column)}"
+
+        alias = safe_alias(aggregation.alias or default_alias)
+        if alias in output_columns:
+            alias = f"{alias}_{index + 1}"
+
+        select_parts.append(f"{expression} AS {quote_identifier(alias)}")
+        output_columns.add(alias)
+
+    if not select_parts:
+        select_parts.append("*")
+        output_columns.update(valid_columns)
+
+    non_grouped_columns = [column for column in selected_columns if column not in group_by]
+    if request.aggregations and non_grouped_columns:
+        raise HTTPException(
+            status_code=400,
+            detail="Selected columns must also be grouped when aggregations are used",
+        )
+
+    where_clause, params = build_filter_where_clause(request.filters, valid_columns)
+    sql_parts = [f"SELECT {', '.join(select_parts)} FROM {TABLE_NAME}", where_clause]
+
+    if group_by:
+        sql_parts.append(
+            "GROUP BY " + ", ".join(quote_identifier(column) for column in group_by)
+        )
+
+    if request.order_by:
+        sort_column = request.order_by.column
+        sort_direction = request.order_by.direction.upper()
+
+        if sort_direction not in ALLOWED_SORT_DIRECTIONS:
+            raise HTTPException(status_code=400, detail="Sort direction must be ASC or DESC")
+
+        if sort_column not in output_columns and sort_column not in valid_columns:
+            raise HTTPException(status_code=400, detail=f"Unknown sort column: {sort_column}")
+
+        sql_parts.append(f"ORDER BY {quote_identifier(sort_column)} {sort_direction}")
+
+    sql_parts.append("LIMIT ?")
+    params.append(request.limit)
+
+    return " ".join(part for part in sql_parts if part), params
 
 
 def normalize_query(sql: str) -> str:
@@ -393,6 +502,29 @@ def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
         "rows": [dict(zip(columns, row)) for row in rows],
         "row_count": len(rows),
         "filtered_count": filtered_count,
+        "limit": request.limit,
+    }
+
+
+@app.post("/datasets/{dataset_id}/query-builder")
+def query_builder_dataset(dataset_id: str, request: QueryBuilderRequest) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    valid_columns = {column["name"] for column in metadata["schema"]}
+
+    with get_connection(dataset_id) as connection:
+        try:
+            sql, params = build_query_builder_sql(request, valid_columns)
+            result = connection.execute(sql, params)
+            columns = [description[0] for description in result.description]
+            rows = result.fetchall()
+        except duckdb.Error as error:
+            raise HTTPException(status_code=400, detail=f"Query builder failed: {error}") from error
+
+    return {
+        "dataset_id": dataset_id,
+        "columns": columns,
+        "rows": [dict(zip(columns, row)) for row in rows],
+        "row_count": len(rows),
         "limit": request.limit,
     }
 
