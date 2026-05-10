@@ -51,9 +51,30 @@ class QueryRequest(BaseModel):
     limit: int = Field(DEFAULT_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
 
 
+class FilterDefinition(BaseModel):
+    column: str
+    type: str
+    min: int | float | str | None = None
+    max: int | float | str | None = None
+    values: list[str] | None = None
+    value: bool | None = None
+    start: str | None = None
+    end: str | None = None
+
+
+class FilterRequest(BaseModel):
+    filters: list[FilterDefinition] = Field(default_factory=list)
+    limit: int = Field(DEFAULT_PREVIEW_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
+
+
 def sanitize_filename(filename: str) -> str:
     clean_name = Path(filename).name
     return re.sub(r"[^A-Za-z0-9._-]", "_", clean_name) or "dataset.csv"
+
+
+def quote_identifier(identifier: str) -> str:
+    escaped_identifier = identifier.replace('"', '""')
+    return f'"{escaped_identifier}"'
 
 
 def get_connection(dataset_id: str) -> duckdb.DuckDBPyConnection:
@@ -75,6 +96,73 @@ def fetch_schema(connection: duckdb.DuckDBPyConnection) -> list[dict[str, str]]:
     return [{"name": row[1], "type": row[2]} for row in rows]
 
 
+def infer_column_type(duckdb_type: str, unique_count: int, row_count: int) -> str:
+    normalized_type = duckdb_type.upper()
+
+    if "BOOL" in normalized_type:
+        return "boolean"
+
+    if any(token in normalized_type for token in ("DATE", "TIME")):
+        return "date"
+
+    if any(
+        token in normalized_type
+        for token in ("INT", "DECIMAL", "DOUBLE", "FLOAT", "REAL", "NUMERIC")
+    ):
+        return "numeric"
+
+    if unique_count <= 50 and (row_count == 0 or unique_count / row_count < 0.8):
+        return "categorical"
+
+    return "text"
+
+
+def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+    schema = fetch_schema(connection)
+    row_count = connection.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+    profiles: list[dict[str, Any]] = []
+
+    for column in schema:
+        column_name = column["name"]
+        column_type = column["type"]
+        identifier = quote_identifier(column_name)
+        null_count = connection.execute(
+            f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE {identifier} IS NULL"
+        ).fetchone()[0]
+        unique_count = connection.execute(
+            f"SELECT COUNT(DISTINCT {identifier}) FROM {TABLE_NAME}"
+        ).fetchone()[0]
+        sample_rows = connection.execute(
+            f"""
+            SELECT DISTINCT {identifier}
+            FROM {TABLE_NAME}
+            WHERE {identifier} IS NOT NULL
+            LIMIT 12
+            """
+        ).fetchall()
+        sample_values = [row[0] for row in sample_rows]
+        inferred_type = infer_column_type(column_type, unique_count, row_count)
+        profile: dict[str, Any] = {
+            "name": column_name,
+            "type": column_type,
+            "inferred_type": inferred_type,
+            "null_count": null_count,
+            "unique_count": unique_count,
+            "sample_values": sample_values,
+        }
+
+        if inferred_type in ("numeric", "date"):
+            minimum, maximum = connection.execute(
+                f"SELECT MIN({identifier}), MAX({identifier}) FROM {TABLE_NAME}"
+            ).fetchone()
+            profile["min"] = minimum
+            profile["max"] = maximum
+
+        profiles.append(profile)
+
+    return profiles
+
+
 def fetch_preview(
     connection: duckdb.DuckDBPyConnection,
     limit: int = DEFAULT_PREVIEW_LIMIT,
@@ -89,6 +177,54 @@ def table_stats(connection: duckdb.DuckDBPyConnection) -> tuple[int, int]:
     row_count = connection.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
     column_count = len(fetch_schema(connection))
     return row_count, column_count
+
+
+def build_filter_where_clause(
+    filters: list[FilterDefinition],
+    valid_columns: set[str],
+) -> tuple[str, list[Any]]:
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    for filter_item in filters:
+        if filter_item.column not in valid_columns:
+            raise HTTPException(status_code=400, detail=f"Unknown column: {filter_item.column}")
+
+        identifier = quote_identifier(filter_item.column)
+        filter_type = filter_item.type.lower()
+
+        if filter_type == "numeric":
+            if filter_item.min not in (None, ""):
+                conditions.append(f"{identifier} >= ?")
+                params.append(filter_item.min)
+            if filter_item.max not in (None, ""):
+                conditions.append(f"{identifier} <= ?")
+                params.append(filter_item.max)
+
+        elif filter_type in ("categorical", "text"):
+            values = [value for value in (filter_item.values or []) if value != ""]
+            if values:
+                placeholders = ", ".join("?" for _ in values)
+                conditions.append(f"{identifier} IN ({placeholders})")
+                params.extend(values)
+
+        elif filter_type == "date":
+            if filter_item.start:
+                conditions.append(f"{identifier} >= ?")
+                params.append(filter_item.start)
+            if filter_item.end:
+                conditions.append(f"{identifier} <= ?")
+                params.append(filter_item.end)
+
+        elif filter_type == "boolean":
+            if filter_item.value is not None:
+                conditions.append(f"{identifier} = ?")
+                params.append(filter_item.value)
+
+    if not conditions:
+        return "", []
+
+    return f"WHERE {' AND '.join(conditions)}", params
 
 
 def normalize_query(sql: str) -> str:
@@ -163,7 +299,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
                 f"CREATE TABLE {TABLE_NAME} AS SELECT * FROM read_csv_auto(?, HEADER=TRUE)",
                 [str(uploaded_path)],
             )
-            schema = fetch_schema(connection)
+            schema = profile_dataset(connection)
             preview = fetch_preview(connection)
             row_count, column_count = table_stats(connection)
 
@@ -229,7 +365,35 @@ def get_dataset_schema(dataset_id: str) -> dict[str, Any]:
         "dataset_id": dataset_id,
         "table_name": metadata["table_name"],
         "schema": metadata["schema"],
+        "profiles": metadata["schema"],
         "column_count": metadata["column_count"],
+    }
+
+
+@app.post("/datasets/{dataset_id}/filter")
+def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    valid_columns = {column["name"] for column in metadata["schema"]}
+
+    with get_connection(dataset_id) as connection:
+        try:
+            where_clause, params = build_filter_where_clause(request.filters, valid_columns)
+            query = f"SELECT * FROM {TABLE_NAME} {where_clause} LIMIT ?"
+            count_query = f"SELECT COUNT(*) FROM {TABLE_NAME} {where_clause}"
+            preview_result = connection.execute(query, [*params, request.limit])
+            columns = [description[0] for description in preview_result.description]
+            rows = preview_result.fetchall()
+            filtered_count = connection.execute(count_query, params).fetchone()[0]
+        except duckdb.Error as error:
+            raise HTTPException(status_code=400, detail=f"Filter failed: {error}") from error
+
+    return {
+        "dataset_id": dataset_id,
+        "columns": columns,
+        "rows": [dict(zip(columns, row)) for row in rows],
+        "row_count": len(rows),
+        "filtered_count": filtered_count,
+        "limit": request.limit,
     }
 
 
