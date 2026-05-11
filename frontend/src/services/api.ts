@@ -1,95 +1,17 @@
+import type { UploadResponse } from "../features/dataset/datasetTypes";
+import type {
+  FilterDefinition,
+  FilterRequest,
+  FilterResponse,
+  SortDefinition,
+} from "../features/filters/filterTypes";
+import type {
+  QueryBuilderRequest,
+  QueryBuilderResponse,
+} from "../features/query-builder/queryBuilderTypes";
+import type { PreviewOptions } from "../features/results/resultTypes";
+
 const API_BASE_URL = "http://127.0.0.1:8000";
-
-export type SortDirection = "ASC" | "DESC";
-
-export type SchemaColumn = {
-  name: string;
-  type: string;
-  inferred_type: "text" | "numeric" | "date" | "boolean" | "categorical";
-  null_count: number;
-  unique_count: number;
-  sample_values: unknown[];
-  min?: number | string;
-  max?: number | string;
-};
-
-export type DatasetMetadata = {
-  dataset_id: string;
-  filename: string;
-  original_filename: string;
-  table_name: string;
-  uploaded_at: string;
-  row_count: number;
-  column_count: number;
-  schema: SchemaColumn[];
-};
-
-export type UploadResponse = {
-  dataset: DatasetMetadata;
-  preview: Record<string, unknown>[];
-};
-
-export type FilterDefinition = {
-  column: string;
-  type: string;
-  min?: string | number | null;
-  max?: string | number | null;
-  values?: string[];
-  value?: boolean | null;
-  start?: string | null;
-  end?: string | null;
-};
-
-export type SortDefinition = {
-  column: string;
-  direction: SortDirection;
-};
-
-export type FilterRequest = {
-  filters: FilterDefinition[];
-  limit: number;
-  page: number;
-  order_by?: SortDefinition | null;
-};
-
-export type FilterResponse = {
-  columns: string[];
-  rows: Record<string, unknown>[];
-  filtered_count: number;
-  total_count: number;
-  page: number;
-  limit: number;
-};
-
-export type AggregationDefinition = {
-  function: "COUNT" | "SUM" | "AVG" | "MIN" | "MAX";
-  column: string | null;
-};
-
-export type QueryBuilderRequest = {
-  selected_columns: string[];
-  group_by: string[];
-  aggregations: AggregationDefinition[];
-  filters: FilterDefinition[];
-  order_by?: SortDefinition | null;
-  limit: number;
-  page: number;
-};
-
-export type QueryBuilderResponse = {
-  columns: string[];
-  rows: Record<string, unknown>[];
-  total_count: number;
-  page: number;
-  limit: number;
-};
-
-export type PreviewOptions = {
-  limit?: number;
-  page?: number;
-  sort_by?: string;
-  sort_direction?: SortDirection;
-};
 
 export type ExportRequest = {
   source: "filter" | "preview" | "query_builder";

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-
-type SortDirection = "ASC" | "DESC";
+import type { SortDirection } from "../../features/results/resultTypes";
 
 type ResultsGridProps = {
   title: string;

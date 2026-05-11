@@ -1,90 +1,28 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
 import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuilderPanel";
-import ResultTabs, { type ResultTabKey } from "./components/results/ResultTabs";
+import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
+import type {
+  ActiveView,
+  DatasetMetadata,
+  DatasetSession,
+  WorkspaceMode,
+} from "./features/dataset/datasetTypes";
+import type { FilterState } from "./features/filters/filterTypes";
+import type { HistoryItem } from "./features/history/historyTypes";
+import type { AggregationState } from "./features/query-builder/queryBuilderTypes";
+import type { ResultState, ResultTabKey, SortDirection } from "./features/results/resultTypes";
 import {
   exportDataset,
   filterDataset,
   runQueryBuilder,
   uploadDataset,
-  type DatasetMetadata,
-  type SortDirection,
 } from "./services/api";
 import "./App.css";
 
 const MAX_QUERY_LIMIT = 1000;
-
-type FilterState = {
-  min?: string;
-  max?: string;
-  values?: string[];
-  value?: string;
-  start?: string;
-  end?: string;
-};
-
-type AggregationState = {
-  id: number;
-  function: "COUNT" | "SUM" | "AVG" | "MIN" | "MAX";
-  column: string;
-};
-
-type HistoryItem = {
-  id: number;
-  timestamp: string;
-  action: string;
-  detail: string;
-  resultCount: number;
-};
-
-type ResultState = {
-  columns: string[];
-  rows: Record<string, unknown>[];
-  totalCount: number;
-  page: number;
-  rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: SortDirection;
-};
-
-type DatasetSession = {
-  dataset: DatasetMetadata;
-  lastActiveView: ActiveView;
-  lastActiveResultTab: ResultTabKey;
-  previewResult: ResultState;
-  filteredResult: ResultState;
-  queriedResult: ResultState;
-  filterValues: Record<string, FilterState>;
-  querySelectedColumns: string[];
-  queryGroupBy: string[];
-  queryAggregations: AggregationState[];
-  querySortColumn: string;
-  querySortDirection: SortDirection;
-  queryLimit: string;
-  hasRunQuery: boolean;
-  activeResultTab: ResultTabKey;
-  queryHistory: HistoryItem[];
-};
-
-type ActiveView =
-  | "welcome"
-  | "dataset"
-  | "filters"
-  | "queryBuilder"
-  | "results"
-  | "history"
-  | "export"
-  | "settings"
-  | "sqlWorkspace"
-  | "savedQueries"
-  | "queryExplain"
-  | "dataCleaning"
-  | "diagnostics"
-  | "normalization";
-
-type WorkspaceMode = "human" | "analyst";
 
 const createEmptyResultState = (): ResultState => ({
   columns: [],

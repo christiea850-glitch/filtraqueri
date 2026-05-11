@@ -1,4 +1,4 @@
-export type ResultTabKey = "preview" | "filtered" | "queried";
+import type { ResultTabKey } from "../../features/results/resultTypes";
 
 type ResultTabsProps = {
   activeTab: ResultTabKey;

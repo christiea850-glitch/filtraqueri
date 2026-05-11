@@ -1,22 +1,5 @@
-type SchemaColumn = {
-  name: string;
-  type: string;
-  inferred_type: "text" | "numeric" | "date" | "boolean" | "categorical";
-  null_count: number;
-  unique_count: number;
-  sample_values: unknown[];
-  min?: number | string;
-  max?: number | string;
-};
-
-type FilterState = {
-  min?: string;
-  max?: string;
-  values?: string[];
-  value?: string;
-  start?: string;
-  end?: string;
-};
+import type { SchemaColumn } from "../../features/dataset/datasetTypes";
+import type { FilterState } from "../../features/filters/filterTypes";
 
 type DynamicFiltersPanelProps = {
   schema: SchemaColumn[];

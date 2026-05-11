@@ -1,15 +1,6 @@
-type SchemaColumn = {
-  name: string;
-  inferred_type: "text" | "numeric" | "date" | "boolean" | "categorical";
-};
-
-type AggregationState = {
-  id: number;
-  function: "COUNT" | "SUM" | "AVG" | "MIN" | "MAX";
-  column: string;
-};
-
-type SortDirection = "ASC" | "DESC";
+import type { SchemaColumn } from "../../features/dataset/datasetTypes";
+import type { AggregationState } from "../../features/query-builder/queryBuilderTypes";
+import type { SortDirection } from "../../features/results/resultTypes";
 
 type VisualQueryBuilderPanelProps = {
   schema: SchemaColumn[];
