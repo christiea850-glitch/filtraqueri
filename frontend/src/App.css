@@ -932,7 +932,8 @@ h1 span:last-child {
   align-items: center;
 }
 
-.result-toggle {
+.result-toggle,
+.result-tabs {
   display: inline-flex;
   padding: 4px;
   border: 1px solid #dbe5ef;
@@ -940,7 +941,8 @@ h1 span:last-child {
   background: #f8fafc;
 }
 
-.result-toggle button {
+.result-toggle button,
+.result-tabs button {
   min-height: 32px;
   padding: 0 11px;
   border: 0;
@@ -953,12 +955,14 @@ h1 span:last-child {
   cursor: pointer;
 }
 
-.result-toggle button.is-active {
+.result-toggle button.is-active,
+.result-tabs button.is-active {
   background: #0f172a;
   color: white;
 }
 
 .result-toggle button:disabled,
+.result-tabs button:disabled,
 .primary-button:disabled,
 .secondary-button:disabled {
   cursor: not-allowed;

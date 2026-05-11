@@ -1,6 +1,7 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
 import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuilderPanel";
+import ResultTabs, { type ResultTabKey } from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
 import "./App.css";
@@ -77,6 +78,16 @@ type HistoryItem = {
   resultCount: number;
 };
 
+type ResultState = {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  totalCount: number;
+  page: number;
+  rowsPerPage: number;
+  sortColumn: string;
+  sortDirection: SortDirection;
+};
+
 type ActiveView =
   | "welcome"
   | "dataset"
@@ -87,25 +98,31 @@ type ActiveView =
   | "export"
   | "settings";
 
+const createEmptyResultState = (): ResultState => ({
+  columns: [],
+  rows: [],
+  totalCount: 0,
+  page: 1,
+  rowsPerPage: 25,
+  sortColumn: "",
+  sortDirection: "ASC",
+});
+
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("welcome");
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
-  const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const [columns, setColumns] = useState<string[]>([]);
+  const [activeResultTab, setActiveResultTab] = useState<ResultTabKey>("preview");
+  const [previewResult, setPreviewResult] = useState<ResultState>(createEmptyResultState);
+  const [filteredResult, setFilteredResult] = useState<ResultState>(createEmptyResultState);
+  const [queriedResult, setQueriedResult] = useState<ResultState>(createEmptyResultState);
   const [isUploading, setIsUploading] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
   const [isRunningQuery, setIsRunningQuery] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [filteredCount, setFilteredCount] = useState<number | null>(null);
   const [filterValues, setFilterValues] = useState<Record<string, FilterState>>({});
-  const [previewPage, setPreviewPage] = useState(1);
-  const [previewRowsPerPage, setPreviewRowsPerPage] = useState(25);
-  const [previewSortColumn, setPreviewSortColumn] = useState("");
-  const [previewSortDirection, setPreviewSortDirection] = useState<SortDirection>("ASC");
-  const [previewTotalCount, setPreviewTotalCount] = useState(0);
   const [querySelectedColumns, setQuerySelectedColumns] = useState<string[]>([]);
   const [queryGroupBy, setQueryGroupBy] = useState<string[]>([]);
   const [queryAggregations, setQueryAggregations] = useState<AggregationState[]>([
@@ -114,13 +131,7 @@ function App() {
   const [querySortColumn, setQuerySortColumn] = useState("");
   const [querySortDirection, setQuerySortDirection] = useState<SortDirection>("ASC");
   const [queryLimit, setQueryLimit] = useState("100");
-  const [queryResultColumns, setQueryResultColumns] = useState<string[]>([]);
-  const [queryResultRows, setQueryResultRows] = useState<Record<string, unknown>[]>([]);
-  const [queryPage, setQueryPage] = useState(1);
-  const [queryRowsPerPage, setQueryRowsPerPage] = useState(25);
-  const [queryTotalCount, setQueryTotalCount] = useState(0);
   const [hasRunQuery, setHasRunQuery] = useState(false);
-  const [activeResultSource, setActiveResultSource] = useState<"preview" | "query">("preview");
   const [queryHistory, setQueryHistory] = useState<HistoryItem[]>([]);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -133,27 +144,17 @@ function App() {
     setIsUploading(true);
     setErrorMessage("");
     setDataset(null);
-    setData([]);
-    setColumns([]);
+    setActiveResultTab("preview");
+    setPreviewResult(createEmptyResultState());
+    setFilteredResult(createEmptyResultState());
+    setQueriedResult(createEmptyResultState());
     setFilterValues({});
-    setFilteredCount(null);
-    setPreviewPage(1);
-    setPreviewRowsPerPage(25);
-    setPreviewSortColumn("");
-    setPreviewSortDirection("ASC");
-    setPreviewTotalCount(0);
     setQuerySelectedColumns([]);
     setQueryGroupBy([]);
     setQueryAggregations([{ id: 1, function: "COUNT", column: "" }]);
     setQuerySortColumn("");
     setQuerySortDirection("ASC");
-    setQueryResultColumns([]);
-    setQueryResultRows([]);
-    setQueryPage(1);
-    setQueryRowsPerPage(25);
-    setQueryTotalCount(0);
     setHasRunQuery(false);
-    setActiveResultSource("preview");
     setQueryHistory([]);
 
     const formData = new FormData();
@@ -172,12 +173,21 @@ function App() {
       }
 
       const uploadResult = payload as UploadResponse;
+      const uploadColumns = uploadResult.dataset.schema.map((column) => column.name);
       setDataset(uploadResult.dataset);
-      setData(uploadResult.preview);
-      setColumns(uploadResult.dataset.schema.map((column) => column.name));
+      setPreviewResult({
+        columns: uploadColumns,
+        rows: uploadResult.preview,
+        totalCount: uploadResult.dataset.row_count,
+        page: 1,
+        rowsPerPage: 25,
+        sortColumn: "",
+        sortDirection: "ASC",
+      });
+      setFilteredResult(createEmptyResultState());
+      setQueriedResult(createEmptyResultState());
       setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
-      setPreviewTotalCount(uploadResult.dataset.row_count);
-      setFilteredCount(null);
+      setActiveResultTab("preview");
       setActiveView("results");
     } catch (error) {
       const message =
@@ -306,14 +316,20 @@ function App() {
       }, {})
     : {};
 
-  const resultRows = activeResultSource === "query" ? queryResultRows : data;
-  const resultColumns = activeResultSource === "query" ? queryResultColumns : columns;
-  const resultPage = activeResultSource === "query" ? queryPage : previewPage;
-  const resultRowsPerPage =
-    activeResultSource === "query" ? queryRowsPerPage : previewRowsPerPage;
-  const resultTotalCount =
-    activeResultSource === "query" ? queryTotalCount : filteredCount ?? previewTotalCount;
+  const activeResult =
+    activeResultTab === "queried"
+      ? queriedResult
+      : activeResultTab === "filtered"
+        ? filteredResult
+        : previewResult;
+  const resultRows = activeResult.rows;
+  const resultColumns = activeResult.columns;
+  const resultPage = activeResult.page;
+  const resultRowsPerPage = activeResult.rowsPerPage;
+  const resultTotalCount = activeResult.totalCount;
   const resultTotalPages = Math.max(1, Math.ceil((resultTotalCount || 0) / resultRowsPerPage));
+  const hasFilteredResults = filteredResult.columns.length > 0;
+  const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
 
   const applyFilters = async () => {
     if (!dataset) return;
@@ -329,12 +345,12 @@ function App() {
         },
         body: JSON.stringify({
           filters: buildBackendFilters(),
-          limit: previewRowsPerPage,
+          limit: filteredResult.rowsPerPage,
           page: 1,
-          order_by: previewSortColumn
+          order_by: filteredResult.sortColumn
             ? {
-                column: previewSortColumn,
-                direction: previewSortDirection,
+                column: filteredResult.sortColumn,
+                direction: filteredResult.sortDirection,
               }
             : null,
         }),
@@ -346,12 +362,15 @@ function App() {
       }
 
       const filterResult = payload as FilterResponse;
-      setData(filterResult.rows);
-      setColumns(filterResult.columns);
-      setFilteredCount(filterResult.filtered_count);
-      setPreviewTotalCount(filterResult.total_count);
-      setPreviewPage(1);
-      setActiveResultSource("preview");
+      setFilteredResult((currentResult) => ({
+        ...currentResult,
+        columns: filterResult.columns,
+        rows: filterResult.rows,
+        totalCount: filterResult.total_count,
+        page: 1,
+        rowsPerPage: filterResult.limit,
+      }));
+      setActiveResultTab("filtered");
       addHistory(
         "Filters",
         activeFilterLabels.length > 0 ? activeFilterLabels.join("; ") : "No filters",
@@ -385,7 +404,7 @@ function App() {
         },
         body: JSON.stringify({
           filters: [],
-          limit: previewRowsPerPage,
+          limit: previewResult.rowsPerPage,
           page: 1,
         }),
       });
@@ -396,12 +415,16 @@ function App() {
       }
 
       const filterResult = payload as FilterResponse;
-      setData(filterResult.rows);
-      setColumns(filterResult.columns);
-      setFilteredCount(null);
-      setPreviewTotalCount(filterResult.total_count);
-      setPreviewPage(1);
-      setActiveResultSource("preview");
+      setPreviewResult((currentResult) => ({
+        ...currentResult,
+        columns: filterResult.columns,
+        rows: filterResult.rows,
+        totalCount: filterResult.total_count,
+        page: 1,
+        rowsPerPage: filterResult.limit,
+      }));
+      setFilteredResult(createEmptyResultState());
+      setActiveResultTab("preview");
       addHistory("Reset", "Cleared all filters", filterResult.total_count);
     } catch (error) {
       const message =
@@ -417,9 +440,9 @@ function App() {
 
   const loadPreviewPage = async (
     page: number,
-    rowsPerPage = previewRowsPerPage,
-    sortColumn = previewSortColumn,
-    sortDirection = previewSortDirection,
+    rowsPerPage = activeResult.rowsPerPage,
+    sortColumn = activeResult.sortColumn,
+    sortDirection = activeResult.sortDirection,
   ) => {
     if (!dataset) return;
 
@@ -433,7 +456,7 @@ function App() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          filters: buildBackendFilters(),
+          filters: activeResultTab === "filtered" ? buildBackendFilters() : [],
           limit: rowsPerPage,
           page,
           order_by: sortColumn
@@ -451,13 +474,21 @@ function App() {
       }
 
       const filterResult = payload as FilterResponse;
-      setData(filterResult.rows);
-      setColumns(filterResult.columns);
-      setFilteredCount(filterResult.filtered_count);
-      setPreviewTotalCount(filterResult.total_count);
-      setPreviewPage(filterResult.page);
-      setPreviewRowsPerPage(filterResult.limit);
-      setActiveResultSource("preview");
+      const nextResult = {
+        columns: filterResult.columns,
+        rows: filterResult.rows,
+        totalCount: filterResult.total_count,
+        page: filterResult.page,
+        rowsPerPage: filterResult.limit,
+        sortColumn,
+        sortDirection,
+      };
+
+      if (activeResultTab === "filtered") {
+        setFilteredResult(nextResult);
+      } else {
+        setPreviewResult(nextResult);
+      }
     } catch (error) {
       const message =
         error instanceof Error
@@ -497,7 +528,7 @@ function App() {
                 direction: querySortDirection,
               }
             : null,
-          limit: Number(queryLimit) || queryRowsPerPage,
+          limit: Number(queryLimit) || queriedResult.rowsPerPage,
           page: 1,
         }),
       });
@@ -508,12 +539,17 @@ function App() {
       }
 
       const queryResult = payload as QueryBuilderResponse;
-      setQueryResultColumns(queryResult.columns);
-      setQueryResultRows(queryResult.rows);
-      setQueryTotalCount(queryResult.total_count);
-      setQueryPage(1);
-      setQueryRowsPerPage(queryResult.limit);
-      setActiveResultSource("query");
+      setQueriedResult((currentResult) => ({
+        ...currentResult,
+        columns: queryResult.columns,
+        rows: queryResult.rows,
+        totalCount: queryResult.total_count,
+        page: 1,
+        rowsPerPage: queryResult.limit,
+        sortColumn: querySortColumn,
+        sortDirection: querySortDirection,
+      }));
+      setActiveResultTab("queried");
       addHistory(
         "Query builder",
         activeAggregations.length > 0
@@ -556,7 +592,7 @@ function App() {
 
   const loadQueryPage = async (
     page: number,
-    rowsPerPage = queryRowsPerPage,
+    rowsPerPage = queriedResult.rowsPerPage,
     sortColumn = querySortColumn,
     sortDirection = querySortDirection,
   ) => {
@@ -597,12 +633,16 @@ function App() {
       }
 
       const queryResult = payload as QueryBuilderResponse;
-      setQueryResultColumns(queryResult.columns);
-      setQueryResultRows(queryResult.rows);
-      setQueryTotalCount(queryResult.total_count);
-      setQueryPage(queryResult.page);
-      setQueryRowsPerPage(queryResult.limit);
-      setActiveResultSource("query");
+      setQueriedResult({
+        columns: queryResult.columns,
+        rows: queryResult.rows,
+        totalCount: queryResult.total_count,
+        page: queryResult.page,
+        rowsPerPage: queryResult.limit,
+        sortColumn,
+        sortDirection,
+      });
+      setActiveResultTab("queried");
     } catch (error) {
       const message =
         error instanceof Error
@@ -622,7 +662,8 @@ function App() {
     setErrorMessage("");
 
     try {
-      const isQueryExport = activeResultSource === "query" && hasRunQuery;
+      const isQueryExport = activeResultTab === "queried" && hasRunQuery;
+      const isFilteredExport = activeResultTab === "filtered";
       const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/export`, {
         method: "POST",
         headers: {
@@ -654,11 +695,11 @@ function App() {
               }
             : {
                 source: "filter",
-                filters: buildBackendFilters(),
-                order_by: previewSortColumn
+                filters: isFilteredExport ? buildBackendFilters() : [],
+                order_by: activeResult.sortColumn
                   ? {
-                      column: previewSortColumn,
-                      direction: previewSortDirection,
+                      column: activeResult.sortColumn,
+                      direction: activeResult.sortDirection,
                     }
                   : null,
                 limit: MAX_QUERY_LIMIT,
@@ -690,25 +731,23 @@ function App() {
   };
 
   const sortWorkspaceColumn = (column: string) => {
-    if (activeResultSource === "query") {
+    if (activeResultTab === "queried") {
       const nextDirection =
-        querySortColumn === column && querySortDirection === "ASC" ? "DESC" : "ASC";
+        queriedResult.sortColumn === column && queriedResult.sortDirection === "ASC" ? "DESC" : "ASC";
       setQuerySortColumn(column);
       setQuerySortDirection(nextDirection);
-      loadQueryPage(1, queryRowsPerPage, column, nextDirection);
+      loadQueryPage(1, queriedResult.rowsPerPage, column, nextDirection);
       return;
     }
 
     const nextDirection =
-      previewSortColumn === column && previewSortDirection === "ASC" ? "DESC" : "ASC";
-    setPreviewSortColumn(column);
-    setPreviewSortDirection(nextDirection);
-    loadPreviewPage(1, previewRowsPerPage, column, nextDirection);
+      activeResult.sortColumn === column && activeResult.sortDirection === "ASC" ? "DESC" : "ASC";
+    loadPreviewPage(1, activeResult.rowsPerPage, column, nextDirection);
   };
 
   const changeWorkspacePage = (page: number) => {
     const nextPage = Math.min(Math.max(page, 1), resultTotalPages);
-    if (activeResultSource === "query") {
+    if (activeResultTab === "queried") {
       loadQueryPage(nextPage);
       return;
     }
@@ -717,14 +756,12 @@ function App() {
   };
 
   const changeWorkspaceRowsPerPage = (rowsPerPage: number) => {
-    if (activeResultSource === "query") {
-      setQueryRowsPerPage(rowsPerPage);
+    if (activeResultTab === "queried") {
       setQueryLimit(String(rowsPerPage));
       loadQueryPage(1, rowsPerPage);
       return;
     }
 
-    setPreviewRowsPerPage(rowsPerPage);
     loadPreviewPage(1, rowsPerPage);
   };
 
@@ -928,19 +965,21 @@ function App() {
             </aside>
 
             <ResultsGrid
-              title={activeResultSource === "query" ? "Query results" : "Dataset preview"}
+              title={
+                activeResultTab === "queried"
+                  ? "Query results"
+                  : activeResultTab === "filtered"
+                    ? "Filtered results"
+                    : "Preview results"
+              }
               label="Data grid"
               columns={resultColumns}
               rows={resultRows}
               totalCount={resultTotalCount}
               loading={isFiltering || isRunningQuery}
               activeFilterLabels={activeFilterLabels}
-              activeSortColumn={
-                activeResultSource === "query" ? querySortColumn : previewSortColumn
-              }
-              activeSortDirection={
-                activeResultSource === "query" ? querySortDirection : previewSortDirection
-              }
+              activeSortColumn={activeResult.sortColumn}
+              activeSortDirection={activeResult.sortDirection}
               page={resultPage}
               totalPages={resultTotalPages}
               rowsPerPage={resultRowsPerPage}
@@ -951,23 +990,12 @@ function App() {
               onRowsPerPageChange={changeWorkspaceRowsPerPage}
               toolbarActions={
                 <div className="workspace-actions">
-                  <div className="result-toggle" aria-label="Result source">
-                    <button
-                      type="button"
-                      className={activeResultSource === "preview" ? "is-active" : ""}
-                      onClick={() => setActiveResultSource("preview")}
-                    >
-                      Preview
-                    </button>
-                    <button
-                      type="button"
-                      className={activeResultSource === "query" ? "is-active" : ""}
-                      onClick={() => setActiveResultSource("query")}
-                      disabled={!hasRunQuery}
-                    >
-                      Query
-                    </button>
-                  </div>
+                  <ResultTabs
+                    activeTab={activeResultTab}
+                    hasFilteredResults={hasFilteredResults}
+                    hasQueryResults={hasQueryResults}
+                    onTabChange={setActiveResultTab}
+                  />
                   <button type="button" className="secondary-button" onClick={exportCurrentResults}>
                     {isExporting ? "Exporting..." : "Export CSV"}
                   </button>
@@ -1039,7 +1067,7 @@ function App() {
                 <p className="section-label">Export</p>
                 <h2>Export current results</h2>
                 <p>
-                  Export the active {activeResultSource === "query" ? "query" : "filtered preview"}{" "}
+                  Export the active {activeResultTab === "queried" ? "query" : activeResultTab}{" "}
                   result as CSV.
                 </p>
               </div>
