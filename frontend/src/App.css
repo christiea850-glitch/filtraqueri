@@ -218,6 +218,13 @@ body {
   font-weight: 800;
 }
 
+.selected-file-name {
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .standalone-panel {
   max-width: 760px;
 }

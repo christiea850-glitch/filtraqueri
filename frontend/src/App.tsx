@@ -1,5 +1,6 @@
-import { type ChangeEvent, useRef, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import ResultsGrid from "./components/results/ResultsGrid";
+import UploadPanel from "./components/upload/UploadPanel";
 import "./App.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -88,6 +89,8 @@ function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("welcome");
+  const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -124,6 +127,7 @@ function App() {
 
     if (!file) return;
 
+    setSelectedFileName(file.name);
     setIsUploading(true);
     setErrorMessage("");
     setDataset(null);
@@ -727,6 +731,13 @@ function App() {
     loadPreviewPage(1, rowsPerPage);
   };
 
+  useEffect(() => {
+    if (activeView === "welcome" && shouldOpenFilePicker) {
+      sidebarFileInputRef.current?.click();
+      setShouldOpenFilePicker(false);
+    }
+  }, [activeView, shouldOpenFilePicker]);
+
   return (
     <div className="app">
       <header className="top-menu-bar">
@@ -762,19 +773,11 @@ function App() {
             className="sidebar-primary"
             onClick={() => {
               setActiveView("welcome");
-              sidebarFileInputRef.current?.click();
+              setShouldOpenFilePicker(true);
             }}
           >
             Open File
           </button>
-          <input
-            ref={sidebarFileInputRef}
-            className="sidebar-file-input"
-            type="file"
-            accept=".csv"
-            onChange={handleFileUpload}
-            disabled={isUploading}
-          />
           <nav>
             {[
               ["welcome", "Welcome"],
@@ -804,31 +807,15 @@ function App() {
           )}
 
           {activeView === "welcome" && (
-            <section className="welcome-screen">
-              <div className="welcome-copy">
-                <p className="section-label">Workspace</p>
-                <h2>Welcome to FiltraQueri</h2>
-                <p>Simple Data Intelligence for Everyone</p>
-                <div className="welcome-actions">
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={() => sidebarFileInputRef.current?.click()}
-                  >
-                    Upload CSV to start
-                  </button>
-                  <button type="button" className="secondary-button">
-                    Open recent dataset
-                  </button>
-                  <button type="button" className="secondary-button">
-                    Try sample dataset
-                  </button>
-                </div>
-                <p className="welcome-note">Ask your data naturally</p>
-                {isUploading && <p className="status-message">Uploading and profiling your dataset...</p>}
-                {errorMessage && <p className="error-message">{errorMessage}</p>}
-              </div>
-            </section>
+            <UploadPanel
+              ref={sidebarFileInputRef}
+              uploading={isUploading}
+              errorMessage={errorMessage}
+              selectedFileName={selectedFileName}
+              buttonLabel="Upload CSV to start"
+              context="Ask your data naturally"
+              onFileChange={handleFileUpload}
+            />
           )}
 
         {dataset && activeView === "dataset" && (
