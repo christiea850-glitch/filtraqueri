@@ -128,7 +128,9 @@ function VisualQueryBuilderPanel({
         <span>{selectedColumns.length} visible columns</span>
         <span>{groupBy.length} grouped columns</span>
         <span>{activeAggregations.length} active aggregations</span>
-        <span>{sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}</span>
+        <span title={sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}>
+          {sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}
+        </span>
         <span>{rowLimit || "No"} row limit</span>
       </div>
 
@@ -380,12 +382,17 @@ function VisualQueryBuilderPanel({
             <div>
               <span>Columns</span>
               <strong>{selectedColumns.length || "Grouped result"}</strong>
-              <p>{selectedColumns.slice(0, 6).join(", ") || "Visible columns use groupings when aggregations are active."}</p>
+              <p title={selectedColumns.join(", ")}>
+                {selectedColumns.slice(0, 6).join(", ") ||
+                  "Visible columns use groupings when aggregations are active."}
+              </p>
             </div>
             <div>
               <span>Grouping</span>
               <strong>{groupBy.length || "None"}</strong>
-              <p>{groupBy.join(", ") || "Rows will not be grouped unless you choose group fields."}</p>
+              <p title={groupBy.join(", ")}>
+                {groupBy.join(", ") || "Rows will not be grouped unless you choose group fields."}
+              </p>
             </div>
             <div>
               <span>Aggregations</span>
@@ -399,7 +406,9 @@ function VisualQueryBuilderPanel({
             <div>
               <span>Sort and limit</span>
               <strong>{rowLimit || "No limit"}</strong>
-              <p>{sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting selected."}</p>
+              <p title={sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting selected."}>
+                {sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting selected."}
+              </p>
             </div>
           </div>
         </div>

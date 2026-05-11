@@ -53,7 +53,7 @@ type WorkspaceShellProps = {
   onRecentDatasetClick: (datasetId: string) => void;
 };
 
-const menuItems = ["File", "Edit", "View", "Dataset", "Tools", "Help"];
+const menuItems = ["View", "Tools", "Help"];
 
 const workspaceHubs: HubItem[] = [
   {

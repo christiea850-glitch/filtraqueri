@@ -53,10 +53,10 @@ export function DatasetSessionPanel({
     <aside className="session-panel">
       <div>
         <p className="section-label">Session</p>
-        <h2>{dataset.original_filename}</h2>
+        <h2 title={dataset.original_filename}>{dataset.original_filename}</h2>
       </div>
       <div className="session-stat-list">
-        <span>{dataset.table_name}</span>
+        <span title={dataset.table_name}>{dataset.table_name}</span>
         <strong>{dataset.row_count.toLocaleString()} rows</strong>
         <strong>{dataset.column_count.toLocaleString()} columns</strong>
       </div>
@@ -71,7 +71,11 @@ export function DatasetSessionPanel({
       <div className="active-context">
         <p>Active filters</p>
         {activeFilterLabels.length > 0 ? (
-          activeFilterLabels.map((label) => <span key={label}>{label}</span>)
+          activeFilterLabels.map((label) => (
+            <span key={label} title={label}>
+              {label}
+            </span>
+          ))
         ) : (
           <small>No filters applied</small>
         )}
@@ -79,7 +83,11 @@ export function DatasetSessionPanel({
       <div className="active-context">
         <p>Active groupings</p>
         {queryGroupBy.length > 0 ? (
-          queryGroupBy.map((column) => <span key={column}>{column}</span>)
+          queryGroupBy.map((column) => (
+            <span key={column} title={column}>
+              {column}
+            </span>
+          ))
         ) : (
           <small>No grouped query active</small>
         )}
