@@ -9,6 +9,7 @@ import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuild
 import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
+import SqlWorkspace from "./features/analyst/sql/SqlWorkspace";
 import type {
   ActiveView,
   DatasetMetadata,
@@ -914,11 +915,13 @@ function App() {
     ),
   };
 
-  const analystViewRegistry: Partial<Record<ActiveView, () => ReactNode>> =
-    analystViews.reduce<Partial<Record<ActiveView, () => ReactNode>>>((registry, item) => {
+  const analystViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
+    ...analystViews.reduce<Partial<Record<ActiveView, () => ReactNode>>>((registry, item) => {
       registry[item.view] = () => renderAnalystView(item.view);
       return registry;
-    }, {});
+    }, {}),
+    sqlWorkspace: () => (dataset ? <SqlWorkspace dataset={dataset} /> : null),
+  };
 
   const workspaceViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
     ...humanViewRegistry,

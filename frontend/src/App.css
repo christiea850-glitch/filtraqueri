@@ -1261,6 +1261,139 @@ h1 span:last-child {
   font-weight: 650;
 }
 
+.sql-workspace {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.sql-context-panel,
+.sql-editor-panel,
+.sql-preview-panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #dbe5ef;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.sql-context-panel h2,
+.sql-editor-toolbar h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 19px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.sql-schema-list {
+  display: flex;
+  max-height: 360px;
+  margin-top: 18px;
+  overflow: auto;
+}
+
+.sql-main-panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sql-editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.sql-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sql-editor-input {
+  width: 100%;
+  min-height: 300px;
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  outline: none;
+  resize: vertical;
+  background: #0f172a;
+  color: #e5eefb;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  tab-size: 2;
+}
+
+.sql-editor-input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+
+.sql-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.sql-draft-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.sql-draft-list p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.sql-draft-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sql-draft-list button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sql-draft-list strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.sql-draft-list span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .table-container {
   overflow-x: auto;
   border: 1px solid #e2e8f0;
@@ -1405,6 +1538,24 @@ tr:hover {
 
   .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sql-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-editor-toolbar,
+  .sql-actions,
+  .sql-editor-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sql-actions,
+  .sql-actions .primary-button,
+  .sql-actions .secondary-button,
+  .sql-actions .text-button {
+    width: 100%;
   }
 
   .data-grid-toolbar,
