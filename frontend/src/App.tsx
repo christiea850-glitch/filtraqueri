@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import DatasetSummaryPanel, {
   DatasetSessionPanel,
 } from "./components/dataset/DatasetSummaryPanel";
@@ -789,6 +789,201 @@ function App() {
     }
   }, [activeView, shouldOpenFilePicker]);
 
+  const renderNoDatasetView = () => (
+    <section className="empty-state">
+      <p className="section-label">No dataset</p>
+      <h2>Open a CSV file to activate this workspace view</h2>
+      <p>Use the sidebar Open File action or return to Welcome to upload a dataset.</p>
+    </section>
+  );
+
+  const renderAnalystView = (view: ActiveView) => {
+    if (workspaceMode !== "analyst") return null;
+
+    return (
+      <section className="analyst-workspace-panel standalone-panel">
+        {analystViews
+          .filter((item) => item.view === view)
+          .map((item) => (
+            <div className="analyst-foundation" key={item.view}>
+              <p className="section-label">Analyst mode</p>
+              <h2>{item.label}</h2>
+              <p>{item.description}</p>
+              <div className="analyst-tool-grid">
+                {item.capabilities.map((capability) => (
+                  <article key={capability}>
+                    <strong>{capability}</strong>
+                    <span>Planned</span>
+                  </article>
+                ))}
+              </div>
+              <div className="analyst-empty-state">
+                <strong>Frontend foundation ready</strong>
+                <p>
+                  This workspace will reuse the active dataset session, results grid,
+                  result tabs, and query history when execution support is added.
+                </p>
+              </div>
+            </div>
+          ))}
+      </section>
+    );
+  };
+
+  const humanViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
+    welcome: () => (
+      <UploadPanel
+        ref={sidebarFileInputRef}
+        uploading={isUploading}
+        errorMessage={errorMessage}
+        selectedFileName={selectedFileName}
+        buttonLabel="Upload CSV to start"
+        context="Ask your data naturally"
+        onFileChange={handleFileUpload}
+      />
+    ),
+    dataset: () => (dataset ? <DatasetSummaryPanel dataset={dataset} /> : null),
+    filters: () =>
+      dataset ? (
+        <DynamicFiltersPanel
+          schema={dataset.schema}
+          filterValues={filterValues}
+          applying={isFiltering}
+          errorMessage={errorMessage}
+          onFilterChange={updateFilter}
+          onApplyFilters={applyFilters}
+          onResetFilters={resetFilters}
+        />
+      ) : null,
+    queryBuilder: () =>
+      dataset ? (
+        <VisualQueryBuilderPanel
+          schema={dataset.schema}
+          selectedColumns={querySelectedColumns}
+          groupBy={queryGroupBy}
+          aggregations={queryAggregations}
+          sortOptions={querySortOptions}
+          sortColumn={querySortColumn}
+          sortDirection={querySortDirection}
+          rowLimit={queryLimit}
+          running={isRunningQuery}
+          errorMessage={errorMessage}
+          onToggleSelectedColumn={(column) =>
+            setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
+          }
+          onGroupByChange={setQueryGroupBy}
+          onAddAggregation={addAggregation}
+          onUpdateAggregation={updateAggregation}
+          onRemoveAggregation={removeAggregation}
+          onSortColumnChange={setQuerySortColumn}
+          onSortDirectionChange={setQuerySortDirection}
+          onRowLimitChange={setQueryLimit}
+          onRunQuery={runVisualQuery}
+        />
+      ) : null,
+    results: () =>
+      dataset ? (
+        <section className="workspace-grid" aria-label="Data exploration workspace">
+          <DatasetSessionPanel
+            dataset={dataset}
+            schemaTypeSummary={schemaTypeSummary}
+            activeFilterLabels={activeFilterLabels}
+            queryGroupBy={queryGroupBy}
+          />
+
+          <ResultsGrid
+            title={
+              activeResultTab === "queried"
+                ? "Query results"
+                : activeResultTab === "filtered"
+                  ? "Filtered results"
+                  : "Preview results"
+            }
+            label="Data grid"
+            columns={resultColumns}
+            rows={resultRows}
+            totalCount={resultTotalCount}
+            loading={isFiltering || isRunningQuery}
+            activeFilterLabels={activeFilterLabels}
+            activeSortColumn={activeResult.sortColumn}
+            activeSortDirection={activeResult.sortDirection}
+            page={resultPage}
+            totalPages={resultTotalPages}
+            rowsPerPage={resultRowsPerPage}
+            emptyTitle="No rows returned"
+            emptyDescription="Adjust filters, sorting, or query builder settings and try again."
+            onSortColumn={sortWorkspaceColumn}
+            onPageChange={changeWorkspacePage}
+            onRowsPerPageChange={changeWorkspaceRowsPerPage}
+            toolbarActions={
+              <div className="workspace-actions">
+                <ResultTabs
+                  activeTab={activeResultTab}
+                  hasFilteredResults={hasFilteredResults}
+                  hasQueryResults={hasQueryResults}
+                  onTabChange={updateDatasetSessionResultTab}
+                />
+                <button type="button" className="secondary-button" onClick={exportCurrentResults}>
+                  {isExporting ? "Exporting..." : "Export CSV"}
+                </button>
+              </div>
+            }
+          />
+
+          <QueryHistoryPanel history={queryHistory} />
+        </section>
+      ) : null,
+    history: () =>
+      dataset ? <QueryHistoryPanel history={queryHistory} variant="standalone" /> : null,
+    export: () =>
+      dataset ? (
+        <section className="export-panel standalone-panel">
+          <div>
+            <p className="section-label">Export</p>
+            <h2>Export current results</h2>
+            <p>
+              Export the active {activeResultTab === "queried" ? "query" : activeResultTab}{" "}
+              result as CSV.
+            </p>
+          </div>
+          <button type="button" className="primary-button" onClick={exportCurrentResults}>
+            {isExporting ? "Exporting..." : "Export CSV"}
+          </button>
+        </section>
+      ) : null,
+    settings: () => (
+      <section className="settings-panel standalone-panel">
+        <div>
+          <p className="section-label">Settings</p>
+          <h2>Workspace settings</h2>
+          <p>Settings will live here as the workspace grows.</p>
+        </div>
+      </section>
+    ),
+  };
+
+  const analystViewRegistry: Partial<Record<ActiveView, () => ReactNode>> =
+    analystViews.reduce<Partial<Record<ActiveView, () => ReactNode>>>((registry, item) => {
+      registry[item.view] = () => renderAnalystView(item.view);
+      return registry;
+    }, {});
+
+  const workspaceViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
+    ...humanViewRegistry,
+    ...analystViewRegistry,
+  };
+
+  const renderWorkspaceView = () => {
+    const renderActiveView = workspaceViewRegistry[activeView];
+
+    return (
+      <>
+        {!dataset && activeView !== "welcome" && renderNoDatasetView()}
+        {renderActiveView?.()}
+      </>
+    );
+  };
+
   return (
     <WorkspaceShell
       activeView={activeView}
@@ -808,177 +1003,7 @@ function App() {
       }}
       onRecentDatasetClick={activateRecentDataset}
     >
-          {activeView === "welcome" && (
-            <UploadPanel
-              ref={sidebarFileInputRef}
-              uploading={isUploading}
-              errorMessage={errorMessage}
-              selectedFileName={selectedFileName}
-              buttonLabel="Upload CSV to start"
-              context="Ask your data naturally"
-              onFileChange={handleFileUpload}
-            />
-          )}
-
-        {dataset && activeView === "dataset" && <DatasetSummaryPanel dataset={dataset} />}
-
-        {dataset && activeView === "filters" && (
-          <DynamicFiltersPanel
-            schema={dataset.schema}
-            filterValues={filterValues}
-            applying={isFiltering}
-            errorMessage={errorMessage}
-            onFilterChange={updateFilter}
-            onApplyFilters={applyFilters}
-            onResetFilters={resetFilters}
-          />
-        )}
-
-        {dataset && activeView === "queryBuilder" && (
-          <VisualQueryBuilderPanel
-            schema={dataset.schema}
-            selectedColumns={querySelectedColumns}
-            groupBy={queryGroupBy}
-            aggregations={queryAggregations}
-            sortOptions={querySortOptions}
-            sortColumn={querySortColumn}
-            sortDirection={querySortDirection}
-            rowLimit={queryLimit}
-            running={isRunningQuery}
-            errorMessage={errorMessage}
-            onToggleSelectedColumn={(column) =>
-              setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
-            }
-            onGroupByChange={setQueryGroupBy}
-            onAddAggregation={addAggregation}
-            onUpdateAggregation={updateAggregation}
-            onRemoveAggregation={removeAggregation}
-            onSortColumnChange={setQuerySortColumn}
-            onSortDirectionChange={setQuerySortDirection}
-            onRowLimitChange={setQueryLimit}
-            onRunQuery={runVisualQuery}
-          />
-        )}
-
-        {dataset && activeView === "results" && (
-          <section className="workspace-grid" aria-label="Data exploration workspace">
-            <DatasetSessionPanel
-              dataset={dataset}
-              schemaTypeSummary={schemaTypeSummary}
-              activeFilterLabels={activeFilterLabels}
-              queryGroupBy={queryGroupBy}
-            />
-
-            <ResultsGrid
-              title={
-                activeResultTab === "queried"
-                  ? "Query results"
-                  : activeResultTab === "filtered"
-                    ? "Filtered results"
-                    : "Preview results"
-              }
-              label="Data grid"
-              columns={resultColumns}
-              rows={resultRows}
-              totalCount={resultTotalCount}
-              loading={isFiltering || isRunningQuery}
-              activeFilterLabels={activeFilterLabels}
-              activeSortColumn={activeResult.sortColumn}
-              activeSortDirection={activeResult.sortDirection}
-              page={resultPage}
-              totalPages={resultTotalPages}
-              rowsPerPage={resultRowsPerPage}
-              emptyTitle="No rows returned"
-              emptyDescription="Adjust filters, sorting, or query builder settings and try again."
-              onSortColumn={sortWorkspaceColumn}
-              onPageChange={changeWorkspacePage}
-              onRowsPerPageChange={changeWorkspaceRowsPerPage}
-              toolbarActions={
-                <div className="workspace-actions">
-                  <ResultTabs
-                    activeTab={activeResultTab}
-                    hasFilteredResults={hasFilteredResults}
-                    hasQueryResults={hasQueryResults}
-                    onTabChange={updateDatasetSessionResultTab}
-                  />
-                  <button type="button" className="secondary-button" onClick={exportCurrentResults}>
-                    {isExporting ? "Exporting..." : "Export CSV"}
-                  </button>
-                </div>
-              }
-            />
-
-            <QueryHistoryPanel history={queryHistory} />
-          </section>
-        )}
-
-          {!dataset && activeView !== "welcome" && (
-            <section className="empty-state">
-              <p className="section-label">No dataset</p>
-              <h2>Open a CSV file to activate this workspace view</h2>
-              <p>Use the sidebar Open File action or return to Welcome to upload a dataset.</p>
-            </section>
-          )}
-
-          {dataset && activeView === "history" && (
-            <QueryHistoryPanel history={queryHistory} variant="standalone" />
-          )}
-
-          {dataset && activeView === "export" && (
-            <section className="export-panel standalone-panel">
-              <div>
-                <p className="section-label">Export</p>
-                <h2>Export current results</h2>
-                <p>
-                  Export the active {activeResultTab === "queried" ? "query" : activeResultTab}{" "}
-                  result as CSV.
-                </p>
-              </div>
-              <button type="button" className="primary-button" onClick={exportCurrentResults}>
-                {isExporting ? "Exporting..." : "Export CSV"}
-              </button>
-            </section>
-          )}
-
-          {workspaceMode === "analyst" &&
-            analystViews.some((item) => item.view === activeView) && (
-              <section className="analyst-workspace-panel standalone-panel">
-                {analystViews
-                  .filter((item) => item.view === activeView)
-                  .map((item) => (
-                    <div className="analyst-foundation" key={item.view}>
-                      <p className="section-label">Analyst mode</p>
-                      <h2>{item.label}</h2>
-                      <p>{item.description}</p>
-                      <div className="analyst-tool-grid">
-                        {item.capabilities.map((capability) => (
-                          <article key={capability}>
-                            <strong>{capability}</strong>
-                            <span>Planned</span>
-                          </article>
-                        ))}
-                      </div>
-                      <div className="analyst-empty-state">
-                        <strong>Frontend foundation ready</strong>
-                        <p>
-                          This workspace will reuse the active dataset session, results grid,
-                          result tabs, and query history when execution support is added.
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-              </section>
-            )}
-
-          {activeView === "settings" && (
-            <section className="settings-panel standalone-panel">
-              <div>
-                <p className="section-label">Settings</p>
-                <h2>Workspace settings</h2>
-                <p>Settings will live here as the workspace grows.</p>
-              </div>
-            </section>
-          )}
+      {renderWorkspaceView()}
     </WorkspaceShell>
   );
 }
