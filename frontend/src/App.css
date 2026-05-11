@@ -667,6 +667,35 @@ h1 span:last-child {
   font-weight: 650;
 }
 
+.human-intent-panel {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #172033;
+}
+
+.human-intent-panel h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.human-intent-panel p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.human-intent-panel strong {
+  color: #1d4ed8;
+}
+
 .human-suggestion-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

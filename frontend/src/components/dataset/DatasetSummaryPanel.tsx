@@ -1,18 +1,33 @@
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 
+export type HumanIntent =
+  | "summary"
+  | "missing_values"
+  | "top_categories"
+  | "compare_columns"
+  | "trends"
+  | "unusual_values"
+  | "simple_chart";
+
+export type HumanGuidanceCard = {
+  intent: HumanIntent;
+  label: string;
+};
+
 type DatasetSummaryPanelProps = {
   dataset: DatasetMetadata;
   onViewPreview: () => void;
+  onHumanIntentSelect: (intent: HumanIntent) => void;
 };
 
-const humanGuidanceCards = [
-  "Summarize this dataset",
-  "Find missing values",
-  "Show top categories",
-  "Compare two columns",
-  "Find trends",
-  "Find unusual values",
-  "Create simple chart",
+export const humanGuidanceCards: HumanGuidanceCard[] = [
+  { intent: "summary", label: "Summarize this dataset" },
+  { intent: "missing_values", label: "Find missing values" },
+  { intent: "top_categories", label: "Show top categories" },
+  { intent: "compare_columns", label: "Compare two columns" },
+  { intent: "trends", label: "Find trends" },
+  { intent: "unusual_values", label: "Find unusual values" },
+  { intent: "simple_chart", label: "Create simple chart" },
 ];
 
 type DatasetSessionPanelProps = {
@@ -67,7 +82,11 @@ export function DatasetSessionPanel({
   );
 }
 
-function DatasetSummaryPanel({ dataset, onViewPreview }: DatasetSummaryPanelProps) {
+function DatasetSummaryPanel({
+  dataset,
+  onViewPreview,
+  onHumanIntentSelect,
+}: DatasetSummaryPanelProps) {
   return (
     <div className="human-dataset-workspace">
       <section className="dataset-summary" aria-label="Dataset metadata">
@@ -120,8 +139,12 @@ function DatasetSummaryPanel({ dataset, onViewPreview }: DatasetSummaryPanelProp
         </div>
         <div className="human-suggestion-grid">
           {humanGuidanceCards.map((suggestion) => (
-            <button type="button" key={suggestion}>
-              <strong>{suggestion}</strong>
+            <button
+              type="button"
+              key={suggestion.intent}
+              onClick={() => onHumanIntentSelect(suggestion.intent)}
+            >
+              <strong>{suggestion.label}</strong>
               <span>Human Mode</span>
             </button>
           ))}

@@ -1,6 +1,7 @@
 import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import DatasetSummaryPanel, {
   DatasetSessionPanel,
+  type HumanIntent,
 } from "./components/dataset/DatasetSummaryPanel";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
 import QueryHistoryPanel from "./components/history/QueryHistoryPanel";
@@ -36,6 +37,66 @@ import "./App.css";
 
 const MAX_QUERY_LIMIT = 1000;
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
+
+const humanIntentGuidance: Record<
+  HumanIntent,
+  {
+    label: string;
+    route: ActiveView;
+    nextStep: string;
+    detail: string;
+  }
+> = {
+  summary: {
+    label: "Summarize this dataset",
+    route: "results",
+    nextStep: "Review the preview rows and column list to get oriented.",
+    detail:
+      "Start with the row count, columns, and sample records. Use sorting or the result tabs to inspect the dataset without writing SQL.",
+  },
+  missing_values: {
+    label: "Find missing values",
+    route: "queryBuilder",
+    nextStep: "Choose the columns you want to check, then run analysis.",
+    detail:
+      "Use the visible column choices to focus the table. Columns with null counts in the dataset profile are good places to start.",
+  },
+  top_categories: {
+    label: "Show top categories",
+    route: "queryBuilder",
+    nextStep: "Choose a category column in Group by, keep COUNT selected, then run the query.",
+    detail:
+      "This creates a beginner-friendly count by category using the existing query builder controls.",
+  },
+  compare_columns: {
+    label: "Compare two columns",
+    route: "queryBuilder",
+    nextStep: "Select two visible columns, then run the query to compare their values side by side.",
+    detail:
+      "Pick columns that answer the same question from two angles, such as region and sales or status and owner.",
+  },
+  trends: {
+    label: "Find trends",
+    route: "queryBuilder",
+    nextStep: "Group by a date or time-like column, choose a useful aggregation, then run the query.",
+    detail:
+      "Trends work best when the dataset has a date column and a numeric measure to summarize.",
+  },
+  unusual_values: {
+    label: "Find unusual values",
+    route: "results",
+    nextStep: "Sort numeric or date columns to bring very high, very low, or unexpected values into view.",
+    detail:
+      "Use the column headers in the results grid to sort. Filtering can narrow the rows after something stands out.",
+  },
+  simple_chart: {
+    label: "Create simple chart",
+    route: "queryBuilder",
+    nextStep: "Build a small grouped result first, such as category plus COUNT.",
+    detail:
+      "Charts are not automated yet, but a grouped query gives you the clean summary table a chart will use later.",
+  },
+};
 
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -88,6 +149,7 @@ function App() {
   const [hasRunQuery, setHasRunQuery] = useState(false);
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
+  const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -108,6 +170,7 @@ function App() {
     setQuerySortColumn("");
     setQuerySortDirection("ASC");
     setHasRunQuery(false);
+    setHumanIntent(null);
     clearHistory();
 
     try {
@@ -700,6 +763,92 @@ function App() {
     loadPreviewPage(1, rowsPerPage);
   };
 
+  const configureQueryBuilderForHumanIntent = (intent: HumanIntent) => {
+    if (!dataset) return;
+
+    const categoryColumn =
+      dataset.schema.find((column) => column.inferred_type === "categorical") ||
+      dataset.schema.find((column) => column.inferred_type === "text");
+    const dateColumn = dataset.schema.find((column) => column.inferred_type === "date");
+    const numericColumn = dataset.schema.find((column) => column.inferred_type === "numeric");
+    const columnsWithMissingValues = dataset.schema
+      .filter((column) => column.null_count > 0)
+      .map((column) => column.name);
+
+    if (intent === "missing_values") {
+      setQuerySelectedColumns(
+        columnsWithMissingValues.length > 0
+          ? columnsWithMissingValues.slice(0, 4)
+          : dataset.schema.slice(0, 4).map((column) => column.name),
+      );
+      setQueryGroupBy([]);
+      setQueryAggregations([]);
+      setQuerySortColumn("");
+      return;
+    }
+
+    if (intent === "top_categories" || intent === "simple_chart") {
+      setQuerySelectedColumns(categoryColumn ? [categoryColumn.name] : []);
+      setQueryGroupBy(categoryColumn ? [categoryColumn.name] : []);
+      setQueryAggregations([{ id: Date.now(), function: "COUNT", column: "" }]);
+      setQuerySortColumn("count_rows");
+      setQuerySortDirection("DESC");
+      return;
+    }
+
+    if (intent === "compare_columns") {
+      setQuerySelectedColumns(dataset.schema.slice(0, 2).map((column) => column.name));
+      setQueryGroupBy([]);
+      setQueryAggregations([]);
+      setQuerySortColumn("");
+      return;
+    }
+
+    if (intent === "trends") {
+      setQuerySelectedColumns(
+        dateColumn ? [dateColumn.name] : dataset.schema.slice(0, 1).map((column) => column.name),
+      );
+      setQueryGroupBy(dateColumn ? [dateColumn.name] : []);
+      setQueryAggregations([
+        numericColumn
+          ? { id: Date.now(), function: "AVG", column: numericColumn.name }
+          : { id: Date.now(), function: "COUNT", column: "" },
+      ]);
+      setQuerySortColumn(dateColumn?.name || "");
+      setQuerySortDirection("ASC");
+    }
+  };
+
+  const selectHumanIntent = (intent: HumanIntent) => {
+    const guidance = humanIntentGuidance[intent];
+    setHumanIntent(intent);
+    setWorkspaceMode("human");
+    configureQueryBuilderForHumanIntent(intent);
+
+    if (intent === "summary" || intent === "unusual_values") {
+      handleResultTabChange("preview");
+    }
+
+    updateDatasetSessionView(guidance.route);
+  };
+
+  const renderHumanIntentGuidance = () => {
+    if (!humanIntent) return null;
+
+    const guidance = humanIntentGuidance[humanIntent];
+
+    return (
+      <section className="human-intent-panel" aria-label="Selected Human Mode guidance">
+        <p className="section-label">Guided analysis</p>
+        <h2>You selected: {guidance.label}</h2>
+        <p>
+          <strong>Next step:</strong> {guidance.nextStep}
+        </p>
+        <p>{guidance.detail}</p>
+      </section>
+    );
+  };
+
   useEffect(() => {
     if (activeView === "welcome" && shouldOpenFilePicker) {
       sidebarFileInputRef.current?.click();
@@ -735,6 +884,7 @@ function App() {
             handleResultTabChange("preview");
             updateDatasetSessionView("results");
           }}
+          onHumanIntentSelect={selectHumanIntent}
         />
       ) : null,
     filters: () =>
@@ -751,81 +901,87 @@ function App() {
       ) : null,
     queryBuilder: () =>
       dataset ? (
-        <VisualQueryBuilderPanel
-          schema={dataset.schema}
-          selectedColumns={querySelectedColumns}
-          groupBy={queryGroupBy}
-          aggregations={queryAggregations}
-          sortOptions={querySortOptions}
-          sortColumn={querySortColumn}
-          sortDirection={querySortDirection}
-          rowLimit={queryLimit}
-          running={isRunningQuery}
-          errorMessage={errorMessage}
-          onToggleSelectedColumn={(column) =>
-            setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
-          }
-          onGroupByChange={setQueryGroupBy}
-          onAddAggregation={addAggregation}
-          onUpdateAggregation={updateAggregation}
-          onRemoveAggregation={removeAggregation}
-          onSortColumnChange={setQuerySortColumn}
-          onSortDirectionChange={setQuerySortDirection}
-          onRowLimitChange={setQueryLimit}
-          onRunQuery={runVisualQuery}
-        />
+        <>
+          {renderHumanIntentGuidance()}
+          <VisualQueryBuilderPanel
+            schema={dataset.schema}
+            selectedColumns={querySelectedColumns}
+            groupBy={queryGroupBy}
+            aggregations={queryAggregations}
+            sortOptions={querySortOptions}
+            sortColumn={querySortColumn}
+            sortDirection={querySortDirection}
+            rowLimit={queryLimit}
+            running={isRunningQuery}
+            errorMessage={errorMessage}
+            onToggleSelectedColumn={(column) =>
+              setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
+            }
+            onGroupByChange={setQueryGroupBy}
+            onAddAggregation={addAggregation}
+            onUpdateAggregation={updateAggregation}
+            onRemoveAggregation={removeAggregation}
+            onSortColumnChange={setQuerySortColumn}
+            onSortDirectionChange={setQuerySortDirection}
+            onRowLimitChange={setQueryLimit}
+            onRunQuery={runVisualQuery}
+          />
+        </>
       ) : null,
     results: () =>
       dataset ? (
-        <section className="workspace-grid" aria-label="Data exploration workspace">
-          <DatasetSessionPanel
-            dataset={dataset}
-            schemaTypeSummary={schemaTypeSummary}
-            activeFilterLabels={activeFilterLabels}
-            queryGroupBy={queryGroupBy}
-          />
+        <>
+          {renderHumanIntentGuidance()}
+          <section className="workspace-grid" aria-label="Data exploration workspace">
+            <DatasetSessionPanel
+              dataset={dataset}
+              schemaTypeSummary={schemaTypeSummary}
+              activeFilterLabels={activeFilterLabels}
+              queryGroupBy={queryGroupBy}
+            />
 
-          <ResultsGrid
-            title={
-              activeResultTab === "queried"
-                ? "Query results"
-                : activeResultTab === "filtered"
-                  ? "Filtered results"
-                  : "Preview results"
-            }
-            label="Data grid"
-            columns={resultColumns}
-            rows={resultRows}
-            totalCount={resultTotalCount}
-            loading={isFiltering || isRunningQuery}
-            activeFilterLabels={activeFilterLabels}
-            activeSortColumn={activeResult.sortColumn}
-            activeSortDirection={activeResult.sortDirection}
-            page={resultPage}
-            totalPages={resultTotalPages}
-            rowsPerPage={resultRowsPerPage}
-            emptyTitle="No rows returned"
-            emptyDescription="Adjust filters, sorting, or query builder settings and try again."
-            onSortColumn={sortWorkspaceColumn}
-            onPageChange={changeWorkspacePage}
-            onRowsPerPageChange={changeWorkspaceRowsPerPage}
-            toolbarActions={
-              <div className="workspace-actions">
-                <ResultTabs
-                  activeTab={activeResultTab}
-                  hasFilteredResults={hasFilteredResults}
-                  hasQueryResults={hasQueryResults}
-                  onTabChange={handleResultTabChange}
-                />
-                <button type="button" className="secondary-button" onClick={exportCurrentResults}>
-                  {isExporting ? "Exporting..." : "Export CSV"}
-                </button>
-              </div>
-            }
-          />
+            <ResultsGrid
+              title={
+                activeResultTab === "queried"
+                  ? "Query results"
+                  : activeResultTab === "filtered"
+                    ? "Filtered results"
+                    : "Preview results"
+              }
+              label="Data grid"
+              columns={resultColumns}
+              rows={resultRows}
+              totalCount={resultTotalCount}
+              loading={isFiltering || isRunningQuery}
+              activeFilterLabels={activeFilterLabels}
+              activeSortColumn={activeResult.sortColumn}
+              activeSortDirection={activeResult.sortDirection}
+              page={resultPage}
+              totalPages={resultTotalPages}
+              rowsPerPage={resultRowsPerPage}
+              emptyTitle="No rows returned"
+              emptyDescription="Adjust filters, sorting, or query builder settings and try again."
+              onSortColumn={sortWorkspaceColumn}
+              onPageChange={changeWorkspacePage}
+              onRowsPerPageChange={changeWorkspaceRowsPerPage}
+              toolbarActions={
+                <div className="workspace-actions">
+                  <ResultTabs
+                    activeTab={activeResultTab}
+                    hasFilteredResults={hasFilteredResults}
+                    hasQueryResults={hasQueryResults}
+                    onTabChange={handleResultTabChange}
+                  />
+                  <button type="button" className="secondary-button" onClick={exportCurrentResults}>
+                    {isExporting ? "Exporting..." : "Export CSV"}
+                  </button>
+                </div>
+              }
+            />
 
-          <QueryHistoryPanel history={queryHistory} />
-        </section>
+            <QueryHistoryPanel history={queryHistory} />
+          </section>
+        </>
       ) : null,
     history: () =>
       dataset ? <QueryHistoryPanel history={queryHistory} variant="standalone" /> : null,
