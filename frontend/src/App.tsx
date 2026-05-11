@@ -1,4 +1,5 @@
 import { type ChangeEvent, useRef, useState } from "react";
+import ResultsGrid from "./components/results/ResultsGrid";
 import "./App.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -1180,16 +1181,29 @@ function App() {
               </div>
             </aside>
 
-            <section className="data-grid-section">
-              <div className="data-grid-toolbar">
-                <div>
-                  <p className="section-label">Data grid</p>
-                  <h2>{activeResultSource === "query" ? "Query results" : "Dataset preview"}</h2>
-                  <p>
-                    {resultTotalCount.toLocaleString()} rows available, showing{" "}
-                    {resultRows.length.toLocaleString()}
-                  </p>
-                </div>
+            <ResultsGrid
+              title={activeResultSource === "query" ? "Query results" : "Dataset preview"}
+              label="Data grid"
+              columns={resultColumns}
+              rows={resultRows}
+              totalCount={resultTotalCount}
+              loading={isFiltering || isRunningQuery}
+              activeFilterLabels={activeFilterLabels}
+              activeSortColumn={
+                activeResultSource === "query" ? querySortColumn : previewSortColumn
+              }
+              activeSortDirection={
+                activeResultSource === "query" ? querySortDirection : previewSortDirection
+              }
+              page={resultPage}
+              totalPages={resultTotalPages}
+              rowsPerPage={resultRowsPerPage}
+              emptyTitle="No rows returned"
+              emptyDescription="Adjust filters, sorting, or query builder settings and try again."
+              onSortColumn={sortWorkspaceColumn}
+              onPageChange={changeWorkspacePage}
+              onRowsPerPageChange={changeWorkspaceRowsPerPage}
+              toolbarActions={
                 <div className="workspace-actions">
                   <div className="result-toggle" aria-label="Result source">
                     <button
@@ -1212,104 +1226,8 @@ function App() {
                     {isExporting ? "Exporting..." : "Export CSV"}
                   </button>
                 </div>
-              </div>
-
-              {activeFilterLabels.length > 0 && (
-                <div className="active-filter-bar">
-                  {activeFilterLabels.map((label) => (
-                    <span key={label}>{label}</span>
-                  ))}
-                </div>
-              )}
-
-              {(isFiltering || isRunningQuery) && (
-                <p className="status-message">Loading rows from DuckDB...</p>
-              )}
-
-              {resultRows.length === 0 && !isFiltering && !isRunningQuery ? (
-                <div className="empty-state compact-empty">
-                  <p className="section-label">
-                    {activeResultSource === "query" ? "Query results" : "Preview"}
-                  </p>
-                  <h2>No rows returned</h2>
-                  <p>Adjust filters, sorting, or query builder settings and try again.</p>
-                </div>
-              ) : (
-                <div className="table-container data-grid-table">
-                  <table>
-                    <thead>
-                      <tr>
-                        {resultColumns.map((column) => {
-                          const activeSortColumn =
-                            activeResultSource === "query" ? querySortColumn : previewSortColumn;
-                          const activeSortDirection =
-                            activeResultSource === "query"
-                              ? querySortDirection
-                              : previewSortDirection;
-
-                          return (
-                            <th key={column}>
-                              <button type="button" onClick={() => sortWorkspaceColumn(column)}>
-                                {column}
-                                {activeSortColumn === column && (
-                                  <span>{activeSortDirection === "ASC" ? " ↑" : " ↓"}</span>
-                                )}
-                              </button>
-                            </th>
-                          );
-                        })}
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {resultRows.map((row, index) => (
-                        <tr key={index}>
-                          {resultColumns.map((column) => (
-                            <td key={column}>{String(row[column] ?? "")}</td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="pagination-bar">
-                <div>
-                  <span>Rows per page</span>
-                  <select
-                    value={resultRowsPerPage}
-                    onChange={(event) => changeWorkspaceRowsPerPage(Number(event.target.value))}
-                  >
-                    <option value="10">10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                  </select>
-                </div>
-                <div className="page-controls">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => changeWorkspacePage(resultPage - 1)}
-                    disabled={resultPage <= 1}
-                  >
-                    Previous
-                  </button>
-                  <span>
-                    Page {resultPage} of {resultTotalPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => changeWorkspacePage(resultPage + 1)}
-                    disabled={resultPage >= resultTotalPages}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </section>
+              }
+            />
 
             <aside className="history-panel">
               <div>
