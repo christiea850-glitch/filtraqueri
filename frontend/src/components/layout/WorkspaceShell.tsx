@@ -12,6 +12,33 @@ type AnalystNavItem = {
   previewBadge?: string;
 };
 
+type HubId = "home" | "data" | "explore" | "build" | "results" | "analyst" | "settings";
+
+type HubItem = {
+  id: HubId;
+  label: string;
+  icon: IconName;
+  defaultView: ActiveView;
+  mode: WorkspaceMode;
+  subItems: Array<{
+    view: ActiveView;
+    label: string;
+    description: string;
+  }>;
+};
+
+type IconName =
+  | "home"
+  | "data"
+  | "explore"
+  | "build"
+  | "results"
+  | "analyst"
+  | "settings"
+  | "upload"
+  | "collapse"
+  | "expand";
+
 type WorkspaceShellProps = {
   activeView: ActiveView;
   workspaceMode: WorkspaceMode;
@@ -28,34 +55,132 @@ type WorkspaceShellProps = {
 
 const menuItems = ["File", "Edit", "View", "Dataset", "Tools", "Help"];
 
-const humanSidebarItems: Array<[ActiveView, string]> = [
-  ["welcome", "Welcome"],
-  ["dataset", "Dataset"],
-  ["filters", "Filters"],
-  ["queryBuilder", "Query Builder"],
-  ["results", "Results"],
-  ["history", "History"],
-  ["export", "Export"],
-  ["settings", "Settings"],
+const workspaceHubs: HubItem[] = [
+  {
+    id: "home",
+    label: "Home",
+    icon: "home",
+    defaultView: "welcome",
+    mode: "human",
+    subItems: [{ view: "welcome", label: "Welcome", description: "Start or upload" }],
+  },
+  {
+    id: "data",
+    label: "Data",
+    icon: "data",
+    defaultView: "dataset",
+    mode: "human",
+    subItems: [{ view: "dataset", label: "Dataset Hub", description: "Manage datasets" }],
+  },
+  {
+    id: "explore",
+    label: "Explore",
+    icon: "explore",
+    defaultView: "filters",
+    mode: "human",
+    subItems: [{ view: "filters", label: "Filters", description: "Refine rows" }],
+  },
+  {
+    id: "build",
+    label: "Build",
+    icon: "build",
+    defaultView: "queryBuilder",
+    mode: "human",
+    subItems: [{ view: "queryBuilder", label: "Query Builder", description: "Group and aggregate" }],
+  },
+  {
+    id: "results",
+    label: "Results",
+    icon: "results",
+    defaultView: "results",
+    mode: "human",
+    subItems: [
+      { view: "results", label: "Result Grid", description: "Preview and query output" },
+      { view: "history", label: "History", description: "Session activity" },
+      { view: "export", label: "Export", description: "Download CSV" },
+    ],
+  },
+  {
+    id: "analyst",
+    label: "Analyst",
+    icon: "analyst",
+    defaultView: "sqlWorkspace",
+    mode: "analyst",
+    subItems: [],
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: "settings",
+    defaultView: "settings",
+    mode: "human",
+    subItems: [{ view: "settings", label: "Workspace Settings", description: "Preferences" }],
+  },
 ];
 
-const navIcons: Record<string, string> = {
-  "Open File": "OF",
-  Welcome: "W",
-  Dataset: "D",
-  Filters: "F",
-  "Query Builder": "QB",
-  Results: "R",
-  History: "H",
-  Export: "E",
-  Settings: "S",
-  "SQL Workspace": "SQL",
-  "Saved Queries": "SQ",
-  "Query Explain": "QE",
-  "Data Cleaning": "DC",
-  Diagnostics: "DG",
-  Normalization: "N",
-};
+function WorkspaceIcon({ name }: { name: IconName }) {
+  const commonProps = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 2,
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      {name === "home" && (
+        <path {...commonProps} d="M4 11.5 12 5l8 6.5V20h-5v-5H9v5H4v-8.5Z" />
+      )}
+      {name === "data" && (
+        <>
+          <ellipse {...commonProps} cx="12" cy="6" rx="7" ry="3" />
+          <path {...commonProps} d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+          <path {...commonProps} d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+        </>
+      )}
+      {name === "explore" && (
+        <>
+          <circle {...commonProps} cx="11" cy="11" r="6" />
+          <path {...commonProps} d="m16 16 4 4" />
+        </>
+      )}
+      {name === "build" && (
+        <>
+          <path {...commonProps} d="M4 7h16M7 4v6M12 4v6M17 4v6" />
+          <path {...commonProps} d="M6 14h5v5H6zM14 14h4v5h-4z" />
+        </>
+      )}
+      {name === "results" && (
+        <>
+          <path {...commonProps} d="M5 19V5M5 19h15" />
+          <path {...commonProps} d="M8 16v-4M12 16V8M16 16v-6" />
+        </>
+      )}
+      {name === "analyst" && (
+        <>
+          <path {...commonProps} d="M4 7h16M4 12h16M4 17h10" />
+          <path {...commonProps} d="m16 16 2 2 3-4" />
+        </>
+      )}
+      {name === "settings" && (
+        <>
+          <circle {...commonProps} cx="12" cy="12" r="3" />
+          <path {...commonProps} d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a7 7 0 0 0-1.8-1L14.4 3h-4.8l-.3 3.1a7 7 0 0 0-1.8 1l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a7 7 0 0 0 1.8 1l.3 3.1h4.8l.3-3.1a7 7 0 0 0 1.8-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z" />
+        </>
+      )}
+      {name === "upload" && (
+        <>
+          <path {...commonProps} d="M12 16V4" />
+          <path {...commonProps} d="m7 9 5-5 5 5" />
+          <path {...commonProps} d="M5 20h14" />
+        </>
+      )}
+      {name === "collapse" && <path {...commonProps} d="m15 6-6 6 6 6" />}
+      {name === "expand" && <path {...commonProps} d="m9 6 6 6-6 6" />}
+    </svg>
+  );
+}
 
 function WorkspaceShell({
   activeView,
@@ -72,6 +197,27 @@ function WorkspaceShell({
 }: WorkspaceShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const hubs = workspaceHubs.map((hub) =>
+    hub.id === "analyst"
+      ? {
+          ...hub,
+          subItems: analystViews.map((item) => ({
+            view: item.view,
+            label: item.label,
+            description: item.previewBadge || "Analyst tool",
+          })),
+        }
+      : hub,
+  );
+  const activeHub =
+    hubs.find((hub) => hub.subItems.some((item) => item.view === activeView)) ||
+    hubs.find((hub) => hub.id === (workspaceMode === "analyst" ? "analyst" : "home")) ||
+    hubs[0];
+
+  const changeHub = (hub: HubItem) => {
+    if (hub.mode !== workspaceMode) onModeChange(hub.mode);
+    onViewChange(hub.defaultView);
+  };
 
   return (
     <div
@@ -141,13 +287,13 @@ function WorkspaceShell({
             aria-label={isSidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
           >
             <span className="nav-icon" aria-hidden="true">
-              {isSidebarCollapsed ? ">" : "<"}
+              <WorkspaceIcon name={isSidebarCollapsed ? "expand" : "collapse"} />
             </span>
             <span className="nav-label">{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
           </button>
-          <button type="button" className="sidebar-primary" onClick={onOpenFile}>
+          <button type="button" className="sidebar-primary" onClick={onOpenFile} title="Open or upload CSV">
             <span className="nav-icon" aria-hidden="true">
-              {navIcons["Open File"]}
+              <WorkspaceIcon name="upload" />
             </span>
             <span className="nav-label">Open File</span>
           </button>
@@ -165,6 +311,7 @@ function WorkspaceShell({
               <span>No dataset open</span>
             )}
           </div>
+          {!isSidebarCollapsed && activeHub.id === "data" && (
           <div className="sidebar-recents" aria-label="Recent datasets">
             <p>Recent datasets</p>
             {recentDatasets.length === 0 ? (
@@ -178,9 +325,6 @@ function WorkspaceShell({
                   onClick={() => onRecentDatasetClick(session.dataset.dataset_id)}
                   title={session.dataset.original_filename}
                 >
-                  <span className="nav-icon" aria-hidden="true">
-                    D
-                  </span>
                   <strong>{session.dataset.original_filename}</strong>
                   <span>
                     {session.dataset.row_count.toLocaleString()} rows &middot;{" "}
@@ -190,26 +334,28 @@ function WorkspaceShell({
               ))
             )}
           </div>
-          <nav>
-            {humanSidebarItems.map(([view, label]) => (
+          )}
+          <nav className="hub-nav" aria-label="Workspace hubs">
+            {hubs.map((hub) => (
               <button
                 type="button"
-                key={view}
-                className={activeView === view ? "is-active" : ""}
-                onClick={() => onViewChange(view)}
-                title={label}
+                key={hub.id}
+                className={activeHub.id === hub.id ? "is-active" : ""}
+                onClick={() => changeHub(hub)}
+                title={hub.label}
               >
                 <span className="nav-icon" aria-hidden="true">
-                  {navIcons[label] || label.slice(0, 2)}
+                  <WorkspaceIcon name={hub.icon} />
                 </span>
-                <span className="nav-label">{label}</span>
+                <span className="nav-label">{hub.label}</span>
               </button>
             ))}
           </nav>
-          {workspaceMode === "analyst" && (
-            <div className="analyst-sidebar-section" aria-label="Analyst mode tools">
-              <p>Analyst mode</p>
-              {analystViews.map((item) => (
+
+          {!isSidebarCollapsed && (
+            <div className="hub-subnav" aria-label={`${activeHub.label} navigation`}>
+              <p>{activeHub.label}</p>
+              {activeHub.subItems.map((item) => (
                 <button
                   type="button"
                   key={item.view}
@@ -217,11 +363,8 @@ function WorkspaceShell({
                   onClick={() => onViewChange(item.view)}
                   title={item.label}
                 >
-                  <span className="nav-icon" aria-hidden="true">
-                    {navIcons[item.label] || item.label.slice(0, 2)}
-                  </span>
-                  <span className="nav-label">{item.label}</span>
-                  <span className="nav-badge">{item.previewBadge || "Preview"}</span>
+                  <strong>{item.label}</strong>
+                  <span>{item.description}</span>
                 </button>
               ))}
             </div>
