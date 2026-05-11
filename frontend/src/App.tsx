@@ -920,7 +920,7 @@ function App() {
       registry[item.view] = () => renderAnalystView(item.view);
       return registry;
     }, {}),
-    sqlWorkspace: () => (dataset ? <SqlWorkspace dataset={dataset} /> : null),
+    sqlWorkspace: () => <SqlWorkspace dataset={dataset} />,
   };
 
   const workspaceViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {

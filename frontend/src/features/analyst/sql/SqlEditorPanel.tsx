@@ -4,6 +4,7 @@ type SqlEditorPanelProps = {
   sqlText: string;
   executionStatus: SqlExecutionStatus;
   savedDrafts: SqlQueryDraft[];
+  canRunQuery: boolean;
   onSqlChange: (sqlText: string) => void;
   onRunQuery: () => void;
   onClear: () => void;
@@ -23,6 +24,7 @@ function SqlEditorPanel({
   sqlText,
   executionStatus,
   savedDrafts,
+  canRunQuery,
   onSqlChange,
   onRunQuery,
   onClear,
@@ -38,7 +40,7 @@ function SqlEditorPanel({
           <h2>Analyst query draft</h2>
         </div>
         <div className="sql-actions">
-          <button type="button" className="primary-button" onClick={onRunQuery}>
+          <button type="button" className="primary-button" onClick={onRunQuery} disabled={!canRunQuery}>
             Run Query
           </button>
           <button type="button" className="secondary-button" onClick={onExplain}>

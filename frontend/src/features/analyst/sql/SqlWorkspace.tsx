@@ -7,11 +7,11 @@ import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } fr
 import type { SqlExecutionStatus, SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 
 type SqlWorkspaceProps = {
-  dataset: DatasetMetadata;
+  dataset: DatasetMetadata | null;
 };
 
-const createInitialSql = (tableName: string) => `SELECT *
-FROM ${tableName}
+const createInitialSql = (tableName?: string) => `SELECT *
+FROM ${tableName || "uploaded_dataset"}
 LIMIT 100;`;
 
 const createPreviewMessage = (status: SqlExecutionStatus) => {
@@ -31,7 +31,7 @@ const createPreviewMessage = (status: SqlExecutionStatus) => {
 };
 
 function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
-  const [sqlText, setSqlText] = useState(() => createInitialSql(dataset.table_name));
+  const [sqlText, setSqlText] = useState(() => createInitialSql(dataset?.table_name));
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>([]);
   const [executionStatus, setExecutionStatus] = useState<SqlExecutionStatus>("idle");
   const [previewResult, setPreviewResult] = useState<SqlPreviewResult>({
@@ -49,8 +49,8 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
     });
   };
 
-  const sqlTemplates = useMemo(() => createSqlTemplates(dataset), [dataset]);
-  const columnSuggestions = useMemo(() => createColumnSuggestions(dataset), [dataset]);
+  const sqlTemplates = useMemo(() => (dataset ? createSqlTemplates(dataset) : []), [dataset]);
+  const columnSuggestions = useMemo(() => (dataset ? createColumnSuggestions(dataset) : []), [dataset]);
 
   const insertSql = (sql: string) => {
     setSqlText((currentSql) => {
@@ -92,6 +92,7 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
           sqlText={sqlText}
           executionStatus={executionStatus}
           savedDrafts={savedDrafts}
+          canRunQuery={Boolean(dataset)}
           onSqlChange={setSqlText}
           onRunQuery={() => updateStatus("execution-pending")}
           onClear={() => {

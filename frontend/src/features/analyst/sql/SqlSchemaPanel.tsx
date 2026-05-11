@@ -2,7 +2,7 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlSuggestion, SqlTemplate } from "./sqlTypes";
 
 type SqlSchemaPanelProps = {
-  dataset: DatasetMetadata;
+  dataset: DatasetMetadata | null;
   columnSuggestions: SqlSuggestion[];
   templates: SqlTemplate[];
   keywordSuggestions: string[];
@@ -20,31 +20,35 @@ function SqlSchemaPanel({
     <aside className="sql-context-panel" aria-label="SQL schema intelligence">
       <div>
         <p className="section-label">Active dataset</p>
-        <h2>{dataset.original_filename}</h2>
+        <h2>{dataset ? dataset.original_filename : "No dataset open"}</h2>
       </div>
       <div className="session-stat-list">
-        <span>{dataset.table_name}</span>
-        <strong>{dataset.row_count.toLocaleString()} rows</strong>
-        <strong>{dataset.column_count.toLocaleString()} columns</strong>
+        <span>{dataset ? dataset.table_name : "Upload a CSV to bind SQL to data"}</span>
+        <strong>{dataset ? `${dataset.row_count.toLocaleString()} rows` : "Execution disabled"}</strong>
+        <strong>{dataset ? `${dataset.column_count.toLocaleString()} columns` : "Schema pending"}</strong>
       </div>
 
       <div className="sql-helper-section">
         <div className="builder-block-header">
           <span>Columns</span>
-          <small>{dataset.schema.length} detected</small>
+          <small>{dataset ? `${dataset.schema.length} detected` : "pending"}</small>
         </div>
         <div className="schema-list sql-schema-list" aria-label="SQL available columns">
-          {dataset.schema.map((column) => (
-            <button
-              type="button"
-              className="schema-pill sql-schema-chip"
-              key={column.name}
-              onClick={() => onInsertSql(`"${column.name.replace(/"/g, '""')}"`)}
-            >
-              {column.name}
-              <small>{column.inferred_type}</small>
-            </button>
-          ))}
+          {dataset ? (
+            dataset.schema.map((column) => (
+              <button
+                type="button"
+                className="schema-pill sql-schema-chip"
+                key={column.name}
+                onClick={() => onInsertSql(`"${column.name.replace(/"/g, '""')}"`)}
+              >
+                {column.name}
+                <small>{column.inferred_type}</small>
+              </button>
+            ))
+          ) : (
+            <p className="sql-helper-empty">Column metadata will appear here after upload.</p>
+          )}
         </div>
       </div>
 
@@ -54,12 +58,16 @@ function SqlSchemaPanel({
           <small>Insert chips</small>
         </div>
         <div className="sql-suggestion-grid">
-          {columnSuggestions.map((suggestion) => (
-            <button type="button" key={suggestion.id} onClick={() => onInsertSql(suggestion.sql)}>
-              <strong>{suggestion.label}</strong>
-              <span>{suggestion.description}</span>
-            </button>
-          ))}
+          {columnSuggestions.length > 0 ? (
+            columnSuggestions.map((suggestion) => (
+              <button type="button" key={suggestion.id} onClick={() => onInsertSql(suggestion.sql)}>
+                <strong>{suggestion.label}</strong>
+                <span>{suggestion.description}</span>
+              </button>
+            ))
+          ) : (
+            <p className="sql-helper-empty">Dataset-aware column chips are waiting for a dataset.</p>
+          )}
         </div>
       </div>
 
