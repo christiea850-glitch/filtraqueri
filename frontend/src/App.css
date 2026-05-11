@@ -635,6 +635,81 @@ h1 span:last-child {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
+.human-dataset-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.human-guidance-panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid #dbe5ef;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 251, 255, 0.9)),
+    #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.human-guidance-panel h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.human-guidance-panel p:last-child {
+  margin: 8px 0 0;
+  max-width: 680px;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.human-suggestion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.human-suggestion-grid button {
+  display: grid;
+  gap: 8px;
+  min-height: 92px;
+  padding: 15px;
+  border: 1px solid #dbe5ef;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.human-suggestion-grid button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.human-suggestion-grid strong {
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.human-suggestion-grid span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .summary-header,
 .preview-heading,
 .filters-header,

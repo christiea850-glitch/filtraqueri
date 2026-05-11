@@ -130,10 +130,13 @@ function App() {
       setQueriedResult(createEmptyResultState());
       setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "We could not upload that file. Please check the backend and try again.";
+      const rawMessage =
+        error instanceof Error ? error.message : "Upload failed. Please try again.";
+      const message = rawMessage.toLowerCase().includes("csv")
+        ? rawMessage
+        : rawMessage.toLowerCase().includes("backend is not running")
+          ? rawMessage
+          : "Upload failed. Please check the file and try again.";
 
       setErrorMessage(message);
     } finally {

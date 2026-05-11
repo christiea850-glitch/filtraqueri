@@ -31,7 +31,13 @@ async function parseError(response: Response, fallbackMessage: string) {
 }
 
 async function requestJson<T>(url: string, init: RequestInit, fallbackMessage: string): Promise<T> {
-  const response = await fetch(url, init);
+  let response: Response;
+
+  try {
+    response = await fetch(url, init);
+  } catch {
+    throw new Error("Backend is not running. Start it with: python -m uvicorn app.main:app --reload");
+  }
 
   if (!response.ok) {
     throw new Error(await parseError(response, fallbackMessage));
@@ -41,6 +47,15 @@ async function requestJson<T>(url: string, init: RequestInit, fallbackMessage: s
 }
 
 export async function uploadDataset(file: File) {
+  const isCsvFile =
+    file.name.toLowerCase().endsWith(".csv") ||
+    file.type === "text/csv" ||
+    file.type === "application/vnd.ms-excel";
+
+  if (!isCsvFile) {
+    throw new Error("Please upload a CSV file. FiltraQueri supports CSV uploads in this workspace.");
+  }
+
   const formData = new FormData();
   formData.append("file", file);
 
@@ -102,13 +117,19 @@ export async function runQueryBuilder(datasetId: string, request: QueryBuilderRe
 }
 
 export async function exportDataset(datasetId: string, request: ExportRequest) {
-  const response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/export`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}/datasets/${datasetId}/export`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw new Error("Backend is not running. Start it with: python -m uvicorn app.main:app --reload");
+  }
 
   if (!response.ok) {
     throw new Error(await parseError(response, "Export could not be created."));

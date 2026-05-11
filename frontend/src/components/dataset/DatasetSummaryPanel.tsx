@@ -4,6 +4,16 @@ type DatasetSummaryPanelProps = {
   dataset: DatasetMetadata;
 };
 
+const humanGuidanceCards = [
+  "Summarize this dataset",
+  "Find missing values",
+  "Show top categories",
+  "Compare two columns",
+  "Find trends",
+  "Find unusual values",
+  "Create simple chart",
+];
+
 type DatasetSessionPanelProps = {
   dataset: DatasetMetadata;
   schemaTypeSummary: Record<string, number>;
@@ -58,39 +68,60 @@ export function DatasetSessionPanel({
 
 function DatasetSummaryPanel({ dataset }: DatasetSummaryPanelProps) {
   return (
-    <section className="dataset-summary" aria-label="Dataset metadata">
-      <div className="summary-header">
-        <div>
-          <p className="section-label">Dataset ready</p>
-          <h2>{dataset.original_filename}</h2>
+    <div className="human-dataset-workspace">
+      <section className="dataset-summary" aria-label="Dataset metadata">
+        <div className="summary-header">
+          <div>
+            <p className="section-label">Dataset ready</p>
+            <h2>{dataset.original_filename}</h2>
+          </div>
+          <span className="dataset-id">ID: {dataset.dataset_id.slice(0, 8)}</span>
         </div>
-        <span className="dataset-id">ID: {dataset.dataset_id.slice(0, 8)}</span>
-      </div>
 
-      <div className="summary-grid">
-        <div>
-          <span>Rows</span>
-          <strong>{dataset.row_count.toLocaleString()}</strong>
+        <div className="summary-grid">
+          <div>
+            <span>Rows</span>
+            <strong>{dataset.row_count.toLocaleString()}</strong>
+          </div>
+          <div>
+            <span>Columns</span>
+            <strong>{dataset.column_count.toLocaleString()}</strong>
+          </div>
+          <div>
+            <span>Table</span>
+            <strong>{dataset.table_name}</strong>
+          </div>
         </div>
-        <div>
-          <span>Columns</span>
-          <strong>{dataset.column_count.toLocaleString()}</strong>
-        </div>
-        <div>
-          <span>Table</span>
-          <strong>{dataset.table_name}</strong>
-        </div>
-      </div>
 
-      <div className="schema-list" aria-label="Detected schema">
-        {dataset.schema.map((column) => (
-          <span className="schema-pill" key={column.name}>
-            {column.name}
-            <small>{column.inferred_type}</small>
-          </span>
-        ))}
-      </div>
-    </section>
+        <div className="schema-list" aria-label="Detected schema">
+          {dataset.schema.map((column) => (
+            <span className="schema-pill" key={column.name}>
+              {column.name}
+              <small>{column.inferred_type}</small>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="human-guidance-panel" aria-label="Human mode data guidance">
+        <div>
+          <p className="section-label">Guided analysis</p>
+          <h2>What do you want to understand?</h2>
+          <p>
+            Start with a no-code question. FiltraQueri will keep heavy dataset work on the
+            backend as the guidance layer grows.
+          </p>
+        </div>
+        <div className="human-suggestion-grid">
+          {humanGuidanceCards.map((suggestion) => (
+            <button type="button" key={suggestion}>
+              <strong>{suggestion}</strong>
+              <span>Human Mode</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }
 
