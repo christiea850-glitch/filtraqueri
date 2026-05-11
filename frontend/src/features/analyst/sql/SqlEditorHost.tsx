@@ -74,12 +74,16 @@ const keywordInsertText: Record<string, string> = {
   "CASE WHEN": "CASE WHEN ${1:condition} THEN ${2:value} ELSE ${3:other_value} END",
 };
 
+const snippetKeywords = new Set(["COUNT", "SUM", "AVG", "MIN", "MAX", "CASE WHEN"]);
+
 const markdownEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
 
 function SqlEditorHost({ editor }: SqlEditorHostProps) {
   const [shouldUseFallback, setShouldUseFallback] = useState(false);
+  const [isMonacoReady, setIsMonacoReady] = useState(false);
   const hasMountedMonacoRef = useRef(false);
   const monacoRef = useRef<Monaco | null>(null);
+  const providerDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
 
   useEffect(() => {
     const fallbackTimer = window.setTimeout(() => {
@@ -89,9 +93,21 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
     return () => window.clearTimeout(fallbackTimer);
   }, []);
 
+  useEffect(
+    () => () => {
+      providerDisposablesRef.current.forEach((provider) => provider.dispose());
+      providerDisposablesRef.current = [];
+      monacoRef.current = null;
+    },
+    [],
+  );
+
   useEffect(() => {
     const monaco = monacoRef.current;
-    if (!monaco || shouldUseFallback) return undefined;
+    if (!monaco || !isMonacoReady || shouldUseFallback) return undefined;
+
+    providerDisposablesRef.current.forEach((provider) => provider.dispose());
+    providerDisposablesRef.current = [];
 
     const completionProvider = monaco.languages.registerCompletionItemProvider("sql", {
       triggerCharacters: [" ", "\n", "\"", "."],
@@ -108,7 +124,7 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
           kind: monaco.languages.CompletionItemKind.Keyword,
           insertText: keywordInsertText[keyword] || `${keyword} `,
           insertTextRules:
-            keyword.includes("(") || keyword === "CASE WHEN"
+            snippetKeywords.has(keyword)
               ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
               : undefined,
           detail: "SQL keyword",
@@ -206,15 +222,18 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
       },
     });
 
+    providerDisposablesRef.current = [completionProvider, hoverProvider];
+
     return () => {
-      completionProvider.dispose();
-      hoverProvider.dispose();
+      providerDisposablesRef.current.forEach((provider) => provider.dispose());
+      providerDisposablesRef.current = [];
     };
   }, [
     editor.keywordSuggestions,
     editor.schema,
     editor.suggestions,
     editor.templates,
+    isMonacoReady,
     shouldUseFallback,
   ]);
 
@@ -242,6 +261,7 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
   const handleMount: OnMount = (monacoEditor, monaco) => {
     hasMountedMonacoRef.current = true;
     monacoRef.current = monaco;
+    setIsMonacoReady(true);
     monacoEditor.layout();
   };
 
