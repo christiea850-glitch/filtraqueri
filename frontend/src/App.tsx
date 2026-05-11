@@ -88,6 +88,23 @@ type ResultState = {
   sortDirection: SortDirection;
 };
 
+type DatasetSession = {
+  dataset: DatasetMetadata;
+  previewResult: ResultState;
+  filteredResult: ResultState;
+  queriedResult: ResultState;
+  filterValues: Record<string, FilterState>;
+  querySelectedColumns: string[];
+  queryGroupBy: string[];
+  queryAggregations: AggregationState[];
+  querySortColumn: string;
+  querySortDirection: SortDirection;
+  queryLimit: string;
+  hasRunQuery: boolean;
+  activeResultTab: ResultTabKey;
+  queryHistory: HistoryItem[];
+};
+
 type ActiveView =
   | "welcome"
   | "dataset"
@@ -111,6 +128,7 @@ const createEmptyResultState = (): ResultState => ({
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
+  const [recentDatasets, setRecentDatasets] = useState<DatasetSession[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("welcome");
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
@@ -242,6 +260,82 @@ function App() {
       ...currentHistory.slice(0, 7),
     ]);
   };
+
+  const createDatasetSession = (datasetMetadata: DatasetMetadata): DatasetSession => ({
+    dataset: datasetMetadata,
+    previewResult,
+    filteredResult,
+    queriedResult,
+    filterValues,
+    querySelectedColumns,
+    queryGroupBy,
+    queryAggregations,
+    querySortColumn,
+    querySortDirection,
+    queryLimit,
+    hasRunQuery,
+    activeResultTab,
+    queryHistory,
+  });
+
+  const addRecentDataset = (session: DatasetSession) => {
+    setRecentDatasets((currentSessions) => [
+      session,
+      ...currentSessions
+        .filter((recentSession) => recentSession.dataset.dataset_id !== session.dataset.dataset_id)
+        .slice(0, 5),
+    ]);
+  };
+
+  const restoreDatasetSession = (session: DatasetSession) => {
+    setDataset(session.dataset);
+    setPreviewResult(session.previewResult);
+    setFilteredResult(session.filteredResult);
+    setQueriedResult(session.queriedResult);
+    setFilterValues(session.filterValues);
+    setQuerySelectedColumns(session.querySelectedColumns);
+    setQueryGroupBy(session.queryGroupBy);
+    setQueryAggregations(session.queryAggregations);
+    setQuerySortColumn(session.querySortColumn);
+    setQuerySortDirection(session.querySortDirection);
+    setQueryLimit(session.queryLimit);
+    setHasRunQuery(session.hasRunQuery);
+    setActiveResultTab(session.activeResultTab);
+    setQueryHistory(session.queryHistory);
+    setSelectedFileName(session.dataset.original_filename);
+    setActiveView("results");
+  };
+
+  const activateRecentDataset = (datasetId: string) => {
+    const session = recentDatasets.find(
+      (recentSession) => recentSession.dataset.dataset_id === datasetId,
+    );
+
+    if (session) {
+      restoreDatasetSession(session);
+    }
+  };
+
+  useEffect(() => {
+    if (dataset) {
+      addRecentDataset(createDatasetSession(dataset));
+    }
+  }, [
+    dataset,
+    previewResult,
+    filteredResult,
+    queriedResult,
+    filterValues,
+    querySelectedColumns,
+    queryGroupBy,
+    queryAggregations,
+    querySortColumn,
+    querySortDirection,
+    queryLimit,
+    hasRunQuery,
+    activeResultTab,
+    queryHistory,
+  ]);
 
   const buildBackendFilters = () => {
     if (!dataset) return [];
@@ -838,6 +932,43 @@ function App() {
           >
             Open File
           </button>
+          <div className="sidebar-dataset-summary" aria-label="Active dataset">
+            <p>Active dataset</p>
+            {dataset ? (
+              <>
+                <strong>{dataset.original_filename}</strong>
+                <span>
+                  {dataset.row_count.toLocaleString()} rows ·{" "}
+                  {dataset.column_count.toLocaleString()} columns
+                </span>
+              </>
+            ) : (
+              <span>No dataset open</span>
+            )}
+          </div>
+          <div className="sidebar-recents" aria-label="Recent datasets">
+            <p>Recent datasets</p>
+            {recentDatasets.length === 0 ? (
+              <span>No recent datasets</span>
+            ) : (
+              recentDatasets.map((session) => (
+                <button
+                  type="button"
+                  key={session.dataset.dataset_id}
+                  className={
+                    dataset?.dataset_id === session.dataset.dataset_id ? "is-active" : ""
+                  }
+                  onClick={() => activateRecentDataset(session.dataset.dataset_id)}
+                >
+                  <strong>{session.dataset.original_filename}</strong>
+                  <span>
+                    {session.dataset.row_count.toLocaleString()} rows ·{" "}
+                    {session.dataset.column_count.toLocaleString()} cols
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
           <nav>
             {[
               ["welcome", "Welcome"],
