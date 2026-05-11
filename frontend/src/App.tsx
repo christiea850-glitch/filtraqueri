@@ -175,20 +175,21 @@ function App() {
       const uploadResult = payload as UploadResponse;
       const uploadColumns = uploadResult.dataset.schema.map((column) => column.name);
       setDataset(uploadResult.dataset);
-      setPreviewResult({
-        columns: uploadColumns,
-        rows: uploadResult.preview,
-        totalCount: uploadResult.dataset.row_count,
-        page: 1,
-        rowsPerPage: 25,
-        sortColumn: "",
-        sortDirection: "ASC",
-      });
+      updatePreviewResult(
+        {
+          columns: uploadColumns,
+          rows: uploadResult.preview,
+          totalCount: uploadResult.dataset.row_count,
+          page: 1,
+          rowsPerPage: 25,
+          sortColumn: "",
+          sortDirection: "ASC",
+        },
+        true,
+      );
       setFilteredResult(createEmptyResultState());
       setQueriedResult(createEmptyResultState());
       setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
-      setActiveResultTab("preview");
-      setActiveView("results");
     } catch (error) {
       const message =
         error instanceof Error
@@ -331,6 +332,26 @@ function App() {
   const hasFilteredResults = filteredResult.columns.length > 0;
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
 
+  const activateResultTab = (tab: ResultTabKey) => {
+    setActiveResultTab(tab);
+    setActiveView("results");
+  };
+
+  const updatePreviewResult = (nextResult: ResultState, shouldActivate = false) => {
+    setPreviewResult(nextResult);
+    if (shouldActivate) activateResultTab("preview");
+  };
+
+  const updateFilteredResult = (nextResult: ResultState, shouldActivate = false) => {
+    setFilteredResult(nextResult);
+    if (shouldActivate) activateResultTab("filtered");
+  };
+
+  const updateQueriedResult = (nextResult: ResultState, shouldActivate = false) => {
+    setQueriedResult(nextResult);
+    if (shouldActivate) activateResultTab("queried");
+  };
+
   const applyFilters = async () => {
     if (!dataset) return;
 
@@ -362,15 +383,17 @@ function App() {
       }
 
       const filterResult = payload as FilterResponse;
-      setFilteredResult((currentResult) => ({
-        ...currentResult,
-        columns: filterResult.columns,
-        rows: filterResult.rows,
-        totalCount: filterResult.total_count,
-        page: 1,
-        rowsPerPage: filterResult.limit,
-      }));
-      setActiveResultTab("filtered");
+      updateFilteredResult(
+        {
+          ...filteredResult,
+          columns: filterResult.columns,
+          rows: filterResult.rows,
+          totalCount: filterResult.total_count,
+          page: 1,
+          rowsPerPage: filterResult.limit,
+        },
+        true,
+      );
       addHistory(
         "Filters",
         activeFilterLabels.length > 0 ? activeFilterLabels.join("; ") : "No filters",
@@ -415,16 +438,18 @@ function App() {
       }
 
       const filterResult = payload as FilterResponse;
-      setPreviewResult((currentResult) => ({
-        ...currentResult,
-        columns: filterResult.columns,
-        rows: filterResult.rows,
-        totalCount: filterResult.total_count,
-        page: 1,
-        rowsPerPage: filterResult.limit,
-      }));
+      updatePreviewResult(
+        {
+          ...previewResult,
+          columns: filterResult.columns,
+          rows: filterResult.rows,
+          totalCount: filterResult.total_count,
+          page: 1,
+          rowsPerPage: filterResult.limit,
+        },
+        true,
+      );
       setFilteredResult(createEmptyResultState());
-      setActiveResultTab("preview");
       addHistory("Reset", "Cleared all filters", filterResult.total_count);
     } catch (error) {
       const message =
@@ -485,9 +510,9 @@ function App() {
       };
 
       if (activeResultTab === "filtered") {
-        setFilteredResult(nextResult);
+        updateFilteredResult(nextResult);
       } else {
-        setPreviewResult(nextResult);
+        updatePreviewResult(nextResult);
       }
     } catch (error) {
       const message =
@@ -539,17 +564,19 @@ function App() {
       }
 
       const queryResult = payload as QueryBuilderResponse;
-      setQueriedResult((currentResult) => ({
-        ...currentResult,
-        columns: queryResult.columns,
-        rows: queryResult.rows,
-        totalCount: queryResult.total_count,
-        page: 1,
-        rowsPerPage: queryResult.limit,
-        sortColumn: querySortColumn,
-        sortDirection: querySortDirection,
-      }));
-      setActiveResultTab("queried");
+      updateQueriedResult(
+        {
+          ...queriedResult,
+          columns: queryResult.columns,
+          rows: queryResult.rows,
+          totalCount: queryResult.total_count,
+          page: 1,
+          rowsPerPage: queryResult.limit,
+          sortColumn: querySortColumn,
+          sortDirection: querySortDirection,
+        },
+        true,
+      );
       addHistory(
         "Query builder",
         activeAggregations.length > 0
@@ -633,7 +660,7 @@ function App() {
       }
 
       const queryResult = payload as QueryBuilderResponse;
-      setQueriedResult({
+      updateQueriedResult({
         columns: queryResult.columns,
         rows: queryResult.rows,
         totalCount: queryResult.total_count,
@@ -642,7 +669,6 @@ function App() {
         sortColumn,
         sortDirection,
       });
-      setActiveResultTab("queried");
     } catch (error) {
       const message =
         error instanceof Error
