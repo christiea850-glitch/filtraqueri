@@ -1,4 +1,5 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
 import "./App.css";
@@ -198,11 +199,6 @@ function App() {
         ...value,
       },
     }));
-  };
-
-  const formatDateValue = (value: unknown) => {
-    if (!value) return "";
-    return String(value).slice(0, 10);
   };
 
   const toggleListValue = (values: string[], value: string) =>
@@ -855,113 +851,15 @@ function App() {
         )}
 
         {dataset && activeView === "filters" && (
-          <section className="filters-panel" aria-label="Dynamic filters">
-            <div className="filters-header">
-              <div>
-                <p className="section-label">Smart filters</p>
-                <h2>Refine the preview</h2>
-              </div>
-              <div className="filter-actions">
-                <button type="button" className="secondary-button" onClick={resetFilters}>
-                  Reset
-                </button>
-                <button type="button" className="primary-button" onClick={applyFilters}>
-                  {isFiltering ? "Applying..." : "Apply filters"}
-                </button>
-              </div>
-            </div>
-
-            <div className="filters-grid">
-              {dataset.schema.map((column) => {
-                const currentFilter = filterValues[column.name] || {};
-                const sampleValues = column.sample_values
-                  .filter((value) => value !== null && value !== undefined)
-                  .map((value) => String(value));
-
-                return (
-                  <div className="filter-card" key={column.name}>
-                    <div className="filter-card-header">
-                      <span>{column.name}</span>
-                      <small>{column.inferred_type}</small>
-                    </div>
-
-                    {column.inferred_type === "numeric" && (
-                      <div className="range-inputs">
-                        <input
-                          type="number"
-                          placeholder={column.min !== undefined ? String(column.min) : "Min"}
-                          value={currentFilter.min || ""}
-                          onChange={(event) => updateFilter(column.name, { min: event.target.value })}
-                        />
-                        <input
-                          type="number"
-                          placeholder={column.max !== undefined ? String(column.max) : "Max"}
-                          value={currentFilter.max || ""}
-                          onChange={(event) => updateFilter(column.name, { max: event.target.value })}
-                        />
-                      </div>
-                    )}
-
-                    {column.inferred_type === "date" && (
-                      <div className="range-inputs">
-                        <input
-                          type="date"
-                          min={formatDateValue(column.min)}
-                          max={formatDateValue(column.max)}
-                          value={currentFilter.start || ""}
-                          onChange={(event) => updateFilter(column.name, { start: event.target.value })}
-                        />
-                        <input
-                          type="date"
-                          min={formatDateValue(column.min)}
-                          max={formatDateValue(column.max)}
-                          value={currentFilter.end || ""}
-                          onChange={(event) => updateFilter(column.name, { end: event.target.value })}
-                        />
-                      </div>
-                    )}
-
-                    {column.inferred_type === "boolean" && (
-                      <select
-                        value={currentFilter.value || ""}
-                        onChange={(event) => updateFilter(column.name, { value: event.target.value })}
-                      >
-                        <option value="">Any value</option>
-                        <option value="true">True</option>
-                        <option value="false">False</option>
-                      </select>
-                    )}
-
-                    {(column.inferred_type === "categorical" || column.inferred_type === "text") && (
-                      <select
-                        multiple
-                        value={currentFilter.values || []}
-                        onChange={(event) =>
-                          updateFilter(column.name, {
-                            values: Array.from(event.target.selectedOptions, (option) => option.value),
-                          })
-                        }
-                      >
-                        {sampleValues.length === 0 && <option disabled>No sample values</option>}
-                        {sampleValues.map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    <p>
-                      {column.unique_count.toLocaleString()} unique,{" "}
-                      {column.null_count.toLocaleString()} empty
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {isFiltering && <p className="status-message">Filtering rows in DuckDB...</p>}
-          </section>
+          <DynamicFiltersPanel
+            schema={dataset.schema}
+            filterValues={filterValues}
+            applying={isFiltering}
+            errorMessage={errorMessage}
+            onFilterChange={updateFilter}
+            onApplyFilters={applyFilters}
+            onResetFilters={resetFilters}
+          />
         )}
 
         {dataset && activeView === "queryBuilder" && (
