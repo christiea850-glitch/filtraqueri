@@ -15,10 +15,12 @@ import type {
   DatasetSession,
   WorkspaceMode,
 } from "./features/dataset/datasetTypes";
+import useDatasetSessions from "./features/dataset/useDatasetSessions";
 import type { FilterState } from "./features/filters/filterTypes";
-import type { HistoryItem } from "./features/history/historyTypes";
+import useQueryHistory from "./features/history/useQueryHistory";
 import type { AggregationState } from "./features/query-builder/queryBuilderTypes";
 import type { ResultState, ResultTabKey, SortDirection } from "./features/results/resultTypes";
+import useResults, { createEmptyResultState } from "./features/results/useResults";
 import {
   exportDataset,
   filterDataset,
@@ -28,16 +30,6 @@ import {
 import "./App.css";
 
 const MAX_QUERY_LIMIT = 1000;
-
-const createEmptyResultState = (): ResultState => ({
-  columns: [],
-  rows: [],
-  totalCount: 0,
-  page: 1,
-  rowsPerPage: 25,
-  sortColumn: "",
-  sortDirection: "ASC",
-});
 
 const analystViews: Array<{
   view: ActiveView;
@@ -85,16 +77,39 @@ const analystViews: Array<{
 
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
-  const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
-  const [recentDatasets, setRecentDatasets] = useState<DatasetSession[]>([]);
-  const [activeView, setActiveView] = useState<ActiveView>("welcome");
+  const {
+    dataset,
+    setDataset,
+    recentDatasets,
+    activeView,
+    setActiveView,
+    addRecentDataset,
+    updateDatasetSessionView,
+    updateDatasetSessionResultTab,
+    activateRecentDataset: activateRecentDatasetSession,
+  } = useDatasetSessions();
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("human");
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
-  const [activeResultTab, setActiveResultTab] = useState<ResultTabKey>("preview");
-  const [previewResult, setPreviewResult] = useState<ResultState>(createEmptyResultState);
-  const [filteredResult, setFilteredResult] = useState<ResultState>(createEmptyResultState);
-  const [queriedResult, setQueriedResult] = useState<ResultState>(createEmptyResultState);
+  const {
+    activeResultTab,
+    setActiveResultTab,
+    previewResult,
+    setPreviewResult,
+    filteredResult,
+    setFilteredResult,
+    queriedResult,
+    setQueriedResult,
+    activeResult,
+    resultRows,
+    resultColumns,
+    resultPage,
+    resultRowsPerPage,
+    resultTotalCount,
+    resultTotalPages,
+    hasFilteredResults,
+    resetResults,
+  } = useResults();
   const [isUploading, setIsUploading] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
   const [isRunningQuery, setIsRunningQuery] = useState(false);
@@ -109,7 +124,7 @@ function App() {
   const [querySortDirection, setQuerySortDirection] = useState<SortDirection>("ASC");
   const [queryLimit, setQueryLimit] = useState("100");
   const [hasRunQuery, setHasRunQuery] = useState(false);
-  const [queryHistory, setQueryHistory] = useState<HistoryItem[]>([]);
+  const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -121,10 +136,9 @@ function App() {
     setIsUploading(true);
     setErrorMessage("");
     setDataset(null);
+    setActiveResultTab("preview");
     updateDatasetSessionResultTab("preview");
-    setPreviewResult(createEmptyResultState());
-    setFilteredResult(createEmptyResultState());
-    setQueriedResult(createEmptyResultState());
+    resetResults();
     setFilterValues({});
     setQuerySelectedColumns([]);
     setQueryGroupBy([]);
@@ -132,7 +146,7 @@ function App() {
     setQuerySortColumn("");
     setQuerySortDirection("ASC");
     setHasRunQuery(false);
-    setQueryHistory([]);
+    clearHistory();
 
     try {
       const uploadResult = await uploadDataset(file);
@@ -193,19 +207,6 @@ function App() {
     ...activeAggregations.map(aggregationAlias),
   ];
 
-  const addHistory = (action: string, detail: string, resultCount: number) => {
-    setQueryHistory((currentHistory) => [
-      {
-        id: Date.now(),
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        action,
-        detail,
-        resultCount,
-      },
-      ...currentHistory.slice(0, 7),
-    ]);
-  };
-
   const createDatasetSession = (datasetMetadata: DatasetMetadata): DatasetSession => ({
     dataset: datasetMetadata,
     lastActiveView: activeView,
@@ -224,15 +225,6 @@ function App() {
     activeResultTab,
     queryHistory,
   });
-
-  const addRecentDataset = (session: DatasetSession) => {
-    setRecentDatasets((currentSessions) => [
-      session,
-      ...currentSessions
-        .filter((recentSession) => recentSession.dataset.dataset_id !== session.dataset.dataset_id)
-        .slice(0, 5),
-    ]);
-  };
 
   const restoreDatasetSession = (session: DatasetSession) => {
     setDataset(session.dataset);
@@ -254,39 +246,7 @@ function App() {
   };
 
   const activateRecentDataset = (datasetId: string) => {
-    const session = recentDatasets.find(
-      (recentSession) => recentSession.dataset.dataset_id === datasetId,
-    );
-
-    if (session) {
-      restoreDatasetSession(session);
-    }
-  };
-
-  const updateDatasetSessionView = (view: ActiveView) => {
-    setActiveView(view);
-    if (!dataset) return;
-
-    setRecentDatasets((currentSessions) =>
-      currentSessions.map((session) =>
-        session.dataset.dataset_id === dataset.dataset_id
-          ? { ...session, lastActiveView: view }
-          : session,
-      ),
-    );
-  };
-
-  const updateDatasetSessionResultTab = (tab: ResultTabKey) => {
-    setActiveResultTab(tab);
-    if (!dataset) return;
-
-    setRecentDatasets((currentSessions) =>
-      currentSessions.map((session) =>
-        session.dataset.dataset_id === dataset.dataset_id
-          ? { ...session, lastActiveResultTab: tab }
-          : session,
-      ),
-    );
+    activateRecentDatasetSession(datasetId, restoreDatasetSession);
   };
 
   useEffect(() => {
@@ -385,23 +345,15 @@ function App() {
       }, {})
     : {};
 
-  const activeResult =
-    activeResultTab === "queried"
-      ? queriedResult
-      : activeResultTab === "filtered"
-        ? filteredResult
-        : previewResult;
-  const resultRows = activeResult.rows;
-  const resultColumns = activeResult.columns;
-  const resultPage = activeResult.page;
-  const resultRowsPerPage = activeResult.rowsPerPage;
-  const resultTotalCount = activeResult.totalCount;
-  const resultTotalPages = Math.max(1, Math.ceil((resultTotalCount || 0) / resultRowsPerPage));
-  const hasFilteredResults = filteredResult.columns.length > 0;
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
 
-  const activateResultTab = (tab: ResultTabKey) => {
+  const handleResultTabChange = (tab: ResultTabKey) => {
+    setActiveResultTab(tab);
     updateDatasetSessionResultTab(tab);
+  };
+
+  const activateResultTab = (tab: ResultTabKey) => {
+    handleResultTabChange(tab);
     updateDatasetSessionView("results");
   };
 
@@ -921,7 +873,7 @@ function App() {
                   activeTab={activeResultTab}
                   hasFilteredResults={hasFilteredResults}
                   hasQueryResults={hasQueryResults}
-                  onTabChange={updateDatasetSessionResultTab}
+                  onTabChange={handleResultTabChange}
                 />
                 <button type="button" className="secondary-button" onClick={exportCurrentResults}>
                   {isExporting ? "Exporting..." : "Export CSV"}
