@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { SchemaColumn } from "../../features/dataset/datasetTypes";
 import type { AggregationState } from "../../features/query-builder/queryBuilderTypes";
 import type { SortDirection } from "../../features/results/resultTypes";
@@ -14,6 +15,7 @@ type VisualQueryBuilderPanelProps = {
   running: boolean;
   errorMessage?: string;
   onToggleSelectedColumn: (column: string) => void;
+  onSelectedColumnsChange: (columns: string[]) => void;
   onGroupByChange: (columns: string[]) => void;
   onAddAggregation: () => void;
   onUpdateAggregation: (id: number, value: Partial<AggregationState>) => void;
@@ -36,6 +38,7 @@ function VisualQueryBuilderPanel({
   running,
   errorMessage,
   onToggleSelectedColumn,
+  onSelectedColumnsChange,
   onGroupByChange,
   onAddAggregation,
   onUpdateAggregation,
@@ -45,6 +48,38 @@ function VisualQueryBuilderPanel({
   onRowLimitChange,
   onRunQuery,
 }: VisualQueryBuilderPanelProps) {
+  const [columnSearch, setColumnSearch] = useState("");
+  const normalizedSearch = columnSearch.trim().toLowerCase();
+  const visibleSchema = useMemo(
+    () =>
+      normalizedSearch
+        ? schema.filter(
+            (column) =>
+              column.name.toLowerCase().includes(normalizedSearch) ||
+              column.inferred_type.toLowerCase().includes(normalizedSearch),
+          )
+        : schema,
+    [normalizedSearch, schema],
+  );
+  const numericColumns = schema
+    .filter((column) => column.inferred_type === "numeric")
+    .map((column) => column.name);
+  const categoricalColumns = schema
+    .filter((column) => column.inferred_type === "categorical" || column.inferred_type === "text")
+    .map((column) => column.name);
+  const recommendedColumns = useMemo(() => {
+    const meaningfulMix = [
+      ...schema.filter((column) => column.inferred_type === "date").slice(0, 2),
+      ...schema.filter((column) => column.inferred_type === "categorical").slice(0, 3),
+      ...schema.filter((column) => column.inferred_type === "numeric").slice(0, 3),
+      ...schema.filter((column) => column.inferred_type === "text").slice(0, 2),
+    ].map((column) => column.name);
+
+    return Array.from(
+      new Set(meaningfulMix.length > 0 ? meaningfulMix : schema.map((column) => column.name)),
+    ).slice(0, 8);
+  }, [schema]);
+
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
       <div className="query-builder-header">
@@ -58,22 +93,81 @@ function VisualQueryBuilderPanel({
       </div>
 
       <div className="builder-grid">
-        <div className="builder-block">
+        <div className="builder-block query-column-block">
           <div className="builder-block-header">
             <span>Visible columns</span>
-            <small>{selectedColumns.length} selected</small>
+            <small>
+              {selectedColumns.length} selected, {schema.length} available
+            </small>
           </div>
-          <div className="field-chip-grid">
-            {schema.map((column) => (
-              <label className="field-chip" key={column.name}>
-                <input
-                  type="checkbox"
-                  checked={selectedColumns.includes(column.name)}
-                  onChange={() => onToggleSelectedColumn(column.name)}
-                />
-                {column.name}
-              </label>
-            ))}
+
+          <div className="query-column-controls">
+            <label className="query-column-search">
+              <span>Search columns</span>
+              <input
+                type="search"
+                value={columnSearch}
+                onChange={(event) => setColumnSearch(event.target.value)}
+                placeholder="Column name or type"
+              />
+            </label>
+
+            <div className="query-bulk-actions" aria-label="Visible column bulk actions">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSelectedColumnsChange(schema.map((column) => column.name))}
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSelectedColumnsChange([])}
+              >
+                Clear All
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSelectedColumnsChange(numericColumns)}
+              >
+                Numeric Only
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSelectedColumnsChange(categoricalColumns)}
+              >
+                Categorical Only
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onSelectedColumnsChange(recommendedColumns)}
+              >
+                Recommended
+              </button>
+            </div>
+          </div>
+
+          <div className="field-chip-scroll">
+            <div className="field-chip-grid">
+              {visibleSchema.map((column) => (
+                <label className="field-chip" key={column.name}>
+                  <input
+                    type="checkbox"
+                    checked={selectedColumns.includes(column.name)}
+                    onChange={() => onToggleSelectedColumn(column.name)}
+                  />
+                  {column.name}
+                </label>
+              ))}
+            </div>
+
+            {visibleSchema.length === 0 && (
+              <p className="query-column-empty">No columns match your search.</p>
+            )}
           </div>
         </div>
 

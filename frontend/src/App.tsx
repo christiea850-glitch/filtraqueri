@@ -917,6 +917,7 @@ function App() {
             onToggleSelectedColumn={(column) =>
               setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
             }
+            onSelectedColumnsChange={setQuerySelectedColumns}
             onGroupByChange={setQueryGroupBy}
             onAddAggregation={addAggregation}
             onUpdateAggregation={updateAggregation}
