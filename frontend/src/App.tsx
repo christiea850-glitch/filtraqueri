@@ -1,4 +1,4 @@
-import { type ChangeEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import DatasetSummaryPanel, {
   DatasetSessionPanel,
   type HumanIntent,
@@ -17,25 +17,20 @@ import {
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
 import type {
   ActiveView,
-  DatasetMetadata,
-  DatasetSession,
-  WorkspaceMode,
 } from "./features/dataset/datasetTypes";
-import useDatasetSessions from "./features/dataset/useDatasetSessions";
-import type { FilterState } from "./features/filters/filterTypes";
+import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatasetController";
+import useExportController from "./features/export/useExportController";
+import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
-import type { AggregationState } from "./features/query-builder/queryBuilderTypes";
-import type { ResultState, ResultTabKey, SortDirection } from "./features/results/resultTypes";
+import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
+import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import useResults, { createEmptyResultState } from "./features/results/useResults";
 import {
-  exportDataset,
   filterDataset,
   runQueryBuilder,
-  uploadDataset,
 } from "./services/api";
 import "./App.css";
 
-const MAX_QUERY_LIMIT = 1000;
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
 
 const humanIntentGuidance: Record<
@@ -101,21 +96,6 @@ const humanIntentGuidance: Record<
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
   const {
-    dataset,
-    setDataset,
-    recentDatasets,
-    activeView,
-    setActiveView,
-    addRecentDataset,
-    updateDatasetSessionView,
-    updateDatasetSessionResultTab,
-    activateRecentDataset: activateRecentDatasetSession,
-    removeRecentDataset,
-  } = useDatasetSessions();
-  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("human");
-  const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
-  const [selectedFileName, setSelectedFileName] = useState("");
-  const {
     activeResultTab,
     setActiveResultTab,
     previewResult,
@@ -134,219 +114,73 @@ function App() {
     hasFilteredResults,
     resetResults,
   } = useResults();
-  const [isUploading, setIsUploading] = useState(false);
   const [isFiltering, setIsFiltering] = useState(false);
   const [isRunningQuery, setIsRunningQuery] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [filterValues, setFilterValues] = useState<Record<string, FilterState>>({});
-  const [querySelectedColumns, setQuerySelectedColumns] = useState<string[]>([]);
-  const [queryGroupBy, setQueryGroupBy] = useState<string[]>([]);
-  const [queryAggregations, setQueryAggregations] = useState<AggregationState[]>([
-    { id: 1, function: "COUNT", column: "" },
-  ]);
-  const [querySortColumn, setQuerySortColumn] = useState("");
-  const [querySortDirection, setQuerySortDirection] = useState<SortDirection>("ASC");
-  const [queryLimit, setQueryLimit] = useState("100");
-  const [hasRunQuery, setHasRunQuery] = useState(false);
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
   const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
-
-  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    setSelectedFileName(file.name);
-    setIsUploading(true);
-    setErrorMessage("");
-    setDataset(null);
-    setActiveResultTab("preview");
-    updateDatasetSessionResultTab("preview");
-    resetResults();
-    setFilterValues({});
-    setQuerySelectedColumns([]);
-    setQueryGroupBy([]);
-    setQueryAggregations([{ id: 1, function: "COUNT", column: "" }]);
-    setQuerySortColumn("");
-    setQuerySortDirection("ASC");
-    setHasRunQuery(false);
-    setHumanIntent(null);
-    clearHistory();
-
-    try {
-      const uploadResult = await uploadDataset(file);
-      const uploadColumns = uploadResult.dataset.schema.map((column) => column.name);
-      setDataset(uploadResult.dataset);
-      updatePreviewResult(
-        {
-          columns: uploadColumns,
-          rows: uploadResult.preview,
-          totalCount: uploadResult.dataset.row_count,
-          page: 1,
-          rowsPerPage: 25,
-          sortColumn: "",
-          sortDirection: "ASC",
-        },
-        false,
-      );
-      setFilteredResult(createEmptyResultState());
-      setQueriedResult(createEmptyResultState());
-      setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
-      updateDatasetSessionView("dataset");
-    } catch (error) {
-      const rawMessage =
-        error instanceof Error ? error.message : "Upload failed. Please try again.";
-      const message = rawMessage.toLowerCase().includes("csv")
-        ? rawMessage
-        : rawMessage.toLowerCase().includes("backend is not running")
-          ? rawMessage
-          : "Upload failed. Please check the file and try again.";
-
-      setErrorMessage(message);
-    } finally {
-      setIsUploading(false);
-      event.target.value = "";
-    }
-  };
-
-  const updateFilter = (columnName: string, value: FilterState) => {
-    setFilterValues((currentValues) => ({
-      ...currentValues,
-      [columnName]: {
-        ...currentValues[columnName],
-        ...value,
-      },
-    }));
-  };
-
-  const toggleListValue = (values: string[], value: string) =>
-    values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-
-  const aggregationAlias = (aggregation: AggregationState) => {
-    if (aggregation.function === "COUNT" && !aggregation.column) return "count_rows";
-    return `${aggregation.function.toLowerCase()}_${aggregation.column.replace(/[^A-Za-z0-9_]/g, "_").toLowerCase()}`;
-  };
-
-  const activeAggregations = queryAggregations.filter(
-    (aggregation) => aggregation.function === "COUNT" || aggregation.column,
-  );
-
-  const querySortOptions = [
-    ...(activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns),
-    ...activeAggregations.map(aggregationAlias),
-  ];
-
-  const createDatasetSession = (datasetMetadata: DatasetMetadata): DatasetSession => ({
-    dataset: datasetMetadata,
-    lastActiveView: activeView,
-    lastActiveResultTab: activeResultTab,
-    previewResult,
-    filteredResult,
-    queriedResult,
-    filterValues,
+  const {
     querySelectedColumns,
+    setQuerySelectedColumns,
     queryGroupBy,
+    setQueryGroupBy,
     queryAggregations,
     querySortColumn,
+    setQuerySortColumn,
     querySortDirection,
+    setQuerySortDirection,
     queryLimit,
+    setQueryLimit,
     hasRunQuery,
-    activeResultTab,
-    queryHistory,
-  });
-
-  const restoreDatasetSession = (session: DatasetSession) => {
-    setDataset(session.dataset);
-    setPreviewResult(session.previewResult);
-    setFilteredResult(session.filteredResult);
-    setQueriedResult(session.queriedResult);
-    setFilterValues(session.filterValues);
-    setQuerySelectedColumns(session.querySelectedColumns);
-    setQueryGroupBy(session.queryGroupBy);
-    setQueryAggregations(session.queryAggregations);
-    setQuerySortColumn(session.querySortColumn);
-    setQuerySortDirection(session.querySortDirection);
-    setQueryLimit(session.queryLimit);
-    setHasRunQuery(session.hasRunQuery);
-    setActiveResultTab(session.lastActiveResultTab || session.activeResultTab || "preview");
-    setQueryHistory(session.queryHistory);
-    setSelectedFileName(session.dataset.original_filename);
-    setActiveView(session.lastActiveView || "results");
-  };
-
-  const activateRecentDataset = (datasetId: string) => {
-    activateRecentDatasetSession(datasetId, restoreDatasetSession);
-  };
-
-  const openDatasetPicker = () => {
-    updateDatasetSessionView("welcome");
-    setShouldOpenFilePicker(true);
-  };
-
-  const clearCurrentDatasetSession = () => {
-    if (!dataset) return;
-
-    const shouldClear = window.confirm(
-      `Clear the current workspace session for "${dataset.original_filename}"? Recent dataset history will remain available.`,
-    );
-
-    if (!shouldClear) return;
-
-    setDataset(null);
-    setSelectedFileName("");
-    setActiveResultTab("preview");
-    resetResults();
-    setFilterValues({});
-    setQuerySelectedColumns([]);
-    setQueryGroupBy([]);
-    setQueryAggregations([{ id: 1, function: "COUNT", column: "" }]);
-    setQuerySortColumn("");
-    setQuerySortDirection("ASC");
-    setQueryLimit("100");
-    setHasRunQuery(false);
-    setHumanIntent(null);
-    clearHistory();
-    setErrorMessage("");
-    setActiveView("dataset");
-  };
-
-  const removeRecentDatasetWithConfirmation = (datasetId: string) => {
-    const recentDataset = recentDatasets.find((session) => session.dataset.dataset_id === datasetId);
-    const datasetName = recentDataset?.dataset.original_filename || "this dataset";
-    const shouldRemove = window.confirm(
-      `Remove "${datasetName}" from recent datasets? This will not delete the uploaded data.`,
-    );
-
-    if (shouldRemove) removeRecentDataset(datasetId);
-  };
-
-  const confirmFutureDatasetDelete = (datasetId: string) => {
-    const targetDataset =
-      dataset?.dataset_id === datasetId
-        ? dataset
-        : recentDatasets.find((session) => session.dataset.dataset_id === datasetId)?.dataset;
-    const datasetName = targetDataset?.original_filename || "this dataset";
-    const shouldContinue = window.confirm(
-      `Delete "${datasetName}"? Backend dataset deletion is not connected yet, so no data will be deleted in this phase.`,
-    );
-
-    if (shouldContinue) {
-      window.alert("Dataset deletion is future-ready, but backend deletion is not connected yet.");
-    }
-  };
-
-  useEffect(() => {
-    if (dataset) {
-      addRecentDataset(createDatasetSession(dataset));
-    }
-  }, [
+    setHasRunQuery,
+    activeAggregations,
+    querySortOptions,
+    toggleListValue,
+    resetQueryBuilder,
+    restoreQueryBuilder,
+    addAggregation,
+    updateAggregation,
+    removeAggregation,
+    configureForHumanIntent,
+  } = useQueryBuilderController();
+  const {
+    filterValues,
+    setFilterValues,
+    updateFilter,
+    buildBackendFilters,
+    createFilterLabels,
+  } = useFilterController();
+  const {
     dataset,
+    recentDatasets,
+    activeView,
+    workspaceMode,
+    setWorkspaceMode,
+    shouldOpenFilePicker,
+    setShouldOpenFilePicker,
+    selectedFileName,
+    isUploading,
+    updateDatasetSessionView,
+    updateDatasetSessionResultTab,
+    activateRecentDataset,
+    openDatasetPicker,
+    handleFileUpload,
+    clearCurrentDatasetSession,
+    removeRecentDatasetWithConfirmation,
+    confirmFutureDatasetDelete,
+  } = useWorkspaceDatasetController({
+    activeResultTab,
+    setActiveResultTab,
     previewResult,
+    setPreviewResult,
     filteredResult,
+    setFilteredResult,
     queriedResult,
+    setQueriedResult,
+    resetResults,
     filterValues,
+    setFilterValues,
     querySelectedColumns,
     queryGroupBy,
     queryAggregations,
@@ -354,76 +188,31 @@ function App() {
     querySortDirection,
     queryLimit,
     hasRunQuery,
-    activeResultTab,
-    activeView,
+    restoreQueryBuilder,
+    resetQueryBuilder,
     queryHistory,
-  ]);
-
-  const buildBackendFilters = () => {
-    if (!dataset) return [];
-
-    return dataset.schema
-      .map((column) => {
-        const value = filterValues[column.name] || {};
-
-        if (column.inferred_type === "numeric") {
-          return {
-            column: column.name,
-            type: column.inferred_type,
-            min: value.min || null,
-            max: value.max || null,
-          };
-        }
-
-        if (column.inferred_type === "date") {
-          return {
-            column: column.name,
-            type: column.inferred_type,
-            start: value.start || null,
-            end: value.end || null,
-          };
-        }
-
-        if (column.inferred_type === "boolean") {
-          return {
-            column: column.name,
-            type: column.inferred_type,
-            value: value.value === "" || value.value === undefined ? null : value.value === "true",
-          };
-        }
-
-        return {
-          column: column.name,
-          type: column.inferred_type,
-          values: value.values || [],
-        };
-      })
-      .filter((filter) =>
-        Object.entries(filter).some(
-          ([key, value]) =>
-            key !== "column" &&
-            key !== "type" &&
-            value !== null &&
-            value !== "" &&
-            (!Array.isArray(value) || value.length > 0),
-        ),
-      );
-  };
-
-  const activeFilters = buildBackendFilters();
-
-  const activeFilterLabels = activeFilters.map((filter) => {
-    if ("values" in filter && Array.isArray(filter.values) && filter.values.length > 0) {
-      return `${filter.column}: ${filter.values.join(", ")}`;
-    }
-    if ("value" in filter && filter.value !== null) return `${filter.column}: ${filter.value}`;
-    if ("start" in filter || "end" in filter) {
-      return `${filter.column}: ${filter.start || "any"} to ${filter.end || "any"}`;
-    }
-    if ("min" in filter || "max" in filter) {
-      return `${filter.column}: ${filter.min || "min"} to ${filter.max || "max"}`;
-    }
-    return filter.column;
+    setQueryHistory,
+    clearHistory,
+    setErrorMessage,
+    setHumanIntent,
+  });
+  const activeFilters = buildBackendFilters(dataset);
+  const activeFilterLabels = createFilterLabels(activeFilters);
+  const buildActiveBackendFilters = () => buildBackendFilters(dataset);
+  const { isExporting, exportCurrentResults: runExportCurrentResults } = useExportController({
+    dataset,
+    activeResultTab,
+    hasRunQuery,
+    queryLimit,
+    queryGroupBy,
+    querySelectedColumns,
+    activeAggregations,
+    querySortColumn,
+    querySortDirection,
+    activeResult,
+    resultTotalCount,
+    buildBackendFilters: buildActiveBackendFilters,
+    addHistory,
   });
 
   const schemaTypeSummary = dataset
@@ -468,7 +257,7 @@ function App() {
 
     try {
       const filterResult = await filterDataset(dataset.dataset_id, {
-        filters: buildBackendFilters(),
+        filters: buildActiveBackendFilters(),
         limit: filteredResult.rowsPerPage,
         page: 1,
         order_by: filteredResult.sortColumn
@@ -558,7 +347,7 @@ function App() {
 
     try {
       const filterResult = await filterDataset(dataset.dataset_id, {
-        filters: activeResultTab === "filtered" ? buildBackendFilters() : [],
+        filters: activeResultTab === "filtered" ? buildActiveBackendFilters() : [],
         limit: rowsPerPage,
         page,
         order_by: sortColumn
@@ -610,7 +399,7 @@ function App() {
           function: aggregation.function,
           column: aggregation.column || null,
         })),
-        filters: buildBackendFilters(),
+        filters: buildActiveBackendFilters(),
         order_by: querySortColumn
           ? {
               column: querySortColumn,
@@ -652,27 +441,6 @@ function App() {
     }
   };
 
-  const addAggregation = () => {
-    setQueryAggregations((currentAggregations) => [
-      ...currentAggregations,
-      { id: Date.now(), function: "SUM", column: "" },
-    ]);
-  };
-
-  const updateAggregation = (id: number, value: Partial<AggregationState>) => {
-    setQueryAggregations((currentAggregations) =>
-      currentAggregations.map((aggregation) =>
-        aggregation.id === id ? { ...aggregation, ...value } : aggregation,
-      ),
-    );
-  };
-
-  const removeAggregation = (id: number) => {
-    setQueryAggregations((currentAggregations) =>
-      currentAggregations.filter((aggregation) => aggregation.id !== id),
-    );
-  };
-
   const loadQueryPage = async (
     page: number,
     rowsPerPage = queriedResult.rowsPerPage,
@@ -693,7 +461,7 @@ function App() {
           function: aggregation.function,
           column: aggregation.column || null,
         })),
-        filters: buildBackendFilters(),
+        filters: buildActiveBackendFilters(),
         order_by: sortColumn
           ? {
               column: sortColumn,
@@ -725,66 +493,9 @@ function App() {
   };
 
   const exportCurrentResults = async () => {
-    if (!dataset) return;
-
-    setIsExporting(true);
     setErrorMessage("");
-
-    try {
-      const isQueryExport = activeResultTab === "queried" && hasRunQuery;
-      const isFilteredExport = activeResultTab === "filtered";
-      const blob = await exportDataset(
-        dataset.dataset_id,
-        isQueryExport
-          ? {
-              source: "query_builder",
-              limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
-              query_builder: {
-                selected_columns:
-                  activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
-                group_by: queryGroupBy,
-                aggregations: activeAggregations.map((aggregation) => ({
-                  function: aggregation.function,
-                  column: aggregation.column || null,
-                })),
-                filters: buildBackendFilters(),
-                order_by: querySortColumn
-                  ? {
-                      column: querySortColumn,
-                      direction: querySortDirection,
-                    }
-                  : null,
-                limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
-                page: 1,
-              },
-            }
-          : {
-              source: "filter",
-              filters: isFilteredExport ? buildBackendFilters() : [],
-              order_by: activeResult.sortColumn
-                ? {
-                    column: activeResult.sortColumn,
-                    direction: activeResult.sortDirection,
-                  }
-                : null,
-              limit: MAX_QUERY_LIMIT,
-            },
-      );
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${dataset.filename.replace(/\.csv$/i, "")}_export.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      addHistory("Export", isQueryExport ? "Exported query result" : "Exported filtered result", resultTotalCount);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "We could not export the current results.";
-
-      setErrorMessage(message);
-    } finally {
-      setIsExporting(false);
-    }
+    const exportError = await runExportCurrentResults();
+    if (exportError) setErrorMessage(exportError);
   };
 
   const sortWorkspaceColumn = (column: string) => {
@@ -822,67 +533,11 @@ function App() {
     loadPreviewPage(1, rowsPerPage);
   };
 
-  const configureQueryBuilderForHumanIntent = (intent: HumanIntent) => {
-    if (!dataset) return;
-
-    const categoryColumn =
-      dataset.schema.find((column) => column.inferred_type === "categorical") ||
-      dataset.schema.find((column) => column.inferred_type === "text");
-    const dateColumn = dataset.schema.find((column) => column.inferred_type === "date");
-    const numericColumn = dataset.schema.find((column) => column.inferred_type === "numeric");
-    const columnsWithMissingValues = dataset.schema
-      .filter((column) => column.null_count > 0)
-      .map((column) => column.name);
-
-    if (intent === "missing_values") {
-      setQuerySelectedColumns(
-        columnsWithMissingValues.length > 0
-          ? columnsWithMissingValues.slice(0, 4)
-          : dataset.schema.slice(0, 4).map((column) => column.name),
-      );
-      setQueryGroupBy([]);
-      setQueryAggregations([]);
-      setQuerySortColumn("");
-      return;
-    }
-
-    if (intent === "top_categories" || intent === "simple_chart") {
-      setQuerySelectedColumns(categoryColumn ? [categoryColumn.name] : []);
-      setQueryGroupBy(categoryColumn ? [categoryColumn.name] : []);
-      setQueryAggregations([{ id: Date.now(), function: "COUNT", column: "" }]);
-      setQuerySortColumn("count_rows");
-      setQuerySortDirection("DESC");
-      return;
-    }
-
-    if (intent === "compare_columns") {
-      setQuerySelectedColumns(dataset.schema.slice(0, 2).map((column) => column.name));
-      setQueryGroupBy([]);
-      setQueryAggregations([]);
-      setQuerySortColumn("");
-      return;
-    }
-
-    if (intent === "trends") {
-      setQuerySelectedColumns(
-        dateColumn ? [dateColumn.name] : dataset.schema.slice(0, 1).map((column) => column.name),
-      );
-      setQueryGroupBy(dateColumn ? [dateColumn.name] : []);
-      setQueryAggregations([
-        numericColumn
-          ? { id: Date.now(), function: "AVG", column: numericColumn.name }
-          : { id: Date.now(), function: "COUNT", column: "" },
-      ]);
-      setQuerySortColumn(dateColumn?.name || "");
-      setQuerySortDirection("ASC");
-    }
-  };
-
   const selectHumanIntent = (intent: HumanIntent) => {
     const guidance = humanIntentGuidance[intent];
     setHumanIntent(intent);
     setWorkspaceMode("human");
-    configureQueryBuilderForHumanIntent(intent);
+    configureForHumanIntent(intent, dataset);
 
     if (intent === "summary" || intent === "unusual_values") {
       handleResultTabChange("preview");
