@@ -90,6 +90,8 @@ type ResultState = {
 
 type DatasetSession = {
   dataset: DatasetMetadata;
+  lastActiveView: ActiveView;
+  lastActiveResultTab: ResultTabKey;
   previewResult: ResultState;
   filteredResult: ResultState;
   queriedResult: ResultState;
@@ -162,7 +164,7 @@ function App() {
     setIsUploading(true);
     setErrorMessage("");
     setDataset(null);
-    setActiveResultTab("preview");
+    updateDatasetSessionResultTab("preview");
     setPreviewResult(createEmptyResultState());
     setFilteredResult(createEmptyResultState());
     setQueriedResult(createEmptyResultState());
@@ -263,6 +265,8 @@ function App() {
 
   const createDatasetSession = (datasetMetadata: DatasetMetadata): DatasetSession => ({
     dataset: datasetMetadata,
+    lastActiveView: activeView,
+    lastActiveResultTab: activeResultTab,
     previewResult,
     filteredResult,
     queriedResult,
@@ -300,10 +304,10 @@ function App() {
     setQuerySortDirection(session.querySortDirection);
     setQueryLimit(session.queryLimit);
     setHasRunQuery(session.hasRunQuery);
-    setActiveResultTab(session.activeResultTab);
+    setActiveResultTab(session.lastActiveResultTab || session.activeResultTab || "preview");
     setQueryHistory(session.queryHistory);
     setSelectedFileName(session.dataset.original_filename);
-    setActiveView("results");
+    setActiveView(session.lastActiveView || "results");
   };
 
   const activateRecentDataset = (datasetId: string) => {
@@ -314,6 +318,32 @@ function App() {
     if (session) {
       restoreDatasetSession(session);
     }
+  };
+
+  const updateDatasetSessionView = (view: ActiveView) => {
+    setActiveView(view);
+    if (!dataset) return;
+
+    setRecentDatasets((currentSessions) =>
+      currentSessions.map((session) =>
+        session.dataset.dataset_id === dataset.dataset_id
+          ? { ...session, lastActiveView: view }
+          : session,
+      ),
+    );
+  };
+
+  const updateDatasetSessionResultTab = (tab: ResultTabKey) => {
+    setActiveResultTab(tab);
+    if (!dataset) return;
+
+    setRecentDatasets((currentSessions) =>
+      currentSessions.map((session) =>
+        session.dataset.dataset_id === dataset.dataset_id
+          ? { ...session, lastActiveResultTab: tab }
+          : session,
+      ),
+    );
   };
 
   useEffect(() => {
@@ -334,6 +364,7 @@ function App() {
     queryLimit,
     hasRunQuery,
     activeResultTab,
+    activeView,
     queryHistory,
   ]);
 
@@ -427,8 +458,8 @@ function App() {
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
 
   const activateResultTab = (tab: ResultTabKey) => {
-    setActiveResultTab(tab);
-    setActiveView("results");
+    updateDatasetSessionResultTab(tab);
+    updateDatasetSessionView("results");
   };
 
   const updatePreviewResult = (nextResult: ResultState, shouldActivate = false) => {
@@ -926,7 +957,7 @@ function App() {
             type="button"
             className="sidebar-primary"
             onClick={() => {
-              setActiveView("welcome");
+              updateDatasetSessionView("welcome");
               setShouldOpenFilePicker(true);
             }}
           >
@@ -984,7 +1015,7 @@ function App() {
                 type="button"
                 key={view}
                 className={activeView === view ? "is-active" : ""}
-                onClick={() => setActiveView(view as ActiveView)}
+                onClick={() => updateDatasetSessionView(view as ActiveView)}
               >
                 {label}
               </button>
@@ -1151,7 +1182,7 @@ function App() {
                     activeTab={activeResultTab}
                     hasFilteredResults={hasFilteredResults}
                     hasQueryResults={hasQueryResults}
-                    onTabChange={setActiveResultTab}
+                    onTabChange={updateDatasetSessionResultTab}
                   />
                   <button type="button" className="secondary-button" onClick={exportCurrentResults}>
                     {isExporting ? "Exporting..." : "Export CSV"}
