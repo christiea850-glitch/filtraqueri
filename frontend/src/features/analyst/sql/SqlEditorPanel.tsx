@@ -3,14 +3,12 @@ import type { SqlExecutionStatus, SqlQueryDraft } from "./sqlTypes";
 type SqlEditorPanelProps = {
   sqlText: string;
   executionStatus: SqlExecutionStatus;
-  savedDrafts: SqlQueryDraft[];
   canRunQuery: boolean;
   onSqlChange: (sqlText: string) => void;
   onRunQuery: () => void;
   onClear: () => void;
   onSaveDraft: () => void;
   onExplain: () => void;
-  onLoadDraft: (draft: SqlQueryDraft) => void;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -23,14 +21,12 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
 function SqlEditorPanel({
   sqlText,
   executionStatus,
-  savedDrafts,
   canRunQuery,
   onSqlChange,
   onRunQuery,
   onClear,
   onSaveDraft,
   onExplain,
-  onLoadDraft,
 }: SqlEditorPanelProps) {
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -67,7 +63,18 @@ function SqlEditorPanel({
         <span>{statusLabels[executionStatus]}</span>
         <span>{sqlText.trim().length.toLocaleString()} characters</span>
       </div>
+    </section>
+  );
+}
 
+type SqlDraftPanelProps = {
+  savedDrafts: SqlQueryDraft[];
+  onLoadDraft: (draft: SqlQueryDraft) => void;
+};
+
+export function SqlDraftPanel({ savedDrafts, onLoadDraft }: SqlDraftPanelProps) {
+  return (
+    <section className="sql-draft-panel" aria-label="Saved SQL drafts">
       <div className="sql-draft-list" aria-label="Saved SQL drafts">
         <div className="builder-block-header">
           <span>Draft memory</span>

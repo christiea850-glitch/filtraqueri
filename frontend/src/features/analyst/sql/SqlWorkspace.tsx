@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
-import SqlEditorPanel from "./SqlEditorPanel";
+import SqlEditorPanel, { SqlDraftPanel } from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
@@ -91,7 +91,6 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
         <SqlEditorPanel
           sqlText={sqlText}
           executionStatus={executionStatus}
-          savedDrafts={savedDrafts}
           canRunQuery={Boolean(dataset)}
           onSqlChange={setSqlText}
           onRunQuery={() => updateStatus("execution-pending")}
@@ -101,12 +100,17 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
           }}
           onSaveDraft={saveDraft}
           onExplain={() => updateStatus("explain-ready")}
-          onLoadDraft={(draft) => {
-            setSqlText(draft.sql);
-            updateStatus("idle");
-          }}
         />
-        <SqlPreviewGrid previewResult={previewResult} />
+        <div className="sql-side-panel">
+          <SqlPreviewGrid previewResult={previewResult} />
+          <SqlDraftPanel
+            savedDrafts={savedDrafts}
+            onLoadDraft={(draft) => {
+              setSqlText(draft.sql);
+              updateStatus("idle");
+            }}
+          />
+        </div>
       </div>
     </section>
   );

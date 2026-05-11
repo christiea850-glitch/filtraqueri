@@ -1571,14 +1571,16 @@ h1 span:last-child {
 
 .sql-workspace {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: min(760px, calc(100vh - 92px));
 }
 
 .sql-context-panel,
 .sql-editor-panel,
-.sql-preview-panel {
+.sql-preview-panel,
+.sql-draft-panel {
   min-width: 0;
   padding: 20px;
   border: 1px solid #dbe5ef;
@@ -1587,8 +1589,14 @@ h1 span:last-child {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
+.sql-context-panel {
+  max-height: calc(100vh - 92px);
+  overflow: auto;
+}
+
 .sql-context-panel h2,
-.sql-editor-toolbar h2 {
+.sql-editor-toolbar h2,
+.sql-preview-panel h2 {
   margin: 0;
   color: #111827;
   font-size: 19px;
@@ -1686,8 +1694,24 @@ h1 span:last-child {
 
 .sql-main-panel {
   display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(280px, 360px);
   gap: 16px;
   min-width: 0;
+  align-items: stretch;
+}
+
+.sql-side-panel {
+  display: grid;
+  grid-template-rows: minmax(220px, 0.9fr) minmax(180px, 0.7fr);
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sql-editor-panel,
+.sql-preview-panel,
+.sql-draft-panel {
+  min-height: 0;
 }
 
 .sql-editor-toolbar {
@@ -1707,7 +1731,7 @@ h1 span:last-child {
 
 .sql-editor-input {
   width: 100%;
-  min-height: 300px;
+  min-height: min(58vh, 560px);
   padding: 18px;
   border: 1px solid #cbd5e1;
   border-radius: 14px;
@@ -1739,9 +1763,8 @@ h1 span:last-child {
 .sql-draft-list {
   display: grid;
   gap: 10px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
+  max-height: 260px;
+  overflow: auto;
 }
 
 .sql-draft-list p {
@@ -1834,6 +1857,21 @@ tr:hover {
 
   .results-workspace .session-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sql-workspace,
+  .sql-main-panel {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .sql-context-panel {
+    max-height: none;
+  }
+
+  .sql-side-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
   }
 }
 
@@ -1972,6 +2010,14 @@ tr:hover {
 
   .sql-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .sql-side-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-editor-input {
+    min-height: 280px;
   }
 
   .sql-editor-toolbar,
