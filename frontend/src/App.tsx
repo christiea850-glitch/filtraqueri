@@ -9,7 +9,11 @@ import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuild
 import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
-import SqlWorkspace from "./features/analyst/sql/SqlWorkspace";
+import {
+  createAnalystNavItems,
+  createAnalystWorkspaceRenderers,
+} from "./features/analyst/analystWorkspaceHelpers";
+import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
 import type {
   ActiveView,
   DatasetMetadata,
@@ -31,50 +35,7 @@ import {
 import "./App.css";
 
 const MAX_QUERY_LIMIT = 1000;
-
-const analystViews: Array<{
-  view: ActiveView;
-  label: string;
-  description: string;
-  capabilities: string[];
-}> = [
-  {
-    view: "sqlWorkspace",
-    label: "SQL Workspace",
-    description: "Write, organize, and review analyst-level SQL workflows in a future release.",
-    capabilities: ["SELECT workflows", "CTEs and subqueries", "Window functions"],
-  },
-  {
-    view: "savedQueries",
-    label: "Saved Queries",
-    description: "Save repeatable analysis steps and reuse query definitions across sessions.",
-    capabilities: ["Query library", "Reusable definitions", "Session-aware history"],
-  },
-  {
-    view: "queryExplain",
-    label: "Query Explain",
-    description: "Validate query structure and explain how a result is produced before execution.",
-    capabilities: ["Validation checks", "Execution explanation", "Risk warnings"],
-  },
-  {
-    view: "dataCleaning",
-    label: "Data Cleaning",
-    description: "Prepare datasets with controlled transformations and calculated fields.",
-    capabilities: ["Type cleanup", "Calculated columns", "Missing value handling"],
-  },
-  {
-    view: "diagnostics",
-    label: "Diagnostics",
-    description: "Inspect relational quality, table design, keys, dependencies, and anomalies.",
-    capabilities: ["Functional dependencies", "Anomaly detection", "Table design checks"],
-  },
-  {
-    view: "normalization",
-    label: "Normalization",
-    description: "Explore normalization guidance for 1NF, 2NF, and 3NF design improvements.",
-    capabilities: ["1NF checks", "2NF checks", "3NF recommendations"],
-  },
-];
+const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
 
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -750,39 +711,6 @@ function App() {
     </section>
   );
 
-  const renderAnalystView = (view: ActiveView) => {
-    if (workspaceMode !== "analyst") return null;
-
-    return (
-      <section className="analyst-workspace-panel standalone-panel">
-        {analystViews
-          .filter((item) => item.view === view)
-          .map((item) => (
-            <div className="analyst-foundation" key={item.view}>
-              <p className="section-label">Analyst mode</p>
-              <h2>{item.label}</h2>
-              <p>{item.description}</p>
-              <div className="analyst-tool-grid">
-                {item.capabilities.map((capability) => (
-                  <article key={capability}>
-                    <strong>{capability}</strong>
-                    <span>Planned</span>
-                  </article>
-                ))}
-              </div>
-              <div className="analyst-empty-state">
-                <strong>Frontend foundation ready</strong>
-                <p>
-                  This workspace will reuse the active dataset session, results grid,
-                  result tabs, and query history when execution support is added.
-                </p>
-              </div>
-            </div>
-          ))}
-      </section>
-    );
-  };
-
   const humanViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
     welcome: () => (
       <UploadPanel
@@ -915,13 +843,9 @@ function App() {
     ),
   };
 
-  const analystViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
-    ...analystViews.reduce<Partial<Record<ActiveView, () => ReactNode>>>((registry, item) => {
-      registry[item.view] = () => renderAnalystView(item.view);
-      return registry;
-    }, {}),
-    sqlWorkspace: () => <SqlWorkspace dataset={dataset} />,
-  };
+  const analystViewRegistry = createAnalystWorkspaceRenderers(analystWorkspaceRegistry, {
+    dataset,
+  });
 
   const workspaceViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
     ...humanViewRegistry,
@@ -945,7 +869,7 @@ function App() {
       workspaceMode={workspaceMode}
       dataset={dataset}
       recentDatasets={recentDatasets}
-      analystViews={analystViews}
+      analystViews={analystNavItems}
       errorMessage={errorMessage}
       onOpenFile={() => {
         updateDatasetSessionView("welcome");

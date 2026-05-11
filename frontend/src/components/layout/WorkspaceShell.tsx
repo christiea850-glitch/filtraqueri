@@ -9,6 +9,7 @@ import type {
 type AnalystNavItem = {
   view: ActiveView;
   label: string;
+  previewBadge?: string;
 };
 
 type WorkspaceShellProps = {
@@ -158,7 +159,7 @@ function WorkspaceShell({
                   onClick={() => onViewChange(item.view)}
                 >
                   {item.label}
-                  <span>Preview</span>
+                  <span>{item.previewBadge || "Preview"}</span>
                 </button>
               ))}
             </div>
