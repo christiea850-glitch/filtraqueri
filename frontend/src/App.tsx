@@ -150,6 +150,7 @@ function App() {
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
+  const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
 
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -934,16 +935,36 @@ function App() {
         <>
           {renderHumanIntentGuidance()}
           <section className="results-workspace" aria-label="Data exploration workspace">
-            <div className="results-context-strip" aria-label="Results context">
-              <DatasetSessionPanel
-                dataset={dataset}
-                schemaTypeSummary={schemaTypeSummary}
-                activeFilterLabels={activeFilterLabels}
-                queryGroupBy={queryGroupBy}
-              />
-
-              <QueryHistoryPanel history={queryHistory} />
+            <div className="results-workspace-header">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setIsResultsContextCollapsed((currentValue) => !currentValue)}
+              >
+                {isResultsContextCollapsed ? "Show context" : "Hide context"}
+              </button>
             </div>
+            {isResultsContextCollapsed ? (
+              <button
+                type="button"
+                className="collapsed-panel-bar"
+                onClick={() => setIsResultsContextCollapsed(false)}
+              >
+                Results context hidden - {activeFilterLabels.length} active filters -{" "}
+                {queryHistory.length} history items
+              </button>
+            ) : (
+              <div className="results-context-strip" aria-label="Results context">
+                <DatasetSessionPanel
+                  dataset={dataset}
+                  schemaTypeSummary={schemaTypeSummary}
+                  activeFilterLabels={activeFilterLabels}
+                  queryGroupBy={queryGroupBy}
+                />
+
+                <QueryHistoryPanel history={queryHistory} />
+              </div>
+            )}
 
             <ResultsGrid
               title={

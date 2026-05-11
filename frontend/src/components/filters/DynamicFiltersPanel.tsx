@@ -22,6 +22,7 @@ function DynamicFiltersPanel({
   onResetFilters,
 }: DynamicFiltersPanelProps) {
   const [columnSearch, setColumnSearch] = useState("");
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
 
   const formatDateValue = (value: unknown) => {
     if (!value) return "";
@@ -63,6 +64,13 @@ function DynamicFiltersPanel({
           <h2>Refine the preview</h2>
         </div>
         <div className="filter-actions">
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => setIsControlsCollapsed((currentValue) => !currentValue)}
+          >
+            {isControlsCollapsed ? "Show controls" : "Hide controls"}
+          </button>
           <button type="button" className="secondary-button" onClick={onResetFilters}>
             Reset
           </button>
@@ -72,26 +80,36 @@ function DynamicFiltersPanel({
         </div>
       </div>
 
-      <div className="filters-control-strip">
-        <div className="active-filter-summary" aria-label="Active filter summary">
-          <span>Active filters</span>
-          {activeFilterLabels.length > 0 ? (
-            activeFilterLabels.map((label) => <strong key={label}>{label}</strong>)
-          ) : (
-            <small>None yet</small>
-          )}
-        </div>
+      {isControlsCollapsed ? (
+        <button
+          type="button"
+          className="collapsed-panel-bar"
+          onClick={() => setIsControlsCollapsed(false)}
+        >
+          Filter controls hidden - {activeFilterLabels.length} active - {visibleSchema.length} visible
+        </button>
+      ) : (
+        <div className="filters-control-strip">
+          <div className="active-filter-summary" aria-label="Active filter summary">
+            <span>Active filters</span>
+            {activeFilterLabels.length > 0 ? (
+              activeFilterLabels.map((label) => <strong key={label}>{label}</strong>)
+            ) : (
+              <small>None yet</small>
+            )}
+          </div>
 
-        <label className="filter-search">
-          <span>Search columns</span>
-          <input
-            type="search"
-            value={columnSearch}
-            onChange={(event) => setColumnSearch(event.target.value)}
-            placeholder="Column name or type"
-          />
-        </label>
-      </div>
+          <label className="filter-search">
+            <span>Search columns</span>
+            <input
+              type="search"
+              value={columnSearch}
+              onChange={(event) => setColumnSearch(event.target.value)}
+              placeholder="Column name or type"
+            />
+          </label>
+        </div>
+      )}
 
       <div className="filters-grid-scroll">
         <div className="filters-grid">

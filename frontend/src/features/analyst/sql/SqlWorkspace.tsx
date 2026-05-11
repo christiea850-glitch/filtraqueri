@@ -34,6 +34,8 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
   const [sqlText, setSqlText] = useState(() => createInitialSql(dataset?.table_name));
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>([]);
   const [executionStatus, setExecutionStatus] = useState<SqlExecutionStatus>("idle");
+  const [isSchemaCollapsed, setIsSchemaCollapsed] = useState(false);
+  const [isSqlSideCollapsed, setIsSqlSideCollapsed] = useState(false);
   const [previewResult, setPreviewResult] = useState<SqlPreviewResult>({
     columns: [],
     rows: [],
@@ -78,12 +80,23 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
   };
 
   return (
-    <section className="sql-workspace" aria-label="SQL workspace">
+    <section
+      className={[
+        "sql-workspace",
+        isSchemaCollapsed ? "is-schema-collapsed" : "",
+        isSqlSideCollapsed ? "is-sql-side-collapsed" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label="SQL workspace"
+    >
       <SqlSchemaPanel
         dataset={dataset}
         columnSuggestions={columnSuggestions}
         templates={sqlTemplates}
         keywordSuggestions={sqlKeywordSuggestions}
+        collapsed={isSchemaCollapsed}
+        onToggleCollapsed={() => setIsSchemaCollapsed((currentValue) => !currentValue)}
         onInsertSql={insertSql}
       />
 
@@ -102,14 +115,25 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
           onExplain={() => updateStatus("explain-ready")}
         />
         <div className="sql-side-panel">
-          <SqlPreviewGrid previewResult={previewResult} />
-          <SqlDraftPanel
-            savedDrafts={savedDrafts}
-            onLoadDraft={(draft) => {
-              setSqlText(draft.sql);
-              updateStatus("idle");
-            }}
-          />
+          <button
+            type="button"
+            className="panel-collapse-button sql-side-collapse-button"
+            onClick={() => setIsSqlSideCollapsed((currentValue) => !currentValue)}
+          >
+            {isSqlSideCollapsed ? "Show preview" : "Hide preview"}
+          </button>
+          {!isSqlSideCollapsed && (
+            <>
+              <SqlPreviewGrid previewResult={previewResult} />
+              <SqlDraftPanel
+                savedDrafts={savedDrafts}
+                onLoadDraft={(draft) => {
+                  setSqlText(draft.sql);
+                  updateStatus("idle");
+                }}
+              />
+            </>
+          )}
         </div>
       </div>
     </section>

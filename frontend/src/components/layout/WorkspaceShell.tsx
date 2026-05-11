@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type {
   ActiveView,
   DatasetMetadata,
@@ -39,6 +39,24 @@ const humanSidebarItems: Array<[ActiveView, string]> = [
   ["settings", "Settings"],
 ];
 
+const navIcons: Record<string, string> = {
+  "Open File": "OF",
+  Welcome: "W",
+  Dataset: "D",
+  Filters: "F",
+  "Query Builder": "QB",
+  Results: "R",
+  History: "H",
+  Export: "E",
+  Settings: "S",
+  "SQL Workspace": "SQL",
+  "Saved Queries": "SQ",
+  "Query Explain": "QE",
+  "Data Cleaning": "DC",
+  Diagnostics: "DG",
+  Normalization: "N",
+};
+
 function WorkspaceShell({
   activeView,
   workspaceMode,
@@ -52,8 +70,19 @@ function WorkspaceShell({
   onModeChange,
   onRecentDatasetClick,
 }: WorkspaceShellProps) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
+
   return (
-    <div className="app">
+    <div
+      className={[
+        "app",
+        isSidebarCollapsed ? "is-sidebar-collapsed" : "",
+        isFocusMode ? "is-workspace-focused" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <header className="top-menu-bar">
         <div className="workspace-brand">
           <div className="brand-mark compact-mark" aria-hidden="true">
@@ -78,6 +107,13 @@ function WorkspaceShell({
         <span className="workspace-status">
           {dataset ? dataset.original_filename : "No dataset open"}
         </span>
+        <button
+          type="button"
+          className={`focus-toggle ${isFocusMode ? "is-active" : ""}`}
+          onClick={() => setIsFocusMode((currentValue) => !currentValue)}
+        >
+          {isFocusMode ? "Exit Focus" : "Focus Mode"}
+        </button>
         <div className="mode-switcher" aria-label="Workspace mode">
           <button
             type="button"
@@ -98,8 +134,22 @@ function WorkspaceShell({
 
       <div className="workspace-shell">
         <aside className="left-sidebar" aria-label="Workspace navigation">
+          <button
+            type="button"
+            className="sidebar-collapse-toggle"
+            onClick={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
+            aria-label={isSidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
+          >
+            <span className="nav-icon" aria-hidden="true">
+              {isSidebarCollapsed ? ">" : "<"}
+            </span>
+            <span className="nav-label">{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
+          </button>
           <button type="button" className="sidebar-primary" onClick={onOpenFile}>
-            Open File
+            <span className="nav-icon" aria-hidden="true">
+              {navIcons["Open File"]}
+            </span>
+            <span className="nav-label">Open File</span>
           </button>
           <div className="sidebar-dataset-summary" aria-label="Active dataset">
             <p>Active dataset</p>
@@ -126,7 +176,11 @@ function WorkspaceShell({
                   key={session.dataset.dataset_id}
                   className={dataset?.dataset_id === session.dataset.dataset_id ? "is-active" : ""}
                   onClick={() => onRecentDatasetClick(session.dataset.dataset_id)}
+                  title={session.dataset.original_filename}
                 >
+                  <span className="nav-icon" aria-hidden="true">
+                    D
+                  </span>
                   <strong>{session.dataset.original_filename}</strong>
                   <span>
                     {session.dataset.row_count.toLocaleString()} rows &middot;{" "}
@@ -143,8 +197,12 @@ function WorkspaceShell({
                 key={view}
                 className={activeView === view ? "is-active" : ""}
                 onClick={() => onViewChange(view)}
+                title={label}
               >
-                {label}
+                <span className="nav-icon" aria-hidden="true">
+                  {navIcons[label] || label.slice(0, 2)}
+                </span>
+                <span className="nav-label">{label}</span>
               </button>
             ))}
           </nav>
@@ -157,9 +215,13 @@ function WorkspaceShell({
                   key={item.view}
                   className={activeView === item.view ? "is-active" : ""}
                   onClick={() => onViewChange(item.view)}
+                  title={item.label}
                 >
-                  {item.label}
-                  <span>{item.previewBadge || "Preview"}</span>
+                  <span className="nav-icon" aria-hidden="true">
+                    {navIcons[item.label] || item.label.slice(0, 2)}
+                  </span>
+                  <span className="nav-label">{item.label}</span>
+                  <span className="nav-badge">{item.previewBadge || "Preview"}</span>
                 </button>
               ))}
             </div>
