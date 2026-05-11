@@ -1,3 +1,5 @@
+import type { SchemaColumn } from "../../dataset/datasetTypes";
+
 export type SqlExecutionStatus = "idle" | "draft-saved" | "explain-ready" | "execution-pending";
 
 export type SqlQueryDraft = {
@@ -22,4 +24,16 @@ export type SqlSuggestion = {
 
 export type SqlTemplate = SqlSuggestion & {
   category: "select" | "aggregate" | "filter" | "sort";
+};
+
+export type SqlEditorInterface = {
+  value: string;
+  onChange: (sqlText: string) => void;
+  onRun: () => void;
+  onExplain: () => void;
+  onSaveDraft: () => void;
+  onClear: () => void;
+  schema: SchemaColumn[];
+  suggestions: SqlSuggestion[];
+  templates: SqlTemplate[];
 };

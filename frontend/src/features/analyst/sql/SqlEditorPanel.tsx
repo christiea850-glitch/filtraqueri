@@ -1,14 +1,11 @@
-import type { SqlExecutionStatus, SqlQueryDraft } from "./sqlTypes";
+import SqlEditorHost from "./SqlEditorHost";
+import type { SqlEditorInterface, SqlExecutionStatus, SqlQueryDraft } from "./sqlTypes";
 
 type SqlEditorPanelProps = {
-  sqlText: string;
+  editor: SqlEditorInterface;
   executionStatus: SqlExecutionStatus;
+  characterCount: number;
   canRunQuery: boolean;
-  onSqlChange: (sqlText: string) => void;
-  onRunQuery: () => void;
-  onClear: () => void;
-  onSaveDraft: () => void;
-  onExplain: () => void;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -19,14 +16,10 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
 };
 
 function SqlEditorPanel({
-  sqlText,
+  editor,
   executionStatus,
+  characterCount,
   canRunQuery,
-  onSqlChange,
-  onRunQuery,
-  onClear,
-  onSaveDraft,
-  onExplain,
 }: SqlEditorPanelProps) {
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -36,32 +29,26 @@ function SqlEditorPanel({
           <h2>Analyst query draft</h2>
         </div>
         <div className="sql-actions">
-          <button type="button" className="primary-button" onClick={onRunQuery} disabled={!canRunQuery}>
+          <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
             Run Query
           </button>
-          <button type="button" className="secondary-button" onClick={onExplain}>
+          <button type="button" className="secondary-button" onClick={editor.onExplain}>
             Explain
           </button>
-          <button type="button" className="secondary-button" onClick={onSaveDraft}>
+          <button type="button" className="secondary-button" onClick={editor.onSaveDraft}>
             Save Draft
           </button>
-          <button type="button" className="text-button" onClick={onClear}>
+          <button type="button" className="text-button" onClick={editor.onClear}>
             Clear
           </button>
         </div>
       </div>
 
-      <textarea
-        className="sql-editor-input"
-        value={sqlText}
-        onChange={(event) => onSqlChange(event.target.value)}
-        spellCheck={false}
-        aria-label="SQL query text"
-      />
+      <SqlEditorHost editor={editor} />
 
       <div className="sql-editor-footer">
         <span>{statusLabels[executionStatus]}</span>
-        <span>{sqlText.trim().length.toLocaleString()} characters</span>
+        <span>{characterCount.toLocaleString()} characters</span>
       </div>
     </section>
   );
