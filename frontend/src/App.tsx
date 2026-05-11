@@ -824,46 +824,10 @@ function App() {
                   </button>
                 </div>
                 <p className="welcome-note">Ask your data naturally</p>
+                {isUploading && <p className="status-message">Uploading and profiling your dataset...</p>}
+                {errorMessage && <p className="error-message">{errorMessage}</p>}
               </div>
             </section>
-          )}
-
-          {activeView === "welcome" && (
-            <div className="card workspace-card">
-              <header className="brand-header">
-          <div className="brand-lockup" aria-label="FiltraQueri">
-            <div className="brand-mark" aria-hidden="true">
-              <svg viewBox="0 0 48 48" role="img">
-                <path
-                  className="mark-funnel"
-                  d="M9 11h30L28 24.5v8.7l-8 4.3v-13L9 11Z"
-                />
-                <path className="mark-search" d="M30 29.5a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" />
-                <path className="mark-handle" d="m34.5 34.5 5 5" />
-              </svg>
-            </div>
-            <h1>
-              <span>Filtra</span>
-              <span>Queri</span>
-            </h1>
-          </div>
-          <p className="tagline">Simple Data Intelligence for Everyone</p>
-          <p className="subtitle">Ask Your Data Naturally</p>
-        </header>
-
-        <div className="upload-box">
-          <div className="upload-icon" aria-hidden="true">
-            CSV
-          </div>
-          <div>
-            <p className="upload-title">Upload your dataset</p>
-            <p className="upload-helper">Upload a CSV file to begin exploring your data.</p>
-          </div>
-          <input type="file" accept=".csv" onChange={handleFileUpload} disabled={isUploading} />
-          {isUploading && <p className="status-message">Uploading and profiling your dataset...</p>}
-          {errorMessage && <p className="error-message">{errorMessage}</p>}
-        </div>
-            </div>
           )}
 
         {dataset && activeView === "dataset" && (
