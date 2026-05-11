@@ -1,0 +1,326 @@
+.sql-workspace {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  min-height: min(760px, calc(100vh - 92px));
+  transition: grid-template-columns 180ms ease;
+}
+
+.sql-workspace.is-schema-collapsed {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+.app.is-workspace-focused .sql-workspace {
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+
+.app.is-workspace-focused .sql-workspace.is-schema-collapsed {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+.sql-context-panel,
+.sql-editor-panel,
+.sql-preview-panel,
+.sql-draft-panel {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #dbe5ef;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.sql-context-panel {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  max-height: calc(100vh - 92px);
+  overflow: auto;
+}
+
+.sql-context-panel .panel-collapse-button {
+  justify-self: start;
+}
+
+.sql-workspace.is-schema-collapsed .sql-context-panel {
+  padding: 10px;
+  overflow: hidden;
+}
+
+.sql-workspace.is-schema-collapsed .sql-context-body {
+  display: none;
+}
+
+.sql-workspace.is-schema-collapsed .sql-context-panel .panel-collapse-button {
+  writing-mode: vertical-rl;
+  min-height: 120px;
+  width: 36px;
+  padding: 10px 0;
+}
+
+.sql-context-panel h2,
+.sql-editor-toolbar h2,
+.sql-preview-panel h2 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-preview-panel .data-grid-toolbar p:last-child {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+.sql-preview-panel .compact-empty h2 {
+  white-space: normal;
+}
+
+.sql-preview-panel .compact-empty p {
+  line-height: 1.45;
+}
+
+.sql-schema-list {
+  display: flex;
+  max-height: 360px;
+  margin-top: 18px;
+  overflow: auto;
+}
+
+.sql-schema-chip {
+  font: inherit;
+  cursor: pointer;
+}
+
+.sql-schema-chip:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sql-helper-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.sql-suggestion-grid,
+.sql-keyword-list,
+.sql-template-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sql-suggestion-grid button,
+.sql-template-list button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sql-suggestion-grid button {
+  flex: 1 1 120px;
+}
+
+.sql-template-list button {
+  flex: 1 1 100%;
+}
+
+.sql-suggestion-grid button:hover,
+.sql-template-list button:hover,
+.sql-keyword-list button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sql-suggestion-grid strong,
+.sql-template-list strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.sql-suggestion-grid span,
+.sql-template-list span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sql-keyword-list button {
+  padding: 7px 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sql-main-panel {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(280px, 360px);
+  gap: 16px;
+  min-width: 0;
+  align-items: stretch;
+  transition: grid-template-columns 180ms ease;
+}
+
+.sql-workspace.is-sql-side-collapsed .sql-main-panel {
+  grid-template-columns: minmax(0, 1fr) 58px;
+}
+
+.sql-side-panel {
+  display: grid;
+  grid-template-rows: minmax(220px, 0.9fr) minmax(180px, 0.7fr);
+  gap: 16px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sql-side-collapse-button {
+  justify-self: end;
+}
+
+.sql-workspace.is-sql-side-collapsed .sql-side-panel {
+  grid-template-rows: 1fr;
+}
+
+.sql-workspace.is-sql-side-collapsed .sql-side-collapse-button {
+  justify-self: stretch;
+  writing-mode: vertical-rl;
+  min-height: 160px;
+  padding: 10px 0;
+}
+
+.sql-editor-panel,
+.sql-preview-panel,
+.sql-draft-panel {
+  min-height: 0;
+}
+
+.sql-editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.sql-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sql-editor-input {
+  width: 100%;
+  min-height: min(58vh, 560px);
+  padding: 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  outline: none;
+  resize: vertical;
+  background: #0f172a;
+  color: #e5eefb;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  tab-size: 2;
+}
+
+.sql-editor-host {
+  min-width: 0;
+}
+
+.sql-editor-input:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
+}
+
+.sql-editor-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.sql-draft-list {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.sql-draft-list p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.sql-helper-empty {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sql-draft-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sql-draft-list button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sql-draft-list strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.sql-draft-list span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+

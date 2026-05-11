@@ -1,0 +1,257 @@
+@media (max-width: 1080px) {
+  .results-context-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .results-workspace .session-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sql-workspace,
+  .sql-main-panel {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .sql-workspace.is-schema-collapsed,
+  .app.is-workspace-focused .sql-workspace,
+  .app.is-workspace-focused .sql-workspace.is-schema-collapsed,
+  .sql-workspace.is-sql-side-collapsed .sql-main-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-context-panel {
+    max-height: none;
+  }
+
+  .sql-workspace.is-schema-collapsed .sql-context-panel {
+    padding: 12px;
+  }
+
+  .sql-workspace.is-schema-collapsed .sql-context-panel .panel-collapse-button,
+  .sql-workspace.is-sql-side-collapsed .sql-side-collapse-button {
+    writing-mode: horizontal-tb;
+    min-height: 32px;
+    width: auto;
+    padding: 0 10px;
+  }
+
+  .sql-side-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .app {
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 0;
+  }
+
+  .top-menu-bar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .menu-items {
+    flex-wrap: wrap;
+  }
+
+  .workspace-status {
+    max-width: 100%;
+  }
+
+  .workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app.is-sidebar-collapsed .workspace-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .left-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #dbe5ef;
+  }
+
+  .app.is-sidebar-collapsed .left-sidebar {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .app.is-sidebar-collapsed .left-sidebar nav,
+  .app.is-sidebar-collapsed .hub-subnav,
+  .app.is-sidebar-collapsed .analyst-sidebar-section {
+    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
+  }
+
+  .workspace-canvas {
+    padding: 14px;
+  }
+
+  .welcome-screen {
+    padding: 26px;
+  }
+
+  .welcome-copy h2 {
+    font-size: 34px;
+  }
+
+  .card {
+    padding: 28px 18px;
+    border-radius: 20px;
+  }
+
+  .brand-lockup {
+    gap: 10px;
+  }
+
+  .brand-mark {
+    width: 46px;
+    height: 46px;
+  }
+
+  h1 {
+    font-size: 34px;
+  }
+
+  .upload-box {
+    grid-template-columns: 1fr;
+    padding: 22px;
+    text-align: center;
+  }
+
+  .upload-icon {
+    margin: 0 auto;
+  }
+
+  .summary-header,
+  .preview-heading,
+  .filters-header,
+  .query-builder-header {
+    flex-direction: column;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dataset-current-card,
+  .recent-dataset-card,
+  .dataset-empty-guidance {
+    grid-template-columns: 1fr;
+  }
+
+  .dataset-card-actions,
+  .dataset-hub-actions {
+    justify-content: stretch;
+  }
+
+  .dataset-id {
+    align-self: flex-start;
+  }
+
+  .filter-actions,
+  .primary-button,
+  .secondary-button {
+    width: 100%;
+  }
+
+  .filter-actions {
+    flex-direction: column;
+  }
+
+  .filters-control-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .filters-grid-scroll {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .range-inputs {
+    grid-template-columns: 1fr;
+  }
+
+  .builder-grid,
+  .query-workflow-tabs,
+  .query-stage-grid,
+  .compact-query-stage .query-stage-grid,
+  .query-review-grid,
+  .aggregation-row,
+  .sort-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .query-stage-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .builder-grid.is-group-collapsed .query-column-block,
+  .builder-grid.is-analysis-collapsed .query-column-block {
+    grid-column: auto;
+  }
+
+  .field-chip-scroll {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .query-builder-header .primary-button {
+    width: 100%;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-workspace .session-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-side-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-editor-input {
+    min-height: 280px;
+  }
+
+  .sql-editor-toolbar,
+  .sql-actions,
+  .sql-editor-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sql-actions,
+  .sql-actions .primary-button,
+  .sql-actions .secondary-button,
+  .sql-actions .text-button {
+    width: 100%;
+  }
+
+  .data-grid-toolbar,
+  .workspace-actions,
+  .pagination-bar,
+  .page-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-actions,
+  .pagination-bar > div,
+  .page-controls {
+    width: 100%;
+  }
+}

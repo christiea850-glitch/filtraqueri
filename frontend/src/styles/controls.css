@@ -1,0 +1,103 @@
+.filter-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.primary-button,
+.secondary-button,
+.text-button,
+.icon-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.primary-button {
+  border: 1px solid #0f172a;
+  background: #0f172a;
+  color: white;
+}
+
+.secondary-button {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+}
+
+.text-button {
+  min-height: 32px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.icon-button {
+  width: 38px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.text-button:hover,
+.icon-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.secondary-button:hover {
+  border-color: #94a3b8;
+}
+
+.text-button:hover {
+  border-color: #bfdbfe;
+  background: #dbeafe;
+}
+
+.collapsed-panel-bar {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px dashed #bfdbfe;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.panel-collapse-button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
