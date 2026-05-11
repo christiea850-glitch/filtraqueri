@@ -1,5 +1,6 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
-import Editor, { type BeforeMount, type OnMount } from "@monaco-editor/react";
+import Editor, { type BeforeMount, type Monaco, type OnMount } from "@monaco-editor/react";
+import type { editor as MonacoEditor, Position } from "monaco-editor";
 import type { SqlEditorInterface } from "./sqlTypes";
 
 type SqlEditorHostProps = {
@@ -43,9 +44,42 @@ function SqlTextareaFallback({ editor }: SqlEditorHostProps) {
   );
 }
 
+const keywordHelp: Record<string, string> = {
+  SELECT: "Choose the columns or calculations you want to return.",
+  FROM: "Choose the dataset table to read from.",
+  WHERE: "Filter rows before results are returned.",
+  "GROUP BY": "Group rows by one or more columns before summarizing.",
+  "ORDER BY": "Sort the result rows by a column or expression.",
+  LIMIT: "Limit how many rows are returned.",
+  COUNT: "Count rows or non-empty values.",
+  SUM: "Add numeric values together.",
+  AVG: "Calculate an average for numeric values.",
+  MIN: "Find the smallest value.",
+  MAX: "Find the largest value.",
+  "CASE WHEN": "Create conditional logic inside a query.",
+};
+
+const keywordInsertText: Record<string, string> = {
+  SELECT: "SELECT ",
+  FROM: "FROM ",
+  WHERE: "WHERE ",
+  "GROUP BY": "GROUP BY ",
+  "ORDER BY": "ORDER BY ",
+  LIMIT: "LIMIT ",
+  COUNT: "COUNT(${1:*})",
+  SUM: "SUM(${1:column})",
+  AVG: "AVG(${1:column})",
+  MIN: "MIN(${1:column})",
+  MAX: "MAX(${1:column})",
+  "CASE WHEN": "CASE WHEN ${1:condition} THEN ${2:value} ELSE ${3:other_value} END",
+};
+
+const markdownEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
+
 function SqlEditorHost({ editor }: SqlEditorHostProps) {
   const [shouldUseFallback, setShouldUseFallback] = useState(false);
   const hasMountedMonacoRef = useRef(false);
+  const monacoRef = useRef<Monaco | null>(null);
 
   useEffect(() => {
     const fallbackTimer = window.setTimeout(() => {
@@ -54,6 +88,135 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
 
     return () => window.clearTimeout(fallbackTimer);
   }, []);
+
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco || shouldUseFallback) return undefined;
+
+    const completionProvider = monaco.languages.registerCompletionItemProvider("sql", {
+      triggerCharacters: [" ", "\n", "\"", "."],
+      provideCompletionItems: (model: MonacoEditor.ITextModel, position: Position) => {
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn,
+        };
+        const keywordCompletions = editor.keywordSuggestions.map((keyword) => ({
+          label: keyword,
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          insertText: keywordInsertText[keyword] || `${keyword} `,
+          insertTextRules:
+            keyword.includes("(") || keyword === "CASE WHEN"
+              ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+              : undefined,
+          detail: "SQL keyword",
+          documentation: keywordHelp[keyword] || "SQL keyword.",
+          range,
+        }));
+        const columnCompletions = editor.suggestions.map((suggestion) => {
+          const schemaColumn = editor.schema.find((column) => column.name === suggestion.label);
+
+          return {
+            label: suggestion.label,
+            kind: monaco.languages.CompletionItemKind.Field,
+            insertText: suggestion.sql,
+            detail: schemaColumn
+              ? `${schemaColumn.inferred_type} column`
+              : suggestion.description,
+            documentation: {
+              value: [
+                `**${markdownEscape(suggestion.label)}**`,
+                "",
+                suggestion.description,
+                schemaColumn
+                  ? `Nulls: ${schemaColumn.null_count.toLocaleString()} | Unique values: ${schemaColumn.unique_count.toLocaleString()}`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join("\n"),
+            },
+            range,
+          };
+        });
+        const templateCompletions = editor.templates.map((template) => ({
+          label: template.label,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: template.sql,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          detail: `${template.category} template`,
+          documentation: {
+            value: `**${markdownEscape(template.label)}**\n\n${template.description}`,
+          },
+          range,
+        }));
+
+        return {
+          suggestions: [...keywordCompletions, ...columnCompletions, ...templateCompletions],
+        };
+      },
+    });
+
+    const hoverProvider = monaco.languages.registerHoverProvider("sql", {
+      provideHover: (model: MonacoEditor.ITextModel, position: Position) => {
+        const word = model.getWordAtPosition(position);
+        if (!word) return null;
+
+        const rawWord = word.word.replace(/^"|"$/g, "");
+        const keyword = editor.keywordSuggestions.find(
+          (keywordSuggestion) => keywordSuggestion === rawWord.toUpperCase(),
+        );
+
+        if (keyword) {
+          return {
+            contents: [
+              { value: `**${keyword}**` },
+              { value: keywordHelp[keyword] || "SQL keyword." },
+            ],
+          };
+        }
+
+        const schemaColumn = editor.schema.find((column) => column.name === rawWord);
+        if (schemaColumn) {
+          return {
+            contents: [
+              { value: `**${markdownEscape(schemaColumn.name)}**` },
+              { value: `${schemaColumn.inferred_type} column` },
+              {
+                value: `Nulls: ${schemaColumn.null_count.toLocaleString()} | Unique values: ${schemaColumn.unique_count.toLocaleString()}`,
+              },
+            ],
+          };
+        }
+
+        const template = editor.templates.find(
+          (sqlTemplate) => sqlTemplate.label.toLowerCase() === rawWord.toLowerCase(),
+        );
+        if (template) {
+          return {
+            contents: [
+              { value: `**${markdownEscape(template.label)}**` },
+              { value: template.description },
+            ],
+          };
+        }
+
+        return null;
+      },
+    });
+
+    return () => {
+      completionProvider.dispose();
+      hoverProvider.dispose();
+    };
+  }, [
+    editor.keywordSuggestions,
+    editor.schema,
+    editor.suggestions,
+    editor.templates,
+    shouldUseFallback,
+  ]);
 
   const configureMonaco: BeforeMount = (monaco) => {
     monaco.editor.defineTheme("filtraqueri-sql-dark", {
@@ -76,8 +239,9 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
     });
   };
 
-  const handleMount: OnMount = (monacoEditor) => {
+  const handleMount: OnMount = (monacoEditor, monaco) => {
     hasMountedMonacoRef.current = true;
+    monacoRef.current = monaco;
     monacoEditor.layout();
   };
 
@@ -105,7 +269,7 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
               lineHeight: 24,
               minimap: { enabled: false },
               padding: { top: 16, bottom: 16 },
-              quickSuggestions: false,
+              quickSuggestions: true,
               readOnly: false,
               renderLineHighlight: "line",
               scrollBeyondLastLine: false,

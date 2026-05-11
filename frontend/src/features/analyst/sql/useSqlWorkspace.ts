@@ -104,6 +104,7 @@ function useSqlWorkspace(dataset: DatasetMetadata | null) {
     schema: dataset?.schema || [],
     suggestions,
     templates,
+    keywordSuggestions: sqlKeywordSuggestions,
   };
 
   return {

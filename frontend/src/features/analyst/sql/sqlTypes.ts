@@ -36,4 +36,5 @@ export type SqlEditorInterface = {
   schema: SchemaColumn[];
   suggestions: SqlSuggestion[];
   templates: SqlTemplate[];
+  keywordSuggestions: string[];
 };
