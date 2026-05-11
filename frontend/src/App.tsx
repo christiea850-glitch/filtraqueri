@@ -546,19 +546,241 @@ function App() {
     updateDatasetSessionView(guidance.route);
   };
 
+  const navigateHumanInsightAction = (view: ActiveView, tab?: ResultTabKey) => {
+    if (tab) handleResultTabChange(tab);
+    updateDatasetSessionView(view);
+  };
+
+  const createHumanInsight = (intent: HumanIntent) => {
+    const guidance = humanIntentGuidance[intent];
+
+    if (!dataset) {
+      return {
+        title: guidance.label,
+        explanation: "Open a CSV dataset first, then FiltraQueri can turn this guided question into a useful workspace path.",
+        canCheck: ["Dataset shape", "Column types", "Preview rows"],
+        signals: ["No dataset is currently open."],
+        actions: [{ label: "Open a dataset", view: "dataset" as ActiveView }],
+      };
+    }
+
+    const numericColumns = dataset.schema.filter((column) => column.inferred_type === "numeric");
+    const categoricalColumns = dataset.schema.filter(
+      (column) => column.inferred_type === "categorical" || column.inferred_type === "text",
+    );
+    const dateColumns = dataset.schema.filter((column) => column.inferred_type === "date");
+    const columnsWithMissingValues = dataset.schema.filter((column) => column.null_count > 0);
+    const previewRowsCount = previewResult.rows.length;
+    const activeResultCount = resultTotalCount || activeResult.totalCount || dataset.row_count;
+
+    const baseSignals = [
+      `${dataset.row_count.toLocaleString()} rows and ${dataset.column_count.toLocaleString()} columns are available.`,
+      `${previewRowsCount.toLocaleString()} preview rows are loaded for a quick first look.`,
+      activeFilterLabels.length > 0
+        ? `${activeFilterLabels.length} active filter${activeFilterLabels.length === 1 ? "" : "s"} may shape the next result.`
+        : "No filters are currently applied.",
+    ];
+
+    if (intent === "summary") {
+      return {
+        title: guidance.label,
+        explanation:
+          "This gives you a plain overview before you choose a deeper analysis path. Start by checking size, column types, and a few preview rows.",
+        canCheck: [
+          "Dataset size and table name",
+          "Column type mix",
+          "Preview rows and active result count",
+        ],
+        signals: [
+          ...baseSignals,
+          `${numericColumns.length} numeric, ${categoricalColumns.length} category/text, and ${dateColumns.length} date columns were detected.`,
+          `The active result currently represents ${activeResultCount.toLocaleString()} rows.`,
+        ],
+        actions: [
+          { label: "View preview rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
+          { label: "Review dataset details", view: "dataset" as ActiveView },
+        ],
+      };
+    }
+
+    if (intent === "missing_values") {
+      return {
+        title: guidance.label,
+        explanation:
+          "Missing values can explain strange totals, blank categories, or rows that disappear during analysis.",
+        canCheck: [
+          "Columns with null counts",
+          "Rows affected by filters",
+          "Which columns are worth inspecting first",
+        ],
+        signals: [
+          columnsWithMissingValues.length > 0
+            ? `${columnsWithMissingValues.length} column${columnsWithMissingValues.length === 1 ? "" : "s"} report missing values.`
+            : "No missing-value counts are reported in the current schema profile.",
+          ...columnsWithMissingValues.slice(0, 4).map((column) =>
+            `${column.name}: ${column.null_count.toLocaleString()} missing value${column.null_count === 1 ? "" : "s"}`,
+          ),
+        ],
+        actions: [
+          { label: "Choose columns to check", view: "queryBuilder" as ActiveView },
+          { label: "Open filters", view: "filters" as ActiveView },
+        ],
+      };
+    }
+
+    if (intent === "top_categories") {
+      const firstCategory = categoricalColumns[0];
+      return {
+        title: guidance.label,
+        explanation:
+          "Top categories help you see the biggest groups in the dataset without reading every row.",
+        canCheck: ["Category/text columns", "Group counts", "Most common values"],
+        signals: [
+          firstCategory
+            ? `${firstCategory.name} is a good first grouping candidate.`
+            : "No clear category column was detected yet.",
+          `${categoricalColumns.length} category/text column${categoricalColumns.length === 1 ? "" : "s"} are available.`,
+          queryGroupBy.length > 0
+            ? `Current grouping: ${queryGroupBy.join(", ")}.`
+            : "No grouped query is active yet.",
+        ],
+        actions: [
+          { label: "Build category summary", view: "queryBuilder" as ActiveView },
+          { label: "See results", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
+        ],
+      };
+    }
+
+    if (intent === "compare_columns") {
+      const comparisonColumns = dataset.schema.slice(0, 2).map((column) => column.name);
+      return {
+        title: guidance.label,
+        explanation:
+          "Comparing columns side by side is useful when you want to understand how two fields relate row by row.",
+        canCheck: ["Two visible columns", "Preview rows", "Sort order"],
+        signals: [
+          comparisonColumns.length >= 2
+            ? `Suggested starting pair: ${comparisonColumns.join(" and ")}.`
+            : "This dataset needs at least two columns for a useful comparison.",
+          `${querySelectedColumns.length} visible column${querySelectedColumns.length === 1 ? "" : "s"} are currently selected in Query Builder.`,
+        ],
+        actions: [
+          { label: "Select comparison columns", view: "queryBuilder" as ActiveView },
+          { label: "Preview rows first", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
+        ],
+      };
+    }
+
+    if (intent === "trends") {
+      return {
+        title: guidance.label,
+        explanation:
+          "Trends work best when there is a date column plus a numeric value to summarize over time.",
+        canCheck: ["Date columns", "Numeric measures", "Grouped query results"],
+        signals: [
+          dateColumns.length > 0
+            ? `${dateColumns[0].name} looks like a good time column.`
+            : "No date column was detected, so trend analysis may need a manually chosen time-like field.",
+          numericColumns.length > 0
+            ? `${numericColumns[0].name} can be used as a numeric measure.`
+            : "No numeric measure was detected yet.",
+        ],
+        actions: [
+          { label: "Build trend query", view: "queryBuilder" as ActiveView },
+          { label: "Filter date range", view: "filters" as ActiveView },
+        ],
+      };
+    }
+
+    if (intent === "unusual_values") {
+      return {
+        title: guidance.label,
+        explanation:
+          "Unusual values usually appear at the high or low end of numeric/date columns, or as unexpected categories.",
+        canCheck: ["Sortable numeric/date columns", "Preview rows", "Filtered result count"],
+        signals: [
+          `${numericColumns.length + dateColumns.length} numeric/date column${numericColumns.length + dateColumns.length === 1 ? "" : "s"} can be sorted for extremes.`,
+          `Current result count: ${activeResultCount.toLocaleString()} rows.`,
+          activeResult.sortColumn
+            ? `Current sort: ${activeResult.sortColumn} ${activeResult.sortDirection}.`
+            : "No result sort is active yet.",
+        ],
+        actions: [
+          { label: "Sort preview rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
+          { label: "Narrow with filters", view: "filters" as ActiveView },
+        ],
+      };
+    }
+
+    return {
+      title: guidance.label,
+      explanation:
+        "A chart starts with a clean summary table. Build a small grouped result first, then it will be ready for future chart tooling.",
+      canCheck: ["Category column", "Count or numeric summary", "Small grouped result"],
+      signals: [
+        categoricalColumns[0]
+          ? `${categoricalColumns[0].name} can be used as the chart category.`
+          : "No category column was detected yet.",
+        numericColumns[0]
+          ? `${numericColumns[0].name} can be used as a chart value.`
+          : "COUNT can be used when there is no numeric value.",
+      ],
+      actions: [
+        { label: "Prepare chart data", view: "queryBuilder" as ActiveView },
+        { label: "Review query result", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
+      ],
+    };
+  };
+
   const renderHumanIntentGuidance = () => {
     if (!humanIntent) return null;
 
     const guidance = humanIntentGuidance[humanIntent];
+    const insight = createHumanInsight(humanIntent);
 
     return (
-      <section className="human-intent-panel" aria-label="Selected Human Mode guidance">
-        <p className="section-label">Guided analysis</p>
-        <h2>You selected: {guidance.label}</h2>
+      <section className="human-intent-panel human-insight-panel" aria-label="Human Mode insight output">
+        <div className="human-insight-header">
+          <div>
+            <p className="section-label">Guided insight</p>
+            <h2>You selected: {insight.title}</h2>
+          </div>
+          <span>{workspaceMode === "human" ? "Human Mode" : "Guidance"}</span>
+        </div>
         <p>
           <strong>Next step:</strong> {guidance.nextStep}
         </p>
-        <p>{guidance.detail}</p>
+        <p>{insight.explanation}</p>
+        <div className="human-insight-grid">
+          <div>
+            <strong>What FiltraQueri can check next</strong>
+            <ul>
+              {insight.canCheck.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <strong>What we can see now</strong>
+            <ul>
+              {insight.signals.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="human-insight-actions">
+          {insight.actions.map((action) => (
+            <button
+              type="button"
+              className="secondary-button"
+              key={`${action.view}-${action.label}`}
+              onClick={() => navigateHumanInsightAction(action.view, action.tab)}
+            >
+              {action.label}
+            </button>
+          ))}
+        </div>
       </section>
     );
   };
