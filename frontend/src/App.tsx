@@ -4,37 +4,17 @@ import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuild
 import ResultTabs, { type ResultTabKey } from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
+import {
+  exportDataset,
+  filterDataset,
+  runQueryBuilder,
+  uploadDataset,
+  type DatasetMetadata,
+  type SortDirection,
+} from "./services/api";
 import "./App.css";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
 const MAX_QUERY_LIMIT = 1000;
-
-type SchemaColumn = {
-  name: string;
-  type: string;
-  inferred_type: "text" | "numeric" | "date" | "boolean" | "categorical";
-  null_count: number;
-  unique_count: number;
-  sample_values: unknown[];
-  min?: number | string;
-  max?: number | string;
-};
-
-type DatasetMetadata = {
-  dataset_id: string;
-  filename: string;
-  original_filename: string;
-  table_name: string;
-  uploaded_at: string;
-  row_count: number;
-  column_count: number;
-  schema: SchemaColumn[];
-};
-
-type UploadResponse = {
-  dataset: DatasetMetadata;
-  preview: Record<string, unknown>[];
-};
 
 type FilterState = {
   min?: string;
@@ -45,30 +25,11 @@ type FilterState = {
   end?: string;
 };
 
-type FilterResponse = {
-  columns: string[];
-  rows: Record<string, unknown>[];
-  filtered_count: number;
-  total_count: number;
-  page: number;
-  limit: number;
-};
-
 type AggregationState = {
   id: number;
   function: "COUNT" | "SUM" | "AVG" | "MIN" | "MAX";
   column: string;
 };
-
-type QueryBuilderResponse = {
-  columns: string[];
-  rows: Record<string, unknown>[];
-  total_count: number;
-  page: number;
-  limit: number;
-};
-
-type SortDirection = "ASC" | "DESC";
 
 type HistoryItem = {
   id: number;
@@ -230,22 +191,8 @@ function App() {
     setHasRunQuery(false);
     setQueryHistory([]);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.detail || "Upload failed. Please try another CSV file.");
-      }
-
-      const uploadResult = payload as UploadResponse;
+      const uploadResult = await uploadDataset(file);
       const uploadColumns = uploadResult.dataset.schema.map((column) => column.name);
       setDataset(uploadResult.dataset);
       updatePreviewResult(
@@ -537,30 +484,17 @@ function App() {
     setErrorMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/filter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          filters: buildBackendFilters(),
-          limit: filteredResult.rowsPerPage,
-          page: 1,
-          order_by: filteredResult.sortColumn
-            ? {
-                column: filteredResult.sortColumn,
-                direction: filteredResult.sortDirection,
-              }
-            : null,
-        }),
+      const filterResult = await filterDataset(dataset.dataset_id, {
+        filters: buildBackendFilters(),
+        limit: filteredResult.rowsPerPage,
+        page: 1,
+        order_by: filteredResult.sortColumn
+          ? {
+              column: filteredResult.sortColumn,
+              direction: filteredResult.sortDirection,
+            }
+          : null,
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.detail || "Filters could not be applied.");
-      }
-
-      const filterResult = payload as FilterResponse;
       updateFilteredResult(
         {
           ...filteredResult,
@@ -598,24 +532,11 @@ function App() {
     setErrorMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/filter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          filters: [],
-          limit: previewResult.rowsPerPage,
-          page: 1,
-        }),
+      const filterResult = await filterDataset(dataset.dataset_id, {
+        filters: [],
+        limit: previewResult.rowsPerPage,
+        page: 1,
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.detail || "Filters could not be reset.");
-      }
-
-      const filterResult = payload as FilterResponse;
       updatePreviewResult(
         {
           ...previewResult,
@@ -653,30 +574,17 @@ function App() {
     setErrorMessage("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/filter`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          filters: activeResultTab === "filtered" ? buildBackendFilters() : [],
-          limit: rowsPerPage,
-          page,
-          order_by: sortColumn
-            ? {
-                column: sortColumn,
-                direction: sortDirection,
-              }
-            : null,
-        }),
+      const filterResult = await filterDataset(dataset.dataset_id, {
+        filters: activeResultTab === "filtered" ? buildBackendFilters() : [],
+        limit: rowsPerPage,
+        page,
+        order_by: sortColumn
+          ? {
+              column: sortColumn,
+              direction: sortDirection,
+            }
+          : null,
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.detail || "Preview could not be loaded.");
-      }
-
-      const filterResult = payload as FilterResponse;
       const nextResult = {
         columns: filterResult.columns,
         rows: filterResult.rows,
@@ -712,36 +620,23 @@ function App() {
     setHasRunQuery(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/query-builder`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
-          group_by: queryGroupBy,
-          aggregations: activeAggregations.map((aggregation) => ({
-            function: aggregation.function,
-            column: aggregation.column || null,
-          })),
-          filters: buildBackendFilters(),
-          order_by: querySortColumn
-            ? {
-                column: querySortColumn,
-                direction: querySortDirection,
-              }
-            : null,
-          limit: Number(queryLimit) || queriedResult.rowsPerPage,
-          page: 1,
-        }),
+      const queryResult = await runQueryBuilder(dataset.dataset_id, {
+        selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
+        group_by: queryGroupBy,
+        aggregations: activeAggregations.map((aggregation) => ({
+          function: aggregation.function,
+          column: aggregation.column || null,
+        })),
+        filters: buildBackendFilters(),
+        order_by: querySortColumn
+          ? {
+              column: querySortColumn,
+              direction: querySortDirection,
+            }
+          : null,
+        limit: Number(queryLimit) || queriedResult.rowsPerPage,
+        page: 1,
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.detail || "The visual query could not be run.");
-      }
-
-      const queryResult = payload as QueryBuilderResponse;
       updateQueriedResult(
         {
           ...queriedResult,
@@ -808,36 +703,23 @@ function App() {
     setHasRunQuery(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/query-builder`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
-          group_by: queryGroupBy,
-          aggregations: activeAggregations.map((aggregation) => ({
-            function: aggregation.function,
-            column: aggregation.column || null,
-          })),
-          filters: buildBackendFilters(),
-          order_by: sortColumn
-            ? {
-                column: sortColumn,
-                direction: sortDirection,
-              }
-            : null,
-          limit: rowsPerPage,
-          page,
-        }),
+      const queryResult = await runQueryBuilder(dataset.dataset_id, {
+        selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
+        group_by: queryGroupBy,
+        aggregations: activeAggregations.map((aggregation) => ({
+          function: aggregation.function,
+          column: aggregation.column || null,
+        })),
+        filters: buildBackendFilters(),
+        order_by: sortColumn
+          ? {
+              column: sortColumn,
+              direction: sortDirection,
+            }
+          : null,
+        limit: rowsPerPage,
+        page,
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.detail || "Query page could not be loaded.");
-      }
-
-      const queryResult = payload as QueryBuilderResponse;
       updateQueriedResult({
         columns: queryResult.columns,
         rows: queryResult.rows,
@@ -868,55 +750,43 @@ function App() {
     try {
       const isQueryExport = activeResultTab === "queried" && hasRunQuery;
       const isFilteredExport = activeResultTab === "filtered";
-      const response = await fetch(`${API_BASE_URL}/datasets/${dataset.dataset_id}/export`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          isQueryExport
-            ? {
-                source: "query_builder",
-                limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
-                query_builder: {
-                  selected_columns:
-                    activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
-                  group_by: queryGroupBy,
-                  aggregations: activeAggregations.map((aggregation) => ({
-                    function: aggregation.function,
-                    column: aggregation.column || null,
-                  })),
-                  filters: buildBackendFilters(),
-                  order_by: querySortColumn
-                    ? {
-                        column: querySortColumn,
-                        direction: querySortDirection,
-                      }
-                    : null,
-                  limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
-                  page: 1,
-                },
-              }
-            : {
-                source: "filter",
-                filters: isFilteredExport ? buildBackendFilters() : [],
-                order_by: activeResult.sortColumn
+      const blob = await exportDataset(
+        dataset.dataset_id,
+        isQueryExport
+          ? {
+              source: "query_builder",
+              limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
+              query_builder: {
+                selected_columns:
+                  activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
+                group_by: queryGroupBy,
+                aggregations: activeAggregations.map((aggregation) => ({
+                  function: aggregation.function,
+                  column: aggregation.column || null,
+                })),
+                filters: buildBackendFilters(),
+                order_by: querySortColumn
                   ? {
-                      column: activeResult.sortColumn,
-                      direction: activeResult.sortDirection,
+                      column: querySortColumn,
+                      direction: querySortDirection,
                     }
                   : null,
-                limit: MAX_QUERY_LIMIT,
+                limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
+                page: 1,
               },
-        ),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json();
-        throw new Error(payload.detail || "Export could not be created.");
-      }
-
-      const blob = await response.blob();
+            }
+          : {
+              source: "filter",
+              filters: isFilteredExport ? buildBackendFilters() : [],
+              order_by: activeResult.sortColumn
+                ? {
+                    column: activeResult.sortColumn,
+                    direction: activeResult.sortDirection,
+                  }
+                : null,
+              limit: MAX_QUERY_LIMIT,
+            },
+      );
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
