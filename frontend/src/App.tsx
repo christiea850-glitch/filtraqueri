@@ -1,5 +1,6 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
+import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuilderPanel";
 import ResultsGrid from "./components/results/ResultsGrid";
 import UploadPanel from "./components/upload/UploadPanel";
 import "./App.css";
@@ -863,169 +864,29 @@ function App() {
         )}
 
         {dataset && activeView === "queryBuilder" && (
-          <section className="query-builder-panel" aria-label="Visual query builder">
-            <div className="query-builder-header">
-              <div>
-                <p className="section-label">Query builder</p>
-                <h2>Build an analytical result</h2>
-              </div>
-              <button type="button" className="primary-button" onClick={runVisualQuery}>
-                {isRunningQuery ? "Running..." : "Run query"}
-              </button>
-            </div>
-
-            <div className="builder-grid">
-              <div className="builder-block">
-                <div className="builder-block-header">
-                  <span>Visible columns</span>
-                  <small>{querySelectedColumns.length} selected</small>
-                </div>
-                <div className="field-chip-grid">
-                  {dataset.schema.map((column) => (
-                    <label className="field-chip" key={column.name}>
-                      <input
-                        type="checkbox"
-                        checked={querySelectedColumns.includes(column.name)}
-                        onChange={() =>
-                          setQuerySelectedColumns((currentColumns) =>
-                            toggleListValue(currentColumns, column.name),
-                          )
-                        }
-                      />
-                      {column.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="builder-block">
-                <div className="builder-block-header">
-                  <span>Group by</span>
-                  <small>{queryGroupBy.length} grouped</small>
-                </div>
-                <select
-                  multiple
-                  value={queryGroupBy}
-                  onChange={(event) =>
-                    setQueryGroupBy(
-                      Array.from(event.target.selectedOptions, (option) => option.value),
-                    )
-                  }
-                >
-                  {dataset.schema.map((column) => (
-                    <option key={column.name} value={column.name}>
-                      {column.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="builder-block wide-block">
-                <div className="builder-block-header">
-                  <span>Aggregations</span>
-                  <button type="button" className="text-button" onClick={addAggregation}>
-                    Add
-                  </button>
-                </div>
-                <div className="aggregation-list">
-                  {queryAggregations.map((aggregation) => (
-                    <div className="aggregation-row" key={aggregation.id}>
-                      <select
-                        value={aggregation.function}
-                        onChange={(event) =>
-                          updateAggregation(aggregation.id, {
-                            function: event.target.value as AggregationState["function"],
-                            column:
-                              event.target.value === "COUNT" && !aggregation.column
-                                ? ""
-                                : aggregation.column,
-                          })
-                        }
-                      >
-                        <option value="COUNT">COUNT</option>
-                        <option value="SUM">SUM</option>
-                        <option value="AVG">AVG</option>
-                        <option value="MIN">MIN</option>
-                        <option value="MAX">MAX</option>
-                      </select>
-                      <select
-                        value={aggregation.column}
-                        onChange={(event) =>
-                          updateAggregation(aggregation.id, { column: event.target.value })
-                        }
-                      >
-                        {aggregation.function === "COUNT" && <option value="">All rows</option>}
-                        {dataset.schema
-                          .filter(
-                            (column) =>
-                              aggregation.function === "COUNT" ||
-                              column.inferred_type === "numeric",
-                          )
-                          .map((column) => (
-                            <option key={column.name} value={column.name}>
-                              {column.name}
-                            </option>
-                          ))}
-                      </select>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        onClick={() => removeAggregation(aggregation.id)}
-                        aria-label="Remove aggregation"
-                      >
-                        x
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="builder-block">
-                <div className="builder-block-header">
-                  <span>Sort</span>
-                  <small>{querySortDirection}</small>
-                </div>
-                <div className="sort-controls">
-                  <select
-                    value={querySortColumn}
-                    onChange={(event) => setQuerySortColumn(event.target.value)}
-                  >
-                    <option value="">No sorting</option>
-                    {Array.from(new Set(querySortOptions)).map((column) => (
-                      <option key={column} value={column}>
-                        {column}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={querySortDirection}
-                    onChange={(event) =>
-                      setQuerySortDirection(event.target.value as "ASC" | "DESC")
-                    }
-                  >
-                    <option value="ASC">ASC</option>
-                    <option value="DESC">DESC</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="builder-block">
-                <div className="builder-block-header">
-                  <span>Row limit</span>
-                  <small>Max 1000</small>
-                </div>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={queryLimit}
-                  onChange={(event) => setQueryLimit(event.target.value)}
-                />
-              </div>
-            </div>
-
-            {isRunningQuery && <p className="status-message">Running query in DuckDB...</p>}
-          </section>
+          <VisualQueryBuilderPanel
+            schema={dataset.schema}
+            selectedColumns={querySelectedColumns}
+            groupBy={queryGroupBy}
+            aggregations={queryAggregations}
+            sortOptions={querySortOptions}
+            sortColumn={querySortColumn}
+            sortDirection={querySortDirection}
+            rowLimit={queryLimit}
+            running={isRunningQuery}
+            errorMessage={errorMessage}
+            onToggleSelectedColumn={(column) =>
+              setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
+            }
+            onGroupByChange={setQueryGroupBy}
+            onAddAggregation={addAggregation}
+            onUpdateAggregation={updateAggregation}
+            onRemoveAggregation={removeAggregation}
+            onSortColumnChange={setQuerySortColumn}
+            onSortDirectionChange={setQuerySortDirection}
+            onRowLimitChange={setQueryLimit}
+            onRunQuery={runVisualQuery}
+          />
         )}
 
         {dataset && activeView === "results" && (
