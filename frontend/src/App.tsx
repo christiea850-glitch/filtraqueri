@@ -1,4 +1,4 @@
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, useRef, useState } from "react";
 import "./App.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -73,8 +73,20 @@ type HistoryItem = {
   resultCount: number;
 };
 
+type ActiveView =
+  | "welcome"
+  | "dataset"
+  | "filters"
+  | "queryBuilder"
+  | "results"
+  | "history"
+  | "export"
+  | "settings";
+
 function App() {
+  const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
+  const [activeView, setActiveView] = useState<ActiveView>("welcome");
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -159,6 +171,7 @@ function App() {
       setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
       setPreviewTotalCount(uploadResult.dataset.row_count);
       setFilteredCount(null);
+      setActiveView("results");
     } catch (error) {
       const message =
         error instanceof Error
@@ -715,8 +728,109 @@ function App() {
 
   return (
     <div className="app">
-      <div className="card">
-        <header className="brand-header">
+      <header className="top-menu-bar">
+        <div className="workspace-brand">
+          <div className="brand-mark compact-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <path
+                className="mark-funnel"
+                d="M9 11h30L28 24.5v8.7l-8 4.3v-13L9 11Z"
+              />
+              <path className="mark-search" d="M30 29.5a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" />
+              <path className="mark-handle" d="m34.5 34.5 5 5" />
+            </svg>
+          </div>
+          <strong>FiltraQueri</strong>
+        </div>
+        <nav className="menu-items" aria-label="Application menu">
+          {["File", "Edit", "View", "Dataset", "Tools", "Help"].map((item) => (
+            <button type="button" key={item}>
+              {item}
+            </button>
+          ))}
+        </nav>
+        <span className="workspace-status">
+          {dataset ? dataset.original_filename : "No dataset open"}
+        </span>
+      </header>
+
+      <div className="workspace-shell">
+        <aside className="left-sidebar" aria-label="Workspace navigation">
+          <button
+            type="button"
+            className="sidebar-primary"
+            onClick={() => {
+              setActiveView("welcome");
+              sidebarFileInputRef.current?.click();
+            }}
+          >
+            Open File
+          </button>
+          <input
+            ref={sidebarFileInputRef}
+            className="sidebar-file-input"
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+            disabled={isUploading}
+          />
+          <nav>
+            {[
+              ["welcome", "Welcome"],
+              ["dataset", "Dataset"],
+              ["filters", "Filters"],
+              ["queryBuilder", "Query Builder"],
+              ["results", "Results"],
+              ["history", "History"],
+              ["export", "Export"],
+              ["settings", "Settings"],
+            ].map(([view, label]) => (
+              <button
+                type="button"
+                key={view}
+                className={activeView === view ? "is-active" : ""}
+                onClick={() => setActiveView(view as ActiveView)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="workspace-canvas">
+          {errorMessage && activeView !== "welcome" && (
+            <p className="error-message workspace-error">{errorMessage}</p>
+          )}
+
+          {activeView === "welcome" && (
+            <section className="welcome-screen">
+              <div className="welcome-copy">
+                <p className="section-label">Workspace</p>
+                <h2>Welcome to FiltraQueri</h2>
+                <p>Simple Data Intelligence for Everyone</p>
+                <div className="welcome-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => sidebarFileInputRef.current?.click()}
+                  >
+                    Upload CSV to start
+                  </button>
+                  <button type="button" className="secondary-button">
+                    Open recent dataset
+                  </button>
+                  <button type="button" className="secondary-button">
+                    Try sample dataset
+                  </button>
+                </div>
+                <p className="welcome-note">Ask your data naturally</p>
+              </div>
+            </section>
+          )}
+
+          {activeView === "welcome" && (
+            <div className="card workspace-card">
+              <header className="brand-header">
           <div className="brand-lockup" aria-label="FiltraQueri">
             <div className="brand-mark" aria-hidden="true">
               <svg viewBox="0 0 48 48" role="img">
@@ -749,8 +863,10 @@ function App() {
           {isUploading && <p className="status-message">Uploading and profiling your dataset...</p>}
           {errorMessage && <p className="error-message">{errorMessage}</p>}
         </div>
+            </div>
+          )}
 
-        {dataset && (
+        {dataset && activeView === "dataset" && (
           <section className="dataset-summary" aria-label="Dataset metadata">
             <div className="summary-header">
               <div>
@@ -786,7 +902,7 @@ function App() {
           </section>
         )}
 
-        {dataset && (
+        {dataset && activeView === "filters" && (
           <section className="filters-panel" aria-label="Dynamic filters">
             <div className="filters-header">
               <div>
@@ -896,7 +1012,7 @@ function App() {
           </section>
         )}
 
-        {dataset && (
+        {dataset && activeView === "queryBuilder" && (
           <section className="query-builder-panel" aria-label="Visual query builder">
             <div className="query-builder-header">
               <div>
@@ -1062,7 +1178,7 @@ function App() {
           </section>
         )}
 
-        {dataset && (
+        {dataset && activeView === "results" && (
           <section className="workspace-grid" aria-label="Data exploration workspace">
             <aside className="session-panel">
               <div>
@@ -1255,6 +1371,66 @@ function App() {
             </aside>
           </section>
         )}
+
+          {!dataset && activeView !== "welcome" && (
+            <section className="empty-state">
+              <p className="section-label">No dataset</p>
+              <h2>Open a CSV file to activate this workspace view</h2>
+              <p>Use the sidebar Open File action or return to Welcome to upload a dataset.</p>
+            </section>
+          )}
+
+          {dataset && activeView === "history" && (
+            <section className="history-panel standalone-panel">
+              <div>
+                <p className="section-label">History</p>
+                <h2>Query activity</h2>
+              </div>
+              {queryHistory.length === 0 ? (
+                <p className="history-empty">Run filters or queries to build a session trail.</p>
+              ) : (
+                <div className="history-list">
+                  {queryHistory.map((item) => (
+                    <article key={item.id}>
+                      <div>
+                        <strong>{item.action}</strong>
+                        <time>{item.timestamp}</time>
+                      </div>
+                      <p>{item.detail}</p>
+                      <span>{item.resultCount.toLocaleString()} rows</span>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {dataset && activeView === "export" && (
+            <section className="export-panel standalone-panel">
+              <div>
+                <p className="section-label">Export</p>
+                <h2>Export current results</h2>
+                <p>
+                  Export the active {activeResultSource === "query" ? "query" : "filtered preview"}{" "}
+                  result as CSV.
+                </p>
+              </div>
+              <button type="button" className="primary-button" onClick={exportCurrentResults}>
+                {isExporting ? "Exporting..." : "Export CSV"}
+              </button>
+            </section>
+          )}
+
+          {activeView === "settings" && (
+            <section className="settings-panel standalone-panel">
+              <div>
+                <p className="section-label">Settings</p>
+                <h2>Workspace settings</h2>
+                <p>Settings will live here as the workspace grows.</p>
+              </div>
+            </section>
+          )}
+        </main>
       </div>
     </div>
   );
