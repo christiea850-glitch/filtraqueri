@@ -26,6 +26,19 @@ type VisualQueryBuilderPanelProps = {
   onRunQuery: () => void;
 };
 
+type BuilderStep = "columns" | "group" | "sort" | "preview";
+
+const builderSteps: Array<{
+  id: BuilderStep;
+  label: string;
+  helper: string;
+}> = [
+  { id: "columns", label: "Columns", helper: "Choose fields to include" },
+  { id: "group", label: "Group & Aggregate", helper: "Summarize rows" },
+  { id: "sort", label: "Sort & Limit", helper: "Order and size results" },
+  { id: "preview", label: "Preview & Run", helper: "Review before running" },
+];
+
 function VisualQueryBuilderPanel({
   schema,
   selectedColumns,
@@ -48,9 +61,8 @@ function VisualQueryBuilderPanel({
   onRowLimitChange,
   onRunQuery,
 }: VisualQueryBuilderPanelProps) {
+  const [activeStep, setActiveStep] = useState<BuilderStep>("columns");
   const [columnSearch, setColumnSearch] = useState("");
-  const [isGroupByCollapsed, setIsGroupByCollapsed] = useState(false);
-  const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(false);
   const normalizedSearch = columnSearch.trim().toLowerCase();
   const visibleSchema = useMemo(
     () =>
@@ -81,6 +93,9 @@ function VisualQueryBuilderPanel({
       new Set(meaningfulMix.length > 0 ? meaningfulMix : schema.map((column) => column.name)),
     ).slice(0, 8);
   }, [schema]);
+  const activeAggregations = aggregations.filter(
+    (aggregation) => aggregation.function === "COUNT" || aggregation.column,
+  );
 
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
@@ -94,18 +109,36 @@ function VisualQueryBuilderPanel({
         </button>
       </div>
 
-      <div
-        className={[
-          "builder-grid",
-          isGroupByCollapsed ? "is-group-collapsed" : "",
-          isAnalysisCollapsed ? "is-analysis-collapsed" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <div className="builder-block query-column-block">
-          <div className="builder-block-header">
-            <span>Visible columns</span>
+      <div className="query-workflow-tabs" aria-label="Query builder workflow">
+        {builderSteps.map((step, index) => (
+          <button
+            type="button"
+            key={step.id}
+            className={activeStep === step.id ? "is-active" : ""}
+            onClick={() => setActiveStep(step.id)}
+          >
+            <span>Step {index + 1}</span>
+            <strong>{step.label}</strong>
+            <small>{step.helper}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="query-summary-strip" aria-label="Query builder summary">
+        <span>{selectedColumns.length} visible columns</span>
+        <span>{groupBy.length} grouped columns</span>
+        <span>{activeAggregations.length} active aggregations</span>
+        <span>{sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}</span>
+        <span>{rowLimit || "No"} row limit</span>
+      </div>
+
+      {activeStep === "columns" && (
+        <div className="query-stage-panel">
+          <div className="query-stage-heading">
+            <div>
+              <h3>Choose visible columns</h3>
+              <p>Start with a focused set of fields. You can add more later without losing work.</p>
+            </div>
             <small>
               {selectedColumns.length} selected, {schema.length} available
             </small>
@@ -122,7 +155,7 @@ function VisualQueryBuilderPanel({
               />
             </label>
 
-            <div className="query-bulk-actions" aria-label="Visible column bulk actions">
+            <div className="query-bulk-actions" aria-label="Visible column suggestions">
               <button
                 type="button"
                 className="text-button"
@@ -164,13 +197,13 @@ function VisualQueryBuilderPanel({
           <div className="field-chip-scroll">
             <div className="field-chip-grid">
               {visibleSchema.map((column) => (
-                <label className="field-chip" key={column.name}>
+                <label className="field-chip" key={column.name} title={column.name}>
                   <input
                     type="checkbox"
                     checked={selectedColumns.includes(column.name)}
                     onChange={() => onToggleSelectedColumn(column.name)}
                   />
-                  {column.name}
+                  <span>{column.name}</span>
                 </label>
               ))}
             </div>
@@ -180,170 +213,197 @@ function VisualQueryBuilderPanel({
             )}
           </div>
         </div>
+      )}
 
-        <div className="builder-block query-group-block">
-          <div className="builder-block-header">
-            <span>Group by</span>
-            <small>{groupBy.length} grouped</small>
-            <button
-              type="button"
-              className="text-button compact-toggle"
-              onClick={() => setIsGroupByCollapsed((currentValue) => !currentValue)}
-            >
-              {isGroupByCollapsed ? "Show" : "Hide"}
+      {activeStep === "group" && (
+        <div className="query-stage-panel">
+          <div className="query-stage-heading">
+            <div>
+              <h3>Group and aggregate</h3>
+              <p>Group by categories or dates, then choose counts, sums, averages, or ranges.</p>
+            </div>
+            <button type="button" className="text-button" onClick={onAddAggregation}>
+              Add aggregation
             </button>
           </div>
-          {isGroupByCollapsed ? (
-            <button
-              type="button"
-              className="collapsed-panel-bar"
-              onClick={() => setIsGroupByCollapsed(false)}
-            >
-              Group By hidden - {groupBy.length} grouped
-            </button>
-          ) : (
-            <select
-              multiple
-              value={groupBy}
-              onChange={(event) =>
-                onGroupByChange(Array.from(event.target.selectedOptions, (option) => option.value))
-              }
-            >
-              {schema.map((column) => (
-                <option key={column.name} value={column.name}>
-                  {column.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
 
-        <div className="builder-block wide-block">
-          <div className="builder-block-header">
-            <span>Aggregations</span>
-            <small>{aggregations.length} configured</small>
-            <div className="builder-header-actions">
-              <button
-                type="button"
-                className="text-button compact-toggle"
-                onClick={() => setIsAnalysisCollapsed((currentValue) => !currentValue)}
-              >
-                {isAnalysisCollapsed ? "Show" : "Hide"}
-              </button>
-              {!isAnalysisCollapsed && (
-                <button type="button" className="text-button" onClick={onAddAggregation}>
-                  Add
-                </button>
-              )}
-            </div>
-          </div>
-          {isAnalysisCollapsed ? (
-            <button
-              type="button"
-              className="collapsed-panel-bar"
-              onClick={() => setIsAnalysisCollapsed(false)}
-            >
-              Aggregations, sort, and row limit hidden
-            </button>
-          ) : (
-            <div className="aggregation-list">
-              {aggregations.map((aggregation) => (
-                <div className="aggregation-row" key={aggregation.id}>
-                  <select
-                    value={aggregation.function}
-                    onChange={(event) =>
-                      onUpdateAggregation(aggregation.id, {
-                        function: event.target.value as AggregationState["function"],
-                        column:
-                          event.target.value === "COUNT" && !aggregation.column
-                            ? ""
-                            : aggregation.column,
-                      })
-                    }
-                  >
-                    <option value="COUNT">COUNT</option>
-                    <option value="SUM">SUM</option>
-                    <option value="AVG">AVG</option>
-                    <option value="MIN">MIN</option>
-                    <option value="MAX">MAX</option>
-                  </select>
-                  <select
-                    value={aggregation.column}
-                    onChange={(event) =>
-                      onUpdateAggregation(aggregation.id, { column: event.target.value })
-                    }
-                  >
-                    {aggregation.function === "COUNT" && <option value="">All rows</option>}
-                    {schema
-                      .filter(
-                        (column) =>
-                          aggregation.function === "COUNT" || column.inferred_type === "numeric",
-                      )
-                      .map((column) => (
-                        <option key={column.name} value={column.name}>
-                          {column.name}
-                        </option>
-                      ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    onClick={() => onRemoveAggregation(aggregation.id)}
-                    aria-label="Remove aggregation"
-                  >
-                    x
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {!isAnalysisCollapsed && (
-          <div className="builder-block">
-            <div className="builder-block-header">
-              <span>Sort</span>
-              <small>{sortDirection}</small>
-            </div>
-            <div className="sort-controls">
+          <div className="query-stage-grid">
+            <div className="builder-block flat-builder-block">
+              <div className="builder-block-header">
+                <span>Group by</span>
+                <small>{groupBy.length} grouped</small>
+              </div>
               <select
-                value={sortColumn}
-                onChange={(event) => onSortColumnChange(event.target.value)}
+                multiple
+                value={groupBy}
+                onChange={(event) =>
+                  onGroupByChange(
+                    Array.from(event.target.selectedOptions, (option) => option.value),
+                  )
+                }
               >
-                <option value="">No sorting</option>
-                {Array.from(new Set(sortOptions)).map((column) => (
-                  <option key={column} value={column}>
-                    {column}
+                {schema.map((column) => (
+                  <option key={column.name} value={column.name} title={column.name}>
+                    {column.name}
                   </option>
                 ))}
               </select>
-              <select
-                value={sortDirection}
-                onChange={(event) => onSortDirectionChange(event.target.value as SortDirection)}
-              >
-                <option value="ASC">ASC</option>
-                <option value="DESC">DESC</option>
-              </select>
             </div>
-          </div>
-        )}
 
-        {!isAnalysisCollapsed && (
-          <div className="builder-block">
-            <div className="builder-block-header">
-              <span>Row limit</span>
-              <small>Max 1000</small>
+            <div className="builder-block flat-builder-block">
+              <div className="builder-block-header">
+                <span>Aggregations</span>
+                <small>{aggregations.length} configured</small>
+              </div>
+              <div className="aggregation-list">
+                {aggregations.map((aggregation) => (
+                  <div className="aggregation-row" key={aggregation.id}>
+                    <select
+                      value={aggregation.function}
+                      onChange={(event) =>
+                        onUpdateAggregation(aggregation.id, {
+                          function: event.target.value as AggregationState["function"],
+                          column:
+                            event.target.value === "COUNT" && !aggregation.column
+                              ? ""
+                              : aggregation.column,
+                        })
+                      }
+                    >
+                      <option value="COUNT">COUNT</option>
+                      <option value="SUM">SUM</option>
+                      <option value="AVG">AVG</option>
+                      <option value="MIN">MIN</option>
+                      <option value="MAX">MAX</option>
+                    </select>
+                    <select
+                      value={aggregation.column}
+                      onChange={(event) =>
+                        onUpdateAggregation(aggregation.id, { column: event.target.value })
+                      }
+                    >
+                      {aggregation.function === "COUNT" && <option value="">All rows</option>}
+                      {schema
+                        .filter(
+                          (column) =>
+                            aggregation.function === "COUNT" || column.inferred_type === "numeric",
+                        )
+                        .map((column) => (
+                          <option key={column.name} value={column.name} title={column.name}>
+                            {column.name}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => onRemoveAggregation(aggregation.id)}
+                      aria-label="Remove aggregation"
+                    >
+                      x
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <input
-              type="number"
-              min="1"
-              max="1000"
-              value={rowLimit}
-              onChange={(event) => onRowLimitChange(event.target.value)}
-            />
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {activeStep === "sort" && (
+        <div className="query-stage-panel compact-query-stage">
+          <div className="query-stage-heading">
+            <div>
+              <h3>Sort and limit</h3>
+              <p>Keep the output manageable and order it by the field that matters most.</p>
+            </div>
+          </div>
+
+          <div className="query-stage-grid">
+            <div className="builder-block flat-builder-block">
+              <div className="builder-block-header">
+                <span>Sort</span>
+                <small>{sortDirection}</small>
+              </div>
+              <div className="sort-controls">
+                <select
+                  value={sortColumn}
+                  onChange={(event) => onSortColumnChange(event.target.value)}
+                >
+                  <option value="">No sorting</option>
+                  {Array.from(new Set(sortOptions)).map((column) => (
+                    <option key={column} value={column} title={column}>
+                      {column}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={sortDirection}
+                  onChange={(event) => onSortDirectionChange(event.target.value as SortDirection)}
+                >
+                  <option value="ASC">ASC</option>
+                  <option value="DESC">DESC</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="builder-block flat-builder-block">
+              <div className="builder-block-header">
+                <span>Row limit</span>
+                <small>Max 1000</small>
+              </div>
+              <input
+                type="number"
+                min="1"
+                max="1000"
+                value={rowLimit}
+                onChange={(event) => onRowLimitChange(event.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeStep === "preview" && (
+        <div className="query-stage-panel preview-query-stage">
+          <div className="query-stage-heading">
+            <div>
+              <h3>Preview and run</h3>
+              <p>Review the query shape, then run it through the existing query builder endpoint.</p>
+            </div>
+            <button type="button" className="primary-button" onClick={onRunQuery}>
+              {running ? "Running..." : "Run query"}
+            </button>
+          </div>
+
+          <div className="query-review-grid">
+            <div>
+              <span>Columns</span>
+              <strong>{selectedColumns.length || "Grouped result"}</strong>
+              <p>{selectedColumns.slice(0, 6).join(", ") || "Visible columns use groupings when aggregations are active."}</p>
+            </div>
+            <div>
+              <span>Grouping</span>
+              <strong>{groupBy.length || "None"}</strong>
+              <p>{groupBy.join(", ") || "Rows will not be grouped unless you choose group fields."}</p>
+            </div>
+            <div>
+              <span>Aggregations</span>
+              <strong>{activeAggregations.length || "None"}</strong>
+              <p>
+                {activeAggregations
+                  .map((aggregation) => `${aggregation.function} ${aggregation.column || "rows"}`)
+                  .join(", ") || "Add aggregations when you want summaries instead of row detail."}
+              </p>
+            </div>
+            <div>
+              <span>Sort and limit</span>
+              <strong>{rowLimit || "No limit"}</strong>
+              <p>{sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting selected."}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {running && <p className="status-message">Running query in DuckDB...</p>}
       {errorMessage && <p className="error-message">{errorMessage}</p>}

@@ -1407,6 +1407,203 @@ h1 span:last-child {
   align-items: center;
 }
 
+.query-workflow-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.query-workflow-tabs button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 74px;
+  padding: 12px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.query-workflow-tabs button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.query-workflow-tabs button.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.query-workflow-tabs span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.query-workflow-tabs strong,
+.query-workflow-tabs small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.query-workflow-tabs strong {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.query-workflow-tabs small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.query-summary-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.query-summary-strip span {
+  max-width: 220px;
+  overflow: hidden;
+  padding: 7px 9px;
+  border: 1px solid #dbe5ef;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.query-stage-panel {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #dbe5ef;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.query-stage-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.query-stage-heading h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.query-stage-heading p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.query-stage-heading small {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.query-stage-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.flat-builder-block {
+  box-shadow: none;
+}
+
+.compact-query-stage .query-stage-grid {
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, 0.55fr);
+}
+
+.preview-query-stage {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 251, 255, 0.94)),
+    #ffffff;
+}
+
+.query-review-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.query-review-grid div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.query-review-grid span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.query-review-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #111827;
+  font-size: 17px;
+  font-weight: 850;
+}
+
+.query-review-grid p {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  -webkit-box-orient: vertical;
+  .query-review-grid p {
+  display: -webkit-box;
+  margin: 6px 0 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+  -webkit-line-clamp: 3;
+}
+
 .builder-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1543,6 +1740,13 @@ h1 span:last-child {
   font-size: 12px;
   font-weight: 750;
   cursor: pointer;
+}
+
+.field-chip span {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .query-column-empty {
@@ -2443,9 +2647,18 @@ tr:hover {
   }
 
   .builder-grid,
+  .query-workflow-tabs,
+  .query-stage-grid,
+  .compact-query-stage .query-stage-grid,
+  .query-review-grid,
   .aggregation-row,
   .sort-controls {
     grid-template-columns: 1fr;
+  }
+
+  .query-stage-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .builder-grid.is-group-collapsed .query-column-block,
