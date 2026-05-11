@@ -1,5 +1,9 @@
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import DatasetSummaryPanel, {
+  DatasetSessionPanel,
+} from "./components/dataset/DatasetSummaryPanel";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
+import QueryHistoryPanel from "./components/history/QueryHistoryPanel";
 import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuilderPanel";
 import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
@@ -939,41 +943,7 @@ function App() {
             />
           )}
 
-        {dataset && activeView === "dataset" && (
-          <section className="dataset-summary" aria-label="Dataset metadata">
-            <div className="summary-header">
-              <div>
-                <p className="section-label">Dataset ready</p>
-                <h2>{dataset.original_filename}</h2>
-              </div>
-              <span className="dataset-id">ID: {dataset.dataset_id.slice(0, 8)}</span>
-            </div>
-
-            <div className="summary-grid">
-              <div>
-                <span>Rows</span>
-                <strong>{dataset.row_count.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>Columns</span>
-                <strong>{dataset.column_count.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>Table</span>
-                <strong>{dataset.table_name}</strong>
-              </div>
-            </div>
-
-            <div className="schema-list" aria-label="Detected schema">
-              {dataset.schema.map((column) => (
-                <span className="schema-pill" key={column.name}>
-                  {column.name}
-                  <small>{column.inferred_type}</small>
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
+        {dataset && activeView === "dataset" && <DatasetSummaryPanel dataset={dataset} />}
 
         {dataset && activeView === "filters" && (
           <DynamicFiltersPanel
@@ -1015,41 +985,12 @@ function App() {
 
         {dataset && activeView === "results" && (
           <section className="workspace-grid" aria-label="Data exploration workspace">
-            <aside className="session-panel">
-              <div>
-                <p className="section-label">Session</p>
-                <h2>{dataset.original_filename}</h2>
-              </div>
-              <div className="session-stat-list">
-                <span>{dataset.table_name}</span>
-                <strong>{dataset.row_count.toLocaleString()} rows</strong>
-                <strong>{dataset.column_count.toLocaleString()} columns</strong>
-              </div>
-              <div className="schema-type-list">
-                {Object.entries(schemaTypeSummary).map(([type, count]) => (
-                  <span key={type}>
-                    {type}
-                    <strong>{count}</strong>
-                  </span>
-                ))}
-              </div>
-              <div className="active-context">
-                <p>Active filters</p>
-                {activeFilterLabels.length > 0 ? (
-                  activeFilterLabels.map((label) => <span key={label}>{label}</span>)
-                ) : (
-                  <small>No filters applied</small>
-                )}
-              </div>
-              <div className="active-context">
-                <p>Active groupings</p>
-                {queryGroupBy.length > 0 ? (
-                  queryGroupBy.map((column) => <span key={column}>{column}</span>)
-                ) : (
-                  <small>No grouped query active</small>
-                )}
-              </div>
-            </aside>
+            <DatasetSessionPanel
+              dataset={dataset}
+              schemaTypeSummary={schemaTypeSummary}
+              activeFilterLabels={activeFilterLabels}
+              queryGroupBy={queryGroupBy}
+            />
 
             <ResultsGrid
               title={
@@ -1090,28 +1031,7 @@ function App() {
               }
             />
 
-            <aside className="history-panel">
-              <div>
-                <p className="section-label">History</p>
-                <h2>Query activity</h2>
-              </div>
-              {queryHistory.length === 0 ? (
-                <p className="history-empty">Run filters or queries to build a session trail.</p>
-              ) : (
-                <div className="history-list">
-                  {queryHistory.map((item) => (
-                    <article key={item.id}>
-                      <div>
-                        <strong>{item.action}</strong>
-                        <time>{item.timestamp}</time>
-                      </div>
-                      <p>{item.detail}</p>
-                      <span>{item.resultCount.toLocaleString()} rows</span>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </aside>
+            <QueryHistoryPanel history={queryHistory} />
           </section>
         )}
 
@@ -1124,28 +1044,7 @@ function App() {
           )}
 
           {dataset && activeView === "history" && (
-            <section className="history-panel standalone-panel">
-              <div>
-                <p className="section-label">History</p>
-                <h2>Query activity</h2>
-              </div>
-              {queryHistory.length === 0 ? (
-                <p className="history-empty">Run filters or queries to build a session trail.</p>
-              ) : (
-                <div className="history-list">
-                  {queryHistory.map((item) => (
-                    <article key={item.id}>
-                      <div>
-                        <strong>{item.action}</strong>
-                        <time>{item.timestamp}</time>
-                      </div>
-                      <p>{item.detail}</p>
-                      <span>{item.resultCount.toLocaleString()} rows</span>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
+            <QueryHistoryPanel history={queryHistory} variant="standalone" />
           )}
 
           {dataset && activeView === "export" && (
