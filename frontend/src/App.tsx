@@ -932,13 +932,17 @@ function App() {
       dataset ? (
         <>
           {renderHumanIntentGuidance()}
-          <section className="workspace-grid" aria-label="Data exploration workspace">
-            <DatasetSessionPanel
-              dataset={dataset}
-              schemaTypeSummary={schemaTypeSummary}
-              activeFilterLabels={activeFilterLabels}
-              queryGroupBy={queryGroupBy}
-            />
+          <section className="results-workspace" aria-label="Data exploration workspace">
+            <div className="results-context-strip" aria-label="Results context">
+              <DatasetSessionPanel
+                dataset={dataset}
+                schemaTypeSummary={schemaTypeSummary}
+                activeFilterLabels={activeFilterLabels}
+                queryGroupBy={queryGroupBy}
+              />
+
+              <QueryHistoryPanel history={queryHistory} />
+            </div>
 
             <ResultsGrid
               title={
@@ -978,8 +982,6 @@ function App() {
                 </div>
               }
             />
-
-            <QueryHistoryPanel history={queryHistory} />
           </section>
         </>
       ) : null,

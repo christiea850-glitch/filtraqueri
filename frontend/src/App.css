@@ -1137,6 +1137,19 @@ h1 span:last-child {
   align-items: start;
 }
 
+.results-workspace {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.results-context-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
 .session-panel,
 .history-panel,
 .data-grid-section {
@@ -1297,6 +1310,59 @@ h1 span:last-child {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.results-workspace .session-panel,
+.results-workspace .history-panel {
+  padding: 16px;
+}
+
+.results-workspace .session-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(230px, 0.8fr) minmax(180px, 0.55fr) minmax(220px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.results-workspace .session-panel h2,
+.results-workspace .history-panel h2 {
+  font-size: 16px;
+}
+
+.results-workspace .session-stat-list,
+.results-workspace .schema-type-list,
+.results-workspace .active-context {
+  margin-top: 0;
+}
+
+.results-workspace .session-stat-list {
+  align-content: start;
+}
+
+.results-workspace .history-panel {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.results-workspace .history-list {
+  margin-top: 10px;
+}
+
+.results-workspace .history-list article {
+  padding: 9px 10px;
+}
+
+.results-workspace .data-grid-section {
+  padding: 18px;
+}
+
+.results-workspace .data-grid-table {
+  max-height: min(68vh, 760px);
+  overflow: auto;
+}
+
+.results-workspace .data-grid-table table {
+  min-width: max(1120px, 100%);
 }
 
 .pagination-bar {
@@ -1632,6 +1698,16 @@ tr:hover {
   background: #f8fafc;
 }
 
+@media (max-width: 1080px) {
+  .results-context-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .results-workspace .session-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 640px) {
   .app {
     grid-template-rows: auto minmax(0, 1fr);
@@ -1742,6 +1818,10 @@ tr:hover {
   }
 
   .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-workspace .session-panel {
     grid-template-columns: 1fr;
   }
 
