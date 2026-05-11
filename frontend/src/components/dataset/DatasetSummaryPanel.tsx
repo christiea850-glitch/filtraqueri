@@ -2,6 +2,7 @@ import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 
 type DatasetSummaryPanelProps = {
   dataset: DatasetMetadata;
+  onViewPreview: () => void;
 };
 
 const humanGuidanceCards = [
@@ -66,7 +67,7 @@ export function DatasetSessionPanel({
   );
 }
 
-function DatasetSummaryPanel({ dataset }: DatasetSummaryPanelProps) {
+function DatasetSummaryPanel({ dataset, onViewPreview }: DatasetSummaryPanelProps) {
   return (
     <div className="human-dataset-workspace">
       <section className="dataset-summary" aria-label="Dataset metadata">
@@ -75,7 +76,12 @@ function DatasetSummaryPanel({ dataset }: DatasetSummaryPanelProps) {
             <p className="section-label">Dataset ready</p>
             <h2>{dataset.original_filename}</h2>
           </div>
-          <span className="dataset-id">ID: {dataset.dataset_id.slice(0, 8)}</span>
+          <div className="dataset-summary-actions">
+            <span className="dataset-id">ID: {dataset.dataset_id.slice(0, 8)}</span>
+            <button type="button" className="secondary-button" onClick={onViewPreview}>
+              View data preview
+            </button>
+          </div>
         </div>
 
         <div className="summary-grid">

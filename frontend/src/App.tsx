@@ -124,11 +124,12 @@ function App() {
           sortColumn: "",
           sortDirection: "ASC",
         },
-        true,
+        false,
       );
       setFilteredResult(createEmptyResultState());
       setQueriedResult(createEmptyResultState());
       setQuerySelectedColumns(uploadResult.dataset.schema.slice(0, 4).map((column) => column.name));
+      updateDatasetSessionView("dataset");
     } catch (error) {
       const rawMessage =
         error instanceof Error ? error.message : "Upload failed. Please try again.";
@@ -726,7 +727,16 @@ function App() {
         onFileChange={handleFileUpload}
       />
     ),
-    dataset: () => (dataset ? <DatasetSummaryPanel dataset={dataset} /> : null),
+    dataset: () =>
+      dataset ? (
+        <DatasetSummaryPanel
+          dataset={dataset}
+          onViewPreview={() => {
+            handleResultTabChange("preview");
+            updateDatasetSessionView("results");
+          }}
+        />
+      ) : null,
     filters: () =>
       dataset ? (
         <DynamicFiltersPanel
