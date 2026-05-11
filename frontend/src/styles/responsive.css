@@ -227,6 +227,11 @@
     min-height: 280px;
   }
 
+  .sql-editor-host,
+  .sql-monaco-editor {
+    min-height: 280px;
+  }
+
   .sql-editor-toolbar,
   .sql-actions,
   .sql-editor-footer {

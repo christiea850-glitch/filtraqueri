@@ -250,6 +250,21 @@
 
 .sql-editor-host {
   min-width: 0;
+  min-height: min(58vh, 560px);
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #0f172a;
+}
+
+.sql-editor-host .sql-editor-input {
+  min-height: min(58vh, 560px);
+  border: 0;
+  border-radius: 0;
+}
+
+.sql-monaco-editor {
+  min-height: min(58vh, 560px);
 }
 
 .sql-editor-input:focus {
