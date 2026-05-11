@@ -115,7 +115,13 @@ type ActiveView =
   | "results"
   | "history"
   | "export"
-  | "settings";
+  | "settings"
+  | "sqlWorkspace"
+  | "savedQueries"
+  | "queryExplain"
+  | "dataCleaning"
+  | "diagnostics"
+  | "normalization";
 
 type WorkspaceMode = "human" | "analyst";
 
@@ -128,6 +134,50 @@ const createEmptyResultState = (): ResultState => ({
   sortColumn: "",
   sortDirection: "ASC",
 });
+
+const analystViews: Array<{
+  view: ActiveView;
+  label: string;
+  description: string;
+  capabilities: string[];
+}> = [
+  {
+    view: "sqlWorkspace",
+    label: "SQL Workspace",
+    description: "Write, organize, and review analyst-level SQL workflows in a future release.",
+    capabilities: ["SELECT workflows", "CTEs and subqueries", "Window functions"],
+  },
+  {
+    view: "savedQueries",
+    label: "Saved Queries",
+    description: "Save repeatable analysis steps and reuse query definitions across sessions.",
+    capabilities: ["Query library", "Reusable definitions", "Session-aware history"],
+  },
+  {
+    view: "queryExplain",
+    label: "Query Explain",
+    description: "Validate query structure and explain how a result is produced before execution.",
+    capabilities: ["Validation checks", "Execution explanation", "Risk warnings"],
+  },
+  {
+    view: "dataCleaning",
+    label: "Data Cleaning",
+    description: "Prepare datasets with controlled transformations and calculated fields.",
+    capabilities: ["Type cleanup", "Calculated columns", "Missing value handling"],
+  },
+  {
+    view: "diagnostics",
+    label: "Diagnostics",
+    description: "Inspect relational quality, table design, keys, dependencies, and anomalies.",
+    capabilities: ["Functional dependencies", "Anomaly detection", "Table design checks"],
+  },
+  {
+    view: "normalization",
+    label: "Normalization",
+    description: "Explore normalization guidance for 1NF, 2NF, and 3NF design improvements.",
+    capabilities: ["1NF checks", "2NF checks", "3NF recommendations"],
+  },
+];
 
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -956,7 +1006,10 @@ function App() {
           <button
             type="button"
             className={workspaceMode === "human" ? "is-active" : ""}
-            onClick={() => setWorkspaceMode("human")}
+            onClick={() => {
+              setWorkspaceMode("human");
+              updateDatasetSessionView(dataset ? "results" : "welcome");
+            }}
           >
             Human Mode
           </button>
@@ -965,7 +1018,7 @@ function App() {
             className={workspaceMode === "analyst" ? "is-active" : ""}
             onClick={() => {
               setWorkspaceMode("analyst");
-              updateDatasetSessionView("settings");
+              updateDatasetSessionView("sqlWorkspace");
             }}
           >
             Analyst Mode
@@ -1046,16 +1099,14 @@ function App() {
           {workspaceMode === "analyst" && (
             <div className="analyst-sidebar-section" aria-label="Analyst mode tools">
               <p>Analyst mode</p>
-              {[
-                "SQL Workspace",
-                "Saved Queries",
-                "Query Explain",
-                "Data Cleaning",
-                "Diagnostics",
-                "Normalization",
-              ].map((item) => (
-                <button type="button" key={item} onClick={() => updateDatasetSessionView("settings")}>
-                  {item}
+              {analystViews.map((item) => (
+                <button
+                  type="button"
+                  key={item.view}
+                  className={activeView === item.view ? "is-active" : ""}
+                  onClick={() => updateDatasetSessionView(item.view)}
+                >
+                  {item.label}
                   <span>Preview</span>
                 </button>
               ))}
@@ -1305,39 +1356,43 @@ function App() {
             </section>
           )}
 
+          {workspaceMode === "analyst" &&
+            analystViews.some((item) => item.view === activeView) && (
+              <section className="analyst-workspace-panel standalone-panel">
+                {analystViews
+                  .filter((item) => item.view === activeView)
+                  .map((item) => (
+                    <div className="analyst-foundation" key={item.view}>
+                      <p className="section-label">Analyst mode</p>
+                      <h2>{item.label}</h2>
+                      <p>{item.description}</p>
+                      <div className="analyst-tool-grid">
+                        {item.capabilities.map((capability) => (
+                          <article key={capability}>
+                            <strong>{capability}</strong>
+                            <span>Planned</span>
+                          </article>
+                        ))}
+                      </div>
+                      <div className="analyst-empty-state">
+                        <strong>Frontend foundation ready</strong>
+                        <p>
+                          This workspace will reuse the active dataset session, results grid,
+                          result tabs, and query history when execution support is added.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </section>
+            )}
+
           {activeView === "settings" && (
             <section className="settings-panel standalone-panel">
-              {workspaceMode === "analyst" ? (
-                <div className="analyst-foundation">
-                  <p className="section-label">Analyst mode</p>
-                  <h2>Analyst workspace foundation</h2>
-                  <p>
-                    Analyst tools will reuse the active dataset session, result tabs, results grid,
-                    and query history foundation.
-                  </p>
-                  <div className="analyst-tool-grid">
-                    {[
-                      "SQL Workspace",
-                      "Saved Queries",
-                      "Query Explain/Validation",
-                      "Data Cleaning",
-                      "Relational Diagnostics",
-                      "Normalization Tools",
-                    ].map((tool) => (
-                      <article key={tool}>
-                        <strong>{tool}</strong>
-                        <span>Planned</span>
-                      </article>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <p className="section-label">Settings</p>
-                  <h2>Workspace settings</h2>
-                  <p>Settings will live here as the workspace grows.</p>
-                </div>
-              )}
+              <div>
+                <p className="section-label">Settings</p>
+                <h2>Workspace settings</h2>
+                <p>Settings will live here as the workspace grows.</p>
+              </div>
             </section>
           )}
         </main>
