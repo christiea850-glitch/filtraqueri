@@ -117,6 +117,8 @@ type ActiveView =
   | "export"
   | "settings";
 
+type WorkspaceMode = "human" | "analyst";
+
 const createEmptyResultState = (): ResultState => ({
   columns: [],
   rows: [],
@@ -132,6 +134,7 @@ function App() {
   const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
   const [recentDatasets, setRecentDatasets] = useState<DatasetSession[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>("welcome");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("human");
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [activeResultTab, setActiveResultTab] = useState<ResultTabKey>("preview");
@@ -949,6 +952,25 @@ function App() {
         <span className="workspace-status">
           {dataset ? dataset.original_filename : "No dataset open"}
         </span>
+        <div className="mode-switcher" aria-label="Workspace mode">
+          <button
+            type="button"
+            className={workspaceMode === "human" ? "is-active" : ""}
+            onClick={() => setWorkspaceMode("human")}
+          >
+            Human Mode
+          </button>
+          <button
+            type="button"
+            className={workspaceMode === "analyst" ? "is-active" : ""}
+            onClick={() => {
+              setWorkspaceMode("analyst");
+              updateDatasetSessionView("settings");
+            }}
+          >
+            Analyst Mode
+          </button>
+        </div>
       </header>
 
       <div className="workspace-shell">
@@ -1021,6 +1043,24 @@ function App() {
               </button>
             ))}
           </nav>
+          {workspaceMode === "analyst" && (
+            <div className="analyst-sidebar-section" aria-label="Analyst mode tools">
+              <p>Analyst mode</p>
+              {[
+                "SQL Workspace",
+                "Saved Queries",
+                "Query Explain",
+                "Data Cleaning",
+                "Diagnostics",
+                "Normalization",
+              ].map((item) => (
+                <button type="button" key={item} onClick={() => updateDatasetSessionView("settings")}>
+                  {item}
+                  <span>Preview</span>
+                </button>
+              ))}
+            </div>
+          )}
         </aside>
 
         <main className="workspace-canvas">
@@ -1267,11 +1307,37 @@ function App() {
 
           {activeView === "settings" && (
             <section className="settings-panel standalone-panel">
-              <div>
-                <p className="section-label">Settings</p>
-                <h2>Workspace settings</h2>
-                <p>Settings will live here as the workspace grows.</p>
-              </div>
+              {workspaceMode === "analyst" ? (
+                <div className="analyst-foundation">
+                  <p className="section-label">Analyst mode</p>
+                  <h2>Analyst workspace foundation</h2>
+                  <p>
+                    Analyst tools will reuse the active dataset session, result tabs, results grid,
+                    and query history foundation.
+                  </p>
+                  <div className="analyst-tool-grid">
+                    {[
+                      "SQL Workspace",
+                      "Saved Queries",
+                      "Query Explain/Validation",
+                      "Data Cleaning",
+                      "Relational Diagnostics",
+                      "Normalization Tools",
+                    ].map((tool) => (
+                      <article key={tool}>
+                        <strong>{tool}</strong>
+                        <span>Planned</span>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="section-label">Settings</p>
+                  <h2>Workspace settings</h2>
+                  <p>Settings will live here as the workspace grows.</p>
+                </div>
+              )}
             </section>
           )}
         </main>

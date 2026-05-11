@@ -102,6 +102,32 @@ body {
   white-space: nowrap;
 }
 
+.mode-switcher {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.mode-switcher button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mode-switcher button.is-active {
+  background: #0f172a;
+  color: white;
+}
+
 .workspace-shell {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
@@ -213,6 +239,50 @@ body {
   color: #1d4ed8;
 }
 
+.analyst-sidebar-section {
+  display: grid;
+  gap: 5px;
+  padding-top: 12px;
+  border-top: 1px solid #dbe5ef;
+}
+
+.analyst-sidebar-section p {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.analyst-sidebar-section button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.analyst-sidebar-section button:hover {
+  border-color: #dbeafe;
+  background: #eff6ff;
+}
+
+.analyst-sidebar-section span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .workspace-canvas {
   min-width: 0;
   min-height: 0;
@@ -309,6 +379,38 @@ body {
   color: #64748b;
   font-size: 14px;
   font-weight: 650;
+}
+
+.analyst-foundation {
+  width: 100%;
+}
+
+.analyst-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.analyst-tool-grid article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #dbe5ef;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.analyst-tool-grid strong {
+  color: #172033;
+  font-size: 14px;
+}
+
+.analyst-tool-grid span {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .brand-header {
