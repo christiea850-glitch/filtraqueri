@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import SqlEditorPanel from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
+import SqlSchemaPanel from "./SqlSchemaPanel";
+import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import type { SqlExecutionStatus, SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 
 type SqlWorkspaceProps = {
@@ -47,6 +49,18 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
     });
   };
 
+  const sqlTemplates = useMemo(() => createSqlTemplates(dataset), [dataset]);
+  const columnSuggestions = useMemo(() => createColumnSuggestions(dataset), [dataset]);
+
+  const insertSql = (sql: string) => {
+    setSqlText((currentSql) => {
+      const trimmedCurrentSql = currentSql.trimEnd();
+      const separator = trimmedCurrentSql ? "\n\n" : "";
+      return `${trimmedCurrentSql}${separator}${sql}`;
+    });
+    updateStatus("idle");
+  };
+
   const saveDraft = () => {
     const trimmedSql = sqlText.trim();
     if (!trimmedSql) return;
@@ -65,25 +79,13 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
 
   return (
     <section className="sql-workspace" aria-label="SQL workspace">
-      <aside className="sql-context-panel">
-        <div>
-          <p className="section-label">Active dataset</p>
-          <h2>{dataset.original_filename}</h2>
-        </div>
-        <div className="session-stat-list">
-          <span>{dataset.table_name}</span>
-          <strong>{dataset.row_count.toLocaleString()} rows</strong>
-          <strong>{dataset.column_count.toLocaleString()} columns</strong>
-        </div>
-        <div className="schema-list sql-schema-list" aria-label="SQL available columns">
-          {dataset.schema.map((column) => (
-            <span className="schema-pill" key={column.name}>
-              {column.name}
-              <small>{column.inferred_type}</small>
-            </span>
-          ))}
-        </div>
-      </aside>
+      <SqlSchemaPanel
+        dataset={dataset}
+        columnSuggestions={columnSuggestions}
+        templates={sqlTemplates}
+        keywordSuggestions={sqlKeywordSuggestions}
+        onInsertSql={insertSql}
+      />
 
       <div className="sql-main-panel">
         <SqlEditorPanel

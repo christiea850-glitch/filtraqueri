@@ -1295,6 +1295,87 @@ h1 span:last-child {
   overflow: auto;
 }
 
+.sql-schema-chip {
+  font: inherit;
+  cursor: pointer;
+}
+
+.sql-schema-chip:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sql-helper-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.sql-suggestion-grid,
+.sql-keyword-list,
+.sql-template-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sql-suggestion-grid button,
+.sql-template-list button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sql-suggestion-grid button {
+  flex: 1 1 120px;
+}
+
+.sql-template-list button {
+  flex: 1 1 100%;
+}
+
+.sql-suggestion-grid button:hover,
+.sql-template-list button:hover,
+.sql-keyword-list button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.sql-suggestion-grid strong,
+.sql-template-list strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.sql-suggestion-grid span,
+.sql-template-list span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sql-keyword-list button {
+  padding: 7px 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .sql-main-panel {
   display: grid;
   gap: 16px;
