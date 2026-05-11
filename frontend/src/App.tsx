@@ -110,6 +110,7 @@ function App() {
     updateDatasetSessionView,
     updateDatasetSessionResultTab,
     activateRecentDataset: activateRecentDatasetSession,
+    removeRecentDataset,
   } = useDatasetSessions();
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("human");
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
@@ -277,6 +278,63 @@ function App() {
 
   const activateRecentDataset = (datasetId: string) => {
     activateRecentDatasetSession(datasetId, restoreDatasetSession);
+  };
+
+  const openDatasetPicker = () => {
+    updateDatasetSessionView("welcome");
+    setShouldOpenFilePicker(true);
+  };
+
+  const clearCurrentDatasetSession = () => {
+    if (!dataset) return;
+
+    const shouldClear = window.confirm(
+      `Clear the current workspace session for "${dataset.original_filename}"? Recent dataset history will remain available.`,
+    );
+
+    if (!shouldClear) return;
+
+    setDataset(null);
+    setSelectedFileName("");
+    setActiveResultTab("preview");
+    resetResults();
+    setFilterValues({});
+    setQuerySelectedColumns([]);
+    setQueryGroupBy([]);
+    setQueryAggregations([{ id: 1, function: "COUNT", column: "" }]);
+    setQuerySortColumn("");
+    setQuerySortDirection("ASC");
+    setQueryLimit("100");
+    setHasRunQuery(false);
+    setHumanIntent(null);
+    clearHistory();
+    setErrorMessage("");
+    setActiveView("dataset");
+  };
+
+  const removeRecentDatasetWithConfirmation = (datasetId: string) => {
+    const recentDataset = recentDatasets.find((session) => session.dataset.dataset_id === datasetId);
+    const datasetName = recentDataset?.dataset.original_filename || "this dataset";
+    const shouldRemove = window.confirm(
+      `Remove "${datasetName}" from recent datasets? This will not delete the uploaded data.`,
+    );
+
+    if (shouldRemove) removeRecentDataset(datasetId);
+  };
+
+  const confirmFutureDatasetDelete = (datasetId: string) => {
+    const targetDataset =
+      dataset?.dataset_id === datasetId
+        ? dataset
+        : recentDatasets.find((session) => session.dataset.dataset_id === datasetId)?.dataset;
+    const datasetName = targetDataset?.original_filename || "this dataset";
+    const shouldContinue = window.confirm(
+      `Delete "${datasetName}"? Backend dataset deletion is not connected yet, so no data will be deleted in this phase.`,
+    );
+
+    if (shouldContinue) {
+      window.alert("Dataset deletion is future-ready, but backend deletion is not connected yet.");
+    }
   };
 
   useEffect(() => {
@@ -878,16 +936,22 @@ function App() {
       />
     ),
     dataset: () =>
-      dataset ? (
+      (
         <DatasetSummaryPanel
           dataset={dataset}
+          recentDatasets={recentDatasets}
+          onOpenDataset={openDatasetPicker}
           onViewPreview={() => {
             handleResultTabChange("preview");
             updateDatasetSessionView("results");
           }}
           onHumanIntentSelect={selectHumanIntent}
+          onActivateRecentDataset={activateRecentDataset}
+          onRemoveRecentDataset={removeRecentDatasetWithConfirmation}
+          onClearCurrentDataset={clearCurrentDatasetSession}
+          onDeleteDataset={confirmFutureDatasetDelete}
         />
-      ) : null,
+      ),
     filters: () =>
       dataset ? (
         <DynamicFiltersPanel
@@ -1050,7 +1114,7 @@ function App() {
 
     return (
       <>
-        {!dataset && activeView !== "welcome" && renderNoDatasetView()}
+        {!dataset && activeView !== "welcome" && activeView !== "dataset" && renderNoDatasetView()}
         {renderActiveView?.()}
       </>
     );
@@ -1065,8 +1129,7 @@ function App() {
       analystViews={analystNavItems}
       errorMessage={errorMessage}
       onOpenFile={() => {
-        updateDatasetSessionView("welcome");
-        setShouldOpenFilePicker(true);
+        openDatasetPicker();
       }}
       onViewChange={updateDatasetSessionView}
       onModeChange={(mode) => {

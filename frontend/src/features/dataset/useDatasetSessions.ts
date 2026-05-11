@@ -58,6 +58,12 @@ function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptio
     }
   };
 
+  const removeRecentDataset = (datasetId: string) => {
+    setRecentDatasets((currentSessions) =>
+      currentSessions.filter((session) => session.dataset.dataset_id !== datasetId),
+    );
+  };
+
   return {
     dataset,
     setDataset,
@@ -68,6 +74,7 @@ function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptio
     updateDatasetSessionView,
     updateDatasetSessionResultTab,
     activateRecentDataset,
+    removeRecentDataset,
   };
 }
 

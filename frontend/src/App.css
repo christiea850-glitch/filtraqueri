@@ -734,6 +734,7 @@ h1 span:last-child {
 }
 
 .dataset-summary,
+.dataset-hub-panel,
 .filters-panel,
 .query-builder-panel,
 .empty-state {
@@ -856,6 +857,143 @@ h1 span:last-child {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+}
+
+.dataset-hub-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.dataset-hub-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.dataset-current-card,
+.recent-dataset-card,
+.dataset-empty-guidance {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid #dbe5ef;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.dataset-current-card {
+  grid-template-columns: minmax(220px, 0.85fr) minmax(280px, 1.25fr) auto;
+  align-items: center;
+}
+
+.dataset-card-main {
+  min-width: 0;
+}
+
+.dataset-card-main h3 {
+  margin: 6px 0 4px;
+  overflow: hidden;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataset-card-main p {
+  margin: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dataset-hub-stats {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+
+.dataset-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.danger-text-button {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #b91c1c;
+}
+
+.danger-text-button:hover {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.dataset-empty-guidance {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.dataset-empty-guidance p {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.compact-dataset-empty {
+  grid-template-columns: 1fr;
+}
+
+.dataset-count-pill {
+  align-self: flex-start;
+  padding: 7px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.recent-dataset-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recent-dataset-card {
+  grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1fr) auto;
+  align-items: center;
+  padding: 14px;
+}
+
+.recent-dataset-card h3 {
+  font-size: 15px;
+}
+
+.recent-dataset-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.recent-dataset-meta span {
+  max-width: 160px;
+  overflow: hidden;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-label {
@@ -2230,6 +2368,17 @@ tr:hover {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dataset-current-card,
+  .recent-dataset-card,
+  .dataset-empty-guidance {
+    grid-template-columns: 1fr;
+  }
+
+  .dataset-card-actions,
+  .dataset-hub-actions {
+    justify-content: stretch;
   }
 
   .dataset-id {
