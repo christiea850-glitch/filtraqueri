@@ -63,7 +63,7 @@ def workspace_manifest_path(workspace_id: str) -> Path:
 
 
 def dataset_manifest_entry(metadata: dict[str, Any], source_type: str = "uploaded") -> dict[str, Any]:
-    return {
+    entry = {
         "dataset_id": metadata["dataset_id"],
         "dataset_name": metadata["original_filename"],
         "source_type": source_type,
@@ -74,11 +74,14 @@ def dataset_manifest_entry(metadata: dict[str, Any], source_type: str = "uploade
         "column_count": metadata["column_count"],
         "created_at": metadata["uploaded_at"],
     }
+    if isinstance(metadata.get("workbook_metadata"), dict):
+        entry["workbook_metadata"] = normalize_workbook_manifest_metadata(metadata["workbook_metadata"])
+    return entry
 
 
 def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None = None) -> dict[str, Any]:
     resolved_workspace_id = workspace_id or metadata["dataset_id"]
-    return {
+    manifest = {
         "version": WORKSPACE_MANIFEST_VERSION,
         "workspace_id": resolved_workspace_id,
         "workspace_name": metadata["original_filename"],
@@ -94,6 +97,83 @@ def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None
         "created_at": metadata["uploaded_at"],
         "last_opened_at": metadata["uploaded_at"],
         "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if isinstance(metadata.get("workbook_metadata"), dict):
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(metadata["workbook_metadata"])
+    return manifest
+
+
+def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+
+    worksheets = value.get("worksheets") if isinstance(value.get("worksheets"), list) else []
+    normalized_worksheets: list[dict[str, Any]] = []
+    worksheet_ids: list[str] = []
+
+    for index, worksheet in enumerate(worksheets):
+        if not isinstance(worksheet, dict):
+            continue
+
+        worksheet_id = str(worksheet.get("worksheet_id") or f"worksheet:{index + 1}")
+        table_name = str(worksheet.get("table_name") or "")
+        sheet_name = str(worksheet.get("sheet_name") or f"Worksheet {index + 1}")
+        if not table_name:
+            continue
+
+        schema = worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
+        status = worksheet.get("status") if worksheet.get("status") in ("ready", "empty", "error", "skipped") else "error"
+        normalized_worksheet = {
+            **worksheet,
+            "worksheet_id": worksheet_id,
+            "sheet_name": sheet_name,
+            "display_name": str(worksheet.get("display_name") or sheet_name),
+            "table_name": table_name,
+            "original_index": int(worksheet.get("original_index") or index),
+            "status": status,
+            "schema": schema,
+            "row_count": max(0, int(worksheet.get("row_count") or 0)),
+            "column_count": max(0, int(worksheet.get("column_count") or len(schema))),
+            "visible_columns": worksheet.get("visible_columns") if isinstance(worksheet.get("visible_columns"), list) else [column.get("name") for column in schema if isinstance(column, dict) and column.get("name")],
+            "hidden_columns": worksheet.get("hidden_columns") if isinstance(worksheet.get("hidden_columns"), list) else [],
+            "normalization": worksheet.get("normalization") if isinstance(worksheet.get("normalization"), dict) else {},
+        }
+        worksheet_ids.append(worksheet_id)
+        normalized_worksheets.append(normalized_worksheet)
+
+    active_worksheet_id = value.get("active_worksheet_id")
+    if active_worksheet_id not in worksheet_ids:
+        active_worksheet_id = next(
+            (
+                worksheet["worksheet_id"]
+                for worksheet in normalized_worksheets
+                if worksheet.get("status") == "ready"
+            ),
+            worksheet_ids[0] if worksheet_ids else None,
+        )
+
+    table_mappings = [
+        {
+            "sheet_name": worksheet["sheet_name"],
+            "table_name": worksheet["table_name"],
+            "original_index": worksheet["original_index"],
+        }
+        for worksheet in normalized_worksheets
+    ]
+
+    return {
+        **value,
+        "workbook_id": str(value.get("workbook_id") or "workbook"),
+        "workspace_id": value.get("workspace_id"),
+        "name": str(value.get("name") or value.get("source_file", {}).get("original_filename") or "Workbook"),
+        "status": value.get("status") if value.get("status") in ("pending", "profiling", "ready", "partial", "error") else "partial",
+        "worksheet_ids": worksheet_ids,
+        "active_worksheet_id": active_worksheet_id,
+        "worksheets": normalized_worksheets,
+        "table_mappings": table_mappings,
+        "relationship_candidates": value.get("relationship_candidates") if isinstance(value.get("relationship_candidates"), list) else [],
+        "ingestion_profile": value.get("ingestion_profile") if isinstance(value.get("ingestion_profile"), dict) else {},
+        "normalization": value.get("normalization") if isinstance(value.get("normalization"), dict) else {},
     }
 
 
@@ -134,6 +214,13 @@ def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         manifest["query_builder_metadata"] = {}
     if not isinstance(manifest.get("sql_workspace_metadata"), dict):
         manifest["sql_workspace_metadata"] = {}
+    if isinstance(manifest.get("workbook_metadata"), dict):
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(manifest["workbook_metadata"])
+    else:
+        manifest.pop("workbook_metadata", None)
+    for dataset in datasets:
+        if isinstance(dataset, dict) and isinstance(dataset.get("workbook_metadata"), dict):
+            dataset["workbook_metadata"] = normalize_workbook_manifest_metadata(dataset["workbook_metadata"])
 
     dataset_ids = {
         dataset.get("dataset_id")
@@ -211,6 +298,15 @@ def workspace_manifest_health(manifest: dict[str, Any]) -> dict[str, Any]:
             messages.append(f"Dataset files are missing for {dataset_entry.get('dataset_name', 'dataset')}.")
             if status != "corrupted":
                 status = "stale"
+            continue
+
+        workbook_metadata = dataset_entry.get("workbook_metadata")
+        if isinstance(workbook_metadata, dict):
+            workbook_messages = validate_workbook_manifest_tables(workbook_metadata, duckdb_path)
+            if workbook_messages:
+                messages.extend(workbook_messages)
+                if status != "corrupted":
+                    status = "stale"
 
     active_dataset_id = manifest.get("active_dataset_id")
     dataset_ids = {
@@ -326,6 +422,41 @@ def validate_workspace_manifest_files(manifest: dict[str, Any]) -> None:
         uploaded_path = Path(uploaded_path_value) if uploaded_path_value else None
         if not duckdb_path or not uploaded_path or not duckdb_path.exists() or not uploaded_path.exists():
             raise HTTPException(status_code=404, detail="Workspace dataset files are missing")
+        workbook_metadata = dataset_entry.get("workbook_metadata")
+        if isinstance(workbook_metadata, dict):
+            workbook_messages = validate_workbook_manifest_tables(workbook_metadata, duckdb_path)
+            if workbook_messages:
+                raise HTTPException(status_code=404, detail="Workbook worksheet tables are missing")
+
+
+def validate_workbook_manifest_tables(workbook_metadata: dict[str, Any], duckdb_path: Path) -> list[str]:
+    worksheets = workbook_metadata.get("worksheets") if isinstance(workbook_metadata.get("worksheets"), list) else []
+    ready_table_names = [
+        worksheet.get("table_name")
+        for worksheet in worksheets
+        if isinstance(worksheet, dict) and worksheet.get("status") == "ready" and worksheet.get("table_name")
+    ]
+    if not ready_table_names:
+        return ["Workbook has no ready worksheets."]
+
+    try:
+        with duckdb.connect(str(duckdb_path), read_only=True) as connection:
+            existing_tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+            }
+            messages = [
+                f"Workbook worksheet table is missing: {table_name}"
+                for table_name in ready_table_names
+                if table_name not in existing_tables
+            ]
+            if TABLE_NAME not in existing_tables:
+                messages.append("Active workbook compatibility table is missing.")
+            return messages
+    except duckdb.Error:
+        return ["Workbook DuckDB session could not be validated."]
 
 
 def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
@@ -346,6 +477,8 @@ def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
             "column_count": dataset_entry["column_count"],
             "schema": dataset_entry["schema"],
         }
+        if isinstance(dataset_entry.get("workbook_metadata"), dict):
+            metadata["workbook_metadata"] = normalize_workbook_manifest_metadata(dataset_entry["workbook_metadata"])
         dataset_sessions[dataset_id] = metadata
 
 

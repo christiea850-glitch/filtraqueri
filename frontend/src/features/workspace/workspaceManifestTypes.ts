@@ -13,6 +13,7 @@ export type WorkspaceManifestDataset = {
   row_count: number;
   column_count: number;
   created_at: string;
+  workbook_metadata?: unknown;
 };
 
 export type WorkspaceManifest = {
@@ -27,6 +28,7 @@ export type WorkspaceManifest = {
   filter_metadata: Record<string, unknown>;
   query_builder_metadata: Record<string, unknown>;
   sql_workspace_metadata?: SqlWorkspaceMetadataSnapshot | null;
+  workbook_metadata?: unknown;
   datasets: WorkspaceManifestDataset[];
   created_at: string;
   last_opened_at: string;
