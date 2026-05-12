@@ -118,7 +118,11 @@ function App() {
     tab: ResultTabKey;
   } | null>(null);
   const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
-  const { registry: executionRegistry, recordExecutionResult } = useExecutionRegistry();
+  const {
+    registry: executionRegistry,
+    recordExecutionResult,
+    clearActiveExecution,
+  } = useExecutionRegistry();
   const {
     querySelectedColumns,
     setQuerySelectedColumns,
@@ -198,6 +202,7 @@ function App() {
     setHumanIntent,
     onExecutionResult: (executionResult) =>
       coordinateExecutionResult({ executionResult, resultTab: "preview", hiddenColumns: [], recordExecutionResult }),
+    onDatasetContextChange: clearActiveExecution,
   });
   const draftFilters = buildBackendFilters(dataset);
   const activeFilters =

@@ -42,6 +42,7 @@ function useWorkspaceDatasetController({
   setErrorMessage,
   setHumanIntent,
   onExecutionResult,
+  onDatasetContextChange,
 }: {
   activeResultTab: ResultTabKey;
   setActiveResultTab: (tab: ResultTabKey) => void;
@@ -77,6 +78,7 @@ function useWorkspaceDatasetController({
   setErrorMessage: (message: string) => void;
   setHumanIntent: (intent: HumanIntent | null) => void;
   onExecutionResult?: (result: WorkspaceExecutionResult) => void;
+  onDatasetContextChange?: () => void;
 }) {
   const {
     dataset,
@@ -116,6 +118,7 @@ function useWorkspaceDatasetController({
 
   const restoreDatasetSession = (session: DatasetSession) => {
     const restoredWorkspace = restoreWorkspaceStateSafely(session);
+    onDatasetContextChange?.();
     setDataset(restoredWorkspace.dataset);
     setPreviewResult(restoredWorkspace.previewResult);
     setFilteredResult(restoredWorkspace.filteredResult);
@@ -154,6 +157,7 @@ function useWorkspaceDatasetController({
     setIsUploading(true);
     setErrorMessage("");
     setDataset(null);
+    onDatasetContextChange?.();
     const resetWorkspace = resetWorkspaceForDatasetChange();
     setActiveResultTab(resetWorkspace.activeResultTab);
     updateDatasetSessionResultTab(resetWorkspace.activeResultTab);
@@ -232,6 +236,7 @@ function useWorkspaceDatasetController({
     if (!shouldClear) return;
 
     setDataset(null);
+    onDatasetContextChange?.();
     setSelectedFileName("");
     const resetWorkspace = resetWorkspaceForDatasetChange();
     setActiveResultTab(resetWorkspace.activeResultTab);

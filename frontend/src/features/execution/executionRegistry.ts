@@ -8,16 +8,21 @@ import type {
 } from "./executionRegistryTypes";
 
 const DEFAULT_HISTORY_LIMIT = 100;
+let executionSequence = 0;
 
-const createExecutionId = (result: WorkspaceExecutionResult) =>
-  [
+const createExecutionId = (result: WorkspaceExecutionResult) => {
+  executionSequence += 1;
+
+  return [
     result.dataset.datasetId,
     result.source,
     Date.parse(result.executedAt),
     result.pagination.page,
     result.outputRows.length,
     result.outputVisibleColumns.length,
+    executionSequence,
   ].join("-");
+};
 
 export const createExecutionRecord = (
   result: WorkspaceExecutionResult,
@@ -105,9 +110,17 @@ function useExecutionRegistry(limit = DEFAULT_HISTORY_LIMIT) {
     [limit],
   );
 
+  const clearActiveExecution = useCallback(() => {
+    setRegistry((currentRegistry) => ({
+      ...currentRegistry,
+      activeExecutionId: null,
+    }));
+  }, []);
+
   return {
     registry,
     recordExecutionResult,
+    clearActiveExecution,
     latestExecution: getLatestExecution(registry),
     activeExecution: getActiveExecution(registry),
     getExecutionById: (executionId: ExecutionId) => getExecutionById(registry, executionId),
