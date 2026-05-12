@@ -14,6 +14,8 @@ from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .workbook_ingestion import ingest_workbook
+
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STORAGE_DIR = BASE_DIR / "storage"
@@ -774,8 +776,15 @@ def health() -> dict[str, str]:
 
 @app.post("/datasets/upload")
 async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV uploads are supported")
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Upload filename is required")
+
+    filename_lower = file.filename.lower()
+    is_csv_upload = filename_lower.endswith(".csv")
+    is_workbook_upload = filename_lower.endswith((".xlsx", ".xls"))
+
+    if not is_csv_upload and not is_workbook_upload:
+        raise HTTPException(status_code=400, detail="Only CSV and Excel workbook uploads are supported")
 
     dataset_id = uuid4().hex
     safe_filename = sanitize_filename(file.filename)
@@ -786,19 +795,41 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         with uploaded_path.open("wb") as destination:
             shutil.copyfileobj(file.file, destination)
 
-        with duckdb.connect(str(duckdb_path)) as connection:
-            connection.execute(
-                f"CREATE TABLE {TABLE_NAME} AS SELECT * FROM read_csv_auto(?, HEADER=TRUE)",
-                [str(uploaded_path)],
+        workbook_metadata = None
+
+        if is_workbook_upload:
+            uploaded_at = datetime.now(timezone.utc).isoformat()
+            workbook_result = ingest_workbook(
+                path=uploaded_path,
+                original_filename=file.filename,
+                dataset_id=dataset_id,
+                duckdb_path=duckdb_path,
+                uploaded_at=uploaded_at,
             )
-            schema = profile_dataset(connection)
-            preview = fetch_preview(connection)
-            row_count, column_count = table_stats(connection)
+            schema = workbook_result["schema"]
+            preview = workbook_result["preview"]
+            row_count = workbook_result["row_count"]
+            column_count = workbook_result["column_count"]
+            workbook_metadata = workbook_result["workbook_metadata"]
+        else:
+            with duckdb.connect(str(duckdb_path)) as connection:
+                connection.execute(
+                    f"CREATE TABLE {TABLE_NAME} AS SELECT * FROM read_csv_auto(?, HEADER=TRUE)",
+                    [str(uploaded_path)],
+                )
+                schema = profile_dataset(connection)
+                preview = fetch_preview(connection)
+                row_count, column_count = table_stats(connection)
+            uploaded_at = datetime.now(timezone.utc).isoformat()
 
     except duckdb.Error as error:
         uploaded_path.unlink(missing_ok=True)
         duckdb_path.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=f"Could not load CSV: {error}") from error
+    except HTTPException:
+        uploaded_path.unlink(missing_ok=True)
+        duckdb_path.unlink(missing_ok=True)
+        raise
     finally:
         await file.close()
 
@@ -809,11 +840,14 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "table_name": TABLE_NAME,
         "uploaded_path": str(uploaded_path),
         "duckdb_path": str(duckdb_path),
-        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "uploaded_at": uploaded_at,
         "row_count": row_count,
         "column_count": column_count,
         "schema": schema,
     }
+    if workbook_metadata:
+        metadata["workbook_metadata"] = workbook_metadata
+
     dataset_sessions[dataset_id] = metadata
     workspace_manifest = save_workspace_manifest(create_workspace_manifest(metadata))
 
@@ -821,6 +855,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "dataset": metadata,
         "preview": preview,
         "workspace_manifest": workspace_manifest,
+        "workbook_metadata": workbook_metadata,
     }
 
 

@@ -24,12 +24,14 @@ export type DatasetMetadata = {
   row_count: number;
   column_count: number;
   schema: SchemaColumn[];
+  workbook_metadata?: unknown;
 };
 
 export type UploadResponse = {
   dataset: DatasetMetadata;
   preview: Record<string, unknown>[];
   workspace_manifest: WorkspaceManifest;
+  workbook_metadata?: unknown;
 };
 
 export type ActiveView =

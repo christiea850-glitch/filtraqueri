@@ -22,7 +22,7 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
         <div className="welcome-copy">
           <p className="section-label">Workspace</p>
           <h2>Open data</h2>
-          <p>Start with a CSV.</p>
+          <p>Start with a CSV or Excel workbook.</p>
           <div className="welcome-actions">
             <button type="button" className="primary-button" onClick={openFilePicker}>
               {buttonLabel}
@@ -38,7 +38,7 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
             ref={ref}
             className="sidebar-file-input"
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={onFileChange}
             disabled={uploading}
           />

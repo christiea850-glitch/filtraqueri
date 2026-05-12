@@ -56,9 +56,13 @@ export async function uploadDataset(file: File) {
     file.name.toLowerCase().endsWith(".csv") ||
     file.type === "text/csv" ||
     file.type === "application/vnd.ms-excel";
+  const isExcelWorkbook =
+    file.name.toLowerCase().endsWith(".xlsx") ||
+    file.name.toLowerCase().endsWith(".xls") ||
+    file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-  if (!isCsvFile) {
-    throw new Error("Please upload a CSV file. FiltraQueri supports CSV uploads in this workspace.");
+  if (!isCsvFile && !isExcelWorkbook) {
+    throw new Error("Please upload a CSV or Excel workbook file.");
   }
 
   const formData = new FormData();

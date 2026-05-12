@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 WORKBOOK_METADATA_NORMALIZATION_VERSION = 1
@@ -30,6 +30,8 @@ class WorksheetNormalizationMetadata(BaseModel):
 
 
 class WorksheetMetadata(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     worksheet_id: str
     workbook_id: str
     sheet_name: str
@@ -37,7 +39,7 @@ class WorksheetMetadata(BaseModel):
     table_name: str
     original_index: int = Field(ge=0)
     status: Literal["ready", "empty", "error", "skipped"] = "ready"
-    schema: list[dict[str, Any]] = Field(default_factory=list)
+    schema_: list[dict[str, Any]] = Field(default_factory=list, alias="schema")
     row_count: int = Field(default=0, ge=0)
     column_count: int = Field(default=0, ge=0)
     visible_columns: list[str] = Field(default_factory=list)
