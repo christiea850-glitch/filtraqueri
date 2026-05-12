@@ -22,6 +22,19 @@ type ResultsGridProps = {
   onRowsPerPageChange: (rowsPerPage: number) => void;
 };
 
+function getColumnLetter(index: number) {
+  let columnIndex = index + 1;
+  let label = "";
+
+  while (columnIndex > 0) {
+    const remainder = (columnIndex - 1) % 26;
+    label = String.fromCharCode(65 + remainder) + label;
+    columnIndex = Math.floor((columnIndex - 1) / 26);
+  }
+
+  return label;
+}
+
 function ResultsGrid({
   title,
   label,
@@ -42,6 +55,8 @@ function ResultsGrid({
   onPageChange,
   onRowsPerPageChange,
 }: ResultsGridProps) {
+  const firstVisibleRowNumber = (page - 1) * rowsPerPage + 1;
+
   return (
     <section className="data-grid-section">
       <div className="data-grid-toolbar">
@@ -76,11 +91,19 @@ function ResultsGrid({
           <table>
             <thead>
               <tr>
-                {columns.map((column) => (
+                <th className="row-number-cell row-number-header" scope="col">
+                  Row
+                </th>
+                {columns.map((column, columnIndex) => (
                   <th key={column}>
                     <button type="button" onClick={() => onSortColumn(column)}>
-                      {column}
-                      {activeSortColumn === column && <span> {activeSortDirection}</span>}
+                      <span className="column-letter" aria-label={`Column ${getColumnLetter(columnIndex)}`}>
+                        {getColumnLetter(columnIndex)}
+                      </span>
+                      <span className="column-name" title={column}>
+                        {column}
+                        {activeSortColumn === column && <span> {activeSortDirection}</span>}
+                      </span>
                     </button>
                   </th>
                 ))}
@@ -90,8 +113,13 @@ function ResultsGrid({
             <tbody>
               {rows.map((row, rowIndex) => (
                 <tr key={rowIndex}>
+                  <th className="row-number-cell" scope="row">
+                    {firstVisibleRowNumber + rowIndex}
+                  </th>
                   {columns.map((column) => (
-                    <td key={column}>{String(row[column] ?? "")}</td>
+                    <td key={column} tabIndex={0}>
+                      {String(row[column] ?? "")}
+                    </td>
                   ))}
                 </tr>
               ))}

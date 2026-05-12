@@ -208,9 +208,10 @@
 }
 
 .result-tabs button:focus-visible,
-.data-grid-table th button:focus-visible {
+.data-grid-table th button:focus-visible,
+.data-grid-table td:focus-visible {
   outline: 2px solid rgba(37, 99, 235, 0.42);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .result-toggle button:disabled,
@@ -236,13 +237,16 @@
   min-width: 760px;
 }
 
-.data-grid-table th {
+.data-grid-table thead th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 3;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .data-grid-table th button {
+  display: grid;
+  gap: 3px;
   width: 100%;
   border: 0;
   background: transparent;
@@ -255,6 +259,83 @@
 
 .data-grid-table th button:hover {
   color: #bfdbfe;
+}
+
+.data-grid-table .column-letter {
+  display: inline-flex;
+  width: fit-content;
+  min-width: 22px;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid rgba(191, 219, 254, 0.26);
+  border-radius: 999px;
+  background: rgba(219, 234, 254, 0.12);
+  color: #bfdbfe;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.data-grid-table .column-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-grid-table tbody tr {
+  transition: background 120ms ease;
+}
+
+.data-grid-table tbody tr:hover {
+  background: #f1f7ff;
+}
+
+.data-grid-table td {
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+
+.data-grid-table td:hover,
+.data-grid-table td:focus-visible {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+  color: #172033;
+}
+
+.data-grid-table .row-number-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
+  border-right: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: right;
+  box-shadow: 4px 0 12px rgba(15, 23, 42, 0.05);
+}
+
+.data-grid-table .row-number-header {
+  top: 0;
+  z-index: 5;
+  border-right-color: rgba(255, 255, 255, 0.18);
+  background: #111827;
+  color: #bfdbfe;
+  text-align: left;
+}
+
+.data-grid-table tbody tr:hover .row-number-cell {
+  background: #eaf4ff;
+  color: #1d4ed8;
 }
 
 .results-workspace .session-panel,
