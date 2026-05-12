@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
+import {
+  normalizeSqlWorkspaceMetadataSnapshot,
+  updateSqlWorkspaceDialect,
+  updateSqlWorkspaceDraftMetadata,
+  type SqlWorkspaceMetadataSnapshot,
+} from "../../sqlWorkspacePersistence";
 import {
   analyzeSqlWorkspaceDraft,
   getDialectProfile,
@@ -39,11 +45,19 @@ const createPreviewMessage = (status: SqlExecutionStatus) => {
 function useSqlWorkspace(
   dataset: DatasetMetadata | null,
   onExecutionResult?: (result: WorkspaceExecutionResult) => void,
+  metadata?: SqlWorkspaceMetadataSnapshot,
+  onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void,
 ) {
+  const normalizedMetadata = useMemo(
+    () => normalizeSqlWorkspaceMetadataSnapshot(metadata),
+    [metadata],
+  );
   const [sqlDraft, setSqlDraft] = useState(() => createInitialSql(dataset?.table_name));
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>([]);
   const [editorStatus, setEditorStatus] = useState<SqlExecutionStatus>("idle");
-  const [selectedDialect, setSelectedDialect] = useState<SqlDialectId>("duckdb");
+  const [selectedDialect, setSelectedDialect] = useState<SqlDialectId>(
+    normalizedMetadata.selectedDialect,
+  );
   const [previewResult, setPreviewResult] = useState<SqlPreviewResult>({
     columns: [],
     rows: [],
@@ -69,6 +83,15 @@ function useSqlWorkspace(
     [selectedDialect, sqlDraft],
   );
   const characterCount = sqlDraft.trim().length;
+
+  useEffect(() => {
+    setSelectedDialect(normalizedMetadata.selectedDialect);
+  }, [normalizedMetadata.selectedDialect]);
+
+  const updateSelectedDialect = (dialect: SqlDialectId) => {
+    setSelectedDialect(dialect);
+    onMetadataChange?.(updateSqlWorkspaceDialect(normalizedMetadata, dialect));
+  };
 
   const updateStatus = (status: SqlExecutionStatus) => {
     const message = createPreviewMessage(status);
@@ -130,6 +153,12 @@ function useSqlWorkspace(
     };
 
     setSavedDrafts((currentDrafts) => [draft, ...currentDrafts.slice(0, 5)]);
+    onMetadataChange?.(
+      updateSqlWorkspaceDraftMetadata(normalizedMetadata, {
+        draftCount: Math.min(savedDrafts.length + 1, 6),
+        lastDraftSavedAt: draft.savedAt,
+      }),
+    );
     updateStatus("draft-saved");
   };
 
@@ -178,7 +207,7 @@ function useSqlWorkspace(
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,
-    setSelectedDialect,
+    setSelectedDialect: updateSelectedDialect,
     editor,
     insertSql,
     saveDraft,

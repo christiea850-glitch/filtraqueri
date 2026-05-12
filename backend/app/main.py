@@ -87,6 +87,7 @@ def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None
         "current_result_tab": "preview",
         "filter_metadata": {},
         "query_builder_metadata": {},
+        "sql_workspace_metadata": {},
         "datasets": [dataset_manifest_entry(metadata)],
         "created_at": metadata["uploaded_at"],
         "last_opened_at": metadata["uploaded_at"],
@@ -129,6 +130,8 @@ def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         manifest["filter_metadata"] = {}
     if not isinstance(manifest.get("query_builder_metadata"), dict):
         manifest["query_builder_metadata"] = {}
+    if not isinstance(manifest.get("sql_workspace_metadata"), dict):
+        manifest["sql_workspace_metadata"] = {}
 
     dataset_ids = {
         dataset.get("dataset_id")
@@ -416,6 +419,7 @@ class WorkspaceManifestUpdate(BaseModel):
     current_result_tab: str | None = None
     filter_metadata: dict[str, Any] | None = None
     query_builder_metadata: dict[str, Any] | None = None
+    sql_workspace_metadata: dict[str, Any] | None = None
 
 
 def sanitize_filename(filename: str) -> str:

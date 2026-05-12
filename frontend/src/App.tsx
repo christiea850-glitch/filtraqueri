@@ -162,6 +162,8 @@ function App() {
     activeView,
     workspaceMode,
     setWorkspaceMode,
+    sqlWorkspaceMetadata,
+    setSqlWorkspaceMetadata,
     shouldOpenFilePicker,
     setShouldOpenFilePicker,
     selectedFileName,
@@ -1021,6 +1023,8 @@ function App() {
 
   const analystViewRegistry = createAnalystWorkspaceRenderers(analystWorkspaceRegistry, {
     dataset,
+    sqlWorkspaceMetadata,
+    onSqlWorkspaceMetadataChange: setSqlWorkspaceMetadata,
     onExecutionResult: (executionResult) => {
       const coordinationResult = coordinateExecutionResult({
         executionResult,

@@ -16,6 +16,11 @@ import type { AggregationState } from "../query-builder/queryBuilderTypes";
 import type { ResultState, ResultTabKey, SortDirection } from "../results/resultTypes";
 import { createEmptyResultState } from "../results/useResults";
 import {
+  createSqlWorkspaceMetadataSnapshot,
+  normalizeSqlWorkspaceMetadataSnapshot,
+  type SqlWorkspaceMetadataSnapshot,
+} from "../sqlWorkspacePersistence";
+import {
   resetWorkspaceForDatasetChange,
   restoreWorkspaceStateSafely,
 } from "../workspace/workspaceOrchestration";
@@ -119,6 +124,8 @@ function useWorkspaceDatasetController({
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [sqlWorkspaceMetadata, setSqlWorkspaceMetadata] =
+    useState<SqlWorkspaceMetadataSnapshot>(() => createSqlWorkspaceMetadataSnapshot());
 
   const createDatasetSession = (datasetMetadata: DatasetMetadata): DatasetSession => ({
     dataset: datasetMetadata,
@@ -186,6 +193,9 @@ function useWorkspaceDatasetController({
         getPreview(activeDatasetId, { limit: 25, page: 1 }),
       ]);
       const queryMetadata = workspace.query_builder_metadata || {};
+      const restoredSqlWorkspaceMetadata = normalizeSqlWorkspaceMetadataSnapshot(
+        workspace.sql_workspace_metadata,
+      );
       const defaultSelectedColumns = restoredDataset.schema.slice(0, 4).map((column) => column.name);
       const restoredAggregations = Array.isArray(queryMetadata.aggregations)
         ? queryMetadata.aggregations
@@ -231,6 +241,7 @@ function useWorkspaceDatasetController({
       });
       setActiveResultTab(workspace.current_result_tab === "preview" ? "preview" : "preview");
       setWorkspaceMode(workspace.current_mode === "analyst" ? "analyst" : "human");
+      setSqlWorkspaceMetadata(restoredSqlWorkspaceMetadata);
       setSelectedFileName(restoredDataset.original_filename);
       setActiveWorkspaceId(workspace.workspace_id);
       saveActiveWorkspaceId(workspace.workspace_id);
@@ -270,6 +281,7 @@ function useWorkspaceDatasetController({
     resetResults();
     setFilterValues({});
     resetQueryBuilder();
+    setSqlWorkspaceMetadata(createSqlWorkspaceMetadataSnapshot());
     setHumanIntent(null);
     clearHistory();
 
@@ -353,6 +365,7 @@ function useWorkspaceDatasetController({
     resetResults();
     setFilterValues({});
     resetQueryBuilder();
+    setSqlWorkspaceMetadata(createSqlWorkspaceMetadataSnapshot());
     setHumanIntent(null);
     clearHistory();
     setErrorMessage("");
@@ -429,6 +442,7 @@ function useWorkspaceDatasetController({
         limit: queryLimit,
         has_run_query: hasRunQuery,
       },
+      sql_workspace_metadata: sqlWorkspaceMetadata,
     }).catch(() => undefined);
   }, [
     activeWorkspaceId,
@@ -443,6 +457,7 @@ function useWorkspaceDatasetController({
     queryLimit,
     hasRunQuery,
     filterValues,
+    sqlWorkspaceMetadata,
     isRestoringWorkspace,
   ]);
 
@@ -478,6 +493,8 @@ function useWorkspaceDatasetController({
     setActiveView,
     workspaceMode,
     setWorkspaceMode,
+    sqlWorkspaceMetadata,
+    setSqlWorkspaceMetadata,
     shouldOpenFilePicker,
     setShouldOpenFilePicker,
     selectedFileName,
