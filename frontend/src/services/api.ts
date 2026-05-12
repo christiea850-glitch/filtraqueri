@@ -14,6 +14,7 @@ import type {
   WorkspaceManifest,
   WorkspaceManifestUpdate,
 } from "../features/workspace/workspaceManifestTypes";
+import type { WorkspaceManifestSummary } from "../features/workspace/workspaceManagerTypes";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -112,6 +113,16 @@ export async function getWorkspaceManifest(workspaceId: string) {
   );
 }
 
+export async function listWorkspaceManifests() {
+  return requestJson<{ workspaces: WorkspaceManifestSummary[] }>(
+    `${API_BASE_URL}/workspaces`,
+    {
+      method: "GET",
+    },
+    "Saved workspaces could not be loaded.",
+  );
+}
+
 export async function updateWorkspaceManifest(
   workspaceId: string,
   request: WorkspaceManifestUpdate,
@@ -126,6 +137,16 @@ export async function updateWorkspaceManifest(
       body: JSON.stringify(request),
     },
     "Workspace could not be saved.",
+  );
+}
+
+export async function removeWorkspaceManifest(workspaceId: string) {
+  return requestJson<{ removed: boolean; workspace_id: string }>(
+    `${API_BASE_URL}/workspaces/${workspaceId}/manifest`,
+    {
+      method: "DELETE",
+    },
+    "Workspace manifest could not be removed.",
   );
 }
 

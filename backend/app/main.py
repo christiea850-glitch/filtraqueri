@@ -79,6 +79,7 @@ def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None
     return {
         "version": WORKSPACE_MANIFEST_VERSION,
         "workspace_id": resolved_workspace_id,
+        "workspace_name": metadata["original_filename"],
         "active_dataset_id": metadata["dataset_id"],
         "active_result_id": "preview",
         "active_execution_id": None,
@@ -88,24 +89,80 @@ def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None
         "query_builder_metadata": {},
         "datasets": [dataset_manifest_entry(metadata)],
         "created_at": metadata["uploaded_at"],
+        "last_opened_at": metadata["uploaded_at"],
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
+def normalize_workspace_name(value: Any, fallback: str) -> str:
+    if not isinstance(value, str):
+        return fallback
+
+    trimmed_value = value.strip()
+    return trimmed_value[:120] if trimmed_value else fallback
+
+
+def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    datasets = manifest.get("datasets") if isinstance(manifest.get("datasets"), list) else []
+    first_dataset = datasets[0] if datasets else {}
+    fallback_name = first_dataset.get("dataset_name") if isinstance(first_dataset, dict) else None
+    created_at = manifest.get("created_at") or datetime.now(timezone.utc).isoformat()
+
+    manifest["version"] = manifest.get("version", WORKSPACE_MANIFEST_VERSION)
+    manifest["workspace_id"] = str(manifest.get("workspace_id") or uuid4().hex)
+    manifest["workspace_name"] = normalize_workspace_name(
+        manifest.get("workspace_name"),
+        str(fallback_name or "Untitled workspace"),
+    )
+    manifest["created_at"] = created_at
+    manifest["updated_at"] = manifest.get("updated_at") or created_at
+    manifest["last_opened_at"] = manifest.get("last_opened_at") or manifest["updated_at"]
+    manifest["datasets"] = datasets
+
+    if manifest.get("current_mode") not in ("human", "analyst"):
+        manifest["current_mode"] = "human"
+    if manifest.get("current_result_tab") not in ("preview", "filtered", "queried"):
+        manifest["current_result_tab"] = "preview"
+    if manifest.get("active_result_id") not in (None, "preview", "filtered", "queried"):
+        manifest["active_result_id"] = manifest["current_result_tab"]
+    if not isinstance(manifest.get("filter_metadata"), dict):
+        manifest["filter_metadata"] = {}
+    if not isinstance(manifest.get("query_builder_metadata"), dict):
+        manifest["query_builder_metadata"] = {}
+
+    dataset_ids = {
+        dataset.get("dataset_id")
+        for dataset in datasets
+        if isinstance(dataset, dict) and dataset.get("dataset_id")
+    }
+    if manifest.get("active_dataset_id") not in dataset_ids:
+        manifest["active_dataset_id"] = next(
+            (
+                dataset.get("dataset_id")
+                for dataset in datasets
+                if isinstance(dataset, dict) and dataset.get("dataset_id")
+            ),
+            None,
+        )
+
+    return manifest
+
+
 def save_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    manifest = normalize_workspace_manifest(manifest)
     manifest["updated_at"] = datetime.now(timezone.utc).isoformat()
     path = workspace_manifest_path(manifest["workspace_id"])
     path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
 
 
-def read_workspace_manifest(workspace_id: str) -> dict[str, Any]:
+def read_workspace_manifest(workspace_id: str, mark_opened: bool = True) -> dict[str, Any]:
     path = workspace_manifest_path(workspace_id)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Workspace manifest not found")
 
     try:
-        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
     except json.JSONDecodeError as error:
         raise HTTPException(status_code=400, detail="Workspace manifest is invalid") from error
 
@@ -114,14 +171,155 @@ def read_workspace_manifest(workspace_id: str) -> dict[str, Any]:
 
     validate_workspace_manifest_files(manifest)
     hydrate_dataset_sessions_from_manifest(manifest)
+    if mark_opened:
+        manifest["last_opened_at"] = datetime.now(timezone.utc).isoformat()
+        return save_workspace_manifest(manifest)
     return manifest
+
+
+def workspace_manifest_health(manifest: dict[str, Any]) -> dict[str, Any]:
+    messages: list[str] = []
+    status = "recoverable"
+    datasets = manifest.get("datasets") if isinstance(manifest.get("datasets"), list) else []
+
+    if manifest.get("version") != WORKSPACE_MANIFEST_VERSION:
+        messages.append("Unsupported manifest version.")
+        status = "corrupted"
+    if not manifest.get("workspace_id"):
+        messages.append("Workspace id is missing.")
+        status = "corrupted"
+    if not datasets:
+        messages.append("No datasets are registered in this workspace.")
+        status = "stale" if status != "corrupted" else status
+
+    for dataset_entry in datasets:
+        if not isinstance(dataset_entry, dict) or not dataset_entry.get("dataset_id"):
+            messages.append("Dataset manifest entry is invalid.")
+            status = "corrupted"
+            continue
+
+        duckdb_path_value = dataset_entry.get("duckdb_path")
+        uploaded_path_value = dataset_entry.get("uploaded_path")
+        duckdb_path = Path(duckdb_path_value) if duckdb_path_value else None
+        uploaded_path = Path(uploaded_path_value) if uploaded_path_value else None
+        if not duckdb_path or not uploaded_path or not duckdb_path.exists() or not uploaded_path.exists():
+            messages.append(f"Dataset files are missing for {dataset_entry.get('dataset_name', 'dataset')}.")
+            if status != "corrupted":
+                status = "stale"
+
+    active_dataset_id = manifest.get("active_dataset_id")
+    dataset_ids = {
+        dataset.get("dataset_id")
+        for dataset in datasets
+        if isinstance(dataset, dict) and dataset.get("dataset_id")
+    }
+    if active_dataset_id and active_dataset_id not in dataset_ids:
+        messages.append("Active dataset reference is stale and will be reset on recovery.")
+        if status == "recoverable":
+            status = "stale"
+
+    return {
+        "status": status,
+        "is_valid": status in ("active", "recoverable"),
+        "messages": messages,
+    }
+
+
+def workspace_manifest_summary(
+    manifest: dict[str, Any],
+    status: str | None = None,
+    messages: list[str] | None = None,
+) -> dict[str, Any]:
+    manifest = normalize_workspace_manifest(manifest)
+    health = workspace_manifest_health(manifest)
+    resolved_status = status or health["status"]
+    resolved_messages = messages if messages is not None else health["messages"]
+    active_dataset = next(
+        (
+            dataset
+            for dataset in manifest.get("datasets", [])
+            if dataset.get("dataset_id") == manifest.get("active_dataset_id")
+        ),
+        manifest.get("datasets", [None])[0] if manifest.get("datasets") else None,
+    )
+
+    return {
+        "workspace_id": manifest["workspace_id"],
+        "workspace_name": manifest["workspace_name"],
+        "created_at": manifest["created_at"],
+        "last_opened_at": manifest.get("last_opened_at") or manifest.get("updated_at"),
+        "active_dataset": {
+            "dataset_id": active_dataset.get("dataset_id"),
+            "dataset_name": active_dataset.get("dataset_name"),
+            "row_count": active_dataset.get("row_count", 0),
+            "column_count": active_dataset.get("column_count", 0),
+        }
+        if active_dataset
+        else None,
+        "dataset_count": len(manifest.get("datasets", [])),
+        "manifest_version": manifest.get("version"),
+        "status": resolved_status,
+        "recovery": {
+            "can_recover": resolved_status in ("active", "recoverable"),
+            "reason": resolved_messages[0] if resolved_messages else None,
+        },
+        "validation": {
+            "is_valid": resolved_status in ("active", "recoverable"),
+            "messages": resolved_messages,
+        },
+    }
+
+
+def list_workspace_manifest_summaries() -> list[dict[str, Any]]:
+    summaries: list[dict[str, Any]] = []
+    for path in MANIFESTS_DIR.glob("*.json"):
+        try:
+            manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+            health = workspace_manifest_health(manifest)
+            summaries.append(
+                workspace_manifest_summary(
+                    manifest,
+                    status=health["status"],
+                    messages=health["messages"],
+                )
+            )
+        except (json.JSONDecodeError, OSError, TypeError):
+            workspace_id = path.stem
+            summaries.append(
+                {
+                    "workspace_id": workspace_id,
+                    "workspace_name": workspace_id,
+                    "created_at": "",
+                    "last_opened_at": "",
+                    "active_dataset": None,
+                    "dataset_count": 0,
+                    "manifest_version": None,
+                    "status": "corrupted",
+                    "recovery": {
+                        "can_recover": False,
+                        "reason": "Manifest JSON could not be read.",
+                    },
+                    "validation": {
+                        "is_valid": False,
+                        "messages": ["Manifest JSON could not be read."],
+                    },
+                }
+            )
+
+    return sorted(
+        summaries,
+        key=lambda summary: summary.get("last_opened_at") or summary.get("created_at") or "",
+        reverse=True,
+    )
 
 
 def validate_workspace_manifest_files(manifest: dict[str, Any]) -> None:
     for dataset_entry in manifest.get("datasets", []):
-        duckdb_path = Path(dataset_entry.get("duckdb_path", ""))
-        uploaded_path = Path(dataset_entry.get("uploaded_path", ""))
-        if not duckdb_path.exists() or not uploaded_path.exists():
+        duckdb_path_value = dataset_entry.get("duckdb_path")
+        uploaded_path_value = dataset_entry.get("uploaded_path")
+        duckdb_path = Path(duckdb_path_value) if duckdb_path_value else None
+        uploaded_path = Path(uploaded_path_value) if uploaded_path_value else None
+        if not duckdb_path or not uploaded_path or not duckdb_path.exists() or not uploaded_path.exists():
             raise HTTPException(status_code=404, detail="Workspace dataset files are missing")
 
 
@@ -149,7 +347,7 @@ def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
 def load_workspace_manifests() -> None:
     for path in MANIFESTS_DIR.glob("*.json"):
         try:
-            manifest = json.loads(path.read_text(encoding="utf-8"))
+            manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
             if manifest.get("version") == WORKSPACE_MANIFEST_VERSION:
                 validate_workspace_manifest_files(manifest)
                 hydrate_dataset_sessions_from_manifest(manifest)
@@ -210,6 +408,7 @@ class ExportRequest(BaseModel):
 
 
 class WorkspaceManifestUpdate(BaseModel):
+    workspace_name: str | None = None
     active_dataset_id: str | None = None
     active_result_id: str | None = None
     active_execution_id: str | None = None
@@ -621,6 +820,11 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     }
 
 
+@app.get("/workspaces")
+def list_workspaces() -> dict[str, Any]:
+    return {"workspaces": list_workspace_manifest_summaries()}
+
+
 @app.get("/workspaces/{workspace_id}")
 def get_workspace_manifest(workspace_id: str) -> dict[str, Any]:
     return {"workspace": read_workspace_manifest(workspace_id)}
@@ -636,7 +840,10 @@ def update_workspace_manifest(
 
     for key, value in updates.items():
         if value is not None:
-            manifest[key] = value
+            if key == "workspace_name":
+                manifest[key] = normalize_workspace_name(value, manifest.get("workspace_name", "Untitled workspace"))
+            else:
+                manifest[key] = value
 
     if manifest.get("active_dataset_id") and not any(
         dataset["dataset_id"] == manifest["active_dataset_id"]
@@ -652,6 +859,29 @@ def update_workspace_manifest(
         manifest["current_mode"] = "human"
 
     return {"workspace": save_workspace_manifest(manifest)}
+
+
+@app.delete("/workspaces/{workspace_id}/manifest")
+def delete_workspace_manifest(workspace_id: str) -> dict[str, Any]:
+    path = workspace_manifest_path(workspace_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Workspace manifest not found")
+
+    try:
+        manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+        health = workspace_manifest_health(manifest)
+        status = health["status"]
+    except (json.JSONDecodeError, OSError, TypeError):
+        status = "corrupted"
+
+    if status in ("active", "recoverable"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only stale or corrupted workspace manifests can be removed safely",
+        )
+
+    path.unlink(missing_ok=True)
+    return {"removed": True, "workspace_id": workspace_id}
 
 
 @app.get("/datasets/{dataset_id}")

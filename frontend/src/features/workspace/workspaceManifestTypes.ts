@@ -17,6 +17,7 @@ export type WorkspaceManifestDataset = {
 export type WorkspaceManifest = {
   version: number;
   workspace_id: string;
+  workspace_name: string;
   active_dataset_id: string | null;
   active_result_id: ResultTabKey | null;
   active_execution_id: string | null;
@@ -26,12 +27,14 @@ export type WorkspaceManifest = {
   query_builder_metadata: Record<string, unknown>;
   datasets: WorkspaceManifestDataset[];
   created_at: string;
+  last_opened_at: string;
   updated_at: string;
 };
 
 export type WorkspaceManifestUpdate = Partial<
   Pick<
     WorkspaceManifest,
+    | "workspace_name"
     | "active_dataset_id"
     | "active_result_id"
     | "active_execution_id"

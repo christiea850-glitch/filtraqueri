@@ -4,7 +4,7 @@
   "active_dataset_id": "eadfe4f117f04bbfae5ade44919220bf",
   "active_result_id": "preview",
   "active_execution_id": null,
-  "current_mode": "analyst",
+  "current_mode": "human",
   "current_result_tab": "preview",
   "filter_metadata": {},
   "query_builder_metadata": {
@@ -351,5 +351,5 @@
     }
   ],
   "created_at": "2026-05-12T16:24:24.310853+00:00",
-  "updated_at": "2026-05-12T16:25:19.595765+00:00"
+  "updated_at": "2026-05-12T16:32:02.565188+00:00"
 }

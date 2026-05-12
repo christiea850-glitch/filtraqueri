@@ -4,6 +4,7 @@ import {
   getDataset,
   getPreview,
   getWorkspaceManifest,
+  listWorkspaceManifests,
   updateWorkspaceManifest,
   uploadDataset,
 } from "../../services/api";
@@ -23,6 +24,11 @@ import {
   loadActiveWorkspaceId,
   saveActiveWorkspaceId,
 } from "../workspace/workspacePersistence";
+import {
+  gracefullyResetBrokenReferences,
+  listSavedWorkspaces,
+  recoverWorkspaceSafely,
+} from "../workspace/workspaceManager";
 import type { DatasetMetadata, DatasetSession } from "./datasetTypes";
 import useDatasetSessions from "./useDatasetSessions";
 
@@ -170,7 +176,8 @@ function useWorkspaceDatasetController({
     setErrorMessage("");
 
     try {
-      const { workspace } = await getWorkspaceManifest(workspaceId);
+      const response = await getWorkspaceManifest(workspaceId);
+      const workspace = gracefullyResetBrokenReferences(response.workspace);
       const activeDatasetId = workspace.active_dataset_id;
       if (!activeDatasetId) return;
 
@@ -379,7 +386,29 @@ function useWorkspaceDatasetController({
 
   useEffect(() => {
     const storedWorkspaceId = loadActiveWorkspaceId();
-    if (storedWorkspaceId) restoreWorkspaceFromManifest(storedWorkspaceId);
+    if (!storedWorkspaceId) return;
+
+    const recoverLastWorkspace = async () => {
+      try {
+        const { workspaces } = await listWorkspaceManifests();
+        const savedWorkspaces = listSavedWorkspaces(workspaces, storedWorkspaceId);
+        const recoveryDecision = recoverWorkspaceSafely(
+          savedWorkspaces.find((workspace) => workspace.workspace_id === storedWorkspaceId) || null,
+        );
+
+        if (recoveryDecision.canRecover && recoveryDecision.workspaceId) {
+          await restoreWorkspaceFromManifest(recoveryDecision.workspaceId);
+          return;
+        }
+
+        clearActiveWorkspaceId();
+        setActiveWorkspaceId("");
+      } catch {
+        await restoreWorkspaceFromManifest(storedWorkspaceId);
+      }
+    };
+
+    recoverLastWorkspace();
   }, []);
 
   useEffect(() => {
