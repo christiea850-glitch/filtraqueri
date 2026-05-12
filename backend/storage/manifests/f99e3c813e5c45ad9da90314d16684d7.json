@@ -5,7 +5,7 @@
   "active_dataset_id": "f99e3c813e5c45ad9da90314d16684d7",
   "active_result_id": "preview",
   "active_execution_id": null,
-  "current_mode": "human",
+  "current_mode": "analyst",
   "current_result_tab": "preview",
   "filter_metadata": {},
   "query_builder_metadata": {
@@ -32,20 +32,29 @@
     "version": 1,
     "selectedDialect": "duckdb",
     "activeSqlTab": "editor",
-    "activeDraftId": null,
+    "activeDraftId": "active-draft",
     "activeSnippetId": null,
     "lastOpenedContext": "sqlWorkspace",
     "draftMetadata": {
-      "draftCount": 0,
-      "lastDraftSavedAt": null
+      "draftCount": 1,
+      "lastDraftSavedAt": "2026-05-12T23:20:41.577Z"
     },
     "snippetMetadata": {
       "snippetCount": 0,
       "lastSnippetSavedAt": null
     },
-    "drafts": [],
+    "drafts": [
+      {
+        "version": 1,
+        "id": "active-draft",
+        "label": "Query draft",
+        "sql": "SELECT *\nFROM data\nLIMIT 100;",
+        "selectedDialect": "duckdb",
+        "updatedAt": "2026-05-12T23:20:41.577Z"
+      }
+    ],
     "snippets": [],
-    "updatedAt": "2026-05-12T23:09:37.479Z"
+    "updatedAt": "2026-05-12T23:20:41.577Z"
   },
   "datasets": [
     {
@@ -478,8 +487,8 @@
     }
   ],
   "created_at": "2026-05-12T22:50:01.907326+00:00",
-  "last_opened_at": "2026-05-12T23:09:37.586485+00:00",
-  "updated_at": "2026-05-12T23:09:37.590215+00:00",
+  "last_opened_at": "2026-05-12T23:20:41.644154+00:00",
+  "updated_at": "2026-05-12T23:20:41.646162+00:00",
   "workbook_metadata": {
     "workbook_id": "f99e3c813e5c45ad9da90314d16684d7",
     "workspace_id": "f99e3c813e5c45ad9da90314d16684d7",

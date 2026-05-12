@@ -1,4 +1,5 @@
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
 import type { SqlSuggestion, SqlTemplate } from "./sqlTypes";
 
 type SqlSchemaPanelProps = {
@@ -41,6 +42,8 @@ function SqlSchemaPanel({
           <strong>{dataset ? `${dataset.row_count.toLocaleString()} rows` : "No dataset open."}</strong>
           <strong>{dataset ? `${dataset.column_count.toLocaleString()} columns` : "No dataset open."}</strong>
         </div>
+
+        <WorkbookContextPanel dataset={dataset} variant="analyst" />
 
         <div className="sql-helper-section">
           <div className="builder-block-header">

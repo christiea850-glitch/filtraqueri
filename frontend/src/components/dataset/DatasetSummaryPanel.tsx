@@ -4,6 +4,7 @@ import {
   listWorkbookWorksheets,
   type WorksheetMetadata,
 } from "../../features/workbook";
+import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
 
 export type HumanIntent =
   | "summary"
@@ -84,6 +85,7 @@ export function DatasetSessionPanel({
         <p>Grouping</p>
         <small>{queryGroupBy.length > 0 ? queryGroupBy.join(", ") : "None"}</small>
       </div>
+      <WorkbookContextPanel dataset={dataset} variant="results" />
     </aside>
   );
 }
