@@ -29,6 +29,17 @@
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.84);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sql-context-panel:hover,
+.sql-editor-panel:hover,
+.sql-preview-panel:hover,
+.sql-draft-panel:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
 }
 
 .sql-context-panel {
@@ -97,11 +108,18 @@
 .sql-schema-chip {
   font: inherit;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .sql-schema-chip:hover {
   border-color: #bfdbfe;
   background: #eff6ff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
 }
 
 .sql-helper-section {
@@ -131,6 +149,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .sql-suggestion-grid button {
@@ -146,6 +169,8 @@
 .sql-keyword-list button:hover {
   border-color: #bfdbfe;
   background: #eff6ff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
 }
 
 .sql-suggestion-grid strong,
@@ -173,6 +198,11 @@
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .sql-main-panel {
@@ -218,11 +248,17 @@
 }
 
 .sql-editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
   margin-bottom: 10px;
+  padding-bottom: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
 }
 
 .sql-actions {
@@ -255,6 +291,14 @@
   border: 1px solid #cbd5e1;
   border-radius: 14px;
   background: #0f172a;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.sql-editor-host:focus-within {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
 }
 
 .sql-editor-host .sql-editor-input {
@@ -321,11 +365,27 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .sql-draft-list button:hover {
   border-color: #bfdbfe;
   background: #eff6ff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
+}
+
+.sql-schema-chip:focus-visible,
+.sql-suggestion-grid button:focus-visible,
+.sql-keyword-list button:focus-visible,
+.sql-template-list button:focus-visible,
+.sql-draft-list button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
 }
 
 .sql-draft-list strong {

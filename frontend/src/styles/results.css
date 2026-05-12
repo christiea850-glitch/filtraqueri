@@ -16,8 +16,14 @@
 }
 
 .results-workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: flex;
   justify-content: flex-end;
+  padding: 2px 0;
+  background: rgba(248, 251, 255, 0.78);
+  backdrop-filter: blur(12px);
 }
 
 .results-context-strip {
@@ -36,6 +42,16 @@
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.data-grid-section:hover,
+.session-panel:hover,
+.history-panel:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
 }
 
 .session-panel h2,
@@ -105,6 +121,16 @@
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.schema-type-list span:hover,
+.active-context span:hover,
+.active-filter-bar span:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .schema-type-list strong {
@@ -121,11 +147,17 @@
 }
 
 .data-grid-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
   margin-bottom: 10px;
+  padding-bottom: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
 }
 
 .data-grid-toolbar p:last-child {
@@ -162,12 +194,23 @@
   font-size: 13px;
   font-weight: 800;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease;
 }
 
 .result-toggle button.is-active,
 .result-tabs button.is-active {
   background: #0f172a;
   color: white;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
+}
+
+.result-tabs button:focus-visible,
+.data-grid-table th button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
 }
 
 .result-toggle button:disabled,
@@ -207,6 +250,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.data-grid-table th button:hover {
+  color: #bfdbfe;
 }
 
 .results-workspace .session-panel,
@@ -329,6 +377,16 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #f8fafc;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.history-list article:hover {
+  border-color: #bfdbfe;
+  background: #ffffff;
+  transform: translateY(-1px);
 }
 
 .history-list article div {

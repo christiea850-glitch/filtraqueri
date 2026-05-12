@@ -85,6 +85,10 @@ body {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .menu-items button:hover {
@@ -128,6 +132,17 @@ body {
   font-size: 12px;
   font-weight: 850;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.focus-toggle:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+  transform: translateY(-1px);
 }
 
 .focus-toggle.is-active {
@@ -147,11 +162,16 @@ body {
   font-size: 12px;
   font-weight: 850;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .mode-switcher button.is-active {
   background: #0f172a;
   color: white;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
 }
 
 .workspace-shell {
@@ -205,11 +225,17 @@ body {
   border-left: 1px solid transparent;
   background: rgba(248, 251, 255, 0.58);
   cursor: col-resize;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .sidebar-resize-handle:hover,
 .sidebar-resize-handle:focus-visible {
   background: #dbeafe;
+  border-left-color: #93c5fd;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.14);
   outline: none;
 }
 
@@ -242,6 +268,12 @@ body.is-resizing-sidebar {
   font-weight: 750;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
 }
 
 .sidebar-primary {
@@ -249,6 +281,13 @@ body.is-resizing-sidebar {
   background: #0f172a;
   color: white;
   justify-content: center;
+}
+
+.sidebar-primary:hover,
+.sidebar-collapse-toggle:hover,
+.left-sidebar nav button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
 }
 
 .sidebar-collapse-toggle {
@@ -341,6 +380,11 @@ body.is-resizing-sidebar {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .sidebar-recents button .nav-icon {
@@ -366,6 +410,7 @@ body.is-resizing-sidebar {
 .sidebar-recents button.is-active {
   border-color: #dbeafe;
   background: #eff6ff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
 }
 
 .left-sidebar nav {
@@ -384,6 +429,10 @@ body.is-resizing-sidebar {
   border-color: #dbeafe;
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.left-sidebar nav button.is-active {
+  box-shadow: inset 3px 0 0 #2563eb;
 }
 
 .hub-subnav,
@@ -420,6 +469,12 @@ body.is-resizing-sidebar {
   font-size: 13px;
   font-weight: 750;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
 }
 
 .hub-subnav button {
@@ -457,6 +512,30 @@ body.is-resizing-sidebar {
   border-color: #dbeafe;
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.hub-subnav button:hover,
+.analyst-sidebar-section button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+}
+
+.hub-subnav button.is-active,
+.analyst-sidebar-section button.is-active {
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.menu-items button:focus-visible,
+.mode-switcher button:focus-visible,
+.focus-toggle:focus-visible,
+.sidebar-primary:focus-visible,
+.sidebar-collapse-toggle:focus-visible,
+.left-sidebar nav button:focus-visible,
+.sidebar-recents button:focus-visible,
+.hub-subnav button:focus-visible,
+.analyst-sidebar-section button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
 }
 
 .analyst-sidebar-section span {
@@ -586,6 +665,16 @@ body.is-resizing-sidebar {
   border: 1px solid #dbe5ef;
   border-radius: 14px;
   background: #ffffff;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.analyst-tool-grid article:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
 }
 
 .analyst-tool-grid strong {
@@ -615,6 +704,16 @@ body.is-resizing-sidebar {
   border: 1px dashed #bfdbfe;
   border-radius: 14px;
   background: #eff6ff;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.analyst-empty-state:hover {
+  border-color: #93c5fd;
+  background: #eaf4ff;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.08);
 }
 
 .analyst-empty-state strong {
@@ -717,6 +816,16 @@ h1 span:last-child {
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.94)),
     #ffffff;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.upload-box:hover,
+.upload-box:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.11);
 }
 
 .upload-icon {
@@ -783,12 +892,21 @@ h1 span:last-child {
   border-radius: 10px;
   font-size: 14px;
   font-weight: 650;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .status-message {
   border: 1px solid #bfdbfe;
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.status-message:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
 }
 
 .error-message {
@@ -819,5 +937,17 @@ h1 span:last-child {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.empty-state {
+  border-style: dashed;
+}
+
+.empty-state:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.08);
 }
 

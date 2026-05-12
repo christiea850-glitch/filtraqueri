@@ -5,14 +5,26 @@
 }
 
 .query-builder-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   align-items: center;
+  padding-bottom: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
 }
 
 .query-workflow-tabs {
+  position: sticky;
+  top: 50px;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-top: 12px;
+  padding: 4px 0;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
 }
 
 .query-workflow-tabs button {
@@ -31,6 +43,7 @@
   transition:
     background 160ms ease,
     border-color 160ms ease,
+    box-shadow 160ms ease,
     transform 160ms ease;
 }
 
@@ -42,8 +55,19 @@
 
 .query-workflow-tabs button.is-active {
   border-color: #2563eb;
-  background: #eff6ff;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+  background: #f8fbff;
+  box-shadow:
+    inset 0 0 0 1px rgba(37, 99, 235, 0.14),
+    0 8px 18px rgba(37, 99, 235, 0.08);
+}
+
+.query-workflow-tabs button:focus-visible,
+.field-chip:focus-within,
+.builder-block select:focus-visible,
+.builder-block input:focus-visible,
+.query-column-search input:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
 }
 
 .query-workflow-tabs span {
@@ -91,6 +115,14 @@
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.query-summary-strip span:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .query-stage-panel {
@@ -102,6 +134,14 @@
   border: 1px solid #dbe5ef;
   border-radius: 14px;
   background: #ffffff;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.query-stage-panel:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
 }
 
 .query-stage-heading {
@@ -166,6 +206,16 @@
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #ffffff;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.query-review-grid div:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 10px 20px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
 }
 
 .query-review-grid span {
@@ -211,6 +261,14 @@
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #ffffff;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.builder-block:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.05);
 }
 
 .query-column-block {
@@ -331,6 +389,18 @@
   font-size: 12px;
   font-weight: 750;
   cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.field-chip:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
 }
 
 .field-chip span {

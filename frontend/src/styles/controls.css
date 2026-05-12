@@ -17,7 +17,18 @@
   transition:
     background 160ms ease,
     border-color 160ms ease,
+    box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.text-button:focus-visible,
+.icon-button:focus-visible,
+.collapsed-panel-bar:focus-visible,
+.panel-collapse-button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.42);
+  outline-offset: 2px;
 }
 
 .primary-button {
@@ -57,15 +68,18 @@
 .primary-button:hover {
   background: #2563eb;
   border-color: #2563eb;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16);
 }
 
 .secondary-button:hover {
   border-color: #94a3b8;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
 .text-button:hover {
   border-color: #bfdbfe;
   background: #dbeafe;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
 }
 
 .collapsed-panel-bar {
@@ -81,6 +95,16 @@
   font-weight: 800;
   text-align: left;
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.collapsed-panel-bar:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
 }
 
 .panel-collapse-button {
@@ -94,10 +118,23 @@
   font-size: 12px;
   font-weight: 850;
   cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 .icon-button:hover {
   border-color: #cbd5e1;
   color: #0f172a;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.panel-collapse-button:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
 }
 
