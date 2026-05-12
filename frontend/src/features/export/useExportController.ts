@@ -2,14 +2,15 @@ import { useState } from "react";
 import type { DatasetMetadata } from "../dataset/datasetTypes";
 import type { FilterDefinition } from "../filters/filterTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
-import type { ResultState, ResultTabKey } from "../results/resultTypes";
+import type { ActiveResultModel } from "../results/activeResultModel";
+import { getExportPayload, getQuerySourceType } from "../results/activeResultModel";
 import { exportDataset } from "../../services/api";
 
 const MAX_QUERY_LIMIT = 1000;
 
 function useExportController({
   dataset,
-  activeResultTab,
+  activeResultModel,
   hasRunQuery,
   queryLimit,
   queryGroupBy,
@@ -17,13 +18,11 @@ function useExportController({
   activeAggregations,
   querySortColumn,
   querySortDirection,
-  activeResult,
-  resultTotalCount,
   buildBackendFilters,
   addHistory,
 }: {
   dataset: DatasetMetadata | null;
-  activeResultTab: ResultTabKey;
+  activeResultModel: ActiveResultModel | null;
   hasRunQuery: boolean;
   queryLimit: string;
   queryGroupBy: string[];
@@ -31,21 +30,21 @@ function useExportController({
   activeAggregations: AggregationState[];
   querySortColumn: string;
   querySortDirection: "ASC" | "DESC";
-  activeResult: ResultState;
-  resultTotalCount: number;
   buildBackendFilters: () => FilterDefinition[];
   addHistory: (action: string, detail: string, resultCount: number) => void;
 }) {
   const [isExporting, setIsExporting] = useState(false);
 
   const exportCurrentResults = async () => {
-    if (!dataset) return;
+    if (!dataset || !activeResultModel) return;
 
     setIsExporting(true);
 
     try {
-      const isQueryExport = activeResultTab === "queried" && hasRunQuery;
-      const isFilteredExport = activeResultTab === "filtered";
+      const exportPayload = getExportPayload(activeResultModel);
+      const sourceType = getQuerySourceType(activeResultModel);
+      const isQueryExport = sourceType === "query" && hasRunQuery;
+      const isFilteredExport = sourceType === "filtered";
       const blob = await exportDataset(
         dataset.dataset_id,
         isQueryExport
@@ -74,10 +73,10 @@ function useExportController({
           : {
               source: "filter",
               filters: isFilteredExport ? buildBackendFilters() : [],
-              order_by: activeResult.sortColumn
+              order_by: activeResultModel.sorting.column
                 ? {
-                    column: activeResult.sortColumn,
-                    direction: activeResult.sortDirection,
+                    column: activeResultModel.sorting.column,
+                    direction: activeResultModel.sorting.direction,
                   }
                 : null,
               limit: MAX_QUERY_LIMIT,
@@ -92,7 +91,7 @@ function useExportController({
       addHistory(
         "Export",
         isQueryExport ? "Exported query result" : "Exported filtered result",
-        resultTotalCount,
+        exportPayload?.rowCount || activeResultModel.totalCount,
       );
       return null;
     } catch (error) {

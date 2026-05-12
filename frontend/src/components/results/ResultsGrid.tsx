@@ -1,22 +1,19 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import type { ActiveResultModel } from "../../features/results/activeResultModel";
 import type { SortDirection } from "../../features/results/resultTypes";
 
 type ResultsGridProps = {
   title: string;
   label: string;
-  columns: string[];
-  rows: Record<string, unknown>[];
-  totalCount: number;
+  activeResultModel: ActiveResultModel;
   loading: boolean;
-  activeFilterLabels: string[];
   activeSortColumn: string;
   activeSortDirection: SortDirection;
-  page: number;
-  totalPages: number;
-  rowsPerPage: number;
+  hiddenColumns: string[];
   toolbarActions?: ReactNode;
   emptyTitle: string;
   emptyDescription: string;
+  onHiddenColumnsChange: (columns: string[]) => void;
   onSortColumn: (column: string) => void;
   onPageChange: (page: number) => void;
   onRowsPerPageChange: (rowsPerPage: number) => void;
@@ -55,36 +52,37 @@ async function copyTextToClipboard(value: string) {
 function ResultsGrid({
   title,
   label,
-  columns,
-  rows,
-  totalCount,
+  activeResultModel,
   loading,
-  activeFilterLabels,
   activeSortColumn,
   activeSortDirection,
-  page,
-  totalPages,
-  rowsPerPage,
+  hiddenColumns,
   toolbarActions,
   emptyTitle,
   emptyDescription,
+  onHiddenColumnsChange,
   onSortColumn,
   onPageChange,
   onRowsPerPageChange,
 }: ResultsGridProps) {
   const [columnSearch, setColumnSearch] = useState("");
-  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState("");
   const [copiedCellKey, setCopiedCellKey] = useState("");
+  const {
+    rows,
+    columns,
+    visibleColumns,
+    totalCount,
+    page,
+    totalPages,
+    rowsPerPage,
+    filters,
+  } = activeResultModel;
   const firstVisibleRowNumber = (page - 1) * rowsPerPage + 1;
   const isLargePage = rowsPerPage >= 500;
   const largePageWarningId = "results-large-page-warning";
   const normalizedColumnSearch = columnSearch.trim().toLowerCase();
-  const visibleColumns = useMemo(
-    () => columns.filter((column) => !hiddenColumns.includes(column)),
-    [columns, hiddenColumns],
-  );
   const matchingColumns = useMemo(
     () =>
       normalizedColumnSearch
@@ -97,12 +95,6 @@ function ResultsGrid({
   const hiddenColumnCount = columns.length - visibleColumns.length;
 
   useEffect(() => {
-    setHiddenColumns((currentColumns) =>
-      currentColumns.filter((column) => columns.includes(column)),
-    );
-  }, [columns]);
-
-  useEffect(() => {
     if (!copiedMessage) return undefined;
 
     const clearCopiedMessage = window.setTimeout(() => {
@@ -113,13 +105,13 @@ function ResultsGrid({
     return () => window.clearTimeout(clearCopiedMessage);
   }, [copiedMessage]);
 
-  const showAllColumns = () => setHiddenColumns([]);
+  const showAllColumns = () => onHiddenColumnsChange([]);
 
   const toggleColumnVisibility = (column: string) => {
-    setHiddenColumns((currentColumns) =>
-      currentColumns.includes(column)
-        ? currentColumns.filter((currentColumn) => currentColumn !== column)
-        : [...currentColumns, column],
+    onHiddenColumnsChange(
+      hiddenColumns.includes(column)
+        ? hiddenColumns.filter((currentColumn) => currentColumn !== column)
+        : [...hiddenColumns, column],
     );
   };
 
@@ -240,9 +232,9 @@ function ResultsGrid({
         </div>
       )}
 
-      {activeFilterLabels.length > 0 && (
+      {filters.activeLabels.length > 0 && (
         <div className="active-filter-bar">
-          {activeFilterLabels.map((filterLabel) => (
+          {filters.activeLabels.map((filterLabel) => (
             <span key={filterLabel}>{filterLabel}</span>
           ))}
         </div>

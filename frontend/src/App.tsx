@@ -24,6 +24,10 @@ import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
+import useActiveResultModel, {
+  getCurrentPageMetadata,
+  getCurrentRowCount,
+} from "./features/results/activeResultModel";
 import useResults, { createEmptyResultState } from "./features/results/useResults";
 import {
   filterDataset,
@@ -98,12 +102,6 @@ function App() {
     queriedResult,
     setQueriedResult,
     activeResult,
-    resultRows,
-    resultColumns,
-    resultPage,
-    resultRowsPerPage,
-    resultTotalCount,
-    resultTotalPages,
     hasFilteredResults,
     resetResults,
   } = useResults();
@@ -196,9 +194,26 @@ function App() {
   const activeFilters = buildBackendFilters(dataset);
   const activeFilterLabels = createFilterLabels(activeFilters);
   const buildActiveBackendFilters = () => buildBackendFilters(dataset);
-  const { isExporting, exportCurrentResults: runExportCurrentResults } = useExportController({
+  const {
+    activeResultModel,
+    hiddenColumns: resultHiddenColumns,
+    setHiddenColumns: setResultHiddenColumns,
+  } = useActiveResultModel({
     dataset,
     activeResultTab,
+    activeResult,
+    previewResult,
+    activeFilterLabels,
+    activeFilters,
+    queryGroupBy,
+    querySelectedColumns,
+    activeAggregations,
+    queryLimit,
+    hasRunQuery,
+  });
+  const { isExporting, exportCurrentResults: runExportCurrentResults } = useExportController({
+    dataset,
+    activeResultModel,
     hasRunQuery,
     queryLimit,
     queryGroupBy,
@@ -206,8 +221,6 @@ function App() {
     activeAggregations,
     querySortColumn,
     querySortDirection,
-    activeResult,
-    resultTotalCount,
     buildBackendFilters: buildActiveBackendFilters,
     addHistory,
   });
@@ -511,7 +524,8 @@ function App() {
   };
 
   const changeWorkspacePage = (page: number) => {
-    const nextPage = Math.min(Math.max(page, 1), resultTotalPages);
+    const { totalPages } = getCurrentPageMetadata(activeResultModel);
+    const nextPage = Math.min(Math.max(page, 1), totalPages);
     if (activeResultTab === "queried") {
       loadQueryPage(nextPage);
       return;
@@ -583,7 +597,7 @@ function App() {
     const dateColumns = dataset.schema.filter((column) => column.inferred_type === "date");
     const columnsWithMissingValues = dataset.schema.filter((column) => column.null_count > 0);
     const previewRowsCount = previewResult.rows.length;
-    const activeResultCount = resultTotalCount || activeResult.totalCount || dataset.row_count;
+    const activeResultCount = getCurrentRowCount(activeResultModel) || activeResult.totalCount || dataset.row_count;
 
     const baseMetrics = [
       { label: "Rows", value: dataset.row_count.toLocaleString() },
@@ -884,44 +898,42 @@ function App() {
               </div>
             )}
 
-            <ResultsGrid
-              title={
-                activeResultTab === "queried"
-                  ? "Query results"
-                  : activeResultTab === "filtered"
-                    ? "Filtered results"
-                    : "Preview"
-              }
-              label="Results"
-              columns={resultColumns}
-              rows={resultRows}
-              totalCount={resultTotalCount}
-              loading={isFiltering || isRunningQuery}
-              activeFilterLabels={activeFilterLabels}
-              activeSortColumn={activeResult.sortColumn}
-              activeSortDirection={activeResult.sortDirection}
-              page={resultPage}
-              totalPages={resultTotalPages}
-              rowsPerPage={resultRowsPerPage}
-              emptyTitle="No results yet."
-              emptyDescription="Run a query or apply filters."
-              onSortColumn={sortWorkspaceColumn}
-              onPageChange={changeWorkspacePage}
-              onRowsPerPageChange={changeWorkspaceRowsPerPage}
-              toolbarActions={
-                <div className="workspace-actions">
-                  <ResultTabs
-                    activeTab={activeResultTab}
-                    hasFilteredResults={hasFilteredResults}
-                    hasQueryResults={hasQueryResults}
-                    onTabChange={handleResultTabChange}
-                  />
-                  <button type="button" className="secondary-button" onClick={exportCurrentResults}>
-                    {isExporting ? "Exporting..." : "Export CSV"}
-                  </button>
-                </div>
-              }
-            />
+            {activeResultModel && (
+              <ResultsGrid
+                title={
+                  activeResultModel.sourceType === "query"
+                    ? "Query results"
+                    : activeResultModel.sourceType === "filtered"
+                      ? "Filtered results"
+                      : "Preview"
+                }
+                label="Results"
+                activeResultModel={activeResultModel}
+                loading={isFiltering || isRunningQuery}
+                activeSortColumn={activeResultModel.sorting.column}
+                activeSortDirection={activeResultModel.sorting.direction}
+                hiddenColumns={resultHiddenColumns}
+                emptyTitle="No results yet."
+                emptyDescription="Run a query or apply filters."
+                onHiddenColumnsChange={setResultHiddenColumns}
+                onSortColumn={sortWorkspaceColumn}
+                onPageChange={changeWorkspacePage}
+                onRowsPerPageChange={changeWorkspaceRowsPerPage}
+                toolbarActions={
+                  <div className="workspace-actions">
+                    <ResultTabs
+                      activeTab={activeResultTab}
+                      hasFilteredResults={hasFilteredResults}
+                      hasQueryResults={hasQueryResults}
+                      onTabChange={handleResultTabChange}
+                    />
+                    <button type="button" className="secondary-button" onClick={exportCurrentResults}>
+                      {isExporting ? "Exporting..." : "Export CSV"}
+                    </button>
+                  </div>
+                }
+              />
+            )}
           </section>
         </>
       ) : null,
