@@ -11,7 +11,7 @@
 
 .results-workspace {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -23,7 +23,7 @@
 .results-context-strip {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.55fr);
-  gap: 14px;
+  gap: 10px;
   align-items: stretch;
 }
 
@@ -123,9 +123,9 @@
 .data-grid-toolbar {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .data-grid-toolbar p:last-child {
@@ -137,23 +137,23 @@
 
 .workspace-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .result-toggle,
 .result-tabs {
   display: inline-flex;
-  padding: 4px;
+  padding: 3px;
   border: 1px solid #dbe5ef;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #f8fafc;
 }
 
 .result-toggle button,
 .result-tabs button {
-  min-height: 32px;
-  padding: 0 11px;
+  min-height: 30px;
+  padding: 0 10px;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -181,8 +181,8 @@
 .active-filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .data-grid-table {
@@ -211,7 +211,7 @@
 
 .results-workspace .session-panel,
 .results-workspace .history-panel {
-  padding: 16px;
+  padding: 12px;
 }
 
 .results-workspace .session-panel {
@@ -219,7 +219,7 @@
   grid-template-columns: minmax(180px, 1fr) repeat(4, minmax(92px, 0.5fr));
   gap: 10px;
   align-items: center;
-  min-height: 88px;
+  min-height: 72px;
 }
 
 .results-workspace .session-panel h2,
@@ -248,25 +248,25 @@
 }
 
 .results-workspace .history-panel {
-  min-height: 88px;
-  max-height: 142px;
+  min-height: 72px;
+  max-height: 120px;
   overflow: auto;
 }
 
 .results-workspace .history-list {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .results-workspace .history-list article {
-  padding: 9px 10px;
+  padding: 8px 9px;
 }
 
 .results-workspace .data-grid-section {
-  padding: 18px;
+  padding: 14px;
 }
 
 .results-workspace .data-grid-table {
-  max-height: min(68vh, 760px);
+  max-height: min(72vh, 800px);
   overflow: auto;
 }
 
@@ -285,9 +285,9 @@
 .pagination-bar {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
 .pagination-bar > div,

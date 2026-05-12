@@ -1,12 +1,12 @@
 .human-dataset-workspace {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .human-guidance-panel {
   display: grid;
-  gap: 18px;
-  padding: 24px;
+  gap: 14px;
+  padding: 18px;
   border: 1px solid #dbe5ef;
   border-radius: 18px;
   background:
@@ -18,7 +18,7 @@
 .human-guidance-panel h2 {
   margin: 0;
   color: #111827;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
 }
 
@@ -32,9 +32,9 @@
 
 .human-intent-panel {
   display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 18px 20px;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 14px 16px;
   border: 1px solid #bfdbfe;
   border-radius: 14px;
   background: #eff6ff;
@@ -60,8 +60,8 @@
 }
 
 .human-insight-panel {
-  gap: 10px;
-  padding: 16px 18px;
+  gap: 8px;
+  padding: 14px 16px;
 }
 
 .human-insight-header {
@@ -86,14 +86,14 @@
 .human-insight-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .human-insight-metrics > div {
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #dbeafe;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.68);
@@ -157,14 +157,14 @@
 .human-suggestion-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .human-suggestion-grid button {
   display: grid;
-  gap: 8px;
-  min-height: 92px;
-  padding: 15px;
+  gap: 6px;
+  min-height: 76px;
+  padding: 12px;
   border: 1px solid #dbe5ef;
   border-radius: 14px;
   background: #ffffff;

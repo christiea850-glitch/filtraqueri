@@ -1,7 +1,7 @@
 .sql-workspace {
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  gap: 16px;
+  gap: 12px;
   align-items: stretch;
   min-height: min(760px, calc(100vh - 92px));
   transition: grid-template-columns 180ms ease;
@@ -24,7 +24,7 @@
 .sql-preview-panel,
 .sql-draft-panel {
   min-width: 0;
-  padding: 20px;
+  padding: 14px;
   border: 1px solid #dbe5ef;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.84);
@@ -33,7 +33,7 @@
 
 .sql-context-panel {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   align-content: start;
   max-height: calc(100vh - 92px);
   overflow: auto;
@@ -89,8 +89,8 @@
 
 .sql-schema-list {
   display: flex;
-  max-height: 360px;
-  margin-top: 18px;
+  max-height: 320px;
+  margin-top: 12px;
   overflow: auto;
 }
 
@@ -106,8 +106,8 @@
 
 .sql-helper-section {
   display: grid;
-  gap: 10px;
-  margin-top: 18px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .sql-suggestion-grid,
@@ -121,9 +121,9 @@
 .sql-suggestion-grid button,
 .sql-template-list button {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 8px 9px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #f8fafc;
@@ -164,7 +164,7 @@
 }
 
 .sql-keyword-list button {
-  padding: 7px 9px;
+  padding: 6px 8px;
   border: 1px solid #dbeafe;
   border-radius: 999px;
   background: #eff6ff;
@@ -178,7 +178,7 @@
 .sql-main-panel {
   display: grid;
   grid-template-columns: minmax(420px, 1fr) minmax(280px, 360px);
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   align-items: stretch;
   transition: grid-template-columns 180ms ease;
@@ -191,7 +191,7 @@
 .sql-side-panel {
   display: grid;
   grid-template-rows: minmax(220px, 0.9fr) minmax(180px, 0.7fr);
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
   min-height: 0;
 }
@@ -220,15 +220,15 @@
 .sql-editor-toolbar {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .sql-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -250,7 +250,7 @@
 
 .sql-editor-host {
   min-width: 0;
-  min-height: min(58vh, 560px);
+  min-height: min(60vh, 590px);
   overflow: hidden;
   border: 1px solid #cbd5e1;
   border-radius: 14px;
@@ -258,13 +258,13 @@
 }
 
 .sql-editor-host .sql-editor-input {
-  min-height: min(58vh, 560px);
+  min-height: min(60vh, 590px);
   border: 0;
   border-radius: 0;
 }
 
 .sql-monaco-editor {
-  min-height: min(58vh, 560px);
+  min-height: min(60vh, 590px);
 }
 
 .sql-editor-input:focus {
@@ -276,7 +276,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 8px;
   color: #64748b;
   font-size: 12px;
   font-weight: 750;
@@ -284,8 +284,8 @@
 
 .sql-draft-list {
   display: grid;
-  gap: 10px;
-  max-height: 260px;
+  gap: 8px;
+  max-height: 230px;
   overflow: auto;
 }
 
@@ -313,7 +313,7 @@
   gap: 10px;
   align-items: center;
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #f8fafc;
