@@ -138,6 +138,10 @@
     grid-template-columns: 1fr;
   }
 
+  .human-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
   .dataset-current-card,
   .recent-dataset-card,
   .dataset-empty-guidance {

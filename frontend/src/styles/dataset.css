@@ -60,7 +60,8 @@
 }
 
 .human-insight-panel {
-  gap: 12px;
+  gap: 10px;
+  padding: 16px 18px;
 }
 
 .human-insight-header {
@@ -85,12 +86,12 @@
 .human-insight-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .human-insight-grid > div {
   min-width: 0;
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid #dbeafe;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.68);
@@ -98,13 +99,13 @@
 
 .human-insight-grid ul {
   display: grid;
-  gap: 6px;
-  margin: 8px 0 0;
+  gap: 5px;
+  margin: 7px 0 0;
   padding-left: 18px;
   color: #475569;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 650;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .human-insight-grid li {
@@ -115,6 +116,39 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+
+.human-insight-actions > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.human-insight-actions .secondary-button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.human-insight-back-button {
+  margin: 0 0 10px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.human-insight-back-button:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
 }
 
 .human-suggestion-grid {

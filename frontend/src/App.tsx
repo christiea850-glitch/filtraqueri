@@ -119,6 +119,10 @@ function App() {
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
+  const [humanInsightBackTarget, setHumanInsightBackTarget] = useState<{
+    view: ActiveView;
+    tab: ResultTabKey;
+  } | null>(null);
   const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
   const {
     querySelectedColumns,
@@ -536,6 +540,7 @@ function App() {
   const selectHumanIntent = (intent: HumanIntent) => {
     const guidance = humanIntentGuidance[intent];
     setHumanIntent(intent);
+    setHumanInsightBackTarget(null);
     setWorkspaceMode("human");
     configureForHumanIntent(intent, dataset);
 
@@ -547,8 +552,19 @@ function App() {
   };
 
   const navigateHumanInsightAction = (view: ActiveView, tab?: ResultTabKey) => {
+    if (view !== activeView) {
+      setHumanInsightBackTarget({ view: activeView, tab: activeResultTab });
+    }
     if (tab) handleResultTabChange(tab);
     updateDatasetSessionView(view);
+  };
+
+  const returnToHumanInsight = () => {
+    if (!humanInsightBackTarget) return;
+
+    handleResultTabChange(humanInsightBackTarget.tab);
+    updateDatasetSessionView(humanInsightBackTarget.view);
+    setHumanInsightBackTarget(null);
   };
 
   const createHumanInsight = (intent: HumanIntent) => {
@@ -557,9 +573,9 @@ function App() {
     if (!dataset) {
       return {
         title: guidance.label,
-        explanation: "Open a CSV dataset first, then FiltraQueri can turn this guided question into a useful workspace path.",
+        explanation: "Open a CSV first. Then this guide can help.",
         canCheck: ["Dataset shape", "Column types", "Preview rows"],
-        signals: ["No dataset is currently open."],
+        signals: ["No dataset open"],
         actions: [{ label: "Open a dataset", view: "dataset" as ActiveView }],
       };
     }
@@ -574,31 +590,25 @@ function App() {
     const activeResultCount = resultTotalCount || activeResult.totalCount || dataset.row_count;
 
     const baseSignals = [
-      `${dataset.row_count.toLocaleString()} rows and ${dataset.column_count.toLocaleString()} columns are available.`,
-      `${previewRowsCount.toLocaleString()} preview rows are loaded for a quick first look.`,
+      `${dataset.row_count.toLocaleString()} rows`,
+      `${dataset.column_count.toLocaleString()} columns`,
       activeFilterLabels.length > 0
-        ? `${activeFilterLabels.length} active filter${activeFilterLabels.length === 1 ? "" : "s"} may shape the next result.`
-        : "No filters are currently applied.",
+        ? `${activeFilterLabels.length} active filter${activeFilterLabels.length === 1 ? "" : "s"}`
+        : `${previewRowsCount.toLocaleString()} preview rows loaded`,
     ];
 
     if (intent === "summary") {
       return {
         title: guidance.label,
-        explanation:
-          "This gives you a plain overview before you choose a deeper analysis path. Start by checking size, column types, and a few preview rows.",
-        canCheck: [
-          "Dataset size and table name",
-          "Column type mix",
-          "Preview rows and active result count",
-        ],
+        explanation: "Start with size, columns, and sample rows.",
+        canCheck: ["Size", "Column types", "Preview rows"],
         signals: [
           ...baseSignals,
-          `${numericColumns.length} numeric, ${categoricalColumns.length} category/text, and ${dateColumns.length} date columns were detected.`,
-          `The active result currently represents ${activeResultCount.toLocaleString()} rows.`,
+          `${activeResultCount.toLocaleString()} active rows`,
         ],
         actions: [
-          { label: "View preview rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
-          { label: "Review dataset details", view: "dataset" as ActiveView },
+          { label: "View results", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
+          { label: "Open data", view: "dataset" as ActiveView },
         ],
       };
     }
@@ -606,23 +616,18 @@ function App() {
     if (intent === "missing_values") {
       return {
         title: guidance.label,
-        explanation:
-          "Missing values can explain strange totals, blank categories, or rows that disappear during analysis.",
-        canCheck: [
-          "Columns with null counts",
-          "Rows affected by filters",
-          "Which columns are worth inspecting first",
-        ],
+        explanation: "Find blanks before they affect totals.",
+        canCheck: ["Blank columns", "Filter impact", "Rows to inspect"],
         signals: [
           columnsWithMissingValues.length > 0
-            ? `${columnsWithMissingValues.length} column${columnsWithMissingValues.length === 1 ? "" : "s"} report missing values.`
-            : "No missing-value counts are reported in the current schema profile.",
-          ...columnsWithMissingValues.slice(0, 4).map((column) =>
-            `${column.name}: ${column.null_count.toLocaleString()} missing value${column.null_count === 1 ? "" : "s"}`,
+            ? `${columnsWithMissingValues.length} column${columnsWithMissingValues.length === 1 ? "" : "s"} with blanks`
+            : "No missing counts found",
+          ...columnsWithMissingValues.slice(0, 2).map((column) =>
+            `${column.name}: ${column.null_count.toLocaleString()} blank${column.null_count === 1 ? "" : "s"}`,
           ),
         ],
         actions: [
-          { label: "Choose columns to check", view: "queryBuilder" as ActiveView },
+          { label: "Choose columns", view: "queryBuilder" as ActiveView },
           { label: "Open filters", view: "filters" as ActiveView },
         ],
       };
@@ -632,21 +637,20 @@ function App() {
       const firstCategory = categoricalColumns[0];
       return {
         title: guidance.label,
-        explanation:
-          "Top categories help you see the biggest groups in the dataset without reading every row.",
-        canCheck: ["Category/text columns", "Group counts", "Most common values"],
+        explanation: "See the biggest groups quickly.",
+        canCheck: ["Category columns", "Group counts", "Common values"],
         signals: [
           firstCategory
-            ? `${firstCategory.name} is a good first grouping candidate.`
-            : "No clear category column was detected yet.",
-          `${categoricalColumns.length} category/text column${categoricalColumns.length === 1 ? "" : "s"} are available.`,
+            ? `${firstCategory.name} looks useful`
+            : "No category column found",
+          `${categoricalColumns.length} category/text column${categoricalColumns.length === 1 ? "" : "s"}`,
           queryGroupBy.length > 0
-            ? `Current grouping: ${queryGroupBy.join(", ")}.`
-            : "No grouped query is active yet.",
+            ? `Grouped by ${queryGroupBy.join(", ")}`
+            : "No grouped query yet",
         ],
         actions: [
-          { label: "Build category summary", view: "queryBuilder" as ActiveView },
-          { label: "See results", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
+          { label: "Build summary", view: "queryBuilder" as ActiveView },
+          { label: "View results", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
         ],
       };
     }
@@ -655,18 +659,17 @@ function App() {
       const comparisonColumns = dataset.schema.slice(0, 2).map((column) => column.name);
       return {
         title: guidance.label,
-        explanation:
-          "Comparing columns side by side is useful when you want to understand how two fields relate row by row.",
-        canCheck: ["Two visible columns", "Preview rows", "Sort order"],
+        explanation: "Put two fields side by side.",
+        canCheck: ["Two columns", "Preview rows", "Sort order"],
         signals: [
           comparisonColumns.length >= 2
-            ? `Suggested starting pair: ${comparisonColumns.join(" and ")}.`
-            : "This dataset needs at least two columns for a useful comparison.",
-          `${querySelectedColumns.length} visible column${querySelectedColumns.length === 1 ? "" : "s"} are currently selected in Query Builder.`,
+            ? `${comparisonColumns.join(" and ")} suggested`
+            : "Needs at least two columns",
+          `${querySelectedColumns.length} selected column${querySelectedColumns.length === 1 ? "" : "s"}`,
         ],
         actions: [
-          { label: "Select comparison columns", view: "queryBuilder" as ActiveView },
-          { label: "Preview rows first", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
+          { label: "Choose columns", view: "queryBuilder" as ActiveView },
+          { label: "Preview rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
         ],
       };
     }
@@ -674,20 +677,19 @@ function App() {
     if (intent === "trends") {
       return {
         title: guidance.label,
-        explanation:
-          "Trends work best when there is a date column plus a numeric value to summarize over time.",
-        canCheck: ["Date columns", "Numeric measures", "Grouped query results"],
+        explanation: "Use time plus a number.",
+        canCheck: ["Date column", "Numeric value", "Grouped result"],
         signals: [
           dateColumns.length > 0
-            ? `${dateColumns[0].name} looks like a good time column.`
-            : "No date column was detected, so trend analysis may need a manually chosen time-like field.",
+            ? `${dateColumns[0].name} looks time-based`
+            : "No date column found",
           numericColumns.length > 0
-            ? `${numericColumns[0].name} can be used as a numeric measure.`
-            : "No numeric measure was detected yet.",
+            ? `${numericColumns[0].name} can be measured`
+            : "No numeric value found",
         ],
         actions: [
-          { label: "Build trend query", view: "queryBuilder" as ActiveView },
-          { label: "Filter date range", view: "filters" as ActiveView },
+          { label: "Build trend", view: "queryBuilder" as ActiveView },
+          { label: "Open filters", view: "filters" as ActiveView },
         ],
       };
     }
@@ -695,42 +697,47 @@ function App() {
     if (intent === "unusual_values") {
       return {
         title: guidance.label,
-        explanation:
-          "Unusual values usually appear at the high or low end of numeric/date columns, or as unexpected categories.",
-        canCheck: ["Sortable numeric/date columns", "Preview rows", "Filtered result count"],
+        explanation: "Sort to find highs, lows, and surprises.",
+        canCheck: ["Numeric/date columns", "Preview rows", "Filtered count"],
         signals: [
-          `${numericColumns.length + dateColumns.length} numeric/date column${numericColumns.length + dateColumns.length === 1 ? "" : "s"} can be sorted for extremes.`,
-          `Current result count: ${activeResultCount.toLocaleString()} rows.`,
+          `${numericColumns.length + dateColumns.length} sortable column${numericColumns.length + dateColumns.length === 1 ? "" : "s"}`,
+          `${activeResultCount.toLocaleString()} current rows`,
           activeResult.sortColumn
-            ? `Current sort: ${activeResult.sortColumn} ${activeResult.sortDirection}.`
-            : "No result sort is active yet.",
+            ? `${activeResult.sortColumn} sorted ${activeResult.sortDirection}`
+            : "No sort active",
         ],
         actions: [
-          { label: "Sort preview rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
-          { label: "Narrow with filters", view: "filters" as ActiveView },
+          { label: "Sort rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
+          { label: "Open filters", view: "filters" as ActiveView },
         ],
       };
     }
 
     return {
       title: guidance.label,
-      explanation:
-        "A chart starts with a clean summary table. Build a small grouped result first, then it will be ready for future chart tooling.",
-      canCheck: ["Category column", "Count or numeric summary", "Small grouped result"],
+      explanation: "Start with a small summary table.",
+      canCheck: ["Category", "Count or value", "Grouped result"],
       signals: [
         categoricalColumns[0]
-          ? `${categoricalColumns[0].name} can be used as the chart category.`
-          : "No category column was detected yet.",
+          ? `${categoricalColumns[0].name} can be the category`
+          : "No category column found",
         numericColumns[0]
-          ? `${numericColumns[0].name} can be used as a chart value.`
+          ? `${numericColumns[0].name} can be the value`
           : "COUNT can be used when there is no numeric value.",
       ],
       actions: [
-        { label: "Prepare chart data", view: "queryBuilder" as ActiveView },
-        { label: "Review query result", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
+        { label: "Build chart data", view: "queryBuilder" as ActiveView },
+        { label: "View results", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
       ],
     };
   };
+
+  const renderHumanInsightBackButton = () =>
+    humanIntent && humanInsightBackTarget ? (
+      <button type="button" className="human-insight-back-button" onClick={returnToHumanInsight}>
+        Back to insight
+      </button>
+    ) : null;
 
   const renderHumanIntentGuidance = () => {
     if (!humanIntent) return null;
@@ -748,28 +755,29 @@ function App() {
           <span>{workspaceMode === "human" ? "Human Mode" : "Guidance"}</span>
         </div>
         <p>
-          <strong>Next step:</strong> {guidance.nextStep}
+          <strong>Next step</strong> {guidance.nextStep}
         </p>
         <p>{insight.explanation}</p>
         <div className="human-insight-grid">
           <div>
-            <strong>What FiltraQueri can check next</strong>
+            <strong>Check</strong>
             <ul>
-              {insight.canCheck.map((item) => (
+              {insight.canCheck.slice(0, 3).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
           </div>
           <div>
-            <strong>What we can see now</strong>
+            <strong>Current signal</strong>
             <ul>
-              {insight.signals.map((item) => (
+              {insight.signals.slice(0, 3).map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
           </div>
         </div>
         <div className="human-insight-actions">
+          <span>Go to</span>
           {insight.actions.map((action) => (
             <button
               type="button"
@@ -814,36 +822,43 @@ function App() {
     ),
     dataset: () =>
       (
-        <DatasetSummaryPanel
-          dataset={dataset}
-          recentDatasets={recentDatasets}
-          onOpenDataset={openDatasetPicker}
-          onViewPreview={() => {
-            handleResultTabChange("preview");
-            updateDatasetSessionView("results");
-          }}
-          onHumanIntentSelect={selectHumanIntent}
-          onActivateRecentDataset={activateRecentDataset}
-          onRemoveRecentDataset={removeRecentDatasetWithConfirmation}
-          onClearCurrentDataset={clearCurrentDatasetSession}
-          onDeleteDataset={confirmFutureDatasetDelete}
-        />
+        <>
+          {renderHumanInsightBackButton()}
+          <DatasetSummaryPanel
+            dataset={dataset}
+            recentDatasets={recentDatasets}
+            onOpenDataset={openDatasetPicker}
+            onViewPreview={() => {
+              handleResultTabChange("preview");
+              updateDatasetSessionView("results");
+            }}
+            onHumanIntentSelect={selectHumanIntent}
+            onActivateRecentDataset={activateRecentDataset}
+            onRemoveRecentDataset={removeRecentDatasetWithConfirmation}
+            onClearCurrentDataset={clearCurrentDatasetSession}
+            onDeleteDataset={confirmFutureDatasetDelete}
+          />
+        </>
       ),
     filters: () =>
       dataset ? (
-        <DynamicFiltersPanel
-          schema={dataset.schema}
-          filterValues={filterValues}
-          applying={isFiltering}
-          errorMessage={errorMessage}
-          onFilterChange={updateFilter}
-          onApplyFilters={applyFilters}
-          onResetFilters={resetFilters}
-        />
+        <>
+          {renderHumanInsightBackButton()}
+          <DynamicFiltersPanel
+            schema={dataset.schema}
+            filterValues={filterValues}
+            applying={isFiltering}
+            errorMessage={errorMessage}
+            onFilterChange={updateFilter}
+            onApplyFilters={applyFilters}
+            onResetFilters={resetFilters}
+          />
+        </>
       ) : null,
     queryBuilder: () =>
       dataset ? (
         <>
+          {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
           <VisualQueryBuilderPanel
             schema={dataset.schema}
@@ -874,6 +889,7 @@ function App() {
     results: () =>
       dataset ? (
         <>
+          {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
           <section className="results-workspace" aria-label="Data exploration workspace">
             <div className="results-workspace-header">
