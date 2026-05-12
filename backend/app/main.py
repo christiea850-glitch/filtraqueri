@@ -545,6 +545,10 @@ class ExportRequest(BaseModel):
     limit: int = Field(MAX_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
 
 
+class WorkbookWorksheetSelectionRequest(BaseModel):
+    worksheet_id: str = Field(..., min_length=1)
+
+
 class WorkspaceManifestUpdate(BaseModel):
     workspace_name: str | None = None
     active_dataset_id: str | None = None
@@ -679,6 +683,37 @@ def table_stats(connection: duckdb.DuckDBPyConnection) -> tuple[int, int]:
     row_count = connection.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
     column_count = len(fetch_schema(connection))
     return row_count, column_count
+
+
+def persist_dataset_manifest_metadata(metadata: dict[str, Any]) -> None:
+    workspace_id = metadata.get("dataset_id")
+    workbook_metadata = metadata.get("workbook_metadata")
+    if isinstance(workbook_metadata, dict):
+        workspace_id = workbook_metadata.get("workspace_id") or workspace_id
+
+    if not workspace_id:
+        return
+
+    path = workspace_manifest_path(str(workspace_id))
+    if not path.exists():
+        return
+
+    manifest = read_workspace_manifest(str(workspace_id), mark_opened=False)
+    manifest["active_dataset_id"] = metadata["dataset_id"]
+    if isinstance(workbook_metadata, dict):
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(workbook_metadata)
+
+    for dataset_entry in manifest.get("datasets", []):
+        if dataset_entry.get("dataset_id") != metadata["dataset_id"]:
+            continue
+
+        dataset_entry["schema"] = metadata["schema"]
+        dataset_entry["row_count"] = metadata["row_count"]
+        dataset_entry["column_count"] = metadata["column_count"]
+        if isinstance(workbook_metadata, dict):
+            dataset_entry["workbook_metadata"] = normalize_workbook_manifest_metadata(workbook_metadata)
+
+    save_workspace_manifest(manifest)
 
 
 def build_filter_where_clause(
@@ -1103,6 +1138,78 @@ def get_dataset_schema(dataset_id: str) -> dict[str, Any]:
         "schema": metadata["schema"],
         "profiles": metadata["schema"],
         "column_count": metadata["column_count"],
+    }
+
+
+@app.post("/datasets/{dataset_id}/workbook/active-worksheet")
+def select_workbook_worksheet(
+    dataset_id: str,
+    request: WorkbookWorksheetSelectionRequest,
+) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    worksheet = next(
+        (
+            worksheet
+            for worksheet in workbook_metadata.get("worksheets", [])
+            if worksheet.get("worksheet_id") == request.worksheet_id
+        ),
+        None,
+    )
+    if not worksheet:
+        raise HTTPException(status_code=404, detail="Worksheet was not found")
+    if worksheet.get("status") != "ready":
+        raise HTTPException(status_code=400, detail="Only ready worksheets can be selected")
+
+    table_name = worksheet.get("table_name")
+    if not table_name:
+        raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
+
+    try:
+        with get_connection(dataset_id) as connection:
+            table_exists = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'main' AND table_name = ?
+                """,
+                [table_name],
+            ).fetchone()[0]
+            if not table_exists:
+                raise HTTPException(status_code=404, detail="Worksheet table is missing")
+
+            connection.execute(
+                f"CREATE OR REPLACE VIEW {quote_identifier(TABLE_NAME)} AS SELECT * FROM {quote_identifier(table_name)}"
+            )
+            schema = profile_dataset(connection)
+            preview = fetch_preview(connection)
+            row_count, column_count = table_stats(connection)
+    except HTTPException:
+        raise
+    except duckdb.Error as error:
+        raise HTTPException(status_code=400, detail=f"Worksheet switch failed: {error}") from error
+
+    workbook_metadata["active_worksheet_id"] = request.worksheet_id
+    workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
+    metadata.update(
+        {
+            "table_name": TABLE_NAME,
+            "schema": schema,
+            "row_count": row_count,
+            "column_count": column_count,
+            "workbook_metadata": workbook_metadata,
+        }
+    )
+    dataset_sessions[dataset_id] = metadata
+    persist_dataset_manifest_metadata(metadata)
+
+    return {
+        "dataset": metadata,
+        "preview": preview,
+        "workbook_metadata": workbook_metadata,
     }
 
 

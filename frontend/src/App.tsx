@@ -168,11 +168,13 @@ function App() {
     setShouldOpenFilePicker,
     selectedFileName,
     isUploading,
+    isSwitchingWorksheet,
     updateDatasetSessionView,
     updateDatasetSessionResultTab,
     activateRecentDataset,
     openDatasetPicker,
     handleFileUpload,
+    handleWorksheetSelect,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,
@@ -869,6 +871,8 @@ function App() {
             onRemoveRecentDataset={removeRecentDatasetWithConfirmation}
             onClearCurrentDataset={clearCurrentDatasetSession}
             onDeleteDataset={confirmFutureDatasetDelete}
+            onWorksheetSelect={handleWorksheetSelect}
+            isSwitchingWorksheet={isSwitchingWorksheet}
           />
         </>
       ),

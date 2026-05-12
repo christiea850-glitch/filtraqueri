@@ -5,6 +5,7 @@ import {
   getPreview,
   getWorkspaceManifest,
   listWorkspaceManifests,
+  selectWorkbookWorksheet,
   updateWorkspaceManifest,
   uploadDataset,
 } from "../../services/api";
@@ -124,6 +125,7 @@ function useWorkspaceDatasetController({
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isSwitchingWorksheet, setIsSwitchingWorksheet] = useState(false);
   const [sqlWorkspaceMetadata, setSqlWorkspaceMetadata] =
     useState<SqlWorkspaceMetadataSnapshot>(() => createSqlWorkspaceMetadataSnapshot());
 
@@ -173,9 +175,81 @@ function useWorkspaceDatasetController({
     activateRecentDatasetSession(datasetId, restoreDatasetSession);
   };
 
+  const applyPreviewDatasetResult = (
+    datasetMetadata: DatasetMetadata,
+    previewRows: Record<string, unknown>[],
+  ) => {
+    const columns = datasetMetadata.schema.map((column) => column.name);
+    const previewExecution = wrapWorkspaceExecutionOutput({
+      source: "preview",
+      dataset: datasetMetadata,
+      inputRows: previewRows,
+      inputColumns: columns,
+      filters: [],
+      sorting: null,
+      pagination: {
+        page: 1,
+        rowsPerPage: 25,
+      },
+    });
+
+    setPreviewResult({
+      ...previewExecution.activeResult,
+      totalCount: datasetMetadata.row_count,
+    });
+    onExecutionResult?.({
+      ...previewExecution,
+      pagination: {
+        ...previewExecution.pagination,
+        totalCount: datasetMetadata.row_count,
+      },
+      activeResult: {
+        ...previewExecution.activeResult,
+        totalCount: datasetMetadata.row_count,
+      },
+    });
+  };
+
   const openDatasetPicker = () => {
     updateDatasetSessionView("welcome");
     setShouldOpenFilePicker(true);
+  };
+
+  const handleWorksheetSelect = async (worksheetId: string) => {
+    if (!dataset || isSwitchingWorksheet) return;
+
+    setIsSwitchingWorksheet(true);
+    setErrorMessage("");
+
+    try {
+      const selectionResult = await selectWorkbookWorksheet(dataset.dataset_id, worksheetId);
+      setDataset(selectionResult.dataset);
+      onDatasetContextChange?.();
+      applyPreviewDatasetResult(selectionResult.dataset, selectionResult.preview);
+      setFilteredResult(createEmptyResultState());
+      setQueriedResult(createEmptyResultState());
+      setFilterValues({});
+      resetQueryBuilder();
+      restoreQueryBuilder({
+        querySelectedColumns: selectionResult.dataset.schema
+          .slice(0, 4)
+          .map((column) => column.name),
+        queryGroupBy: [],
+        queryAggregations: [{ id: 1, function: "COUNT", column: "" }],
+        querySortColumn: "",
+        querySortDirection: "ASC",
+        queryLimit: "100",
+        hasRunQuery: false,
+      });
+      setActiveResultTab("preview");
+      updateDatasetSessionResultTab("preview");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Worksheet could not be selected.",
+      );
+    } finally {
+      setIsSwitchingWorksheet(false);
+    }
   };
 
   const restoreWorkspaceFromManifest = async (workspaceId: string) => {
@@ -499,11 +573,13 @@ function useWorkspaceDatasetController({
     setShouldOpenFilePicker,
     selectedFileName,
     isUploading: isUploading || isRestoringWorkspace,
+    isSwitchingWorksheet,
     updateDatasetSessionView,
     updateDatasetSessionResultTab,
     activateRecentDataset,
     openDatasetPicker,
     handleFileUpload,
+    handleWorksheetSelect,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,

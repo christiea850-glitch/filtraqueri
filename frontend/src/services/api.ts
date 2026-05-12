@@ -107,6 +107,20 @@ export async function getDataset(datasetId: string) {
   );
 }
 
+export async function selectWorkbookWorksheet(datasetId: string, worksheetId: string) {
+  return requestJson<Pick<UploadResponse, "dataset" | "preview" | "workbook_metadata">>(
+    `${API_BASE_URL}/datasets/${datasetId}/workbook/active-worksheet`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ worksheet_id: worksheetId }),
+    },
+    "Worksheet could not be selected.",
+  );
+}
+
 export async function getWorkspaceManifest(workspaceId: string) {
   return requestJson<{ workspace: WorkspaceManifest }>(
     `${API_BASE_URL}/workspaces/${workspaceId}`,

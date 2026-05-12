@@ -1,4 +1,9 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import {
+  getDatasetActiveWorksheet,
+  listWorkbookWorksheets,
+  type WorksheetMetadata,
+} from "../../features/workbook";
 
 export type HumanIntent =
   | "summary"
@@ -24,6 +29,8 @@ type DatasetSummaryPanelProps = {
   onRemoveRecentDataset: (datasetId: string) => void;
   onClearCurrentDataset: () => void;
   onDeleteDataset: (datasetId: string) => void;
+  onWorksheetSelect: (worksheetId: string) => void;
+  isSwitchingWorksheet: boolean;
 };
 
 export const humanGuidanceCards: HumanGuidanceCard[] = [
@@ -81,6 +88,61 @@ export function DatasetSessionPanel({
   );
 }
 
+type WorksheetSelectorProps = {
+  worksheets: WorksheetMetadata[];
+  activeWorksheetId: string | null;
+  isSwitchingWorksheet: boolean;
+  onWorksheetSelect: (worksheetId: string) => void;
+};
+
+function WorksheetSelector({
+  worksheets,
+  activeWorksheetId,
+  isSwitchingWorksheet,
+  onWorksheetSelect,
+}: WorksheetSelectorProps) {
+  if (worksheets.length === 0) return null;
+
+  return (
+    <div className="worksheet-selector" aria-label="Workbook worksheets">
+      <div className="worksheet-selector-header">
+        <div>
+          <p className="section-label">Workbook sheets</p>
+          <h4>Worksheets</h4>
+        </div>
+        <span className="dataset-count-pill">{worksheets.length}</span>
+      </div>
+      <div className="worksheet-list">
+        {worksheets.map((worksheet) => {
+          const isActive = worksheet.worksheetId === activeWorksheetId;
+          const isReady = worksheet.status === "ready";
+          const label = worksheet.displayName || worksheet.sheetName;
+
+          return (
+            <button
+              type="button"
+              className={`worksheet-item${isActive ? " active" : ""}`}
+              key={worksheet.worksheetId}
+              disabled={!isReady || isActive || isSwitchingWorksheet}
+              onClick={() => onWorksheetSelect(worksheet.worksheetId)}
+              aria-current={isActive ? "true" : undefined}
+              title={label}
+            >
+              <span className="worksheet-name">{label}</span>
+              <span className={`worksheet-status ${worksheet.status}`}>{worksheet.status}</span>
+              <span className="worksheet-metrics">
+                {worksheet.rowCount.toLocaleString()} rows
+                <span aria-hidden="true">/</span>
+                {worksheet.columnCount.toLocaleString()} columns
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function DatasetSummaryPanel({
   dataset,
   recentDatasets,
@@ -91,12 +153,16 @@ function DatasetSummaryPanel({
   onRemoveRecentDataset,
   onClearCurrentDataset,
   onDeleteDataset,
+  onWorksheetSelect,
+  isSwitchingWorksheet,
 }: DatasetSummaryPanelProps) {
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     metadata.schema.reduce<Record<string, number>>((summary, column) => {
       summary[column.inferred_type] = (summary[column.inferred_type] || 0) + 1;
       return summary;
     }, {});
+  const workbookWorksheets = listWorkbookWorksheets(dataset);
+  const activeWorksheet = getDatasetActiveWorksheet(dataset);
 
   return (
     <div className="human-dataset-workspace">
@@ -153,6 +219,12 @@ function DatasetSummaryPanel({
                 Delete
               </button>
             </div>
+            <WorksheetSelector
+              worksheets={workbookWorksheets}
+              activeWorksheetId={activeWorksheet?.worksheetId || null}
+              isSwitchingWorksheet={isSwitchingWorksheet}
+              onWorksheetSelect={onWorksheetSelect}
+            />
           </div>
         ) : (
           <div className="dataset-empty-guidance">
