@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
-import SqlEditorPanel, { SqlDraftPanel } from "./SqlEditorPanel";
+import SqlEditorPanel, { SqlDraftPanel, SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import useSqlWorkspace from "./useSqlWorkspace";
@@ -22,6 +22,7 @@ function SqlWorkspace({ dataset, onExecutionResult }: SqlWorkspaceProps) {
     templates,
     suggestions,
     keywordSuggestions,
+    sqlAnalysis,
     editor,
     insertSql,
     loadDraft,
@@ -66,6 +67,10 @@ function SqlWorkspace({ dataset, onExecutionResult }: SqlWorkspaceProps) {
           {!isSqlSideCollapsed && (
             <>
               <SqlPreviewGrid previewResult={previewResult} />
+              <SqlGuidancePanel
+                diagnostics={sqlAnalysis.diagnostics}
+                guidanceCards={sqlAnalysis.explanationCards}
+              />
               <SqlDraftPanel
                 savedDrafts={savedDrafts}
                 onLoadDraft={loadDraft}

@@ -78,6 +78,17 @@ const snippetKeywords = new Set(["COUNT", "SUM", "AVG", "MIN", "MAX", "CASE WHEN
 
 const markdownEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
 
+const getEditorPosition = (text: string, offset: number) => {
+  const safeOffset = Math.max(0, Math.min(offset, text.length));
+  const beforeOffset = text.slice(0, safeOffset);
+  const lines = beforeOffset.split("\n");
+
+  return {
+    lineNumber: lines.length,
+    column: lines[lines.length - 1].length + 1,
+  };
+};
+
 function SqlEditorHost({ editor }: SqlEditorHostProps) {
   const [shouldUseFallback, setShouldUseFallback] = useState(false);
   const [isMonacoReady, setIsMonacoReady] = useState(false);
@@ -236,6 +247,39 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
     isMonacoReady,
     shouldUseFallback,
   ]);
+
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    if (!monaco || !isMonacoReady || shouldUseFallback) return undefined;
+
+    const models = monaco.editor.getModels();
+    const model = models.find((editorModel: MonacoEditor.ITextModel) => editorModel.getLanguageId() === "sql");
+    if (!model) return undefined;
+
+    const markers = editor.diagnostics.map((diagnostic) => {
+      const start = getEditorPosition(editor.value, diagnostic.start);
+      const end = getEditorPosition(editor.value, diagnostic.end);
+
+      return {
+        severity:
+          diagnostic.severity === "warning"
+            ? monaco.MarkerSeverity.Warning
+            : monaco.MarkerSeverity.Info,
+        message: diagnostic.message,
+        source: "FiltraQueri SQL Intelligence",
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: Math.max(end.column, start.column + 1),
+      };
+    });
+
+    monaco.editor.setModelMarkers(model, "filtraqueri-sql-intelligence", markers);
+
+    return () => {
+      monaco.editor.setModelMarkers(model, "filtraqueri-sql-intelligence", []);
+    };
+  }, [editor.diagnostics, editor.value, isMonacoReady, shouldUseFallback]);
 
   const configureMonaco: BeforeMount = (monaco) => {
     monaco.editor.defineTheme("filtraqueri-sql-dark", {

@@ -1,5 +1,10 @@
 import SqlEditorHost from "./SqlEditorHost";
-import type { SqlEditorInterface, SqlExecutionStatus, SqlQueryDraft } from "./sqlTypes";
+import type {
+  SqlEditorInterface,
+  SqlExecutionStatus,
+  SqlGuidanceCard,
+  SqlQueryDraft,
+} from "./sqlTypes";
 
 type SqlEditorPanelProps = {
   editor: SqlEditorInterface;
@@ -58,6 +63,44 @@ type SqlDraftPanelProps = {
   savedDrafts: SqlQueryDraft[];
   onLoadDraft: (draft: SqlQueryDraft) => void;
 };
+
+type SqlGuidancePanelProps = {
+  diagnostics: SqlEditorInterface["diagnostics"];
+  guidanceCards: SqlGuidanceCard[];
+};
+
+export function SqlGuidancePanel({ diagnostics, guidanceCards }: SqlGuidancePanelProps) {
+  const visibleDiagnostics = diagnostics.slice(0, 4);
+
+  return (
+    <section className="sql-draft-panel" aria-label="SQL guidance">
+      <div className="sql-draft-list" aria-label="SQL guidance notes">
+        <div className="builder-block-header">
+          <span>SQL guidance</span>
+          <small>{diagnostics.length} notes</small>
+        </div>
+        {visibleDiagnostics.length === 0 && guidanceCards.length === 0 ? (
+          <p>No SQL guidance yet.</p>
+        ) : (
+          <>
+            {visibleDiagnostics.map((diagnostic) => (
+              <article key={diagnostic.id}>
+                <strong>{diagnostic.title}</strong>
+                <span>{diagnostic.message}</span>
+              </article>
+            ))}
+            {guidanceCards.map((card) => (
+              <article key={card.id}>
+                <strong>{card.title}</strong>
+                <span>{card.detail || card.summary}</span>
+              </article>
+            ))}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function SqlDraftPanel({ savedDrafts, onLoadDraft }: SqlDraftPanelProps) {
   return (

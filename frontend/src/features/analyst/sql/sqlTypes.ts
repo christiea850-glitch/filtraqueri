@@ -1,4 +1,8 @@
 import type { SchemaColumn } from "../../dataset/datasetTypes";
+import type {
+  SqlIntelligenceDiagnostic,
+  SqlWorkspaceAnalysis,
+} from "../../sqlIntelligence";
 
 export type SqlExecutionStatus = "idle" | "draft-saved" | "explain-ready" | "execution-pending";
 
@@ -37,4 +41,7 @@ export type SqlEditorInterface = {
   suggestions: SqlSuggestion[];
   templates: SqlTemplate[];
   keywordSuggestions: string[];
+  diagnostics: SqlIntelligenceDiagnostic[];
 };
+
+export type SqlGuidanceCard = SqlWorkspaceAnalysis["explanationCards"][number];

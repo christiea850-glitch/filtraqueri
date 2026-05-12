@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
+import { analyzeSqlWorkspaceDraft } from "../../sqlIntelligence";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import type {
   SqlEditorInterface,
@@ -45,6 +46,7 @@ function useSqlWorkspace(
 
   const templates = useMemo(() => (dataset ? createSqlTemplates(dataset) : []), [dataset]);
   const suggestions = useMemo(() => (dataset ? createColumnSuggestions(dataset) : []), [dataset]);
+  const sqlAnalysis = useMemo(() => analyzeSqlWorkspaceDraft(sqlDraft, "duckdb"), [sqlDraft]);
   const characterCount = sqlDraft.trim().length;
 
   const updateStatus = (status: SqlExecutionStatus) => {
@@ -139,6 +141,7 @@ function useSqlWorkspace(
     suggestions,
     templates,
     keywordSuggestions: sqlKeywordSuggestions,
+    diagnostics: sqlAnalysis.diagnostics,
   };
 
   return {
@@ -150,6 +153,7 @@ function useSqlWorkspace(
     templates,
     suggestions,
     keywordSuggestions: sqlKeywordSuggestions,
+    sqlAnalysis,
     editor,
     insertSql,
     saveDraft,

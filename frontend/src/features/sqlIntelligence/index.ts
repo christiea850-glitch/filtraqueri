@@ -26,3 +26,20 @@ export {
   listFunctionCompatibility,
   sqlFunctionCompatibilityRegistry,
 } from "./functions";
+export {
+  analyzeSqlWorkspaceDraft,
+  createSqlDialectDiagnostics,
+  matchSqlConcepts,
+  matchSqlFunctions,
+  scanSqlKeywords,
+} from "./diagnostics";
+export type {
+  SqlConceptMatch,
+  SqlDiagnosticSeverity,
+  SqlFunctionMatch,
+  SqlIntelligenceDiagnostic,
+  SqlKeywordMatch,
+  SqlWorkspaceAnalysis,
+} from "./diagnostics";
+export { getSqlConceptExplanation, getSqlFunctionExplanation } from "./explanations";
+export type { SqlExplanation } from "./explanations";
