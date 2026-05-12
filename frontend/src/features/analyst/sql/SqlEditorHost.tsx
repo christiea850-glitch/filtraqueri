@@ -262,7 +262,9 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
 
       return {
         severity:
-          diagnostic.severity === "warning"
+          diagnostic.severity === "error"
+            ? monaco.MarkerSeverity.Error
+            : diagnostic.severity === "warning"
             ? monaco.MarkerSeverity.Warning
             : monaco.MarkerSeverity.Info,
         message: diagnostic.message,

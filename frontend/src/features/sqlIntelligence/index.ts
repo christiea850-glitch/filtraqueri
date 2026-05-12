@@ -43,3 +43,21 @@ export type {
 } from "./diagnostics";
 export { getSqlConceptExplanation, getSqlFunctionExplanation } from "./explanations";
 export type { SqlExplanation } from "./explanations";
+export {
+  clausePresenceRules,
+  selectOnlySafetyRules,
+  validateSqlClauses,
+  validateSqlDialect,
+  validateSqlSafety,
+  validateSqlWorkspaceDraft,
+  validationDiagnosticToIntelligenceDiagnostic,
+  validationDiagnosticsToIntelligenceDiagnostics,
+} from "./validation";
+export type {
+  SqlValidationCategory,
+  SqlValidationDiagnostic,
+  SqlValidationLocation,
+  SqlValidationResult,
+  SqlValidationRule,
+  SqlValidationSeverity,
+} from "./validation";

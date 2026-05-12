@@ -2,7 +2,7 @@ import { getDialectProfile } from "../dialects";
 import type { SqlDialectId } from "../types";
 import { matchSqlFunctions } from "./sqlFunctionMatcher";
 
-export type SqlDiagnosticSeverity = "info" | "warning";
+export type SqlDiagnosticSeverity = "info" | "warning" | "error";
 
 export type SqlIntelligenceDiagnostic = {
   id: string;
@@ -11,7 +11,7 @@ export type SqlIntelligenceDiagnostic = {
   message: string;
   start: number;
   end: number;
-  source: "concept" | "function" | "dialect";
+  source: "concept" | "function" | "dialect" | "validation";
 };
 
 const createPatternDiagnostic = ({

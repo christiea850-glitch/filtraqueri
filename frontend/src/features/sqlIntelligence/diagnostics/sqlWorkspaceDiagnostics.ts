@@ -1,11 +1,17 @@
 import { getSqlConceptExplanation, getSqlFunctionExplanation } from "../explanations/sqlExplanationRegistry";
 import type { SqlConceptId, SqlDialectId } from "../types";
+import {
+  validateSqlWorkspaceDraft,
+  validationDiagnosticsToIntelligenceDiagnostics,
+  type SqlValidationResult,
+} from "../validation";
 import { matchSqlConcepts } from "./sqlConceptMatcher";
-import { createSqlDialectDiagnostics, type SqlIntelligenceDiagnostic } from "./sqlDialectDiagnostics";
+import type { SqlIntelligenceDiagnostic } from "./sqlDialectDiagnostics";
 import { matchSqlFunctions } from "./sqlFunctionMatcher";
 
 export type SqlWorkspaceAnalysis = {
   diagnostics: SqlIntelligenceDiagnostic[];
+  validation: SqlValidationResult;
   explanationCards: Array<{
     id: string;
     title: string;
@@ -35,6 +41,7 @@ export const analyzeSqlWorkspaceDraft = (
   sourceDialect: SqlDialectId = "duckdb",
 ): SqlWorkspaceAnalysis => {
   const conceptMatches = matchSqlConcepts(sql);
+  const validation = validateSqlWorkspaceDraft(sql, sourceDialect);
   const conceptDiagnostics = conceptMatches.map(({ concept, match }) => ({
     id: `concept-${concept.id}-${match.start}`,
     severity: "info" as const,
@@ -44,8 +51,10 @@ export const analyzeSqlWorkspaceDraft = (
     end: match.end,
     source: "concept" as const,
   }));
-  const dialectDiagnostics = createSqlDialectDiagnostics(sql, sourceDialect);
-  const diagnostics = [...conceptDiagnostics, ...dialectDiagnostics].sort(
+  const validationDiagnostics = validationDiagnosticsToIntelligenceDiagnostics(
+    validation.diagnostics,
+  );
+  const diagnostics = [...conceptDiagnostics, ...validationDiagnostics].sort(
     (left, right) => left.start - right.start || left.end - right.end,
   );
 
@@ -82,6 +91,7 @@ export const analyzeSqlWorkspaceDraft = (
 
   return {
     diagnostics,
+    validation,
     explanationCards: [...conceptCards, ...functionCards].slice(0, 6),
   };
 };
