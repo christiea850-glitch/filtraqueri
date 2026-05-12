@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import type {
   SqlEditorInterface,
@@ -43,11 +44,37 @@ function useSqlWorkspace(dataset: DatasetMetadata | null) {
   const characterCount = sqlDraft.trim().length;
 
   const updateStatus = (status: SqlExecutionStatus) => {
+    const message = createPreviewMessage(status);
     setEditorStatus(status);
+
+    if (dataset) {
+      const executionResult = wrapWorkspaceExecutionOutput({
+        source: "sql",
+        dataset,
+        inputRows: [],
+        inputColumns: [],
+        sql: {
+          sql: sqlDraft,
+          message,
+        },
+        pagination: {
+          page: 1,
+          rowsPerPage: 100,
+        },
+      });
+
+      setPreviewResult({
+        columns: executionResult.outputVisibleColumns,
+        rows: executionResult.outputRows,
+        message: executionResult.sql?.message || message,
+      });
+      return;
+    }
+
     setPreviewResult({
       columns: [],
       rows: [],
-      message: createPreviewMessage(status),
+      message,
     });
   };
 

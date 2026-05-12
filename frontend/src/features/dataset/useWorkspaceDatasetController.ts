@@ -1,6 +1,7 @@
 import { type ChangeEvent, useEffect, useState } from "react";
 import type { HumanIntent } from "../../components/dataset/DatasetSummaryPanel";
 import { uploadDataset } from "../../services/api";
+import { wrapWorkspaceExecutionOutput } from "../execution/executeWorkspaceQuery";
 import type { FilterState } from "../filters/filterTypes";
 import type { HistoryItem } from "../history/historyTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
@@ -156,19 +157,22 @@ function useWorkspaceDatasetController({
     try {
       const uploadResult = await uploadDataset(file);
       const uploadColumns = uploadResult.dataset.schema.map((column) => column.name);
+      const previewExecution = wrapWorkspaceExecutionOutput({
+        source: "preview",
+        dataset: uploadResult.dataset,
+        inputRows: uploadResult.preview,
+        inputColumns: uploadColumns,
+        filters: [],
+        sorting: null,
+        pagination: {
+          page: 1,
+          rowsPerPage: 25,
+        },
+      });
       setDataset(uploadResult.dataset);
       setPreviewResult({
-        columns: uploadColumns,
-        rows: uploadResult.preview,
+        ...previewExecution.activeResult,
         totalCount: uploadResult.dataset.row_count,
-        page: 1,
-        rowsPerPage: 25,
-        sortColumn: "",
-        sortDirection: "ASC",
-        source: {
-          filters: [],
-          orderBy: null,
-        },
       });
       setFilteredResult(createEmptyResultState());
       setQueriedResult(createEmptyResultState());

@@ -18,6 +18,7 @@ import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceReg
 import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
+import { executeWorkspaceQuery } from "./features/execution/executeWorkspaceQuery";
 import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatasetController";
 import useExportController from "./features/export/useExportController";
 import useFilterController from "./features/filters/useFilterController";
@@ -29,10 +30,6 @@ import useActiveResultModel, {
   getCurrentRowCount,
 } from "./features/results/activeResultModel";
 import useResults, { createEmptyResultState } from "./features/results/useResults";
-import {
-  filterDataset,
-  runQueryBuilder,
-} from "./services/api";
 import "./App.css";
 
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
@@ -263,32 +260,23 @@ function App() {
 
     try {
       const filters = buildActiveBackendFilters();
+      const filterLabels = createFilterLabels(filters);
       const orderBy = createOrderBy(filteredResult.sortColumn, filteredResult.sortDirection);
-      const filterResult = await filterDataset(dataset.dataset_id, {
+      const executionResult = await executeWorkspaceQuery({
+        source: "filtered",
+        dataset,
         filters,
-        limit: filteredResult.rowsPerPage,
-        page: 1,
-        order_by: orderBy,
-      });
-      updateFilteredResult(
-        {
-          ...filteredResult,
-          columns: filterResult.columns,
-          rows: filterResult.rows,
-          totalCount: filterResult.total_count,
+        sorting: orderBy,
+        pagination: {
           page: 1,
-          rowsPerPage: filterResult.limit,
-          source: {
-            filters,
-            orderBy,
-          },
+          rowsPerPage: filteredResult.rowsPerPage,
         },
-        true,
-      );
+      });
+      updateFilteredResult(executionResult.activeResult, true);
       addHistory(
         "Filters",
-        activeFilterLabels.length > 0 ? activeFilterLabels.join("; ") : "No filters",
-        filterResult.filtered_count,
+        filterLabels.length > 0 ? filterLabels.join("; ") : "No filters",
+        executionResult.pagination.totalCount,
       );
     } catch (error) {
       const message =
@@ -311,28 +299,19 @@ function App() {
     setErrorMessage("");
 
     try {
-      const filterResult = await filterDataset(dataset.dataset_id, {
+      const executionResult = await executeWorkspaceQuery({
+        source: "preview",
+        dataset,
         filters: [],
-        limit: previewResult.rowsPerPage,
-        page: 1,
-      });
-      updatePreviewResult(
-        {
-          ...previewResult,
-          columns: filterResult.columns,
-          rows: filterResult.rows,
-          totalCount: filterResult.total_count,
+        sorting: null,
+        pagination: {
           page: 1,
-          rowsPerPage: filterResult.limit,
-          source: {
-            filters: [],
-            orderBy: null,
-          },
+          rowsPerPage: previewResult.rowsPerPage,
         },
-        true,
-      );
+      });
+      updatePreviewResult(executionResult.activeResult, true);
       setFilteredResult(createEmptyResultState());
-      addHistory("Reset", "Cleared all filters", filterResult.total_count);
+      addHistory("Reset", "Cleared all filters", executionResult.pagination.totalCount);
     } catch (error) {
       const message =
         error instanceof Error
@@ -362,30 +341,21 @@ function App() {
           ? activeResult.source?.filters || buildActiveBackendFilters()
           : [];
       const orderBy = createOrderBy(sortColumn, sortDirection);
-      const filterResult = await filterDataset(dataset.dataset_id, {
+      const executionResult = await executeWorkspaceQuery({
+        source: activeResultTab === "filtered" ? "filtered" : "preview",
+        dataset,
         filters,
-        limit: rowsPerPage,
-        page,
-        order_by: orderBy,
-      });
-      const nextResult = {
-        columns: filterResult.columns,
-        rows: filterResult.rows,
-        totalCount: filterResult.total_count,
-        page: filterResult.page,
-        rowsPerPage: filterResult.limit,
-        sortColumn,
-        sortDirection,
-        source: {
-          filters,
-          orderBy,
+        sorting: orderBy,
+        pagination: {
+          page,
+          rowsPerPage,
         },
-      };
+      });
 
       if (activeResultTab === "filtered") {
-        updateFilteredResult(nextResult);
+        updateFilteredResult(executionResult.activeResult);
       } else {
-        updatePreviewResult(nextResult);
+        updatePreviewResult(executionResult.activeResult);
       }
     } catch (error) {
       const message =
@@ -421,31 +391,25 @@ function App() {
         limit: Number(queryLimit) || queriedResult.rowsPerPage,
         page: 1,
       };
-      const queryResult = await runQueryBuilder(dataset.dataset_id, queryBuilderRequest);
-      updateQueriedResult(
-        {
-          ...queriedResult,
-          columns: queryResult.columns,
-          rows: queryResult.rows,
-          totalCount: queryResult.total_count,
+      const executionResult = await executeWorkspaceQuery({
+        source: "query-builder",
+        dataset,
+        filters,
+        queryBuilder: queryBuilderRequest,
+        sorting: orderBy,
+        grouping: queryGroupBy,
+        pagination: {
           page: 1,
-          rowsPerPage: queryResult.limit,
-          sortColumn: querySortColumn,
-          sortDirection: querySortDirection,
-          source: {
-            filters,
-            queryBuilder: queryBuilderRequest,
-            orderBy,
-          },
+          rowsPerPage: queryBuilderRequest.limit,
         },
-        true,
-      );
+      });
+      updateQueriedResult(executionResult.activeResult, true);
       addHistory(
         "Query builder",
         activeAggregations.length > 0
           ? `${activeAggregations.length} aggregation${activeAggregations.length === 1 ? "" : "s"}`
           : `${querySelectedColumns.length} visible columns`,
-        queryResult.total_count,
+        executionResult.pagination.totalCount,
       );
     } catch (error) {
       const message =
@@ -462,8 +426,8 @@ function App() {
   const loadQueryPage = async (
     page: number,
     rowsPerPage = queriedResult.rowsPerPage,
-    sortColumn = querySortColumn,
-    sortDirection = querySortDirection,
+    sortColumn = queriedResult.sortColumn,
+    sortDirection = queriedResult.sortDirection,
   ) => {
     if (!dataset) return;
 
@@ -491,21 +455,19 @@ function App() {
         limit: rowsPerPage,
         page,
       };
-      const queryResult = await runQueryBuilder(dataset.dataset_id, queryBuilderRequest);
-      updateQueriedResult({
-        columns: queryResult.columns,
-        rows: queryResult.rows,
-        totalCount: queryResult.total_count,
-        page: queryResult.page,
-        rowsPerPage: queryResult.limit,
-        sortColumn,
-        sortDirection,
-        source: {
-          filters,
-          queryBuilder: queryBuilderRequest,
-          orderBy,
+      const executionResult = await executeWorkspaceQuery({
+        source: "query-builder",
+        dataset,
+        filters,
+        queryBuilder: queryBuilderRequest,
+        sorting: orderBy,
+        grouping: queryBuilderRequest.group_by,
+        pagination: {
+          page,
+          rowsPerPage,
         },
       });
+      updateQueriedResult(executionResult.activeResult);
     } catch (error) {
       const message =
         error instanceof Error
