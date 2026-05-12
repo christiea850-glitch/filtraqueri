@@ -613,7 +613,8 @@
 }
 
 .workbook-mapping-list,
-.workbook-schema-list {
+.workbook-schema-list,
+.workbook-relationship-list {
   display: grid;
   gap: 6px;
   max-height: 220px;
@@ -700,6 +701,75 @@
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+}
+
+.workbook-relationship-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workbook-relationship-header,
+.workbook-relationship-path,
+.workbook-relationship-tables,
+.workbook-evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.workbook-relationship-header {
+  justify-content: space-between;
+}
+
+.workbook-relationship-header small,
+.workbook-relationship-tables span,
+.workbook-evidence-list span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workbook-relationship-path strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-confidence {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.relationship-confidence.high {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.relationship-confidence.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.relationship-confidence.low {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .section-label {

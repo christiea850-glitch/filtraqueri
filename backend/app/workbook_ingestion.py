@@ -20,6 +20,7 @@ from .workbook_models import (
     WorksheetNormalizationMetadata,
     WorksheetTableMapping,
 )
+from .workbook_relationships import profile_relationship_candidates
 
 
 MAX_WORKBOOK_FILE_BYTES = 25 * 1024 * 1024
@@ -293,6 +294,7 @@ def ingest_workbook(
     active_schema: list[dict[str, Any]] = []
     active_row_count = 0
     active_column_count = 0
+    relationship_candidates = []
 
     with duckdb.connect(str(duckdb_path)) as connection:
         for index, sheet in enumerate(raw_sheets[:MAX_WORKSHEETS]):
@@ -347,6 +349,7 @@ def ingest_workbook(
         )
         preview_columns = [description[0] for description in preview_result.description]
         preview = [dict(zip(preview_columns, row)) for row in preview_result.fetchall()]
+        relationship_candidates = profile_relationship_candidates(connection, dataset_id, worksheets)
 
     workbook_metadata = WorkbookMetadata(
         workbook_id=dataset_id,
@@ -373,7 +376,7 @@ def ingest_workbook(
             )
             for worksheet in worksheets
         ],
-        relationship_candidates=[],
+        relationship_candidates=relationship_candidates,
         ingestion_profile=WorkbookIngestionProfile(
             max_worksheets=MAX_WORKSHEETS,
             max_rows_per_worksheet_profile=MAX_WORKSHEET_ROWS,

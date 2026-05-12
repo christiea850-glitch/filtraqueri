@@ -54,23 +54,29 @@ class WorksheetRelationshipEvidence(BaseModel):
     target_unique_ratio: float = Field(ge=0, le=1)
     sampled_overlap_ratio: float = Field(ge=0, le=1)
     sampled_row_count: int = Field(default=0, ge=0)
+    summaries: list[str] = Field(default_factory=list)
 
 
 class WorksheetRelationshipCandidate(BaseModel):
     relationship_id: str
     workbook_id: str
     source_worksheet_id: str
+    source_worksheet_name: str
+    source_table: str
     source_column: str
     target_worksheet_id: str
+    target_worksheet_name: str
+    target_table: str
     target_column: str
     confidence: float = Field(ge=0, le=1)
+    confidence_label: Literal["low", "medium", "high"] = "low"
     relationship_type: Literal[
-        "one-to-one",
-        "one-to-many",
-        "many-to-one",
-        "many-to-many",
-        "unknown",
-    ] = "unknown"
+        "one_to_one_candidate",
+        "one_to_many_candidate",
+        "many_to_one_candidate",
+        "unknown_candidate",
+    ] = "unknown_candidate"
+    direction: Literal["source_to_target", "target_to_source", "bidirectional", "unknown"] = "unknown"
     evidence: WorksheetRelationshipEvidence
     status: Literal["candidate", "confirmed", "dismissed"] = "candidate"
 

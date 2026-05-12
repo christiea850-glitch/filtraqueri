@@ -52,17 +52,28 @@ export type WorksheetRelationshipEvidence = {
   targetUniqueRatio: number;
   sampledOverlapRatio: number;
   sampledRowCount: number;
+  summaries: string[];
 };
 
 export type WorksheetRelationshipCandidate = {
   relationshipId: WorksheetRelationshipId;
   workbookId: WorkbookId;
   sourceWorksheetId: WorksheetId;
+  sourceWorksheetName: string;
+  sourceTable: string;
   sourceColumn: string;
   targetWorksheetId: WorksheetId;
+  targetWorksheetName: string;
+  targetTable: string;
   targetColumn: string;
   confidence: number;
-  relationshipType: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many" | "unknown";
+  confidenceLabel: "low" | "medium" | "high";
+  relationshipType:
+    | "one_to_one_candidate"
+    | "one_to_many_candidate"
+    | "many_to_one_candidate"
+    | "unknown_candidate";
+  direction: "source_to_target" | "target_to_source" | "bidirectional" | "unknown";
   evidence: WorksheetRelationshipEvidence;
   status: "candidate" | "confirmed" | "dismissed";
 };

@@ -3,6 +3,7 @@ import {
   getActiveWorksheet,
   getWorkbookMetadata,
   type WorkbookIngestionProfile,
+  type WorksheetRelationshipCandidate,
   type WorksheetMetadata,
   type WorksheetStatus,
 } from "../../features/workbook";
@@ -57,6 +58,56 @@ function WorkbookProfileList({ profile }: { profile: WorkbookIngestionProfile })
           {label}
           <strong>{formatProfileValue(value)}</strong>
         </span>
+      ))}
+    </div>
+  );
+}
+
+const relationshipTypeLabel = (type: WorksheetRelationshipCandidate["relationshipType"]) => {
+  if (type === "one_to_many_candidate") return "one to many";
+  if (type === "many_to_one_candidate") return "many to one";
+  if (type === "one_to_one_candidate") return "one to one";
+  return "unknown";
+};
+
+function RelationshipCandidateList({
+  candidates,
+}: {
+  candidates: WorksheetRelationshipCandidate[];
+}) {
+  if (candidates.length === 0) {
+    return <p className="workbook-empty-note">No relationship candidates profiled yet.</p>;
+  }
+
+  return (
+    <div className="workbook-relationship-list" aria-label="Relationship candidates">
+      {candidates.map((candidate) => (
+        <div className="workbook-relationship-card" key={candidate.relationshipId}>
+          <div className="workbook-relationship-header">
+            <span className={`relationship-confidence ${candidate.confidenceLabel}`}>
+              {candidate.confidenceLabel}
+            </span>
+            <small>{relationshipTypeLabel(candidate.relationshipType)}</small>
+          </div>
+          <div className="workbook-relationship-path">
+            <strong>
+              {candidate.sourceWorksheetName}.{candidate.sourceColumn}
+            </strong>
+            <span aria-hidden="true">-&gt;</span>
+            <strong>
+              {candidate.targetWorksheetName}.{candidate.targetColumn}
+            </strong>
+          </div>
+          <div className="workbook-relationship-tables">
+            <span>{candidate.sourceTable}</span>
+            <span>{candidate.targetTable}</span>
+          </div>
+          <div className="workbook-evidence-list">
+            {candidate.evidence.summaries.map((summary) => (
+              <span key={summary}>{summary}</span>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -153,6 +204,14 @@ function WorkbookContextPanel({ dataset, variant = "results" }: WorkbookContextP
           <small>{workbook.sourceFile.originalFilename}</small>
         </div>
         <WorkbookProfileList profile={workbook.ingestionProfile} />
+      </div>
+
+      <div className="workbook-mapping-section">
+        <div className="builder-block-header">
+          <span>Relationship candidates</span>
+          <small>{workbook.relationshipCandidates.length.toLocaleString()} profiled</small>
+        </div>
+        <RelationshipCandidateList candidates={workbook.relationshipCandidates.slice(0, 8)} />
       </div>
 
       {variant === "analyst" && (

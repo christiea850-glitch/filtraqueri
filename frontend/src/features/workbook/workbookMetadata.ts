@@ -173,6 +173,98 @@ export const normalizeUnknownWorksheetMetadata = (
   );
 };
 
+const normalizeRelationshipType = (value: unknown): WorksheetRelationshipCandidate["relationshipType"] => {
+  if (
+    value === "one_to_one_candidate" ||
+    value === "one_to_many_candidate" ||
+    value === "many_to_one_candidate" ||
+    value === "unknown_candidate"
+  ) {
+    return value;
+  }
+
+  if (value === "one-to-one") return "one_to_one_candidate";
+  if (value === "one-to-many") return "one_to_many_candidate";
+  if (value === "many-to-one") return "many_to_one_candidate";
+  return "unknown_candidate";
+};
+
+const normalizeRelationshipCandidate = (
+  value: unknown,
+  workbookId: string,
+  index = 0,
+): WorksheetRelationshipCandidate => {
+  const candidate = readObject(value);
+  const evidence = readObject(candidate.evidence);
+  const confidence = Math.min(1, Math.max(0, readNumber(candidate.confidence, 0)));
+  const confidenceLabel =
+    candidate.confidenceLabel === "high" ||
+    candidate.confidence_label === "high" ||
+    candidate.confidenceLabel === "medium" ||
+    candidate.confidence_label === "medium" ||
+    candidate.confidenceLabel === "low" ||
+    candidate.confidence_label === "low"
+      ? ((candidate.confidenceLabel ?? candidate.confidence_label) as "low" | "medium" | "high")
+      : confidence >= 0.75
+        ? "high"
+        : confidence >= 0.52
+          ? "medium"
+          : "low";
+  const direction = candidate.direction;
+
+  return {
+    relationshipId: readString(
+      candidate.relationshipId ?? candidate.relationship_id,
+      `${workbookId}:relationship:${index + 1}`,
+    ),
+    workbookId,
+    sourceWorksheetId: readString(candidate.sourceWorksheetId ?? candidate.source_worksheet_id, ""),
+    sourceWorksheetName: readString(
+      candidate.sourceWorksheetName ?? candidate.source_worksheet_name,
+      "Source worksheet",
+    ),
+    sourceTable: readString(candidate.sourceTable ?? candidate.source_table, ""),
+    sourceColumn: readString(candidate.sourceColumn ?? candidate.source_column, ""),
+    targetWorksheetId: readString(candidate.targetWorksheetId ?? candidate.target_worksheet_id, ""),
+    targetWorksheetName: readString(
+      candidate.targetWorksheetName ?? candidate.target_worksheet_name,
+      "Target worksheet",
+    ),
+    targetTable: readString(candidate.targetTable ?? candidate.target_table, ""),
+    targetColumn: readString(candidate.targetColumn ?? candidate.target_column, ""),
+    confidence,
+    confidenceLabel,
+    relationshipType: normalizeRelationshipType(
+      candidate.relationshipType ?? candidate.relationship_type,
+    ),
+    direction:
+      direction === "source_to_target" ||
+      direction === "target_to_source" ||
+      direction === "bidirectional" ||
+      direction === "unknown"
+        ? direction
+        : "unknown",
+    evidence: {
+      nameSimilarity: readNumber(evidence.nameSimilarity ?? evidence.name_similarity, 0),
+      typeCompatible: Boolean(evidence.typeCompatible ?? evidence.type_compatible),
+      sourceUniqueRatio: readNumber(evidence.sourceUniqueRatio ?? evidence.source_unique_ratio, 0),
+      targetUniqueRatio: readNumber(evidence.targetUniqueRatio ?? evidence.target_unique_ratio, 0),
+      sampledOverlapRatio: readNumber(
+        evidence.sampledOverlapRatio ?? evidence.sampled_overlap_ratio,
+        0,
+      ),
+      sampledRowCount: readNumber(evidence.sampledRowCount ?? evidence.sampled_row_count, 0),
+      summaries: readArray<string>(evidence.summaries),
+    },
+    status:
+      candidate.status === "candidate" ||
+      candidate.status === "confirmed" ||
+      candidate.status === "dismissed"
+        ? candidate.status
+        : "candidate",
+  };
+};
+
 export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetadata | null => {
   if (!value || typeof value !== "object") return null;
 
@@ -230,7 +322,15 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
       tableName: worksheet.tableName,
       originalIndex: worksheet.originalIndex,
     })),
-    relationshipCandidates: [],
+    relationshipCandidates: readArray(workbook.relationshipCandidates ?? workbook.relationship_candidates)
+      .map((candidate, index) => normalizeRelationshipCandidate(candidate, workbookId, index))
+      .filter(
+        (candidate) =>
+          candidate.sourceWorksheetId &&
+          candidate.targetWorksheetId &&
+          candidate.sourceColumn &&
+          candidate.targetColumn,
+      ),
     ingestionProfile: DEFAULT_WORKBOOK_INGESTION_PROFILE,
     normalization: {
       version: readNumber(normalization.version, WORKBOOK_METADATA_NORMALIZATION_VERSION),
