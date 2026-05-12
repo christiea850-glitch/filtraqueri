@@ -4,6 +4,7 @@ from typing import Any
 from uuid import uuid4
 import csv
 import io
+import json
 import re
 import shutil
 
@@ -18,7 +19,9 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 STORAGE_DIR = BASE_DIR / "storage"
 UPLOADS_DIR = STORAGE_DIR / "uploads"
 SESSIONS_DIR = STORAGE_DIR / "sessions"
+MANIFESTS_DIR = STORAGE_DIR / "manifests"
 TABLE_NAME = "data"
+WORKSPACE_MANIFEST_VERSION = 1
 DEFAULT_PREVIEW_LIMIT = 25
 MAX_QUERY_LIMIT = 1000
 DEFAULT_QUERY_LIMIT = 100
@@ -37,6 +40,7 @@ ALLOWED_SORT_DIRECTIONS = {"ASC", "DESC"}
 
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+MANIFESTS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="FiltraQueri API", version="0.1.0")
 
@@ -49,6 +53,108 @@ app.add_middleware(
 )
 
 dataset_sessions: dict[str, dict[str, Any]] = {}
+
+
+def workspace_manifest_path(workspace_id: str) -> Path:
+    safe_workspace_id = re.sub(r"[^A-Za-z0-9_-]", "_", workspace_id)
+    return MANIFESTS_DIR / f"{safe_workspace_id}.json"
+
+
+def dataset_manifest_entry(metadata: dict[str, Any], source_type: str = "uploaded") -> dict[str, Any]:
+    return {
+        "dataset_id": metadata["dataset_id"],
+        "dataset_name": metadata["original_filename"],
+        "source_type": source_type,
+        "uploaded_path": metadata["uploaded_path"],
+        "duckdb_path": metadata["duckdb_path"],
+        "schema": metadata["schema"],
+        "row_count": metadata["row_count"],
+        "column_count": metadata["column_count"],
+        "created_at": metadata["uploaded_at"],
+    }
+
+
+def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None = None) -> dict[str, Any]:
+    resolved_workspace_id = workspace_id or metadata["dataset_id"]
+    return {
+        "version": WORKSPACE_MANIFEST_VERSION,
+        "workspace_id": resolved_workspace_id,
+        "active_dataset_id": metadata["dataset_id"],
+        "active_result_id": "preview",
+        "active_execution_id": None,
+        "current_mode": "human",
+        "current_result_tab": "preview",
+        "filter_metadata": {},
+        "query_builder_metadata": {},
+        "datasets": [dataset_manifest_entry(metadata)],
+        "created_at": metadata["uploaded_at"],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def save_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    manifest["updated_at"] = datetime.now(timezone.utc).isoformat()
+    path = workspace_manifest_path(manifest["workspace_id"])
+    path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
+
+
+def read_workspace_manifest(workspace_id: str) -> dict[str, Any]:
+    path = workspace_manifest_path(workspace_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Workspace manifest not found")
+
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=400, detail="Workspace manifest is invalid") from error
+
+    if manifest.get("version") != WORKSPACE_MANIFEST_VERSION:
+        raise HTTPException(status_code=400, detail="Workspace manifest version is not supported")
+
+    validate_workspace_manifest_files(manifest)
+    hydrate_dataset_sessions_from_manifest(manifest)
+    return manifest
+
+
+def validate_workspace_manifest_files(manifest: dict[str, Any]) -> None:
+    for dataset_entry in manifest.get("datasets", []):
+        duckdb_path = Path(dataset_entry.get("duckdb_path", ""))
+        uploaded_path = Path(dataset_entry.get("uploaded_path", ""))
+        if not duckdb_path.exists() or not uploaded_path.exists():
+            raise HTTPException(status_code=404, detail="Workspace dataset files are missing")
+
+
+def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
+    for dataset_entry in manifest.get("datasets", []):
+        dataset_id = dataset_entry["dataset_id"]
+        if dataset_id in dataset_sessions:
+            continue
+
+        metadata = {
+            "dataset_id": dataset_id,
+            "filename": sanitize_filename(dataset_entry["dataset_name"]),
+            "original_filename": dataset_entry["dataset_name"],
+            "table_name": TABLE_NAME,
+            "uploaded_path": dataset_entry["uploaded_path"],
+            "duckdb_path": dataset_entry["duckdb_path"],
+            "uploaded_at": dataset_entry["created_at"],
+            "row_count": dataset_entry["row_count"],
+            "column_count": dataset_entry["column_count"],
+            "schema": dataset_entry["schema"],
+        }
+        dataset_sessions[dataset_id] = metadata
+
+
+def load_workspace_manifests() -> None:
+    for path in MANIFESTS_DIR.glob("*.json"):
+        try:
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            if manifest.get("version") == WORKSPACE_MANIFEST_VERSION:
+                validate_workspace_manifest_files(manifest)
+                hydrate_dataset_sessions_from_manifest(manifest)
+        except (json.JSONDecodeError, HTTPException, OSError, KeyError):
+            continue
 
 
 class QueryRequest(BaseModel):
@@ -101,6 +207,16 @@ class ExportRequest(BaseModel):
     query_builder: QueryBuilderRequest | None = None
     order_by: SortDefinition | None = None
     limit: int = Field(MAX_QUERY_LIMIT, ge=1, le=MAX_QUERY_LIMIT)
+
+
+class WorkspaceManifestUpdate(BaseModel):
+    active_dataset_id: str | None = None
+    active_result_id: str | None = None
+    active_execution_id: str | None = None
+    current_mode: str | None = None
+    current_result_tab: str | None = None
+    filter_metadata: dict[str, Any] | None = None
+    query_builder_metadata: dict[str, Any] | None = None
 
 
 def sanitize_filename(filename: str) -> str:
@@ -443,6 +559,11 @@ def run_limited_query(
     }
 
 
+@app.on_event("startup")
+def hydrate_workspace_manifests() -> None:
+    load_workspace_manifests()
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -491,11 +612,46 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         "schema": schema,
     }
     dataset_sessions[dataset_id] = metadata
+    workspace_manifest = save_workspace_manifest(create_workspace_manifest(metadata))
 
     return {
         "dataset": metadata,
         "preview": preview,
+        "workspace_manifest": workspace_manifest,
     }
+
+
+@app.get("/workspaces/{workspace_id}")
+def get_workspace_manifest(workspace_id: str) -> dict[str, Any]:
+    return {"workspace": read_workspace_manifest(workspace_id)}
+
+
+@app.put("/workspaces/{workspace_id}")
+def update_workspace_manifest(
+    workspace_id: str,
+    request: WorkspaceManifestUpdate,
+) -> dict[str, Any]:
+    manifest = read_workspace_manifest(workspace_id)
+    updates = request.model_dump(exclude_unset=True)
+
+    for key, value in updates.items():
+        if value is not None:
+            manifest[key] = value
+
+    if manifest.get("active_dataset_id") and not any(
+        dataset["dataset_id"] == manifest["active_dataset_id"]
+        for dataset in manifest.get("datasets", [])
+    ):
+        manifest["active_dataset_id"] = manifest["datasets"][0]["dataset_id"] if manifest.get("datasets") else None
+
+    if manifest.get("current_result_tab") not in (None, "preview", "filtered", "queried"):
+        manifest["current_result_tab"] = "preview"
+    if manifest.get("active_result_id") not in (None, "preview", "filtered", "queried"):
+        manifest["active_result_id"] = manifest.get("current_result_tab") or "preview"
+    if manifest.get("current_mode") not in (None, "human", "analyst"):
+        manifest["current_mode"] = "human"
+
+    return {"workspace": save_workspace_manifest(manifest)}
 
 
 @app.get("/datasets/{dataset_id}")

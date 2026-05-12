@@ -1,6 +1,12 @@
 import { type ChangeEvent, useEffect, useState } from "react";
 import type { HumanIntent } from "../../components/dataset/DatasetSummaryPanel";
-import { uploadDataset } from "../../services/api";
+import {
+  getDataset,
+  getPreview,
+  getWorkspaceManifest,
+  updateWorkspaceManifest,
+  uploadDataset,
+} from "../../services/api";
 import { wrapWorkspaceExecutionOutput } from "../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTypes";
 import type { FilterState } from "../filters/filterTypes";
@@ -12,6 +18,11 @@ import {
   resetWorkspaceForDatasetChange,
   restoreWorkspaceStateSafely,
 } from "../workspace/workspaceOrchestration";
+import {
+  clearActiveWorkspaceId,
+  loadActiveWorkspaceId,
+  saveActiveWorkspaceId,
+} from "../workspace/workspacePersistence";
 import type { DatasetMetadata, DatasetSession } from "./datasetTypes";
 import useDatasetSessions from "./useDatasetSessions";
 
@@ -97,6 +108,8 @@ function useWorkspaceDatasetController({
     removeRecentDataset,
   } = useDatasetSessions();
   const [workspaceMode, setWorkspaceMode] = useState<"human" | "analyst">("human");
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState("");
+  const [isRestoringWorkspace, setIsRestoringWorkspace] = useState(false);
   const [shouldOpenFilePicker, setShouldOpenFilePicker] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -152,6 +165,88 @@ function useWorkspaceDatasetController({
     setShouldOpenFilePicker(true);
   };
 
+  const restoreWorkspaceFromManifest = async (workspaceId: string) => {
+    setIsRestoringWorkspace(true);
+    setErrorMessage("");
+
+    try {
+      const { workspace } = await getWorkspaceManifest(workspaceId);
+      const activeDatasetId = workspace.active_dataset_id;
+      if (!activeDatasetId) return;
+
+      const [{ dataset: restoredDataset }, previewResult] = await Promise.all([
+        getDataset(activeDatasetId),
+        getPreview(activeDatasetId, { limit: 25, page: 1 }),
+      ]);
+      const queryMetadata = workspace.query_builder_metadata || {};
+      const defaultSelectedColumns = restoredDataset.schema.slice(0, 4).map((column) => column.name);
+      const restoredAggregations = Array.isArray(queryMetadata.aggregations)
+        ? queryMetadata.aggregations
+        : [{ id: 1, function: "COUNT" as const, column: "" }];
+      const restoredColumns = restoredDataset.schema.map((column) => column.name);
+      const previewExecution = wrapWorkspaceExecutionOutput({
+        source: "preview",
+        dataset: restoredDataset,
+        inputRows: previewResult.rows,
+        inputColumns: restoredColumns,
+        filters: [],
+        sorting: null,
+        pagination: {
+          page: previewResult.page,
+          rowsPerPage: previewResult.limit,
+        },
+      });
+
+      restoreDataset(restoredDataset, workspace.workspace_id);
+      setPreviewResult({
+        ...previewExecution.activeResult,
+        totalCount: restoredDataset.row_count,
+      });
+      setFilteredResult(createEmptyResultState());
+      setQueriedResult(createEmptyResultState());
+      setFilterValues(
+        workspace.filter_metadata && typeof workspace.filter_metadata === "object"
+          ? (workspace.filter_metadata as Record<string, FilterState>)
+          : {},
+      );
+      resetQueryBuilder();
+      restoreQueryBuilder({
+        querySelectedColumns: Array.isArray(queryMetadata.selected_columns)
+          ? queryMetadata.selected_columns
+          : defaultSelectedColumns,
+        queryGroupBy: Array.isArray(queryMetadata.group_by) ? queryMetadata.group_by : [],
+        queryAggregations: restoredAggregations as AggregationState[],
+        querySortColumn:
+          typeof queryMetadata.sort_column === "string" ? queryMetadata.sort_column : "",
+        querySortDirection: queryMetadata.sort_direction === "DESC" ? "DESC" : "ASC",
+        queryLimit: typeof queryMetadata.limit === "string" ? queryMetadata.limit : "100",
+        hasRunQuery: false,
+      });
+      setActiveResultTab(workspace.current_result_tab === "preview" ? "preview" : "preview");
+      setWorkspaceMode(workspace.current_mode === "analyst" ? "analyst" : "human");
+      setSelectedFileName(restoredDataset.original_filename);
+      setActiveWorkspaceId(workspace.workspace_id);
+      saveActiveWorkspaceId(workspace.workspace_id);
+      setActiveView(workspace.current_mode === "analyst" ? "sqlWorkspace" : "results");
+      onExecutionResult?.({
+        ...previewExecution,
+        pagination: {
+          ...previewExecution.pagination,
+          totalCount: restoredDataset.row_count,
+        },
+        activeResult: {
+          ...previewExecution.activeResult,
+          totalCount: restoredDataset.row_count,
+        },
+      });
+    } catch {
+      clearActiveWorkspaceId();
+      setActiveWorkspaceId("");
+    } finally {
+      setIsRestoringWorkspace(false);
+    }
+  };
+
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
 
@@ -187,6 +282,8 @@ function useWorkspaceDatasetController({
         },
       });
       setDataset(uploadResult.dataset);
+      setActiveWorkspaceId(uploadResult.workspace_manifest.workspace_id);
+      saveActiveWorkspaceId(uploadResult.workspace_manifest.workspace_id);
       setPreviewResult({
         ...previewExecution.activeResult,
         totalCount: uploadResult.dataset.row_count,
@@ -241,6 +338,8 @@ function useWorkspaceDatasetController({
 
     setDataset(null);
     onDatasetContextChange?.();
+    clearActiveWorkspaceId();
+    setActiveWorkspaceId("");
     setSelectedFileName("");
     const resetWorkspace = resetWorkspaceForDatasetChange();
     setActiveResultTab(resetWorkspace.activeResultTab);
@@ -279,6 +378,46 @@ function useWorkspaceDatasetController({
   };
 
   useEffect(() => {
+    const storedWorkspaceId = loadActiveWorkspaceId();
+    if (storedWorkspaceId) restoreWorkspaceFromManifest(storedWorkspaceId);
+  }, []);
+
+  useEffect(() => {
+    if (!activeWorkspaceId || !dataset || isRestoringWorkspace) return;
+
+    updateWorkspaceManifest(activeWorkspaceId, {
+      active_dataset_id: dataset.dataset_id,
+      active_result_id: activeResultTab,
+      current_result_tab: activeResultTab,
+      current_mode: workspaceMode,
+      filter_metadata: filterValues,
+      query_builder_metadata: {
+        selected_columns: querySelectedColumns,
+        group_by: queryGroupBy,
+        aggregations: queryAggregations,
+        sort_column: querySortColumn,
+        sort_direction: querySortDirection,
+        limit: queryLimit,
+        has_run_query: hasRunQuery,
+      },
+    }).catch(() => undefined);
+  }, [
+    activeWorkspaceId,
+    dataset,
+    activeResultTab,
+    workspaceMode,
+    querySelectedColumns,
+    queryGroupBy,
+    queryAggregations,
+    querySortColumn,
+    querySortDirection,
+    queryLimit,
+    hasRunQuery,
+    filterValues,
+    isRestoringWorkspace,
+  ]);
+
+  useEffect(() => {
     if (dataset) {
       addRecentDataset(createDatasetSession(dataset));
     }
@@ -313,7 +452,7 @@ function useWorkspaceDatasetController({
     shouldOpenFilePicker,
     setShouldOpenFilePicker,
     selectedFileName,
-    isUploading,
+    isUploading: isUploading || isRestoringWorkspace,
     updateDatasetSessionView,
     updateDatasetSessionResultTab,
     activateRecentDataset,

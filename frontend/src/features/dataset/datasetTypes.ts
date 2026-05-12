@@ -2,6 +2,7 @@ import type { FilterState } from "../filters/filterTypes";
 import type { HistoryItem } from "../history/historyTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
 import type { ResultState, ResultTabKey, SortDirection } from "../results/resultTypes";
+import type { WorkspaceManifest } from "../workspace/workspaceManifestTypes";
 
 export type SchemaColumn = {
   name: string;
@@ -28,6 +29,7 @@ export type DatasetMetadata = {
 export type UploadResponse = {
   dataset: DatasetMetadata;
   preview: Record<string, unknown>[];
+  workspace_manifest: WorkspaceManifest;
 };
 
 export type ActiveView =

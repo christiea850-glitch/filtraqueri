@@ -10,6 +10,10 @@ import type {
   QueryBuilderResponse,
 } from "../features/query-builder/queryBuilderTypes";
 import type { PreviewOptions } from "../features/results/resultTypes";
+import type {
+  WorkspaceManifest,
+  WorkspaceManifestUpdate,
+} from "../features/workspace/workspaceManifestTypes";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 
@@ -85,6 +89,43 @@ export async function getPreview(datasetId: string, options: PreviewOptions = {}
       method: "GET",
     },
     "Preview could not be loaded.",
+  );
+}
+
+export async function getDataset(datasetId: string) {
+  return requestJson<{ dataset: UploadResponse["dataset"] }>(
+    `${API_BASE_URL}/datasets/${datasetId}`,
+    {
+      method: "GET",
+    },
+    "Dataset could not be loaded.",
+  );
+}
+
+export async function getWorkspaceManifest(workspaceId: string) {
+  return requestJson<{ workspace: WorkspaceManifest }>(
+    `${API_BASE_URL}/workspaces/${workspaceId}`,
+    {
+      method: "GET",
+    },
+    "Workspace could not be restored.",
+  );
+}
+
+export async function updateWorkspaceManifest(
+  workspaceId: string,
+  request: WorkspaceManifestUpdate,
+) {
+  return requestJson<{ workspace: WorkspaceManifest }>(
+    `${API_BASE_URL}/workspaces/${workspaceId}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+    "Workspace could not be saved.",
   );
 }
 
