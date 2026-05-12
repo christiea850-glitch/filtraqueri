@@ -8,6 +8,7 @@ import {
   normalizeSqlWorkspaceMetadataSnapshot,
   updateSqlWorkspaceDialect,
   updateSqlWorkspaceDraftMetadata,
+  upsertSqlSnippet,
   upsertActiveSqlDraftSnapshot,
   type SqlWorkspaceMetadataSnapshot,
 } from "../../sqlWorkspacePersistence";
@@ -223,12 +224,22 @@ function useSqlWorkspace(
     ]);
     onMetadataChange?.(
       updateSqlWorkspaceDraftMetadata(
-        upsertActiveSqlDraftSnapshot(normalizedMetadata, {
-          id: draft.id,
-          label: draft.name,
-          sql: draft.sql,
-          selectedDialect,
-        }),
+        upsertSqlSnippet(
+          upsertActiveSqlDraftSnapshot(normalizedMetadata, {
+            id: draft.id,
+            label: draft.name,
+            sql: draft.sql,
+            selectedDialect,
+          }),
+          {
+            id: draft.id,
+            name: draft.name,
+            sql: draft.sql,
+            dialect: selectedDialect,
+            tags: ["draft"],
+            description: "Saved from the SQL Workspace draft action.",
+          },
+        ),
         {
           draftCount: Math.min(savedDrafts.length + 1, MAX_SQL_DRAFT_SNAPSHOTS),
           lastDraftSavedAt: draft.savedAt,
