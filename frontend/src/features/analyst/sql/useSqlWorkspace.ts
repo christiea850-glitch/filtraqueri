@@ -2,7 +2,12 @@ import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
-import { analyzeSqlWorkspaceDraft } from "../../sqlIntelligence";
+import {
+  analyzeSqlWorkspaceDraft,
+  getDialectProfile,
+  listSupportedDialects,
+  type SqlDialectId,
+} from "../../sqlIntelligence";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import type {
   SqlEditorInterface,
@@ -38,6 +43,7 @@ function useSqlWorkspace(
   const [sqlDraft, setSqlDraft] = useState(() => createInitialSql(dataset?.table_name));
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>([]);
   const [editorStatus, setEditorStatus] = useState<SqlExecutionStatus>("idle");
+  const [selectedDialect, setSelectedDialect] = useState<SqlDialectId>("duckdb");
   const [previewResult, setPreviewResult] = useState<SqlPreviewResult>({
     columns: [],
     rows: [],
@@ -46,7 +52,22 @@ function useSqlWorkspace(
 
   const templates = useMemo(() => (dataset ? createSqlTemplates(dataset) : []), [dataset]);
   const suggestions = useMemo(() => (dataset ? createColumnSuggestions(dataset) : []), [dataset]);
-  const sqlAnalysis = useMemo(() => analyzeSqlWorkspaceDraft(sqlDraft, "duckdb"), [sqlDraft]);
+  const dialectOptions = useMemo(
+    () =>
+      listSupportedDialects().map((dialect) => ({
+        id: dialect.id,
+        displayName: dialect.displayName,
+      })),
+    [],
+  );
+  const selectedDialectProfile = useMemo(
+    () => getDialectProfile(selectedDialect),
+    [selectedDialect],
+  );
+  const sqlAnalysis = useMemo(
+    () => analyzeSqlWorkspaceDraft(sqlDraft, selectedDialect),
+    [selectedDialect, sqlDraft],
+  );
   const characterCount = sqlDraft.trim().length;
 
   const updateStatus = (status: SqlExecutionStatus) => {
@@ -154,6 +175,10 @@ function useSqlWorkspace(
     suggestions,
     keywordSuggestions: sqlKeywordSuggestions,
     sqlAnalysis,
+    selectedDialect,
+    selectedDialectProfile,
+    dialectOptions,
+    setSelectedDialect,
     editor,
     insertSql,
     saveDraft,

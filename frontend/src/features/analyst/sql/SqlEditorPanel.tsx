@@ -1,9 +1,11 @@
 import SqlEditorHost from "./SqlEditorHost";
 import type {
   SqlEditorInterface,
+  SqlDialectContext,
   SqlExecutionStatus,
   SqlGuidanceCard,
   SqlQueryDraft,
+  SqlValidationSummary,
 } from "./sqlTypes";
 
 type SqlEditorPanelProps = {
@@ -11,6 +13,7 @@ type SqlEditorPanelProps = {
   executionStatus: SqlExecutionStatus;
   characterCount: number;
   canRunQuery: boolean;
+  dialectContext: SqlDialectContext;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -25,6 +28,7 @@ function SqlEditorPanel({
   executionStatus,
   characterCount,
   canRunQuery,
+  dialectContext,
 }: SqlEditorPanelProps) {
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -34,6 +38,22 @@ function SqlEditorPanel({
           <h2>Query draft</h2>
         </div>
         <div className="sql-actions">
+          <label className="sql-dialect-selector">
+            <span>Dialect</span>
+            <select
+              value={dialectContext.selectedDialect}
+              onChange={(event) =>
+                dialectContext.onDialectChange(event.target.value as SqlDialectContext["selectedDialect"])
+              }
+              aria-label="SQL dialect context"
+            >
+              {dialectContext.dialectOptions.map((dialect) => (
+                <option key={dialect.id} value={dialect.id}>
+                  {dialect.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
           <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
             Run query
           </button>
@@ -67,10 +87,22 @@ type SqlDraftPanelProps = {
 type SqlGuidancePanelProps = {
   diagnostics: SqlEditorInterface["diagnostics"];
   guidanceCards: SqlGuidanceCard[];
+  dialectContext: Pick<SqlDialectContext, "selectedDialectProfile">;
+  validation: SqlValidationSummary;
 };
 
-export function SqlGuidancePanel({ diagnostics, guidanceCards }: SqlGuidancePanelProps) {
+export function SqlGuidancePanel({
+  diagnostics,
+  guidanceCards,
+  dialectContext,
+  validation,
+}: SqlGuidancePanelProps) {
   const visibleDiagnostics = diagnostics.slice(0, 4);
+  const functionCount = diagnostics.filter((diagnostic) => diagnostic.source === "function").length;
+  const conceptCount = diagnostics.filter((diagnostic) => diagnostic.source === "concept").length;
+  const safetyCount = validation.diagnostics.filter(
+    (diagnostic) => diagnostic.category === "safety",
+  ).length;
 
   return (
     <section className="sql-draft-panel" aria-label="SQL guidance">
@@ -78,6 +110,12 @@ export function SqlGuidancePanel({ diagnostics, guidanceCards }: SqlGuidancePane
         <div className="builder-block-header">
           <span>SQL guidance</span>
           <small>{diagnostics.length} notes</small>
+        </div>
+        <div className="sql-guidance-context">
+          <strong>{dialectContext.selectedDialectProfile.displayName}</strong>
+          <span>
+            {functionCount} functions | {conceptCount} concepts | {safetyCount} safety
+          </span>
         </div>
         {visibleDiagnostics.length === 0 && guidanceCards.length === 0 ? (
           <p>No SQL guidance yet.</p>

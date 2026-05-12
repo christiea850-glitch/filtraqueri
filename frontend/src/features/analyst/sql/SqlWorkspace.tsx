@@ -23,6 +23,10 @@ function SqlWorkspace({ dataset, onExecutionResult }: SqlWorkspaceProps) {
     suggestions,
     keywordSuggestions,
     sqlAnalysis,
+    selectedDialect,
+    selectedDialectProfile,
+    dialectOptions,
+    setSelectedDialect,
     editor,
     insertSql,
     loadDraft,
@@ -55,6 +59,12 @@ function SqlWorkspace({ dataset, onExecutionResult }: SqlWorkspaceProps) {
           executionStatus={editorStatus}
           characterCount={characterCount}
           canRunQuery={Boolean(dataset)}
+          dialectContext={{
+            selectedDialect,
+            selectedDialectProfile,
+            dialectOptions,
+            onDialectChange: setSelectedDialect,
+          }}
         />
         <div className="sql-side-panel">
           <button
@@ -70,6 +80,8 @@ function SqlWorkspace({ dataset, onExecutionResult }: SqlWorkspaceProps) {
               <SqlGuidancePanel
                 diagnostics={sqlAnalysis.diagnostics}
                 guidanceCards={sqlAnalysis.explanationCards}
+                dialectContext={{ selectedDialectProfile }}
+                validation={sqlAnalysis.validation}
               />
               <SqlDraftPanel
                 savedDrafts={savedDrafts}

@@ -268,6 +268,29 @@
   justify-content: flex-end;
 }
 
+.sql-dialect-selector {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 36px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sql-dialect-selector select {
+  min-height: 34px;
+  max-width: 132px;
+  padding: 6px 28px 6px 9px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #172033;
+  font: inherit;
+  text-transform: none;
+}
+
 .sql-editor-input {
   width: 100%;
   min-height: min(58vh, 560px);
@@ -338,6 +361,36 @@
   color: #64748b;
   font-size: 13px;
   font-weight: 650;
+}
+
+.sql-guidance-context,
+.sql-draft-list article {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.sql-guidance-context {
+  border-color: #dbeafe;
+  background: #eff6ff;
+}
+
+.sql-guidance-context strong,
+.sql-draft-list article strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.sql-guidance-context span,
+.sql-draft-list article span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .sql-helper-empty {

@@ -1,6 +1,9 @@
 import type { SchemaColumn } from "../../dataset/datasetTypes";
 import type {
+  SqlDialectId,
+  SqlDialectProfile,
   SqlIntelligenceDiagnostic,
+  SqlValidationResult,
   SqlWorkspaceAnalysis,
 } from "../../sqlIntelligence";
 
@@ -45,3 +48,14 @@ export type SqlEditorInterface = {
 };
 
 export type SqlGuidanceCard = SqlWorkspaceAnalysis["explanationCards"][number];
+
+export type SqlDialectOption = Pick<SqlDialectProfile, "id" | "displayName">;
+
+export type SqlDialectContext = {
+  selectedDialect: SqlDialectId;
+  selectedDialectProfile: SqlDialectProfile;
+  dialectOptions: SqlDialectOption[];
+  onDialectChange: (dialect: SqlDialectId) => void;
+};
+
+export type SqlValidationSummary = SqlValidationResult;
