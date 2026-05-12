@@ -255,6 +255,7 @@
   }
 
   .data-grid-toolbar,
+  .results-toolbar-tools,
   .workspace-actions,
   .pagination-bar,
   .page-controls {
@@ -262,9 +263,20 @@
     flex-direction: column;
   }
 
+  .find-column-control,
+  .find-column-control input,
+  .visible-columns-control,
+  .visible-columns-control > .secondary-button,
   .workspace-actions,
   .pagination-bar > div,
+  .rows-per-page-control,
   .page-controls {
     width: 100%;
+  }
+
+  .columns-menu {
+    left: 0;
+    right: auto;
+    width: min(100%, 320px);
   }
 }
