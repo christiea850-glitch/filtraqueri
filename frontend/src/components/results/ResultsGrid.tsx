@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import type { SortDirection } from "../../features/results/resultTypes";
 
 type ResultsGridProps = {
@@ -56,6 +56,23 @@ function ResultsGrid({
   onRowsPerPageChange,
 }: ResultsGridProps) {
   const firstVisibleRowNumber = (page - 1) * rowsPerPage + 1;
+  const isLargePage = rowsPerPage >= 500;
+  const largePageWarningId = "results-large-page-warning";
+
+  const focusSiblingRow = (event: KeyboardEvent<HTMLTableRowElement>) => {
+    const currentRow = event.currentTarget;
+    let nextRow: Element | null = null;
+
+    if (event.key === "ArrowDown") nextRow = currentRow.nextElementSibling;
+    if (event.key === "ArrowUp") nextRow = currentRow.previousElementSibling;
+    if (event.key === "Home") nextRow = currentRow.parentElement?.firstElementChild || null;
+    if (event.key === "End") nextRow = currentRow.parentElement?.lastElementChild || null;
+
+    if (!nextRow) return;
+
+    event.preventDefault();
+    if (nextRow instanceof HTMLElement) nextRow.focus();
+  };
 
   return (
     <section className="data-grid-section">
@@ -88,16 +105,24 @@ function ResultsGrid({
         </div>
       ) : (
         <div className="table-container data-grid-table">
-          <table>
+          <table aria-label={`${title} data grid`}>
             <thead>
               <tr>
-                <th className="row-number-cell row-number-header" scope="col">
+                <th
+                  className="row-number-cell row-number-header"
+                  scope="col"
+                  title="Visible row number"
+                >
                   Row
                 </th>
                 {columns.map((column, columnIndex) => (
                   <th key={column}>
                     <button type="button" onClick={() => onSortColumn(column)}>
-                      <span className="column-letter" aria-label={`Column ${getColumnLetter(columnIndex)}`}>
+                      <span
+                        className="column-letter"
+                        aria-label={`Column ${getColumnLetter(columnIndex)}`}
+                        title={`Column ${getColumnLetter(columnIndex)}`}
+                      >
                         {getColumnLetter(columnIndex)}
                       </span>
                       <span className="column-name" title={column}>
@@ -112,12 +137,17 @@ function ResultsGrid({
 
             <tbody>
               {rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
+                <tr
+                  key={rowIndex}
+                  tabIndex={0}
+                  onKeyDown={focusSiblingRow}
+                  aria-label={`Row ${firstVisibleRowNumber + rowIndex}`}
+                >
                   <th className="row-number-cell" scope="row">
                     {firstVisibleRowNumber + rowIndex}
                   </th>
                   {columns.map((column) => (
-                    <td key={column} tabIndex={0}>
+                    <td key={column} title={`${column}: ${String(row[column] ?? "")}`}>
                       {String(row[column] ?? "")}
                     </td>
                   ))}
@@ -129,9 +159,12 @@ function ResultsGrid({
       )}
 
       <div className="pagination-bar">
-        <div>
+        <label className="rows-per-page-control">
           <span>Rows per page</span>
           <select
+            aria-label="Rows per page"
+            title="Rows per page"
+            aria-describedby={isLargePage ? largePageWarningId : undefined}
             value={rowsPerPage}
             onChange={(event) => onRowsPerPageChange(Number(event.target.value))}
           >
@@ -143,7 +176,7 @@ function ResultsGrid({
             <option value="500">500</option>
             <option value="800">800</option>
           </select>
-        </div>
+        </label>
         <div className="page-controls">
           <button
             type="button"
@@ -166,6 +199,12 @@ function ResultsGrid({
           </button>
         </div>
       </div>
+
+      {isLargePage && (
+        <p className="large-page-helper" id={largePageWarningId}>
+          Large previews may affect browser performance.
+        </p>
+      )}
     </section>
   );
 }

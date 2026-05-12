@@ -208,10 +208,9 @@
 }
 
 .result-tabs button:focus-visible,
-.data-grid-table th button:focus-visible,
-.data-grid-table td:focus-visible {
+.data-grid-table th button:focus-visible {
   outline: 2px solid rgba(37, 99, 235, 0.42);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
 .result-toggle button:disabled,
@@ -290,8 +289,15 @@
   transition: background 120ms ease;
 }
 
-.data-grid-table tbody tr:hover {
+.data-grid-table tbody tr:hover,
+.data-grid-table tbody tr:focus-visible {
   background: #f1f7ff;
+  outline: none;
+}
+
+.data-grid-table tbody tr:focus-visible td,
+.data-grid-table tbody tr:focus-visible .row-number-cell {
+  box-shadow: inset 0 0 0 1px #93c5fd;
 }
 
 .data-grid-table td {
@@ -301,8 +307,7 @@
     color 120ms ease;
 }
 
-.data-grid-table td:hover,
-.data-grid-table td:focus-visible {
+.data-grid-table td:hover {
   background: #eff6ff;
   box-shadow: inset 0 0 0 1px #bfdbfe;
   color: #172033;
@@ -333,7 +338,8 @@
   text-align: left;
 }
 
-.data-grid-table tbody tr:hover .row-number-cell {
+.data-grid-table tbody tr:hover .row-number-cell,
+.data-grid-table tbody tr:focus-visible .row-number-cell {
   background: #eaf4ff;
   color: #1d4ed8;
 }
@@ -420,6 +426,7 @@
 }
 
 .pagination-bar > div,
+.rows-per-page-control,
 .page-controls {
   display: flex;
   gap: 10px;
@@ -440,6 +447,13 @@
   background: white;
   color: #172033;
   font: inherit;
+}
+
+.large-page-helper {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .compact-empty {

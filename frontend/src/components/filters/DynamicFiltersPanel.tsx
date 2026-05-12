@@ -86,7 +86,7 @@ function DynamicFiltersPanel({
           className="collapsed-panel-bar"
           onClick={() => setIsControlsCollapsed(false)}
         >
-          Filters hidden · {activeFilterLabels.length} active · {visibleSchema.length} columns
+          Filters hidden | {activeFilterLabels.length} active | {visibleSchema.length} columns
         </button>
       ) : (
         <div className="filters-control-strip">

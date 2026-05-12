@@ -341,7 +341,7 @@ function WorkspaceShell({
               <>
                 <strong>{dataset.original_filename}</strong>
                 <span>
-                  {dataset.row_count.toLocaleString()} rows &middot;{" "}
+                  {dataset.row_count.toLocaleString()} rows |{" "}
                   {dataset.column_count.toLocaleString()} columns
                 </span>
               </>
@@ -365,7 +365,7 @@ function WorkspaceShell({
                 >
                   <strong>{session.dataset.original_filename}</strong>
                   <span>
-                    {session.dataset.row_count.toLocaleString()} rows &middot;{" "}
+                    {session.dataset.row_count.toLocaleString()} rows |{" "}
                     {session.dataset.column_count.toLocaleString()} cols
                   </span>
                 </button>

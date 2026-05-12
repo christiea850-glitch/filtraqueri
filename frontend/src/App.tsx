@@ -869,7 +869,7 @@ function App() {
                 className="collapsed-panel-bar"
                 onClick={() => setIsResultsContextCollapsed(false)}
               >
-                Context hidden · {activeFilterLabels.length} filters · {queryHistory.length} history
+                Context hidden | {activeFilterLabels.length} filters | {queryHistory.length} history
               </button>
             ) : (
               <div className="results-context-strip" aria-label="Results context">
