@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { DatasetMetadata, DatasetSession, WorkspaceMode } from "../dataset/datasetTypes";
+import type { DatasetRegistryState } from "../dataset/datasetRegistryTypes";
 import type { ExecutionRegistryState } from "../execution/executionRegistryTypes";
 import type { FilterDefinition, SortDefinition } from "../filters/filterTypes";
 import type { AggregationState, QueryBuilderRequest } from "../query-builder/queryBuilderTypes";
@@ -18,6 +19,7 @@ function useWorkspaceOrchestrationSnapshot({
   activeResult,
   activeResultModel,
   executionRegistry,
+  datasetRegistry,
   mode,
   activeFilters,
   sorting,
@@ -37,6 +39,7 @@ function useWorkspaceOrchestrationSnapshot({
   activeResult: ResultState;
   activeResultModel: ActiveResultModel | null;
   executionRegistry: ExecutionRegistryState;
+  datasetRegistry?: DatasetRegistryState | null;
   mode: WorkspaceMode;
   activeFilters: FilterDefinition[];
   sorting: SortDefinition | null;
@@ -59,6 +62,7 @@ function useWorkspaceOrchestrationSnapshot({
         activeResult,
         activeResultModel,
         executionRegistry,
+        datasetRegistry,
         mode,
         activeFilters,
         sorting,
@@ -81,6 +85,7 @@ function useWorkspaceOrchestrationSnapshot({
       activeResult,
       activeResultModel,
       executionRegistry,
+      datasetRegistry,
       mode,
       activeFilters,
       sorting,

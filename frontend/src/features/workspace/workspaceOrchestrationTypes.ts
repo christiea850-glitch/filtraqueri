@@ -1,4 +1,5 @@
 import type { DatasetMetadata, WorkspaceMode } from "../dataset/datasetTypes";
+import type { DatasetRegistryState } from "../dataset/datasetRegistryTypes";
 import type { ExecutionRegistryRecord, ExecutionRegistryState } from "../execution/executionRegistryTypes";
 import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTypes";
 import type { FilterDefinition, SortDefinition } from "../filters/filterTypes";
@@ -48,6 +49,7 @@ export type ActiveResultSnapshot = {
 export type DatasetRegistrySnapshot = {
   activeDataset: DatasetMetadata | null;
   recentDatasetIds: string[];
+  registry: DatasetRegistryState | null;
 };
 
 export type WorkspaceOrchestrationSnapshot = {

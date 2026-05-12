@@ -83,6 +83,10 @@ function useWorkspaceDatasetController({
   const {
     dataset,
     setDataset,
+    restoreDataset,
+    datasetRegistry,
+    attachExecutionToActiveDataset,
+    attachActiveResultToActiveDataset,
     recentDatasets,
     activeView,
     setActiveView,
@@ -119,7 +123,7 @@ function useWorkspaceDatasetController({
   const restoreDatasetSession = (session: DatasetSession) => {
     const restoredWorkspace = restoreWorkspaceStateSafely(session);
     onDatasetContextChange?.();
-    setDataset(restoredWorkspace.dataset);
+    restoreDataset(restoredWorkspace.dataset, restoredWorkspace.dataset.dataset_id);
     setPreviewResult(restoredWorkspace.previewResult);
     setFilteredResult(restoredWorkspace.filteredResult);
     setQueriedResult(restoredWorkspace.queriedResult);
@@ -298,6 +302,9 @@ function useWorkspaceDatasetController({
 
   return {
     dataset,
+    datasetRegistry,
+    attachExecutionToActiveDataset,
+    attachActiveResultToActiveDataset,
     recentDatasets,
     activeView,
     setActiveView,

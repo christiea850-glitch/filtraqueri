@@ -174,6 +174,9 @@ function App() {
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,
+    datasetRegistry,
+    attachExecutionToActiveDataset,
+    attachActiveResultToActiveDataset,
   } = useWorkspaceDatasetController({
     activeResultTab,
     setActiveResultTab,
@@ -200,8 +203,19 @@ function App() {
     clearHistory,
     setErrorMessage,
     setHumanIntent,
-    onExecutionResult: (executionResult) =>
-      coordinateExecutionResult({ executionResult, resultTab: "preview", hiddenColumns: [], recordExecutionResult }),
+    onExecutionResult: (executionResult) => {
+      const coordinationResult = coordinateExecutionResult({
+        executionResult,
+        resultTab: "preview",
+        hiddenColumns: [],
+        recordExecutionResult,
+      });
+      attachExecutionToActiveDataset(
+        coordinationResult.record.executionId,
+        coordinationResult.record.datasetId,
+      );
+      attachActiveResultToActiveDataset("preview", coordinationResult.record.datasetId);
+    },
     onDatasetContextChange: clearActiveExecution,
   });
   const draftFilters = buildBackendFilters(dataset);
@@ -238,6 +252,7 @@ function App() {
     activeResult,
     activeResultModel,
     executionRegistry,
+    datasetRegistry,
     mode: workspaceMode,
     activeFilters,
     sorting: activeResult.sortColumn
@@ -297,14 +312,22 @@ function App() {
     updateActiveResult: (nextResult: ResultState, shouldActivate?: boolean) => void,
     shouldActivate = false,
   ) =>
-    coordinateExecutionResult({
+    {
+      const coordinationResult = coordinateExecutionResult({
       executionResult,
       resultTab,
       hiddenColumns: resultHiddenColumns,
       recordExecutionResult,
       updateActiveResult,
       shouldActivate,
-    });
+      });
+      attachExecutionToActiveDataset(
+        coordinationResult.record.executionId,
+        coordinationResult.record.datasetId,
+      );
+      attachActiveResultToActiveDataset(resultTab, coordinationResult.record.datasetId);
+      return coordinationResult;
+    };
 
   const applyFilters = async () => {
     if (!dataset) return;
@@ -998,8 +1021,18 @@ function App() {
 
   const analystViewRegistry = createAnalystWorkspaceRenderers(analystWorkspaceRegistry, {
     dataset,
-    onExecutionResult: (executionResult) =>
-      coordinateExecutionResult({ executionResult, resultTab: "sql", hiddenColumns: [], recordExecutionResult }),
+    onExecutionResult: (executionResult) => {
+      const coordinationResult = coordinateExecutionResult({
+        executionResult,
+        resultTab: "sql",
+        hiddenColumns: [],
+        recordExecutionResult,
+      });
+      attachExecutionToActiveDataset(
+        coordinationResult.record.executionId,
+        coordinationResult.record.datasetId,
+      );
+    },
   });
 
   const workspaceViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {

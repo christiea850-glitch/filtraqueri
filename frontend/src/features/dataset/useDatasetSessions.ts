@@ -1,15 +1,48 @@
 import { useState } from "react";
 import type { ActiveView, DatasetMetadata, DatasetSession } from "./datasetTypes";
 import type { ResultTabKey } from "../results/resultTypes";
+import {
+  attachActiveResultToDataset,
+  attachExecutionToDataset,
+  clearActiveDatasetSafely,
+  createEmptyDatasetRegistry,
+  getActiveDataset,
+  registerDataset,
+  restoreDatasetState,
+  setActiveDataset,
+  trimStaleDatasetReferences,
+} from "./datasetRegistry";
+import type { DatasetId, DatasetRegistryState } from "./datasetRegistryTypes";
 
 type UseDatasetSessionsOptions = {
   initialView?: ActiveView;
 };
 
 function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptions = {}) {
-  const [dataset, setDataset] = useState<DatasetMetadata | null>(null);
+  const [datasetRegistry, setDatasetRegistry] = useState<DatasetRegistryState>(
+    createEmptyDatasetRegistry,
+  );
   const [recentDatasets, setRecentDatasets] = useState<DatasetSession[]>([]);
   const [activeView, setActiveView] = useState<ActiveView>(initialView);
+  const activeDatasetRecord = getActiveDataset(datasetRegistry);
+  const dataset = activeDatasetRecord?.metadata || null;
+
+  const setDataset = (nextDataset: DatasetMetadata | null) => {
+    setDatasetRegistry((currentRegistry) =>
+      nextDataset
+        ? registerDataset(currentRegistry, nextDataset, {
+            sourceType: "uploaded",
+            isActive: true,
+          })
+        : clearActiveDatasetSafely(currentRegistry),
+    );
+  };
+
+  const restoreDataset = (nextDataset: DatasetMetadata, sourceSessionId?: string) => {
+    setDatasetRegistry((currentRegistry) =>
+      restoreDatasetState(currentRegistry, nextDataset, sourceSessionId),
+    );
+  };
 
   const addRecentDataset = (session: DatasetSession) => {
     setRecentDatasets((currentSessions) => [
@@ -36,6 +69,10 @@ function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptio
   const updateDatasetSessionResultTab = (tab: ResultTabKey) => {
     if (!dataset) return;
 
+    setDatasetRegistry((currentRegistry) =>
+      attachActiveResultToDataset(currentRegistry, dataset.dataset_id, tab),
+    );
+
     setRecentDatasets((currentSessions) =>
       currentSessions.map((session) =>
         session.dataset.dataset_id === dataset.dataset_id
@@ -54,19 +91,48 @@ function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptio
     );
 
     if (session) {
+      setDatasetRegistry((currentRegistry) => setActiveDataset(currentRegistry, datasetId));
       restoreDatasetSession(session);
     }
   };
 
   const removeRecentDataset = (datasetId: string) => {
+    setDatasetRegistry((currentRegistry) =>
+      trimStaleDatasetReferences({
+        ...currentRegistry,
+        records: currentRegistry.records.filter((record) => record.datasetId !== datasetId),
+      }),
+    );
     setRecentDatasets((currentSessions) =>
       currentSessions.filter((session) => session.dataset.dataset_id !== datasetId),
+    );
+  };
+
+  const attachExecutionToActiveDataset = (executionId: string, datasetId?: DatasetId) => {
+    const targetDatasetId = datasetId || dataset?.dataset_id;
+    if (!targetDatasetId) return;
+
+    setDatasetRegistry((currentRegistry) =>
+      attachExecutionToDataset(currentRegistry, targetDatasetId, executionId),
+    );
+  };
+
+  const attachActiveResultToActiveDataset = (activeResultId: ResultTabKey, datasetId?: DatasetId) => {
+    const targetDatasetId = datasetId || dataset?.dataset_id;
+    if (!targetDatasetId) return;
+
+    setDatasetRegistry((currentRegistry) =>
+      attachActiveResultToDataset(currentRegistry, targetDatasetId, activeResultId),
     );
   };
 
   return {
     dataset,
     setDataset,
+    restoreDataset,
+    datasetRegistry,
+    attachExecutionToActiveDataset,
+    attachActiveResultToActiveDataset,
     recentDatasets,
     activeView,
     setActiveView,

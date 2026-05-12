@@ -1,4 +1,5 @@
 import type { DatasetMetadata, DatasetSession, WorkspaceMode } from "../dataset/datasetTypes";
+import type { DatasetRegistryState } from "../dataset/datasetRegistryTypes";
 import type { ExecutionRegistryState } from "../execution/executionRegistryTypes";
 import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTypes";
 import type { FilterDefinition, SortDefinition } from "../filters/filterTypes";
@@ -99,6 +100,7 @@ export const buildWorkspaceStateSnapshot = ({
   activeResult,
   activeResultModel,
   executionRegistry,
+  datasetRegistry = null,
   mode,
   activeFilters,
   sorting,
@@ -113,6 +115,7 @@ export const buildWorkspaceStateSnapshot = ({
   activeResult: ResultState;
   activeResultModel: ActiveResultModel | null;
   executionRegistry: ExecutionRegistryState;
+  datasetRegistry?: DatasetRegistryState | null;
   mode: WorkspaceMode;
   activeFilters: FilterDefinition[];
   sorting: SortDefinition | null;
@@ -130,6 +133,7 @@ export const buildWorkspaceStateSnapshot = ({
   datasetRegistry: {
     activeDataset: dataset,
     recentDatasetIds: recentDatasets.map((session) => session.dataset.dataset_id),
+    registry: datasetRegistry,
   },
   activeResult: {
     resultTab: activeResultTab,
