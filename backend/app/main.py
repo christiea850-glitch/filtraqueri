@@ -160,6 +160,64 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         }
         for worksheet in normalized_worksheets
     ]
+    relationship_candidates = (
+        value.get("relationship_candidates")
+        if isinstance(value.get("relationship_candidates"), list)
+        else []
+    )
+    normalized_relationship_candidates: list[dict[str, Any]] = []
+    for index, candidate in enumerate(relationship_candidates):
+        if not isinstance(candidate, dict):
+            continue
+
+        review_status = candidate.get("review_status")
+        if review_status not in ("pending", "accepted", "dismissed"):
+            review_status = "pending"
+        confidence_label = candidate.get("confidence_label")
+        if confidence_label not in ("low", "medium", "high"):
+            confidence_label = "low"
+        relationship_type = candidate.get("relationship_type")
+        if relationship_type not in (
+            "one_to_one_candidate",
+            "one_to_many_candidate",
+            "many_to_one_candidate",
+            "unknown_candidate",
+        ):
+            relationship_type = "unknown_candidate"
+        direction = candidate.get("direction")
+        if direction not in ("source_to_target", "target_to_source", "bidirectional", "unknown"):
+            direction = "unknown"
+        try:
+            confidence = float(candidate.get("confidence") or 0)
+        except (TypeError, ValueError):
+            confidence = 0
+
+        evidence = candidate.get("evidence") if isinstance(candidate.get("evidence"), dict) else {}
+        evidence["summaries"] = evidence.get("summaries") if isinstance(evidence.get("summaries"), list) else []
+        normalized_relationship_candidates.append(
+            {
+                **candidate,
+                "relationship_id": str(candidate.get("relationship_id") or f"relationship:{index + 1}"),
+                "workbook_id": str(candidate.get("workbook_id") or value.get("workbook_id") or "workbook"),
+                "source_worksheet_id": str(candidate.get("source_worksheet_id") or ""),
+                "source_worksheet_name": str(candidate.get("source_worksheet_name") or "Source worksheet"),
+                "source_table": str(candidate.get("source_table") or ""),
+                "source_column": str(candidate.get("source_column") or ""),
+                "target_worksheet_id": str(candidate.get("target_worksheet_id") or ""),
+                "target_worksheet_name": str(candidate.get("target_worksheet_name") or "Target worksheet"),
+                "target_table": str(candidate.get("target_table") or ""),
+                "target_column": str(candidate.get("target_column") or ""),
+                "confidence": max(0, min(1, confidence)),
+                "confidence_label": confidence_label,
+                "relationship_type": relationship_type,
+                "direction": direction,
+                "evidence": evidence,
+                "review_status": review_status,
+                "reviewed_at": candidate.get("reviewed_at") if isinstance(candidate.get("reviewed_at"), str) else None,
+                "reviewed_by": candidate.get("reviewed_by") if isinstance(candidate.get("reviewed_by"), str) else None,
+                "review_notes": candidate.get("review_notes") if isinstance(candidate.get("review_notes"), str) else None,
+            }
+        )
 
     return {
         **value,
@@ -171,7 +229,7 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         "active_worksheet_id": active_worksheet_id,
         "worksheets": normalized_worksheets,
         "table_mappings": table_mappings,
-        "relationship_candidates": value.get("relationship_candidates") if isinstance(value.get("relationship_candidates"), list) else [],
+        "relationship_candidates": normalized_relationship_candidates,
         "ingestion_profile": value.get("ingestion_profile") if isinstance(value.get("ingestion_profile"), dict) else {},
         "normalization": value.get("normalization") if isinstance(value.get("normalization"), dict) else {},
     }
@@ -547,6 +605,12 @@ class ExportRequest(BaseModel):
 
 class WorkbookWorksheetSelectionRequest(BaseModel):
     worksheet_id: str = Field(..., min_length=1)
+
+
+class WorkbookRelationshipReviewRequest(BaseModel):
+    candidate_id: str = Field(..., min_length=1)
+    review_status: str
+    notes: str | None = None
 
 
 class WorkspaceManifestUpdate(BaseModel):
@@ -1209,6 +1273,60 @@ def select_workbook_worksheet(
     return {
         "dataset": metadata,
         "preview": preview,
+        "workbook_metadata": workbook_metadata,
+    }
+
+
+@app.post("/datasets/{dataset_id}/workbook/relationship-review")
+def review_workbook_relationship(
+    dataset_id: str,
+    request: WorkbookRelationshipReviewRequest,
+) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    review_status = request.review_status
+    if review_status not in ("pending", "accepted", "dismissed"):
+        raise HTTPException(status_code=400, detail="Review status must be pending, accepted, or dismissed")
+
+    candidates = workbook_metadata.get("relationship_candidates")
+    if not isinstance(candidates, list):
+        candidates = []
+
+    candidate = next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.get("relationship_id") == request.candidate_id
+        ),
+        None,
+    )
+    if not candidate:
+        raise HTTPException(status_code=404, detail="Relationship candidate was not found")
+
+    candidate["review_status"] = review_status
+    candidate["reviewed_at"] = datetime.now(timezone.utc).isoformat() if review_status != "pending" else None
+    candidate["reviewed_by"] = "local-workspace" if review_status != "pending" else None
+    candidate["review_notes"] = (request.notes or "").strip()[:500] or None
+    workbook_metadata["relationship_candidates"] = candidates
+    workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
+    metadata["workbook_metadata"] = workbook_metadata
+    dataset_sessions[dataset_id] = metadata
+    persist_dataset_manifest_metadata(metadata)
+
+    summary = {
+        "total": len(candidates),
+        "pending": sum(1 for item in candidates if item.get("review_status", "pending") == "pending"),
+        "accepted": sum(1 for item in candidates if item.get("review_status") == "accepted"),
+        "dismissed": sum(1 for item in candidates if item.get("review_status") == "dismissed"),
+    }
+
+    return {
+        "dataset": metadata,
+        "candidate": candidate,
+        "summary": summary,
         "workbook_metadata": workbook_metadata,
     }
 

@@ -79,6 +79,10 @@ class WorksheetRelationshipCandidate(BaseModel):
     direction: Literal["source_to_target", "target_to_source", "bidirectional", "unknown"] = "unknown"
     evidence: WorksheetRelationshipEvidence
     status: Literal["candidate", "confirmed", "dismissed"] = "candidate"
+    review_status: Literal["pending", "accepted", "dismissed"] = "pending"
+    reviewed_at: str | None = None
+    reviewed_by: str | None = None
+    review_notes: str | None = None
 
 
 class WorkbookIngestionProfile(BaseModel):

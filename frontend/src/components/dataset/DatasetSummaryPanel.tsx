@@ -49,6 +49,11 @@ type DatasetSessionPanelProps = {
   schemaTypeSummary: Record<string, number>;
   activeFilterLabels: string[];
   queryGroupBy: string[];
+  onRelationshipReview?: (
+    candidateId: string,
+    reviewStatus: "pending" | "accepted" | "dismissed",
+    notes?: string,
+  ) => void;
 };
 
 export function DatasetSessionPanel({
@@ -56,6 +61,7 @@ export function DatasetSessionPanel({
   schemaTypeSummary,
   activeFilterLabels,
   queryGroupBy,
+  onRelationshipReview,
 }: DatasetSessionPanelProps) {
   return (
     <aside className="session-panel">
@@ -85,7 +91,11 @@ export function DatasetSessionPanel({
         <p>Grouping</p>
         <small>{queryGroupBy.length > 0 ? queryGroupBy.join(", ") : "None"}</small>
       </div>
-      <WorkbookContextPanel dataset={dataset} variant="results" />
+      <WorkbookContextPanel
+        dataset={dataset}
+        variant="results"
+        onRelationshipReview={onRelationshipReview}
+      />
     </aside>
   );
 }

@@ -76,6 +76,10 @@ export type WorksheetRelationshipCandidate = {
   direction: "source_to_target" | "target_to_source" | "bidirectional" | "unknown";
   evidence: WorksheetRelationshipEvidence;
   status: "candidate" | "confirmed" | "dismissed";
+  reviewStatus: "pending" | "accepted" | "dismissed";
+  reviewedAt: string | null;
+  reviewedBy: string | null;
+  reviewNotes: string | null;
 };
 
 export type WorkbookIngestionProfile = {

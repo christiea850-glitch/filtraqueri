@@ -1,4 +1,5 @@
 import type { UploadResponse } from "../features/dataset/datasetTypes";
+import type { WorksheetRelationshipCandidate } from "../features/workbook";
 import type {
   FilterDefinition,
   FilterRequest,
@@ -24,6 +25,12 @@ export type ExportRequest = {
   order_by?: SortDefinition | null;
   limit: number;
   query_builder?: QueryBuilderRequest;
+};
+
+export type RelationshipReviewRequest = {
+  candidate_id: string;
+  review_status: "pending" | "accepted" | "dismissed";
+  notes?: string;
 };
 
 async function parseError(response: Response, fallbackMessage: string) {
@@ -118,6 +125,33 @@ export async function selectWorkbookWorksheet(datasetId: string, worksheetId: st
       body: JSON.stringify({ worksheet_id: worksheetId }),
     },
     "Worksheet could not be selected.",
+  );
+}
+
+export async function reviewWorkbookRelationship(
+  datasetId: string,
+  request: RelationshipReviewRequest,
+) {
+  return requestJson<{
+    dataset: UploadResponse["dataset"];
+    candidate: WorksheetRelationshipCandidate;
+    summary: {
+      total: number;
+      pending: number;
+      accepted: number;
+      dismissed: number;
+    };
+    workbook_metadata: unknown;
+  }>(
+    `${API_BASE_URL}/datasets/${datasetId}/workbook/relationship-review`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+    "Relationship review could not be saved.",
   );
 }
 

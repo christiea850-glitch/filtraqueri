@@ -5,6 +5,7 @@ import {
   getPreview,
   getWorkspaceManifest,
   listWorkspaceManifests,
+  reviewWorkbookRelationship,
   selectWorkbookWorksheet,
   updateWorkspaceManifest,
   uploadDataset,
@@ -249,6 +250,29 @@ function useWorkspaceDatasetController({
       );
     } finally {
       setIsSwitchingWorksheet(false);
+    }
+  };
+
+  const handleRelationshipReview = async (
+    candidateId: string,
+    reviewStatus: "pending" | "accepted" | "dismissed",
+    notes?: string,
+  ) => {
+    if (!dataset) return;
+
+    setErrorMessage("");
+
+    try {
+      const reviewResult = await reviewWorkbookRelationship(dataset.dataset_id, {
+        candidate_id: candidateId,
+        review_status: reviewStatus,
+        notes,
+      });
+      setDataset(reviewResult.dataset);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Relationship review could not be saved.",
+      );
     }
   };
 
@@ -580,6 +604,7 @@ function useWorkspaceDatasetController({
     openDatasetPicker,
     handleFileUpload,
     handleWorksheetSelect,
+    handleRelationshipReview,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,

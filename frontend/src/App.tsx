@@ -175,6 +175,7 @@ function App() {
     openDatasetPicker,
     handleFileUpload,
     handleWorksheetSelect,
+    handleRelationshipReview,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,
@@ -952,6 +953,7 @@ function App() {
                   schemaTypeSummary={schemaTypeSummary}
                   activeFilterLabels={activeFilterLabels}
                   queryGroupBy={activeResultModel?.grouping.columns || queryGroupBy}
+                  onRelationshipReview={handleRelationshipReview}
                 />
 
                 <QueryHistoryPanel history={queryHistory} />

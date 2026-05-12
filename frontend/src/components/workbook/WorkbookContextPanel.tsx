@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import type { DatasetMetadata, SchemaColumn } from "../../features/dataset/datasetTypes";
 import {
   getActiveWorksheet,
@@ -11,6 +12,11 @@ import {
 type WorkbookContextPanelProps = {
   dataset: DatasetMetadata | null;
   variant?: "results" | "analyst";
+  onRelationshipReview?: (
+    candidateId: string,
+    reviewStatus: "pending" | "accepted" | "dismissed",
+    notes?: string,
+  ) => void;
 };
 
 const statusLabel = (status: WorksheetStatus) => (status === "error" ? "unsupported" : status);
@@ -72,48 +78,280 @@ const relationshipTypeLabel = (type: WorksheetRelationshipCandidate["relationshi
 
 function RelationshipCandidateList({
   candidates,
+  worksheets,
+  onRelationshipReview,
 }: {
   candidates: WorksheetRelationshipCandidate[];
+  worksheets: WorksheetMetadata[];
+  onRelationshipReview?: WorkbookContextPanelProps["onRelationshipReview"];
 }) {
+  const [searchText, setSearchText] = useState("");
+  const [confidenceFilter, setConfidenceFilter] = useState("all");
+  const [reviewFilter, setReviewFilter] = useState("all");
+  const [worksheetFilter, setWorksheetFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("confidence");
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [reviewNotes, setReviewNotes] = useState("");
+  const selectedCandidate =
+    candidates.find((candidate) => candidate.relationshipId === selectedCandidateId) ||
+    candidates[0] ||
+    null;
+  const normalizedSearch = searchText.trim().toLowerCase();
+  const filteredCandidates = useMemo(() => {
+    const matchingCandidates = candidates.filter((candidate) => {
+      const haystack = [
+        candidate.sourceWorksheetName,
+        candidate.sourceColumn,
+        candidate.sourceTable,
+        candidate.targetWorksheetName,
+        candidate.targetColumn,
+        candidate.targetTable,
+        candidate.relationshipType,
+        ...candidate.evidence.summaries,
+      ]
+        .join(" ")
+        .toLowerCase();
+      const matchesSearch = normalizedSearch ? haystack.includes(normalizedSearch) : true;
+      const matchesConfidence =
+        confidenceFilter === "all" || candidate.confidenceLabel === confidenceFilter;
+      const matchesReview =
+        reviewFilter === "all" || candidate.reviewStatus === reviewFilter;
+      const matchesWorksheet =
+        worksheetFilter === "all" ||
+        candidate.sourceWorksheetId === worksheetFilter ||
+        candidate.targetWorksheetId === worksheetFilter;
+
+      return matchesSearch && matchesConfidence && matchesReview && matchesWorksheet;
+    });
+
+    return [...matchingCandidates].sort((left, right) => {
+      if (sortMode === "status") return left.reviewStatus.localeCompare(right.reviewStatus);
+      if (sortMode === "worksheet") {
+        return `${left.sourceWorksheetName}.${left.targetWorksheetName}`.localeCompare(
+          `${right.sourceWorksheetName}.${right.targetWorksheetName}`,
+        );
+      }
+      return right.confidence - left.confidence;
+    });
+  }, [candidates, confidenceFilter, normalizedSearch, reviewFilter, sortMode, worksheetFilter]);
+
   if (candidates.length === 0) {
     return <p className="workbook-empty-note">No relationship candidates profiled yet.</p>;
   }
 
+  const saveReview = (
+    candidate: WorksheetRelationshipCandidate,
+    reviewStatus: "pending" | "accepted" | "dismissed",
+  ) => {
+    onRelationshipReview?.(candidate.relationshipId, reviewStatus, reviewNotes);
+  };
+
   return (
-    <div className="workbook-relationship-list" aria-label="Relationship candidates">
-      {candidates.map((candidate) => (
-        <div className="workbook-relationship-card" key={candidate.relationshipId}>
-          <div className="workbook-relationship-header">
-            <span className={`relationship-confidence ${candidate.confidenceLabel}`}>
-              {candidate.confidenceLabel}
+    <div className="workbook-relationship-review" aria-label="Relationship review">
+      <div className="relationship-review-controls">
+        <label>
+          <span>Search</span>
+          <input
+            type="search"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Sheet, column, evidence"
+          />
+        </label>
+        <label>
+          <span>Confidence</span>
+          <select
+            value={confidenceFilter}
+            onChange={(event) => setConfidenceFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>
+          <span>Review</span>
+          <select value={reviewFilter} onChange={(event) => setReviewFilter(event.target.value)}>
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="accepted">Accepted</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+        </label>
+        <label>
+          <span>Worksheet</span>
+          <select
+            value={worksheetFilter}
+            onChange={(event) => setWorksheetFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            {worksheets.map((worksheet) => (
+              <option key={worksheet.worksheetId} value={worksheet.worksheetId}>
+                {worksheet.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Sort</span>
+          <select value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+            <option value="confidence">Confidence</option>
+            <option value="status">Review status</option>
+            <option value="worksheet">Worksheet</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="workbook-relationship-list" aria-label="Relationship candidates">
+        {filteredCandidates.map((candidate) => (
+          <div
+            className={`workbook-relationship-card ${candidate.reviewStatus}`}
+            key={candidate.relationshipId}
+          >
+            <div className="workbook-relationship-header">
+              <button
+                type="button"
+                className="text-button relationship-detail-button"
+                onClick={() => {
+                  setSelectedCandidateId(candidate.relationshipId);
+                  setReviewNotes(candidate.reviewNotes || "");
+                }}
+              >
+                Details
+              </button>
+              <span className={`relationship-confidence ${candidate.confidenceLabel}`}>
+                {candidate.confidenceLabel}
+              </span>
+              <small className={`relationship-review-status ${candidate.reviewStatus}`}>
+                {candidate.reviewStatus}
+              </small>
+              <small>{relationshipTypeLabel(candidate.relationshipType)}</small>
+            </div>
+            <div className="workbook-relationship-path">
+              <strong>
+                {candidate.sourceWorksheetName}.{candidate.sourceColumn}
+              </strong>
+              <span aria-hidden="true">-&gt;</span>
+              <strong>
+                {candidate.targetWorksheetName}.{candidate.targetColumn}
+              </strong>
+            </div>
+            <div className="workbook-relationship-tables">
+              <span>{candidate.sourceTable}</span>
+              <span>{candidate.targetTable}</span>
+            </div>
+            <div className="workbook-evidence-list">
+              {candidate.evidence.summaries.map((summary) => (
+                <span key={summary}>{summary}</span>
+              ))}
+            </div>
+            {onRelationshipReview && (
+              <div className="relationship-review-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => saveReview(candidate, "accepted")}
+                  disabled={candidate.reviewStatus === "accepted"}
+                >
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => saveReview(candidate, "dismissed")}
+                  disabled={candidate.reviewStatus === "dismissed"}
+                >
+                  Dismiss
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => saveReview(candidate, "pending")}
+                  disabled={candidate.reviewStatus === "pending"}
+                >
+                  Pending
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+        {filteredCandidates.length === 0 && (
+          <p className="workbook-empty-note">No relationship candidates match these filters.</p>
+        )}
+      </div>
+
+      {selectedCandidate && (
+        <div className="relationship-detail-panel" aria-label="Relationship candidate details">
+          <div className="builder-block-header">
+            <span>Candidate detail</span>
+            <small>{selectedCandidate.confidenceLabel}</small>
+          </div>
+          <div className="workbook-summary-grid">
+            <span>
+              Overlap
+              <strong>{Math.round(selectedCandidate.evidence.sampledOverlapRatio * 100)}%</strong>
             </span>
-            <small>{relationshipTypeLabel(candidate.relationshipType)}</small>
+            <span>
+              Type compatible
+              <strong>{selectedCandidate.evidence.typeCompatible ? "Yes" : "No"}</strong>
+            </span>
+            <span>
+              Source unique
+              <strong>{Math.round(selectedCandidate.evidence.sourceUniqueRatio * 100)}%</strong>
+            </span>
+            <span>
+              Target unique
+              <strong>{Math.round(selectedCandidate.evidence.targetUniqueRatio * 100)}%</strong>
+            </span>
+            <span>
+              Direction
+              <strong>{selectedCandidate.direction.replace(/_/g, " ")}</strong>
+            </span>
+            <span>
+              Reviewed
+              <strong>{selectedCandidate.reviewedAt ? "Yes" : "No"}</strong>
+            </span>
           </div>
           <div className="workbook-relationship-path">
             <strong>
-              {candidate.sourceWorksheetName}.{candidate.sourceColumn}
+              {selectedCandidate.sourceWorksheetName}.{selectedCandidate.sourceColumn}
             </strong>
             <span aria-hidden="true">-&gt;</span>
             <strong>
-              {candidate.targetWorksheetName}.{candidate.targetColumn}
+              {selectedCandidate.targetWorksheetName}.{selectedCandidate.targetColumn}
             </strong>
           </div>
           <div className="workbook-relationship-tables">
-            <span>{candidate.sourceTable}</span>
-            <span>{candidate.targetTable}</span>
+            <span>{selectedCandidate.sourceTable}</span>
+            <span>{selectedCandidate.targetTable}</span>
           </div>
           <div className="workbook-evidence-list">
-            {candidate.evidence.summaries.map((summary) => (
+            {selectedCandidate.evidence.summaries.map((summary) => (
               <span key={summary}>{summary}</span>
             ))}
           </div>
+          {onRelationshipReview && (
+            <label className="relationship-notes-control">
+              <span>Review notes</span>
+              <textarea
+                value={reviewNotes}
+                onChange={(event) => setReviewNotes(event.target.value)}
+                maxLength={500}
+              />
+            </label>
+          )}
         </div>
-      ))}
+      )}
     </div>
   );
 }
 
-function WorkbookContextPanel({ dataset, variant = "results" }: WorkbookContextPanelProps) {
+function WorkbookContextPanel({
+  dataset,
+  variant = "results",
+  onRelationshipReview,
+}: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
   if (!workbook) return null;
 
@@ -211,7 +449,11 @@ function WorkbookContextPanel({ dataset, variant = "results" }: WorkbookContextP
           <span>Relationship candidates</span>
           <small>{workbook.relationshipCandidates.length.toLocaleString()} profiled</small>
         </div>
-        <RelationshipCandidateList candidates={workbook.relationshipCandidates.slice(0, 8)} />
+        <RelationshipCandidateList
+          candidates={workbook.relationshipCandidates}
+          worksheets={workbook.worksheets}
+          onRelationshipReview={onRelationshipReview}
+        />
       </div>
 
       {variant === "analyst" && (

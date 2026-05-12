@@ -262,6 +262,27 @@ const normalizeRelationshipCandidate = (
       candidate.status === "dismissed"
         ? candidate.status
         : "candidate",
+    reviewStatus:
+      candidate.reviewStatus === "accepted" ||
+      candidate.review_status === "accepted" ||
+      candidate.reviewStatus === "dismissed" ||
+      candidate.review_status === "dismissed" ||
+      candidate.reviewStatus === "pending" ||
+      candidate.review_status === "pending"
+        ? ((candidate.reviewStatus ?? candidate.review_status) as "pending" | "accepted" | "dismissed")
+        : "pending",
+    reviewedAt:
+      typeof (candidate.reviewedAt ?? candidate.reviewed_at) === "string"
+        ? ((candidate.reviewedAt ?? candidate.reviewed_at) as string)
+        : null,
+    reviewedBy:
+      typeof (candidate.reviewedBy ?? candidate.reviewed_by) === "string"
+        ? ((candidate.reviewedBy ?? candidate.reviewed_by) as string)
+        : null,
+    reviewNotes:
+      typeof (candidate.reviewNotes ?? candidate.review_notes) === "string"
+        ? ((candidate.reviewNotes ?? candidate.review_notes) as string)
+        : null,
   };
 };
 

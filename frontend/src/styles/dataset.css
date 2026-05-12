@@ -713,6 +713,86 @@
   background: #ffffff;
 }
 
+.workbook-relationship-card.accepted {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.workbook-relationship-card.dismissed {
+  border-color: #fecaca;
+  background: #fff7f7;
+  opacity: 0.82;
+}
+
+.workbook-relationship-review {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.relationship-review-controls {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.relationship-review-controls label,
+.relationship-notes-control {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.relationship-review-controls input,
+.relationship-review-controls select,
+.relationship-notes-control textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.relationship-review-controls input,
+.relationship-review-controls select {
+  height: 34px;
+  padding: 0 8px;
+}
+
+.relationship-notes-control textarea {
+  min-height: 68px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.relationship-detail-button {
+  padding-inline: 8px;
+}
+
+.relationship-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.relationship-detail-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
 .workbook-relationship-header,
 .workbook-relationship-path,
 .workbook-relationship-tables,
@@ -768,6 +848,25 @@
 }
 
 .relationship-confidence.low {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.relationship-review-status {
+  text-transform: uppercase;
+}
+
+.relationship-review-status.accepted {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.relationship-review-status.dismissed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.relationship-review-status.pending {
   background: #e2e8f0;
   color: #334155;
 }
