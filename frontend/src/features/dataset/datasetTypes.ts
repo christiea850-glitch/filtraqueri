@@ -3,6 +3,7 @@ import type { HistoryItem } from "../history/historyTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
 import type { ResultState, ResultTabKey, SortDirection } from "../results/resultTypes";
 import type { WorkspaceManifest } from "../workspace/workspaceManifestTypes";
+import type { WorkbookMetadata } from "../workbook";
 
 export type SchemaColumn = {
   name: string;
@@ -24,7 +25,7 @@ export type DatasetMetadata = {
   row_count: number;
   column_count: number;
   schema: SchemaColumn[];
-  workbook_metadata?: unknown;
+  workbook_metadata?: WorkbookMetadata;
 };
 
 export type UploadResponse = {

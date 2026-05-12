@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ActiveView, DatasetMetadata, DatasetSession } from "./datasetTypes";
 import type { ResultTabKey } from "../results/resultTypes";
+import { normalizeUnknownWorkbookMetadata } from "../workbook";
 import {
   attachActiveResultToDataset,
   attachExecutionToDataset,
@@ -26,11 +27,24 @@ function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptio
   const [activeView, setActiveView] = useState<ActiveView>(initialView);
   const activeDatasetRecord = getActiveDataset(datasetRegistry);
   const dataset = activeDatasetRecord?.metadata || null;
+  const normalizeDatasetMetadata = (metadata: DatasetMetadata): DatasetMetadata => {
+    const workbookMetadata = normalizeUnknownWorkbookMetadata(metadata.workbook_metadata);
+    if (!workbookMetadata) {
+      const { workbook_metadata: _workbookMetadata, ...legacyMetadata } = metadata;
+      return legacyMetadata;
+    }
+
+    return {
+      ...metadata,
+      table_name: metadata.table_name || "data",
+      workbook_metadata: workbookMetadata,
+    };
+  };
 
   const setDataset = (nextDataset: DatasetMetadata | null) => {
     setDatasetRegistry((currentRegistry) =>
       nextDataset
-        ? registerDataset(currentRegistry, nextDataset, {
+        ? registerDataset(currentRegistry, normalizeDatasetMetadata(nextDataset), {
             sourceType: "uploaded",
             isActive: true,
           })
@@ -40,15 +54,19 @@ function useDatasetSessions({ initialView = "welcome" }: UseDatasetSessionsOptio
 
   const restoreDataset = (nextDataset: DatasetMetadata, sourceSessionId?: string) => {
     setDatasetRegistry((currentRegistry) =>
-      restoreDatasetState(currentRegistry, nextDataset, sourceSessionId),
+      restoreDatasetState(currentRegistry, normalizeDatasetMetadata(nextDataset), sourceSessionId),
     );
   };
 
   const addRecentDataset = (session: DatasetSession) => {
+    const normalizedSession = {
+      ...session,
+      dataset: normalizeDatasetMetadata(session.dataset),
+    };
     setRecentDatasets((currentSessions) => [
-      session,
+      normalizedSession,
       ...currentSessions
-        .filter((recentSession) => recentSession.dataset.dataset_id !== session.dataset.dataset_id)
+        .filter((recentSession) => recentSession.dataset.dataset_id !== normalizedSession.dataset.dataset_id)
         .slice(0, 5),
     ]);
   };

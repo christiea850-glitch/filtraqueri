@@ -18,6 +18,17 @@ export const DEFAULT_WORKBOOK_INGESTION_PROFILE: WorkbookIngestionProfile = {
 
 const nowIso = () => new Date().toISOString();
 
+const readString = (value: unknown, fallback: string) =>
+  typeof value === "string" && value.trim() ? value : fallback;
+
+const readNumber = (value: unknown, fallback = 0) =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+const readArray = <T = unknown>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+
+const readObject = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
 export const generateSafeWorksheetTableName = (
   sheetName: string,
   index = 0,
@@ -117,6 +128,126 @@ export const normalizeWorkbookMetadata = (
   };
 };
 
+export const normalizeUnknownWorksheetMetadata = (
+  value: unknown,
+  workbookId: string,
+  index = 0,
+): WorksheetMetadata => {
+  const worksheet = readObject(value);
+  const normalization = readObject(worksheet.normalization);
+
+  return normalizeWorksheetMetadata(
+    {
+      worksheetId: readString(worksheet.worksheetId ?? worksheet.worksheet_id, `${workbookId}:worksheet:${index + 1}`),
+      workbookId,
+      sheetName: readString(worksheet.sheetName ?? worksheet.sheet_name, `Worksheet ${index + 1}`),
+      displayName: readString(worksheet.displayName ?? worksheet.display_name, readString(worksheet.sheetName ?? worksheet.sheet_name, `Worksheet ${index + 1}`)),
+      tableName: readString(worksheet.tableName ?? worksheet.table_name, generateSafeWorksheetTableName(readString(worksheet.sheetName ?? worksheet.sheet_name, `Worksheet ${index + 1}`), index)),
+      originalIndex: readNumber(worksheet.originalIndex ?? worksheet.original_index, index),
+      status:
+        worksheet.status === "ready" ||
+        worksheet.status === "empty" ||
+        worksheet.status === "error" ||
+        worksheet.status === "skipped"
+          ? worksheet.status
+          : "error",
+      schema: readArray(worksheet.schema),
+      rowCount: readNumber(worksheet.rowCount ?? worksheet.row_count, 0),
+      columnCount: readNumber(worksheet.columnCount ?? worksheet.column_count, readArray(worksheet.schema).length),
+      visibleColumns: readArray<string>(worksheet.visibleColumns ?? worksheet.visible_columns),
+      hiddenColumns: readArray<string>(worksheet.hiddenColumns ?? worksheet.hidden_columns),
+      normalization: {
+        version: readNumber(normalization.version, WORKBOOK_METADATA_NORMALIZATION_VERSION),
+        normalizedAt: readString(normalization.normalizedAt ?? normalization.normalized_at, nowIso()),
+        headerRowIndex:
+          typeof (normalization.headerRowIndex ?? normalization.header_row_index) === "number"
+            ? (normalization.headerRowIndex ?? normalization.header_row_index) as number
+            : null,
+        duplicateColumnCount: readNumber(normalization.duplicateColumnCount ?? normalization.duplicate_column_count, 0),
+        emptyColumnCount: readNumber(normalization.emptyColumnCount ?? normalization.empty_column_count, 0),
+        warnings: readArray<string>(normalization.warnings),
+      },
+    },
+    workbookId,
+    index,
+  );
+};
+
+export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetadata | null => {
+  if (!value || typeof value !== "object") return null;
+
+  const workbook = readObject(value);
+  const sourceFile = readObject(workbook.sourceFile ?? workbook.source_file);
+  const normalization = readObject(workbook.normalization);
+  const workbookId = readString(workbook.workbookId ?? workbook.workbook_id, "");
+  if (!workbookId) return null;
+
+  const worksheets = readArray(workbook.worksheets).map((worksheet, index) =>
+    normalizeUnknownWorksheetMetadata(worksheet, workbookId, index),
+  );
+  const worksheetIds = worksheets.map((worksheet) => worksheet.worksheetId);
+  const activeWorksheetId = readString(
+    workbook.activeWorksheetId ?? workbook.active_worksheet_id,
+    worksheetIds[0] || "",
+  );
+
+  return normalizeWorkbookMetadata({
+    workbookId,
+    workspaceId:
+      typeof (workbook.workspaceId ?? workbook.workspace_id) === "string"
+        ? ((workbook.workspaceId ?? workbook.workspace_id) as string)
+        : null,
+    name: readString(workbook.name, readString(sourceFile.originalFilename ?? sourceFile.original_filename, "Workbook")),
+    status:
+      workbook.status === "pending" ||
+      workbook.status === "profiling" ||
+      workbook.status === "ready" ||
+      workbook.status === "partial" ||
+      workbook.status === "error"
+        ? workbook.status
+        : "partial",
+    sourceFile: {
+      originalFilename: readString(sourceFile.originalFilename ?? sourceFile.original_filename, "workbook.xlsx"),
+      storedPath:
+        typeof (sourceFile.storedPath ?? sourceFile.stored_path) === "string"
+          ? ((sourceFile.storedPath ?? sourceFile.stored_path) as string)
+          : null,
+      mimeType:
+        typeof (sourceFile.mimeType ?? sourceFile.mime_type) === "string"
+          ? ((sourceFile.mimeType ?? sourceFile.mime_type) as string)
+          : null,
+      byteSize:
+        typeof (sourceFile.byteSize ?? sourceFile.byte_size) === "number"
+          ? ((sourceFile.byteSize ?? sourceFile.byte_size) as number)
+          : null,
+      uploadedAt: readString(sourceFile.uploadedAt ?? sourceFile.uploaded_at, nowIso()),
+    },
+    worksheetIds,
+    activeWorksheetId: worksheetIds.includes(activeWorksheetId) ? activeWorksheetId : worksheetIds[0] || null,
+    worksheets,
+    tableMappings: worksheets.map((worksheet) => ({
+      sheetName: worksheet.sheetName,
+      tableName: worksheet.tableName,
+      originalIndex: worksheet.originalIndex,
+    })),
+    relationshipCandidates: [],
+    ingestionProfile: DEFAULT_WORKBOOK_INGESTION_PROFILE,
+    normalization: {
+      version: readNumber(normalization.version, WORKBOOK_METADATA_NORMALIZATION_VERSION),
+      normalizedAt: readString(normalization.normalizedAt ?? normalization.normalized_at, nowIso()),
+      status:
+        normalization.status === "normalized" ||
+        normalization.status === "needs-review" ||
+        normalization.status === "failed"
+          ? normalization.status
+          : "normalized",
+      warnings: readArray<string>(normalization.warnings),
+    },
+    createdAt: readString(workbook.createdAt ?? workbook.created_at, nowIso()),
+    updatedAt: readString(workbook.updatedAt ?? workbook.updated_at, nowIso()),
+  });
+};
+
 export const validateWorksheetMetadata = (worksheet: WorksheetMetadata) => {
   const messages: string[] = [];
 
@@ -176,3 +307,30 @@ export const listWorksheets = (workbook: WorkbookMetadata): WorksheetMetadata[] 
 export const listRelationshipCandidates = (
   workbook: WorkbookMetadata,
 ): WorksheetRelationshipCandidate[] => workbook.relationshipCandidates;
+
+export const getWorkbookMetadata = (dataset: { workbook_metadata?: unknown } | null) =>
+  normalizeUnknownWorkbookMetadata(dataset?.workbook_metadata);
+
+export const hasWorkbookMetadata = (dataset: { workbook_metadata?: unknown } | null) =>
+  Boolean(getWorkbookMetadata(dataset));
+
+export const getDatasetActiveWorksheet = (dataset: { workbook_metadata?: unknown } | null) => {
+  const workbook = getWorkbookMetadata(dataset);
+  return workbook ? getActiveWorksheet(workbook) : null;
+};
+
+export const listWorkbookWorksheets = (dataset: { workbook_metadata?: unknown } | null) => {
+  const workbook = getWorkbookMetadata(dataset);
+  return workbook ? listWorksheets(workbook) : [];
+};
+
+export const getWorksheetTableName = (
+  dataset: { workbook_metadata?: unknown } | null,
+  worksheetId: string,
+) => {
+  const workbook = getWorkbookMetadata(dataset);
+  return (
+    workbook?.worksheets.find((worksheet) => worksheet.worksheetId === worksheetId)?.tableName ||
+    null
+  );
+};
