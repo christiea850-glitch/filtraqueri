@@ -3,9 +3,12 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import {
+  MAX_SQL_DRAFT_SNAPSHOTS,
+  getActiveSqlDraftSnapshot,
   normalizeSqlWorkspaceMetadataSnapshot,
   updateSqlWorkspaceDialect,
   updateSqlWorkspaceDraftMetadata,
+  upsertActiveSqlDraftSnapshot,
   type SqlWorkspaceMetadataSnapshot,
 } from "../../sqlWorkspacePersistence";
 import {
@@ -52,8 +55,21 @@ function useSqlWorkspace(
     () => normalizeSqlWorkspaceMetadataSnapshot(metadata),
     [metadata],
   );
-  const [sqlDraft, setSqlDraft] = useState(() => createInitialSql(dataset?.table_name));
-  const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>([]);
+  const restoredActiveDraft = useMemo(
+    () => getActiveSqlDraftSnapshot(normalizedMetadata),
+    [normalizedMetadata],
+  );
+  const [sqlDraft, setSqlDraft] = useState(
+    () => restoredActiveDraft?.sql ?? createInitialSql(dataset?.table_name),
+  );
+  const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>(() =>
+    normalizedMetadata.drafts.map((draft) => ({
+      id: draft.id,
+      name: draft.label,
+      sql: draft.sql,
+      savedAt: draft.updatedAt,
+    })),
+  );
   const [editorStatus, setEditorStatus] = useState<SqlExecutionStatus>("idle");
   const [selectedDialect, setSelectedDialect] = useState<SqlDialectId>(
     normalizedMetadata.selectedDialect,
@@ -87,6 +103,55 @@ function useSqlWorkspace(
   useEffect(() => {
     setSelectedDialect(normalizedMetadata.selectedDialect);
   }, [normalizedMetadata.selectedDialect]);
+
+  useEffect(() => {
+    if (!restoredActiveDraft) return;
+
+    setSqlDraft(restoredActiveDraft.sql);
+    setSelectedDialect(restoredActiveDraft.selectedDialect);
+  }, [restoredActiveDraft?.id, restoredActiveDraft?.sql, restoredActiveDraft?.selectedDialect]);
+
+  useEffect(() => {
+    setSavedDrafts(
+      normalizedMetadata.drafts.map((draft) => ({
+        id: draft.id,
+        name: draft.label,
+        sql: draft.sql,
+        savedAt: draft.updatedAt,
+      })),
+    );
+  }, [normalizedMetadata.drafts]);
+
+  useEffect(() => {
+    const persistTimer = window.setTimeout(() => {
+      const activeDraft = getActiveSqlDraftSnapshot(normalizedMetadata);
+      if (
+        activeDraft &&
+        activeDraft.sql === sqlDraft &&
+        activeDraft.selectedDialect === selectedDialect
+      ) {
+        return;
+      }
+
+      onMetadataChange?.(
+        upsertActiveSqlDraftSnapshot(normalizedMetadata, {
+          sql: sqlDraft,
+          selectedDialect,
+          id: normalizedMetadata.activeDraftId || restoredActiveDraft?.id || "active-draft",
+          label: restoredActiveDraft?.label || "Query draft",
+        }),
+      );
+    }, 700);
+
+    return () => window.clearTimeout(persistTimer);
+  }, [
+    normalizedMetadata,
+    onMetadataChange,
+    restoredActiveDraft?.id,
+    restoredActiveDraft?.label,
+    selectedDialect,
+    sqlDraft,
+  ]);
 
   const updateSelectedDialect = (dialect: SqlDialectId) => {
     setSelectedDialect(dialect);
@@ -152,12 +217,23 @@ function useSqlWorkspace(
       savedAt: timestamp,
     };
 
-    setSavedDrafts((currentDrafts) => [draft, ...currentDrafts.slice(0, 5)]);
+    setSavedDrafts((currentDrafts) => [
+      draft,
+      ...currentDrafts.filter((currentDraft) => currentDraft.id !== draft.id).slice(0, 5),
+    ]);
     onMetadataChange?.(
-      updateSqlWorkspaceDraftMetadata(normalizedMetadata, {
-        draftCount: Math.min(savedDrafts.length + 1, 6),
-        lastDraftSavedAt: draft.savedAt,
-      }),
+      updateSqlWorkspaceDraftMetadata(
+        upsertActiveSqlDraftSnapshot(normalizedMetadata, {
+          id: draft.id,
+          label: draft.name,
+          sql: draft.sql,
+          selectedDialect,
+        }),
+        {
+          draftCount: Math.min(savedDrafts.length + 1, MAX_SQL_DRAFT_SNAPSHOTS),
+          lastDraftSavedAt: draft.savedAt,
+        },
+      ),
     );
     updateStatus("draft-saved");
   };
@@ -177,6 +253,14 @@ function useSqlWorkspace(
 
   const loadDraft = (draft: SqlQueryDraft) => {
     setSqlDraft(draft.sql);
+    onMetadataChange?.(
+      upsertActiveSqlDraftSnapshot(normalizedMetadata, {
+        id: draft.id,
+        label: draft.name,
+        sql: draft.sql,
+        selectedDialect,
+      }),
+    );
     updateStatus("idle");
   };
 
