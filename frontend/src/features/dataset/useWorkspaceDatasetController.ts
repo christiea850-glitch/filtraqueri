@@ -8,6 +8,10 @@ import type { HistoryItem } from "../history/historyTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
 import type { ResultState, ResultTabKey, SortDirection } from "../results/resultTypes";
 import { createEmptyResultState } from "../results/useResults";
+import {
+  resetWorkspaceForDatasetChange,
+  restoreWorkspaceStateSafely,
+} from "../workspace/workspaceOrchestration";
 import type { DatasetMetadata, DatasetSession } from "./datasetTypes";
 import useDatasetSessions from "./useDatasetSessions";
 
@@ -111,10 +115,11 @@ function useWorkspaceDatasetController({
   });
 
   const restoreDatasetSession = (session: DatasetSession) => {
-    setDataset(session.dataset);
-    setPreviewResult(session.previewResult);
-    setFilteredResult(session.filteredResult);
-    setQueriedResult(session.queriedResult);
+    const restoredWorkspace = restoreWorkspaceStateSafely(session);
+    setDataset(restoredWorkspace.dataset);
+    setPreviewResult(restoredWorkspace.previewResult);
+    setFilteredResult(restoredWorkspace.filteredResult);
+    setQueriedResult(restoredWorkspace.queriedResult);
     setFilterValues(session.filterValues);
     restoreQueryBuilder({
       querySelectedColumns: session.querySelectedColumns,
@@ -125,7 +130,7 @@ function useWorkspaceDatasetController({
       queryLimit: session.queryLimit,
       hasRunQuery: session.hasRunQuery,
     });
-    setActiveResultTab(session.lastActiveResultTab || session.activeResultTab || "preview");
+    setActiveResultTab(restoredWorkspace.activeResultTab);
     setQueryHistory(session.queryHistory);
     setSelectedFileName(session.dataset.original_filename);
     setActiveView(session.lastActiveView || "results");
@@ -149,8 +154,9 @@ function useWorkspaceDatasetController({
     setIsUploading(true);
     setErrorMessage("");
     setDataset(null);
-    setActiveResultTab("preview");
-    updateDatasetSessionResultTab("preview");
+    const resetWorkspace = resetWorkspaceForDatasetChange();
+    setActiveResultTab(resetWorkspace.activeResultTab);
+    updateDatasetSessionResultTab(resetWorkspace.activeResultTab);
     resetResults();
     setFilterValues({});
     resetQueryBuilder();
@@ -227,7 +233,8 @@ function useWorkspaceDatasetController({
 
     setDataset(null);
     setSelectedFileName("");
-    setActiveResultTab("preview");
+    const resetWorkspace = resetWorkspaceForDatasetChange();
+    setActiveResultTab(resetWorkspace.activeResultTab);
     resetResults();
     setFilterValues({});
     resetQueryBuilder();
