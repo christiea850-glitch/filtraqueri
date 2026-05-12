@@ -19,6 +19,7 @@ import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
 import { executeWorkspaceQuery } from "./features/execution/executeWorkspaceQuery";
+import useExecutionRegistry from "./features/execution/executionRegistry";
 import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatasetController";
 import useExportController from "./features/export/useExportController";
 import useFilterController from "./features/filters/useFilterController";
@@ -112,6 +113,7 @@ function App() {
     tab: ResultTabKey;
   } | null>(null);
   const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
+  const { recordExecutionResult } = useExecutionRegistry();
   const {
     querySelectedColumns,
     setQuerySelectedColumns,
@@ -189,6 +191,11 @@ function App() {
     clearHistory,
     setErrorMessage,
     setHumanIntent,
+    onExecutionResult: (executionResult) =>
+      recordExecutionResult(executionResult, {
+        activeResultTab: "preview",
+        hiddenColumns: [],
+      }),
   });
   const draftFilters = buildBackendFilters(dataset);
   const activeFilters =
@@ -272,6 +279,10 @@ function App() {
           rowsPerPage: filteredResult.rowsPerPage,
         },
       });
+      recordExecutionResult(executionResult, {
+        activeResultTab: "filtered",
+        hiddenColumns: resultHiddenColumns,
+      });
       updateFilteredResult(executionResult.activeResult, true);
       addHistory(
         "Filters",
@@ -308,6 +319,10 @@ function App() {
           page: 1,
           rowsPerPage: previewResult.rowsPerPage,
         },
+      });
+      recordExecutionResult(executionResult, {
+        activeResultTab: "preview",
+        hiddenColumns: resultHiddenColumns,
       });
       updatePreviewResult(executionResult.activeResult, true);
       setFilteredResult(createEmptyResultState());
@@ -350,6 +365,10 @@ function App() {
           page,
           rowsPerPage,
         },
+      });
+      recordExecutionResult(executionResult, {
+        activeResultTab: activeResultTab === "filtered" ? "filtered" : "preview",
+        hiddenColumns: resultHiddenColumns,
       });
 
       if (activeResultTab === "filtered") {
@@ -402,6 +421,10 @@ function App() {
           page: 1,
           rowsPerPage: queryBuilderRequest.limit,
         },
+      });
+      recordExecutionResult(executionResult, {
+        activeResultTab: "queried",
+        hiddenColumns: resultHiddenColumns,
       });
       updateQueriedResult(executionResult.activeResult, true);
       addHistory(
@@ -466,6 +489,10 @@ function App() {
           page,
           rowsPerPage,
         },
+      });
+      recordExecutionResult(executionResult, {
+        activeResultTab: "queried",
+        hiddenColumns: resultHiddenColumns,
       });
       updateQueriedResult(executionResult.activeResult);
     } catch (error) {
@@ -945,6 +972,11 @@ function App() {
 
   const analystViewRegistry = createAnalystWorkspaceRenderers(analystWorkspaceRegistry, {
     dataset,
+    onExecutionResult: (executionResult) =>
+      recordExecutionResult(executionResult, {
+        activeResultTab: "sql",
+        hiddenColumns: [],
+      }),
   });
 
   const workspaceViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {

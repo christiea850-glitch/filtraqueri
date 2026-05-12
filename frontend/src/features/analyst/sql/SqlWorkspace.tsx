@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import SqlEditorPanel, { SqlDraftPanel } from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
@@ -7,9 +8,10 @@ import useSqlWorkspace from "./useSqlWorkspace";
 
 type SqlWorkspaceProps = {
   dataset: DatasetMetadata | null;
+  onExecutionResult?: (result: WorkspaceExecutionResult) => void;
 };
 
-function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
+function SqlWorkspace({ dataset, onExecutionResult }: SqlWorkspaceProps) {
   const [isSchemaCollapsed, setIsSchemaCollapsed] = useState(false);
   const [isSqlSideCollapsed, setIsSqlSideCollapsed] = useState(false);
   const {
@@ -23,7 +25,7 @@ function SqlWorkspace({ dataset }: SqlWorkspaceProps) {
     editor,
     insertSql,
     loadDraft,
-  } = useSqlWorkspace(dataset);
+  } = useSqlWorkspace(dataset, onExecutionResult);
 
   return (
     <section

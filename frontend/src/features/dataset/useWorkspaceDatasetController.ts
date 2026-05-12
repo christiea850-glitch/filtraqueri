@@ -2,6 +2,7 @@ import { type ChangeEvent, useEffect, useState } from "react";
 import type { HumanIntent } from "../../components/dataset/DatasetSummaryPanel";
 import { uploadDataset } from "../../services/api";
 import { wrapWorkspaceExecutionOutput } from "../execution/executeWorkspaceQuery";
+import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTypes";
 import type { FilterState } from "../filters/filterTypes";
 import type { HistoryItem } from "../history/historyTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
@@ -36,6 +37,7 @@ function useWorkspaceDatasetController({
   clearHistory,
   setErrorMessage,
   setHumanIntent,
+  onExecutionResult,
 }: {
   activeResultTab: ResultTabKey;
   setActiveResultTab: (tab: ResultTabKey) => void;
@@ -70,6 +72,7 @@ function useWorkspaceDatasetController({
   clearHistory: () => void;
   setErrorMessage: (message: string) => void;
   setHumanIntent: (intent: HumanIntent | null) => void;
+  onExecutionResult?: (result: WorkspaceExecutionResult) => void;
 }) {
   const {
     dataset,
@@ -173,6 +176,17 @@ function useWorkspaceDatasetController({
       setPreviewResult({
         ...previewExecution.activeResult,
         totalCount: uploadResult.dataset.row_count,
+      });
+      onExecutionResult?.({
+        ...previewExecution,
+        pagination: {
+          ...previewExecution.pagination,
+          totalCount: uploadResult.dataset.row_count,
+        },
+        activeResult: {
+          ...previewExecution.activeResult,
+          totalCount: uploadResult.dataset.row_count,
+        },
       });
       setFilteredResult(createEmptyResultState());
       setQueriedResult(createEmptyResultState());

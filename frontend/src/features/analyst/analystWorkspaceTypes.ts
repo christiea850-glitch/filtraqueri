@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import type { ActiveView, DatasetMetadata } from "../dataset/datasetTypes";
+import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTypes";
 
 export type AnalystWorkspaceRenderContext = {
   dataset: DatasetMetadata | null;
+  onExecutionResult?: (result: WorkspaceExecutionResult) => void;
 };
 
 export type AnalystAiCapabilityFlags = {

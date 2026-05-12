@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
+import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import type {
   SqlEditorInterface,
@@ -29,7 +30,10 @@ const createPreviewMessage = (status: SqlExecutionStatus) => {
   return "No results yet.";
 };
 
-function useSqlWorkspace(dataset: DatasetMetadata | null) {
+function useSqlWorkspace(
+  dataset: DatasetMetadata | null,
+  onExecutionResult?: (result: WorkspaceExecutionResult) => void,
+) {
   const [sqlDraft, setSqlDraft] = useState(() => createInitialSql(dataset?.table_name));
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>([]);
   const [editorStatus, setEditorStatus] = useState<SqlExecutionStatus>("idle");
@@ -68,6 +72,9 @@ function useSqlWorkspace(dataset: DatasetMetadata | null) {
         rows: executionResult.outputRows,
         message: executionResult.sql?.message || message,
       });
+      if (status === "execution-pending") {
+        onExecutionResult?.(executionResult);
+      }
       return;
     }
 
