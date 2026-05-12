@@ -71,6 +71,10 @@
     grid-template-columns: 1fr;
   }
 
+  .sidebar-resize-handle {
+    display: none;
+  }
+
   .left-sidebar {
     border-right: 0;
     border-bottom: 1px solid #dbe5ef;

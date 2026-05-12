@@ -156,13 +156,13 @@ body {
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 236px) 6px minmax(0, 1fr);
   min-height: 0;
   transition: grid-template-columns 180ms ease;
 }
 
 .app.is-sidebar-collapsed .workspace-shell {
-  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-columns: 68px 0 minmax(0, 1fr);
 }
 
 .app.is-workspace-focused .workspace-canvas {
@@ -195,6 +195,36 @@ body {
 .app.is-sidebar-collapsed .left-sidebar {
   align-items: center;
   padding: 14px 8px;
+}
+
+.sidebar-resize-handle {
+  width: 6px;
+  min-width: 6px;
+  border: 0;
+  border-right: 1px solid #dbe5ef;
+  border-left: 1px solid transparent;
+  background: rgba(248, 251, 255, 0.58);
+  cursor: col-resize;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:focus-visible {
+  background: #dbeafe;
+  outline: none;
+}
+
+.app.is-sidebar-collapsed .sidebar-resize-handle {
+  width: 0;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  cursor: default;
+  pointer-events: none;
+}
+
+body.is-resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .sidebar-primary,

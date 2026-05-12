@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import type {
   ActiveView,
   DatasetMetadata,
@@ -54,6 +54,9 @@ type WorkspaceShellProps = {
 };
 
 const menuItems = ["Help"];
+const SIDEBAR_MIN_WIDTH = 180;
+const SIDEBAR_MAX_WIDTH = 360;
+const SIDEBAR_DEFAULT_WIDTH = 236;
 
 const workspaceHubs: HubItem[] = [
   {
@@ -197,6 +200,8 @@ function WorkspaceShell({
 }: WorkspaceShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const hubs = workspaceHubs.map((hub) =>
     hub.id === "analyst"
       ? {
@@ -219,6 +224,38 @@ function WorkspaceShell({
     onViewChange(hub.defaultView);
   };
 
+  useEffect(() => {
+    if (!isResizingSidebar) return undefined;
+
+    const resizeSidebar = (event: PointerEvent | globalThis.PointerEvent) => {
+      const nextWidth = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, event.clientX),
+      );
+      setSidebarWidth(nextWidth);
+    };
+    const stopResize = () => setIsResizingSidebar(false);
+
+    window.addEventListener("pointermove", resizeSidebar);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
+    document.body.classList.add("is-resizing-sidebar");
+
+    return () => {
+      window.removeEventListener("pointermove", resizeSidebar);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+      document.body.classList.remove("is-resizing-sidebar");
+    };
+  }, [isResizingSidebar]);
+
+  const startSidebarResize = (event: PointerEvent<HTMLButtonElement>) => {
+    if (isSidebarCollapsed) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizingSidebar(true);
+  };
+
   return (
     <div
       className={[
@@ -228,6 +265,7 @@ function WorkspaceShell({
       ]
         .filter(Boolean)
         .join(" ")}
+      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
     >
       <header className="top-menu-bar">
         <div className="workspace-brand">
@@ -370,6 +408,16 @@ function WorkspaceShell({
             </div>
           )}
         </aside>
+        <button
+          type="button"
+          className="sidebar-resize-handle"
+          aria-label="Resize sidebar"
+          aria-valuemin={SIDEBAR_MIN_WIDTH}
+          aria-valuemax={SIDEBAR_MAX_WIDTH}
+          aria-valuenow={sidebarWidth}
+          onPointerDown={startSidebarResize}
+          disabled={isSidebarCollapsed}
+        />
 
         <main className="workspace-canvas">
           {errorMessage && activeView !== "welcome" && (

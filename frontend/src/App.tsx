@@ -49,7 +49,7 @@ const humanIntentGuidance: Record<
     detail: "Start with rows, columns, and preview.",
   },
   missing_values: {
-    label: "Find blanks",
+    label: "Missing values",
     route: "queryBuilder",
     nextStep: "Choose columns.",
     detail: "Check columns with empty values.",
@@ -61,13 +61,13 @@ const humanIntentGuidance: Record<
     detail: "Count the biggest groups.",
   },
   compare_columns: {
-    label: "Compare columns",
+    label: "Compare fields",
     route: "queryBuilder",
     nextStep: "Choose two columns.",
     detail: "View fields side by side.",
   },
   trends: {
-    label: "Find trends",
+    label: "Trend analysis",
     route: "queryBuilder",
     nextStep: "Choose time and value.",
     detail: "Summarize change over time.",
@@ -79,7 +79,7 @@ const humanIntentGuidance: Record<
     detail: "Look for highs, lows, and surprises.",
   },
   simple_chart: {
-    label: "Prepare chart",
+    label: "Visualize data",
     route: "queryBuilder",
     nextStep: "Build a small summary.",
     detail: "Prepare grouped chart data.",
@@ -609,11 +609,11 @@ function App() {
     if (intent === "missing_values") {
       return {
         title: guidance.label,
-        explanation: "Find blanks before totals change.",
+        explanation: "Review missing values before totals change.",
         metrics: [
-          { label: "Blank columns", value: columnsWithMissingValues.length.toLocaleString() },
+          { label: "Missing-value columns", value: columnsWithMissingValues.length.toLocaleString() },
           {
-            label: columnsWithMissingValues[0]?.name || "Top blank",
+            label: columnsWithMissingValues[0]?.name || "Highest missing",
             value: columnsWithMissingValues[0]?.null_count.toLocaleString() || "0",
           },
         ],
@@ -699,7 +699,7 @@ function App() {
         { label: "Groups", value: queryGroupBy.length.toLocaleString() },
       ],
       actions: [
-        { label: "Build chart data", view: "queryBuilder" as ActiveView },
+        { label: "Build visualization", view: "queryBuilder" as ActiveView },
         { label: "View results", view: "results" as ActiveView, tab: "queried" as ResultTabKey },
       ],
     };

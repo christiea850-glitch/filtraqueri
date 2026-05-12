@@ -28,12 +28,12 @@ type DatasetSummaryPanelProps = {
 
 export const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
-  { intent: "missing_values", label: "Find blanks" },
+  { intent: "missing_values", label: "Missing values" },
   { intent: "top_categories", label: "Top categories" },
-  { intent: "compare_columns", label: "Compare columns" },
-  { intent: "trends", label: "Find trends" },
+  { intent: "compare_columns", label: "Compare fields" },
+  { intent: "trends", label: "Trend analysis" },
   { intent: "unusual_values", label: "Unusual values" },
-  { intent: "simple_chart", label: "Prepare chart" },
+  { intent: "simple_chart", label: "Visualize data" },
 ];
 
 type DatasetSessionPanelProps = {
