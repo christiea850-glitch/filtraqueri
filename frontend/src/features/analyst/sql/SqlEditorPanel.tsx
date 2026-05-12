@@ -26,17 +26,17 @@ function SqlEditorPanel({
       <div className="sql-editor-toolbar">
         <div>
           <p className="section-label">SQL workspace</p>
-          <h2>Analyst query draft</h2>
+          <h2>Query draft</h2>
         </div>
         <div className="sql-actions">
           <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
-            Run Query
+            Run query
           </button>
           <button type="button" className="secondary-button" onClick={editor.onExplain}>
-            Explain
+            Explain query
           </button>
           <button type="button" className="secondary-button" onClick={editor.onSaveDraft}>
-            Save Draft
+            Save draft
           </button>
           <button type="button" className="text-button" onClick={editor.onClear}>
             Clear
@@ -64,11 +64,11 @@ export function SqlDraftPanel({ savedDrafts, onLoadDraft }: SqlDraftPanelProps) 
     <section className="sql-draft-panel" aria-label="Saved SQL drafts">
       <div className="sql-draft-list" aria-label="Saved SQL drafts">
         <div className="builder-block-header">
-          <span>Draft memory</span>
+          <span>Drafts</span>
           <small>{savedDrafts.length} saved</small>
         </div>
         {savedDrafts.length === 0 ? (
-          <p>No saved drafts in this workspace session.</p>
+          <p>No drafts yet.</p>
         ) : (
           savedDrafts.map((draft) => (
             <button type="button" key={draft.id} onClick={() => onLoadDraft(draft)}>

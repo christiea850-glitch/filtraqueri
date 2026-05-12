@@ -33,10 +33,10 @@ const builderSteps: Array<{
   label: string;
   helper: string;
 }> = [
-  { id: "columns", label: "Columns", helper: "Choose fields to include" },
-  { id: "group", label: "Group & Aggregate", helper: "Summarize rows" },
-  { id: "sort", label: "Sort & Limit", helper: "Order and size results" },
-  { id: "preview", label: "Preview & Run", helper: "Review before running" },
+  { id: "columns", label: "Columns", helper: "Choose fields" },
+  { id: "group", label: "Group", helper: "Summarize" },
+  { id: "sort", label: "Sort", helper: "Order rows" },
+  { id: "preview", label: "Run", helper: "Review" },
 ];
 
 function VisualQueryBuilderPanel({
@@ -102,7 +102,7 @@ function VisualQueryBuilderPanel({
       <div className="query-builder-header">
         <div>
           <p className="section-label">Query builder</p>
-          <h2>Build an analytical result</h2>
+          <h2>Build query</h2>
         </div>
         <button type="button" className="primary-button" onClick={onRunQuery}>
           {running ? "Running..." : "Run query"}
@@ -125,9 +125,9 @@ function VisualQueryBuilderPanel({
       </div>
 
       <div className="query-summary-strip" aria-label="Query builder summary">
-        <span>{selectedColumns.length} visible columns</span>
-        <span>{groupBy.length} grouped columns</span>
-        <span>{activeAggregations.length} active aggregations</span>
+        <span>{selectedColumns.length} columns</span>
+        <span>{groupBy.length} groups</span>
+        <span>{activeAggregations.length} aggregations</span>
         <span title={sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}>
           {sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}
         </span>
@@ -138,8 +138,8 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel">
           <div className="query-stage-heading">
             <div>
-              <h3>Choose visible columns</h3>
-              <p>Start with a focused set of fields. You can add more later without losing work.</p>
+              <h3>Choose columns</h3>
+              <p>Select fields.</p>
             </div>
             <small>
               {selectedColumns.length} selected, {schema.length} available
@@ -221,8 +221,8 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel">
           <div className="query-stage-heading">
             <div>
-              <h3>Group and aggregate</h3>
-              <p>Group by categories or dates, then choose counts, sums, averages, or ranges.</p>
+              <h3>Group</h3>
+              <p>Summarize rows.</p>
             </div>
             <button type="button" className="text-button" onClick={onAddAggregation}>
               Add aggregation
@@ -316,8 +316,8 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel compact-query-stage">
           <div className="query-stage-heading">
             <div>
-              <h3>Sort and limit</h3>
-              <p>Keep the output manageable and order it by the field that matters most.</p>
+              <h3>Sort</h3>
+              <p>Order and limit rows.</p>
             </div>
           </div>
 
@@ -370,8 +370,8 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel preview-query-stage">
           <div className="query-stage-heading">
             <div>
-              <h3>Preview and run</h3>
-              <p>Review the query shape, then run it through the existing query builder endpoint.</p>
+              <h3>Review</h3>
+              <p>Review, then run.</p>
             </div>
             <button type="button" className="primary-button" onClick={onRunQuery}>
               {running ? "Running..." : "Run query"}
@@ -384,14 +384,14 @@ function VisualQueryBuilderPanel({
               <strong>{selectedColumns.length || "Grouped result"}</strong>
               <p title={selectedColumns.join(", ")}>
                 {selectedColumns.slice(0, 6).join(", ") ||
-                  "Visible columns use groupings when aggregations are active."}
+                  "Uses grouped fields when summaries are active."}
               </p>
             </div>
             <div>
               <span>Grouping</span>
               <strong>{groupBy.length || "None"}</strong>
               <p title={groupBy.join(", ")}>
-                {groupBy.join(", ") || "Rows will not be grouped unless you choose group fields."}
+                {groupBy.join(", ") || "None"}
               </p>
             </div>
             <div>
@@ -400,7 +400,7 @@ function VisualQueryBuilderPanel({
               <p>
                 {activeAggregations
                   .map((aggregation) => `${aggregation.function} ${aggregation.column || "rows"}`)
-                  .join(", ") || "Add aggregations when you want summaries instead of row detail."}
+                  .join(", ") || "None"}
               </p>
             </div>
             <div>
@@ -414,7 +414,7 @@ function VisualQueryBuilderPanel({
         </div>
       )}
 
-      {running && <p className="status-message">Running query in DuckDB...</p>}
+      {running && <p className="status-message">Running query...</p>}
       {errorMessage && <p className="error-message">{errorMessage}</p>}
     </section>
   );

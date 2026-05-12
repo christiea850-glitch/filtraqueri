@@ -49,7 +49,7 @@ function ResultsGrid({
           <p className="section-label">{label}</p>
           <h2>{title}</h2>
           <p>
-            {totalCount.toLocaleString()} rows available, showing {rows.length.toLocaleString()}
+            Showing {rows.length.toLocaleString()} of {totalCount.toLocaleString()}
           </p>
         </div>
         {toolbarActions}
@@ -63,7 +63,7 @@ function ResultsGrid({
         </div>
       )}
 
-      {loading && <p className="status-message">Loading rows from DuckDB...</p>}
+      {loading && <p className="status-message">Loading rows...</p>}
 
       {rows.length === 0 && !loading ? (
         <div className="empty-state compact-empty">

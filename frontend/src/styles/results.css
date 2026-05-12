@@ -22,7 +22,7 @@
 
 .results-context-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+  grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.55fr);
   gap: 14px;
   align-items: stretch;
 }
@@ -216,10 +216,10 @@
 
 .results-workspace .session-panel {
   display: grid;
-  grid-template-columns: minmax(180px, 0.9fr) minmax(190px, 0.75fr) minmax(160px, 0.6fr) minmax(180px, 0.75fr);
-  gap: 14px;
-  align-items: start;
-  min-height: 148px;
+  grid-template-columns: minmax(180px, 1fr) repeat(4, minmax(92px, 0.5fr));
+  gap: 10px;
+  align-items: center;
+  min-height: 88px;
 }
 
 .results-workspace .session-panel h2,
@@ -234,13 +234,22 @@
   margin-top: 0;
 }
 
+.results-workspace .session-stat-list,
+.results-workspace .active-context {
+  gap: 4px;
+}
+
+.results-workspace .schema-type-list {
+  gap: 6px;
+}
+
 .results-workspace .session-stat-list {
   align-content: start;
 }
 
 .results-workspace .history-panel {
-  min-height: 148px;
-  max-height: 180px;
+  min-height: 88px;
+  max-height: 142px;
   overflow: auto;
 }
 

@@ -12,7 +12,7 @@ function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
       <div className="data-grid-toolbar">
         <div>
           <p className="section-label">Preview</p>
-          <h2>SQL result placeholder</h2>
+          <h2>Result preview</h2>
           <p>{previewResult.message}</p>
         </div>
       </div>
@@ -41,8 +41,8 @@ function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
       ) : (
         <div className="empty-state compact-empty">
           <p className="section-label">No execution</p>
-          <h2>Backend SQL execution is not connected yet</h2>
-          <p>Draft, save, and explain SQL here until the secure SQL endpoint is added.</p>
+          <h2>Execution not connected yet</h2>
+          <p>No results yet.</p>
         </div>
       )}
     </section>

@@ -10,11 +10,11 @@ function QueryHistoryPanel({ history, variant = "aside" }: QueryHistoryPanelProp
   const content = (
     <>
       <div>
-        <p className="section-label">History</p>
-        <h2>Query activity</h2>
+        <p className="section-label">Activity</p>
+        <h2>Activity</h2>
       </div>
       {history.length === 0 ? (
-        <p className="history-empty">Run filters or queries to build a session trail.</p>
+        <p className="history-empty">No activity yet.</p>
       ) : (
         <div className="history-list">
           {history.map((item) => (

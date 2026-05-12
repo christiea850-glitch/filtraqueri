@@ -14,18 +14,18 @@ LIMIT 100;`;
 
 const createPreviewMessage = (status: SqlExecutionStatus) => {
   if (status === "execution-pending") {
-    return "Run Query is wired as a frontend placeholder. Secure backend SQL execution will plug in here later.";
+    return "Execution not connected yet.";
   }
 
   if (status === "explain-ready") {
-    return "Explain is a placeholder for future validation and query plan feedback.";
+    return "Explain query ready.";
   }
 
   if (status === "draft-saved") {
-    return "Draft saved locally for this workspace session.";
+    return "Draft saved.";
   }
 
-  return "No SQL has been executed in this frontend-only foundation.";
+  return "No results yet.";
 };
 
 function useSqlWorkspace(dataset: DatasetMetadata | null) {

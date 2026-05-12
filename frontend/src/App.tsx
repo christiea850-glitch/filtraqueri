@@ -43,53 +43,46 @@ const humanIntentGuidance: Record<
   }
 > = {
   summary: {
-    label: "Summarize this dataset",
+    label: "Summarize",
     route: "results",
-    nextStep: "Review the preview rows and column list to get oriented.",
-    detail:
-      "Start with the row count, columns, and sample records. Use sorting or the result tabs to inspect the dataset without writing SQL.",
+    nextStep: "Review rows, columns, and preview.",
+    detail: "Start with rows, columns, and preview.",
   },
   missing_values: {
-    label: "Find missing values",
+    label: "Find blanks",
     route: "queryBuilder",
-    nextStep: "Choose the columns you want to check, then run analysis.",
-    detail:
-      "Use the visible column choices to focus the table. Columns with null counts in the dataset profile are good places to start.",
+    nextStep: "Choose columns.",
+    detail: "Check columns with empty values.",
   },
   top_categories: {
-    label: "Show top categories",
+    label: "Top categories",
     route: "queryBuilder",
-    nextStep: "Choose a category column in Group by, keep COUNT selected, then run the query.",
-    detail:
-      "This creates a beginner-friendly count by category using the existing query builder controls.",
+    nextStep: "Group a category.",
+    detail: "Count the biggest groups.",
   },
   compare_columns: {
-    label: "Compare two columns",
+    label: "Compare columns",
     route: "queryBuilder",
-    nextStep: "Select two visible columns, then run the query to compare their values side by side.",
-    detail:
-      "Pick columns that answer the same question from two angles, such as region and sales or status and owner.",
+    nextStep: "Choose two columns.",
+    detail: "View fields side by side.",
   },
   trends: {
     label: "Find trends",
     route: "queryBuilder",
-    nextStep: "Group by a date or time-like column, choose a useful aggregation, then run the query.",
-    detail:
-      "Trends work best when the dataset has a date column and a numeric measure to summarize.",
+    nextStep: "Choose time and value.",
+    detail: "Summarize change over time.",
   },
   unusual_values: {
-    label: "Find unusual values",
+    label: "Unusual values",
     route: "results",
-    nextStep: "Sort numeric or date columns to bring very high, very low, or unexpected values into view.",
-    detail:
-      "Use the column headers in the results grid to sort. Filtering can narrow the rows after something stands out.",
+    nextStep: "Sort rows.",
+    detail: "Look for highs, lows, and surprises.",
   },
   simple_chart: {
-    label: "Create simple chart",
+    label: "Prepare chart",
     route: "queryBuilder",
-    nextStep: "Build a small grouped result first, such as category plus COUNT.",
-    detail:
-      "Charts are not automated yet, but a grouped query gives you the clean summary table a chart will use later.",
+    nextStep: "Build a small summary.",
+    detail: "Prepare grouped chart data.",
   },
 };
 
@@ -573,9 +566,12 @@ function App() {
     if (!dataset) {
       return {
         title: guidance.label,
-        explanation: "Open a CSV first. Then this guide can help.",
-        canCheck: ["Dataset shape", "Column types", "Preview rows"],
-        signals: ["No dataset open"],
+        explanation: "No dataset open. Choose CSV.",
+        metrics: [
+          { label: "Rows", value: "0" },
+          { label: "Columns", value: "0" },
+          { label: "Preview loaded", value: "0" },
+        ],
         actions: [{ label: "Open a dataset", view: "dataset" as ActiveView }],
       };
     }
@@ -589,22 +585,19 @@ function App() {
     const previewRowsCount = previewResult.rows.length;
     const activeResultCount = resultTotalCount || activeResult.totalCount || dataset.row_count;
 
-    const baseSignals = [
-      `${dataset.row_count.toLocaleString()} rows`,
-      `${dataset.column_count.toLocaleString()} columns`,
-      activeFilterLabels.length > 0
-        ? `${activeFilterLabels.length} active filter${activeFilterLabels.length === 1 ? "" : "s"}`
-        : `${previewRowsCount.toLocaleString()} preview rows loaded`,
+    const baseMetrics = [
+      { label: "Rows", value: dataset.row_count.toLocaleString() },
+      { label: "Columns", value: dataset.column_count.toLocaleString() },
+      { label: "Preview loaded", value: previewRowsCount.toLocaleString() },
     ];
 
     if (intent === "summary") {
       return {
         title: guidance.label,
-        explanation: "Start with size, columns, and sample rows.",
-        canCheck: ["Size", "Column types", "Preview rows"],
-        signals: [
-          ...baseSignals,
-          `${activeResultCount.toLocaleString()} active rows`,
+        explanation: "Start with rows, columns, and preview.",
+        metrics: [
+          ...baseMetrics,
+          { label: "Active rows", value: activeResultCount.toLocaleString() },
         ],
         actions: [
           { label: "View results", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
@@ -616,15 +609,13 @@ function App() {
     if (intent === "missing_values") {
       return {
         title: guidance.label,
-        explanation: "Find blanks before they affect totals.",
-        canCheck: ["Blank columns", "Filter impact", "Rows to inspect"],
-        signals: [
-          columnsWithMissingValues.length > 0
-            ? `${columnsWithMissingValues.length} column${columnsWithMissingValues.length === 1 ? "" : "s"} with blanks`
-            : "No missing counts found",
-          ...columnsWithMissingValues.slice(0, 2).map((column) =>
-            `${column.name}: ${column.null_count.toLocaleString()} blank${column.null_count === 1 ? "" : "s"}`,
-          ),
+        explanation: "Find blanks before totals change.",
+        metrics: [
+          { label: "Blank columns", value: columnsWithMissingValues.length.toLocaleString() },
+          {
+            label: columnsWithMissingValues[0]?.name || "Top blank",
+            value: columnsWithMissingValues[0]?.null_count.toLocaleString() || "0",
+          },
         ],
         actions: [
           { label: "Choose columns", view: "queryBuilder" as ActiveView },
@@ -637,16 +628,11 @@ function App() {
       const firstCategory = categoricalColumns[0];
       return {
         title: guidance.label,
-        explanation: "See the biggest groups quickly.",
-        canCheck: ["Category columns", "Group counts", "Common values"],
-        signals: [
-          firstCategory
-            ? `${firstCategory.name} looks useful`
-            : "No category column found",
-          `${categoricalColumns.length} category/text column${categoricalColumns.length === 1 ? "" : "s"}`,
-          queryGroupBy.length > 0
-            ? `Grouped by ${queryGroupBy.join(", ")}`
-            : "No grouped query yet",
+        explanation: "Count the biggest groups.",
+        metrics: [
+          { label: "Category columns", value: categoricalColumns.length.toLocaleString() },
+          { label: "Suggested", value: firstCategory?.name || "None" },
+          { label: "Grouped", value: queryGroupBy.length.toLocaleString() },
         ],
         actions: [
           { label: "Build summary", view: "queryBuilder" as ActiveView },
@@ -660,12 +646,10 @@ function App() {
       return {
         title: guidance.label,
         explanation: "Put two fields side by side.",
-        canCheck: ["Two columns", "Preview rows", "Sort order"],
-        signals: [
-          comparisonColumns.length >= 2
-            ? `${comparisonColumns.join(" and ")} suggested`
-            : "Needs at least two columns",
-          `${querySelectedColumns.length} selected column${querySelectedColumns.length === 1 ? "" : "s"}`,
+        metrics: [
+          { label: "Selected", value: querySelectedColumns.length.toLocaleString() },
+          { label: "First", value: comparisonColumns[0] || "None" },
+          { label: "Second", value: comparisonColumns[1] || "None" },
         ],
         actions: [
           { label: "Choose columns", view: "queryBuilder" as ActiveView },
@@ -678,14 +662,10 @@ function App() {
       return {
         title: guidance.label,
         explanation: "Use time plus a number.",
-        canCheck: ["Date column", "Numeric value", "Grouped result"],
-        signals: [
-          dateColumns.length > 0
-            ? `${dateColumns[0].name} looks time-based`
-            : "No date column found",
-          numericColumns.length > 0
-            ? `${numericColumns[0].name} can be measured`
-            : "No numeric value found",
+        metrics: [
+          { label: "Date columns", value: dateColumns.length.toLocaleString() },
+          { label: "Numeric columns", value: numericColumns.length.toLocaleString() },
+          { label: "Suggested value", value: numericColumns[0]?.name || "None" },
         ],
         actions: [
           { label: "Build trend", view: "queryBuilder" as ActiveView },
@@ -698,13 +678,10 @@ function App() {
       return {
         title: guidance.label,
         explanation: "Sort to find highs, lows, and surprises.",
-        canCheck: ["Numeric/date columns", "Preview rows", "Filtered count"],
-        signals: [
-          `${numericColumns.length + dateColumns.length} sortable column${numericColumns.length + dateColumns.length === 1 ? "" : "s"}`,
-          `${activeResultCount.toLocaleString()} current rows`,
-          activeResult.sortColumn
-            ? `${activeResult.sortColumn} sorted ${activeResult.sortDirection}`
-            : "No sort active",
+        metrics: [
+          { label: "Sortable", value: (numericColumns.length + dateColumns.length).toLocaleString() },
+          { label: "Rows", value: activeResultCount.toLocaleString() },
+          { label: "Sort", value: activeResult.sortColumn || "None" },
         ],
         actions: [
           { label: "Sort rows", view: "results" as ActiveView, tab: "preview" as ResultTabKey },
@@ -716,14 +693,10 @@ function App() {
     return {
       title: guidance.label,
       explanation: "Start with a small summary table.",
-      canCheck: ["Category", "Count or value", "Grouped result"],
-      signals: [
-        categoricalColumns[0]
-          ? `${categoricalColumns[0].name} can be the category`
-          : "No category column found",
-        numericColumns[0]
-          ? `${numericColumns[0].name} can be the value`
-          : "COUNT can be used when there is no numeric value.",
+      metrics: [
+        { label: "Category", value: categoricalColumns[0]?.name || "None" },
+        { label: "Value", value: numericColumns[0]?.name || "COUNT" },
+        { label: "Groups", value: queryGroupBy.length.toLocaleString() },
       ],
       actions: [
         { label: "Build chart data", view: "queryBuilder" as ActiveView },
@@ -758,23 +731,13 @@ function App() {
           <strong>Next step</strong> {guidance.nextStep}
         </p>
         <p>{insight.explanation}</p>
-        <div className="human-insight-grid">
-          <div>
-            <strong>Check</strong>
-            <ul>
-              {insight.canCheck.slice(0, 3).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <strong>Current signal</strong>
-            <ul>
-              {insight.signals.slice(0, 3).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </div>
+        <div className="human-insight-metrics">
+          {insight.metrics.slice(0, 4).map((metric) => (
+            <div key={`${metric.label}-${metric.value}`}>
+              <span>{metric.label}</span>
+              <strong title={metric.value}>{metric.value}</strong>
+            </div>
+          ))}
         </div>
         <div className="human-insight-actions">
           <span>Go to</span>
@@ -803,8 +766,7 @@ function App() {
   const renderNoDatasetView = () => (
     <section className="empty-state">
       <p className="section-label">No dataset</p>
-      <h2>Open a CSV file to activate this workspace view</h2>
-      <p>Use the sidebar Open File action or return to Welcome to upload a dataset.</p>
+      <h2>No dataset open. Choose CSV.</h2>
     </section>
   );
 
@@ -815,8 +777,8 @@ function App() {
         uploading={isUploading}
         errorMessage={errorMessage}
         selectedFileName={selectedFileName}
-        buttonLabel="Upload CSV to start"
-        context="Ask your data naturally"
+        buttonLabel="Choose CSV"
+        context="Open data"
         onFileChange={handleFileUpload}
       />
     ),
@@ -907,8 +869,7 @@ function App() {
                 className="collapsed-panel-bar"
                 onClick={() => setIsResultsContextCollapsed(false)}
               >
-                Results context hidden - {activeFilterLabels.length} active filters -{" "}
-                {queryHistory.length} history items
+                Context hidden · {activeFilterLabels.length} filters · {queryHistory.length} history
               </button>
             ) : (
               <div className="results-context-strip" aria-label="Results context">
@@ -929,9 +890,9 @@ function App() {
                   ? "Query results"
                   : activeResultTab === "filtered"
                     ? "Filtered results"
-                    : "Preview results"
+                    : "Preview"
               }
-              label="Data grid"
+              label="Results"
               columns={resultColumns}
               rows={resultRows}
               totalCount={resultTotalCount}
@@ -942,8 +903,8 @@ function App() {
               page={resultPage}
               totalPages={resultTotalPages}
               rowsPerPage={resultRowsPerPage}
-              emptyTitle="No rows returned"
-              emptyDescription="Adjust filters, sorting, or query builder settings and try again."
+              emptyTitle="No results yet."
+              emptyDescription="Run a query or apply filters."
               onSortColumn={sortWorkspaceColumn}
               onPageChange={changeWorkspacePage}
               onRowsPerPageChange={changeWorkspaceRowsPerPage}
@@ -971,10 +932,9 @@ function App() {
         <section className="export-panel standalone-panel">
           <div>
             <p className="section-label">Export</p>
-            <h2>Export current results</h2>
+            <h2>Export</h2>
             <p>
-              Export the active {activeResultTab === "queried" ? "query" : activeResultTab}{" "}
-              result as CSV.
+              {activeResultTab === "queried" ? "Query result" : activeResultTab} CSV.
             </p>
           </div>
           <button type="button" className="primary-button" onClick={exportCurrentResults}>
@@ -986,8 +946,8 @@ function App() {
       <section className="settings-panel standalone-panel">
         <div>
           <p className="section-label">Settings</p>
-          <h2>Workspace settings</h2>
-          <p>Settings will live here as the workspace grows.</p>
+          <h2>Settings</h2>
+          <p>Preferences.</p>
         </div>
       </section>
     ),

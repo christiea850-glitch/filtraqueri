@@ -27,13 +27,13 @@ type DatasetSummaryPanelProps = {
 };
 
 export const humanGuidanceCards: HumanGuidanceCard[] = [
-  { intent: "summary", label: "Summarize this dataset" },
-  { intent: "missing_values", label: "Find missing values" },
-  { intent: "top_categories", label: "Show top categories" },
-  { intent: "compare_columns", label: "Compare two columns" },
+  { intent: "summary", label: "Summarize" },
+  { intent: "missing_values", label: "Find blanks" },
+  { intent: "top_categories", label: "Top categories" },
+  { intent: "compare_columns", label: "Compare columns" },
   { intent: "trends", label: "Find trends" },
-  { intent: "unusual_values", label: "Find unusual values" },
-  { intent: "simple_chart", label: "Create simple chart" },
+  { intent: "unusual_values", label: "Unusual values" },
+  { intent: "simple_chart", label: "Prepare chart" },
 ];
 
 type DatasetSessionPanelProps = {
@@ -52,45 +52,30 @@ export function DatasetSessionPanel({
   return (
     <aside className="session-panel">
       <div>
-        <p className="section-label">Session</p>
+        <p className="section-label">Context</p>
         <h2 title={dataset.original_filename}>{dataset.original_filename}</h2>
       </div>
       <div className="session-stat-list">
-        <span title={dataset.table_name}>{dataset.table_name}</span>
-        <strong>{dataset.row_count.toLocaleString()} rows</strong>
-        <strong>{dataset.column_count.toLocaleString()} columns</strong>
+        <span>Rows</span>
+        <strong>{dataset.row_count.toLocaleString()}</strong>
       </div>
       <div className="schema-type-list">
-        {Object.entries(schemaTypeSummary).map(([type, count]) => (
-          <span key={type}>
-            {type}
-            <strong>{count}</strong>
-          </span>
-        ))}
+        <span>
+          Columns
+          <strong>{dataset.column_count.toLocaleString()}</strong>
+        </span>
+        <span>
+          Types
+          <strong>{Object.keys(schemaTypeSummary).length}</strong>
+        </span>
       </div>
       <div className="active-context">
-        <p>Active filters</p>
-        {activeFilterLabels.length > 0 ? (
-          activeFilterLabels.map((label) => (
-            <span key={label} title={label}>
-              {label}
-            </span>
-          ))
-        ) : (
-          <small>No filters applied</small>
-        )}
+        <p>Filters</p>
+        <small>{activeFilterLabels.length || "None"}</small>
       </div>
       <div className="active-context">
-        <p>Active groupings</p>
-        {queryGroupBy.length > 0 ? (
-          queryGroupBy.map((column) => (
-            <span key={column} title={column}>
-              {column}
-            </span>
-          ))
-        ) : (
-          <small>No grouped query active</small>
-        )}
+        <p>Grouping</p>
+        <small>{queryGroupBy.length > 0 ? queryGroupBy.join(", ") : "None"}</small>
       </div>
     </aside>
   );
@@ -118,16 +103,16 @@ function DatasetSummaryPanel({
       <section className="dataset-hub-panel" aria-label="Dataset management hub">
         <div className="summary-header">
           <div>
-            <p className="section-label">Dataset Hub</p>
-            <h2>{dataset ? "Manage your current dataset" : "Open a dataset to begin"}</h2>
+            <p className="section-label">Data</p>
+            <h2>{dataset ? "Current dataset" : "No dataset open. Choose CSV."}</h2>
           </div>
           <div className="dataset-summary-actions dataset-hub-actions">
             <button type="button" className="primary-button" onClick={onOpenDataset}>
-              Open or upload CSV
+              Open data
             </button>
             {dataset && (
               <button type="button" className="secondary-button" onClick={onClearCurrentDataset}>
-                Clear current session
+                Clear session
               </button>
             )}
           </div>
@@ -158,42 +143,39 @@ function DatasetSummaryPanel({
             </div>
             <div className="dataset-card-actions">
               <button type="button" className="secondary-button" onClick={onViewPreview}>
-                View data preview
+                View results
               </button>
               <button
                 type="button"
                 className="text-button danger-text-button"
                 onClick={() => onDeleteDataset(dataset.dataset_id)}
               >
-                Delete dataset
+                Delete
               </button>
             </div>
           </div>
         ) : (
           <div className="dataset-empty-guidance">
-            <p>
-              Upload a CSV to activate filters, query builder, results, and guided Human Mode
-              workflows.
-            </p>
+            <p>No dataset open. Choose CSV.</p>
             <button type="button" className="primary-button" onClick={onOpenDataset}>
-              Choose a CSV file
+              Choose CSV
             </button>
           </div>
         )}
       </section>
 
-      <section className="dataset-hub-panel" aria-label="Recent datasets">
+      <section className="dataset-hub-panel" aria-label="Recent files">
         <div className="summary-header">
           <div>
-            <p className="section-label">Recent datasets</p>
-            <h2>Session library</h2>
+            <p className="section-label">Recent files</p>
+            <h2>Recent files</h2>
           </div>
-          <span className="dataset-count-pill">{recentDatasets.length} saved</span>
+          <span className="dataset-count-pill">{recentDatasets.length}</span>
         </div>
 
         {recentDatasets.length === 0 ? (
           <div className="dataset-empty-guidance compact-dataset-empty">
-            <p>No recent datasets yet. Upload a CSV and it will appear here for quick access.</p>
+            <p>No recent files.</p>
           </div>
         ) : (
           <div className="recent-dataset-list">
@@ -231,7 +213,7 @@ function DatasetSummaryPanel({
                       className="text-button"
                       onClick={() => onRemoveRecentDataset(metadata.dataset_id)}
                     >
-                      Remove recent
+                      Remove
                     </button>
                     <button
                       type="button"
@@ -252,11 +234,7 @@ function DatasetSummaryPanel({
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
             <p className="section-label">Guided analysis</p>
-            <h2>What do you want to understand?</h2>
-            <p>
-              Start with a no-code question. FiltraQueri will keep heavy dataset work on the
-              backend as the guidance layer grows.
-            </p>
+            <h2>Choose an insight</h2>
           </div>
           <div className="human-suggestion-grid">
             {humanGuidanceCards.map((suggestion) => (

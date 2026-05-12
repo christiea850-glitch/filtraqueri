@@ -60,8 +60,8 @@ function DynamicFiltersPanel({
     <section className="filters-panel" aria-label="Dynamic filters">
       <div className="filters-header">
         <div>
-          <p className="section-label">Smart filters</p>
-          <h2>Refine the preview</h2>
+          <p className="section-label">Filters</p>
+          <h2>Refine rows</h2>
         </div>
         <div className="filter-actions">
           <button
@@ -86,12 +86,12 @@ function DynamicFiltersPanel({
           className="collapsed-panel-bar"
           onClick={() => setIsControlsCollapsed(false)}
         >
-          Filter controls hidden - {activeFilterLabels.length} active - {visibleSchema.length} visible
+          Filters hidden · {activeFilterLabels.length} active · {visibleSchema.length} columns
         </button>
       ) : (
         <div className="filters-control-strip">
           <div className="active-filter-summary" aria-label="Active filter summary">
-            <span>Active filters</span>
+            <span>Filters</span>
             {activeFilterLabels.length > 0 ? (
               activeFilterLabels.map((label) => <strong key={label}>{label}</strong>)
             ) : (
@@ -100,7 +100,7 @@ function DynamicFiltersPanel({
           </div>
 
           <label className="filter-search">
-            <span>Search columns</span>
+            <span>Columns</span>
             <input
               type="search"
               value={columnSearch}
@@ -216,14 +216,14 @@ function DynamicFiltersPanel({
 
         {visibleSchema.length === 0 && (
           <div className="empty-state compact-empty">
-            <p className="section-label">No matching columns</p>
-            <h2>No filters match your search</h2>
-            <p>Try a column name or a type like numeric, date, text, categorical, or boolean.</p>
+            <p className="section-label">No columns</p>
+            <h2>No matching columns</h2>
+            <p>Try a name or type.</p>
           </div>
         )}
       </div>
 
-      {applying && <p className="status-message">Filtering rows in DuckDB...</p>}
+      {applying && <p className="status-message">Applying filters...</p>}
       {errorMessage && <p className="error-message">{errorMessage}</p>}
     </section>
   );

@@ -53,7 +53,7 @@ type WorkspaceShellProps = {
   onRecentDatasetClick: (datasetId: string) => void;
 };
 
-const menuItems = ["View", "Tools", "Help"];
+const menuItems = ["Help"];
 
 const workspaceHubs: HubItem[] = [
   {
@@ -62,7 +62,7 @@ const workspaceHubs: HubItem[] = [
     icon: "home",
     defaultView: "welcome",
     mode: "human",
-    subItems: [{ view: "welcome", label: "Welcome", description: "Start or upload" }],
+    subItems: [{ view: "welcome", label: "Open data", description: "Choose CSV" }],
   },
   {
     id: "data",
@@ -70,7 +70,7 @@ const workspaceHubs: HubItem[] = [
     icon: "data",
     defaultView: "dataset",
     mode: "human",
-    subItems: [{ view: "dataset", label: "Dataset Hub", description: "Manage datasets" }],
+    subItems: [{ view: "dataset", label: "Data", description: "Current dataset" }],
   },
   {
     id: "explore",
@@ -86,7 +86,7 @@ const workspaceHubs: HubItem[] = [
     icon: "build",
     defaultView: "queryBuilder",
     mode: "human",
-    subItems: [{ view: "queryBuilder", label: "Query Builder", description: "Group and aggregate" }],
+    subItems: [{ view: "queryBuilder", label: "Build query", description: "Group and aggregate" }],
   },
   {
     id: "results",
@@ -95,8 +95,8 @@ const workspaceHubs: HubItem[] = [
     defaultView: "results",
     mode: "human",
     subItems: [
-      { view: "results", label: "Result Grid", description: "Preview and query output" },
-      { view: "history", label: "History", description: "Session activity" },
+      { view: "results", label: "Results", description: "Preview and output" },
+      { view: "history", label: "Activity", description: "Session log" },
       { view: "export", label: "Export", description: "Download CSV" },
     ],
   },
@@ -114,7 +114,7 @@ const workspaceHubs: HubItem[] = [
     icon: "settings",
     defaultView: "settings",
     mode: "human",
-    subItems: [{ view: "settings", label: "Workspace Settings", description: "Preferences" }],
+    subItems: [{ view: "settings", label: "Settings", description: "Preferences" }],
   },
 ];
 
@@ -291,14 +291,14 @@ function WorkspaceShell({
             </span>
             <span className="nav-label">{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
           </button>
-          <button type="button" className="sidebar-primary" onClick={onOpenFile} title="Open or upload CSV">
+          <button type="button" className="sidebar-primary" onClick={onOpenFile} title="Open data">
             <span className="nav-icon" aria-hidden="true">
               <WorkspaceIcon name="upload" />
             </span>
-            <span className="nav-label">Open File</span>
+            <span className="nav-label">Open data</span>
           </button>
           <div className="sidebar-dataset-summary" aria-label="Active dataset">
-            <p>Active dataset</p>
+            <p>Dataset</p>
             {dataset ? (
               <>
                 <strong>{dataset.original_filename}</strong>
@@ -308,14 +308,14 @@ function WorkspaceShell({
                 </span>
               </>
             ) : (
-              <span>No dataset open</span>
+              <span>No dataset open. Choose CSV.</span>
             )}
           </div>
           {!isSidebarCollapsed && activeHub.id === "data" && (
-          <div className="sidebar-recents" aria-label="Recent datasets">
-            <p>Recent datasets</p>
+          <div className="sidebar-recents" aria-label="Recent files">
+            <p>Recent files</p>
             {recentDatasets.length === 0 ? (
-              <span>No recent datasets</span>
+              <span>No recent files</span>
             ) : (
               recentDatasets.map((session) => (
                 <button

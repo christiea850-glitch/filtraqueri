@@ -21,17 +21,17 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
       <section className="welcome-screen">
         <div className="welcome-copy">
           <p className="section-label">Workspace</p>
-          <h2>Welcome to FiltraQueri</h2>
-          <p>Simple Data Intelligence for Everyone</p>
+          <h2>Open data</h2>
+          <p>Start with a CSV.</p>
           <div className="welcome-actions">
             <button type="button" className="primary-button" onClick={openFilePicker}>
               {buttonLabel}
             </button>
             <button type="button" className="secondary-button">
-              Open recent dataset
+              Recent files
             </button>
             <button type="button" className="secondary-button">
-              Try sample dataset
+              Sample data
             </button>
           </div>
           <input
@@ -44,7 +44,7 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
           />
           <p className="welcome-note">{context}</p>
           {selectedFileName && <p className="selected-file-name">Selected: {selectedFileName}</p>}
-          {uploading && <p className="status-message">Uploading and profiling your dataset...</p>}
+          {uploading && <p className="status-message">Uploading dataset...</p>}
           {errorMessage && <p className="error-message">{errorMessage}</p>}
         </div>
       </section>

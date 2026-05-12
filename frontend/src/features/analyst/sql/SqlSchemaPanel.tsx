@@ -33,19 +33,19 @@ function SqlSchemaPanel({
 
       <div className="sql-context-body">
         <div>
-          <p className="section-label">Active dataset</p>
+          <p className="section-label">Dataset</p>
           <h2>{dataset ? dataset.original_filename : "No dataset open"}</h2>
         </div>
         <div className="session-stat-list">
-          <span>{dataset ? dataset.table_name : "Upload a CSV to bind SQL to data"}</span>
-          <strong>{dataset ? `${dataset.row_count.toLocaleString()} rows` : "Execution disabled"}</strong>
-          <strong>{dataset ? `${dataset.column_count.toLocaleString()} columns` : "Schema pending"}</strong>
+          <span>{dataset ? dataset.table_name : "No dataset open."}</span>
+          <strong>{dataset ? `${dataset.row_count.toLocaleString()} rows` : "No dataset open."}</strong>
+          <strong>{dataset ? `${dataset.column_count.toLocaleString()} columns` : "No dataset open."}</strong>
         </div>
 
         <div className="sql-helper-section">
           <div className="builder-block-header">
             <span>Columns</span>
-            <small>{dataset ? `${dataset.schema.length} detected` : "pending"}</small>
+            <small>{dataset ? `${dataset.schema.length}` : "0"}</small>
           </div>
           <div className="schema-list sql-schema-list" aria-label="SQL available columns">
             {dataset ? (
@@ -61,7 +61,7 @@ function SqlSchemaPanel({
                 </button>
               ))
             ) : (
-              <p className="sql-helper-empty">Column metadata will appear here after upload.</p>
+              <p className="sql-helper-empty">No dataset open.</p>
             )}
           </div>
         </div>
@@ -69,7 +69,7 @@ function SqlSchemaPanel({
         <div className="sql-helper-section">
           <div className="builder-block-header">
             <span>Suggestions</span>
-            <small>Insert chips</small>
+            <small>Chips</small>
           </div>
           <div className="sql-suggestion-grid">
             {columnSuggestions.length > 0 ? (
@@ -80,7 +80,7 @@ function SqlSchemaPanel({
                 </button>
               ))
             ) : (
-              <p className="sql-helper-empty">Dataset-aware column chips are waiting for a dataset.</p>
+              <p className="sql-helper-empty">No dataset open.</p>
             )}
           </div>
         </div>
@@ -88,7 +88,7 @@ function SqlSchemaPanel({
         <div className="sql-helper-section">
           <div className="builder-block-header">
             <span>Keywords</span>
-            <small>Autocomplete base</small>
+            <small>Autocomplete</small>
           </div>
           <div className="sql-keyword-list">
             {keywordSuggestions.map((keyword) => (
