@@ -146,6 +146,8 @@ function App() {
     buildBackendFilters,
     createFilterLabels,
   } = useFilterController();
+  const createOrderBy = (column: string, direction: ResultState["sortDirection"]) =>
+    column ? { column, direction } : null;
   const {
     dataset,
     recentDatasets,
@@ -191,7 +193,9 @@ function App() {
     setErrorMessage,
     setHumanIntent,
   });
-  const activeFilters = buildBackendFilters(dataset);
+  const draftFilters = buildBackendFilters(dataset);
+  const activeFilters =
+    activeResultTab === "preview" ? [] : activeResult.source?.filters || draftFilters;
   const activeFilterLabels = createFilterLabels(activeFilters);
   const buildActiveBackendFilters = () => buildBackendFilters(dataset);
   const {
@@ -214,14 +218,6 @@ function App() {
   const { isExporting, exportCurrentResults: runExportCurrentResults } = useExportController({
     dataset,
     activeResultModel,
-    hasRunQuery,
-    queryLimit,
-    queryGroupBy,
-    querySelectedColumns,
-    activeAggregations,
-    querySortColumn,
-    querySortDirection,
-    buildBackendFilters: buildActiveBackendFilters,
     addHistory,
   });
 
@@ -266,16 +262,13 @@ function App() {
     setErrorMessage("");
 
     try {
+      const filters = buildActiveBackendFilters();
+      const orderBy = createOrderBy(filteredResult.sortColumn, filteredResult.sortDirection);
       const filterResult = await filterDataset(dataset.dataset_id, {
-        filters: buildActiveBackendFilters(),
+        filters,
         limit: filteredResult.rowsPerPage,
         page: 1,
-        order_by: filteredResult.sortColumn
-          ? {
-              column: filteredResult.sortColumn,
-              direction: filteredResult.sortDirection,
-            }
-          : null,
+        order_by: orderBy,
       });
       updateFilteredResult(
         {
@@ -285,6 +278,10 @@ function App() {
           totalCount: filterResult.total_count,
           page: 1,
           rowsPerPage: filterResult.limit,
+          source: {
+            filters,
+            orderBy,
+          },
         },
         true,
       );
@@ -327,6 +324,10 @@ function App() {
           totalCount: filterResult.total_count,
           page: 1,
           rowsPerPage: filterResult.limit,
+          source: {
+            filters: [],
+            orderBy: null,
+          },
         },
         true,
       );
@@ -356,16 +357,16 @@ function App() {
     setErrorMessage("");
 
     try {
+      const filters =
+        activeResultTab === "filtered"
+          ? activeResult.source?.filters || buildActiveBackendFilters()
+          : [];
+      const orderBy = createOrderBy(sortColumn, sortDirection);
       const filterResult = await filterDataset(dataset.dataset_id, {
-        filters: activeResultTab === "filtered" ? buildActiveBackendFilters() : [],
+        filters,
         limit: rowsPerPage,
         page,
-        order_by: sortColumn
-          ? {
-              column: sortColumn,
-              direction: sortDirection,
-            }
-          : null,
+        order_by: orderBy,
       });
       const nextResult = {
         columns: filterResult.columns,
@@ -375,6 +376,10 @@ function App() {
         rowsPerPage: filterResult.limit,
         sortColumn,
         sortDirection,
+        source: {
+          filters,
+          orderBy,
+        },
       };
 
       if (activeResultTab === "filtered") {
@@ -402,23 +407,21 @@ function App() {
     setHasRunQuery(true);
 
     try {
-      const queryResult = await runQueryBuilder(dataset.dataset_id, {
+      const filters = buildActiveBackendFilters();
+      const orderBy = createOrderBy(querySortColumn, querySortDirection);
+      const queryBuilderRequest = {
         selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
         group_by: queryGroupBy,
         aggregations: activeAggregations.map((aggregation) => ({
           function: aggregation.function,
           column: aggregation.column || null,
         })),
-        filters: buildActiveBackendFilters(),
-        order_by: querySortColumn
-          ? {
-              column: querySortColumn,
-              direction: querySortDirection,
-            }
-          : null,
+        filters,
+        order_by: orderBy,
         limit: Number(queryLimit) || queriedResult.rowsPerPage,
         page: 1,
-      });
+      };
+      const queryResult = await runQueryBuilder(dataset.dataset_id, queryBuilderRequest);
       updateQueriedResult(
         {
           ...queriedResult,
@@ -429,6 +432,11 @@ function App() {
           rowsPerPage: queryResult.limit,
           sortColumn: querySortColumn,
           sortDirection: querySortDirection,
+          source: {
+            filters,
+            queryBuilder: queryBuilderRequest,
+            orderBy,
+          },
         },
         true,
       );
@@ -464,23 +472,26 @@ function App() {
     setHasRunQuery(true);
 
     try {
-      const queryResult = await runQueryBuilder(dataset.dataset_id, {
-        selected_columns: activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
-        group_by: queryGroupBy,
-        aggregations: activeAggregations.map((aggregation) => ({
-          function: aggregation.function,
-          column: aggregation.column || null,
-        })),
-        filters: buildActiveBackendFilters(),
-        order_by: sortColumn
-          ? {
-              column: sortColumn,
-              direction: sortDirection,
-            }
-          : null,
+      const sourceQuery = queriedResult.source?.queryBuilder;
+      const filters = queriedResult.source?.filters || buildActiveBackendFilters();
+      const orderBy = createOrderBy(sortColumn, sortDirection);
+      const queryBuilderRequest = {
+        selected_columns:
+          sourceQuery?.selected_columns ||
+          (activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns),
+        group_by: sourceQuery?.group_by || queryGroupBy,
+        aggregations:
+          sourceQuery?.aggregations ||
+          activeAggregations.map((aggregation) => ({
+            function: aggregation.function,
+            column: aggregation.column || null,
+          })),
+        filters,
+        order_by: orderBy,
         limit: rowsPerPage,
         page,
-      });
+      };
+      const queryResult = await runQueryBuilder(dataset.dataset_id, queryBuilderRequest);
       updateQueriedResult({
         columns: queryResult.columns,
         rows: queryResult.rows,
@@ -489,6 +500,11 @@ function App() {
         rowsPerPage: queryResult.limit,
         sortColumn,
         sortDirection,
+        source: {
+          filters,
+          queryBuilder: queryBuilderRequest,
+          orderBy,
+        },
       });
     } catch (error) {
       const message =
@@ -891,7 +907,7 @@ function App() {
                   dataset={dataset}
                   schemaTypeSummary={schemaTypeSummary}
                   activeFilterLabels={activeFilterLabels}
-                  queryGroupBy={queryGroupBy}
+                  queryGroupBy={activeResultModel?.grouping.columns || queryGroupBy}
                 />
 
                 <QueryHistoryPanel history={queryHistory} />

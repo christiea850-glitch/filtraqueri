@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata, SchemaColumn } from "../dataset/datasetTypes";
 import type { FilterDefinition } from "../filters/filterTypes";
 import type { AggregationState } from "../query-builder/queryBuilderTypes";
-import type { ResultState, ResultTabKey, SortDirection } from "./resultTypes";
+import type {
+  ResultSourceQueryBuilderSnapshot,
+  ResultState,
+  ResultTabKey,
+  SortDirection,
+} from "./resultTypes";
 
 export type ActiveResultSourceType = "preview" | "filtered" | "query";
 
@@ -44,6 +49,8 @@ export type ActiveResultModel = {
     rowCount: number;
     columns: string[];
     rows: Record<string, unknown>[];
+    filters: FilterDefinition[];
+    queryBuilder: ResultSourceQueryBuilderSnapshot | null;
   };
   chartReady: {
     numericColumns: SchemaColumn[];
@@ -131,6 +138,9 @@ export function createActiveResultModel({
   const sourceColumns = activeResult.columns;
   const visibleColumns = sourceColumns.filter((column) => !hiddenColumns.includes(column));
   const totalCount = activeResult.totalCount;
+  const sourceFilters = activeResult.source?.filters || activeFilters;
+  const sourceGroupBy =
+    sourceType === "query" ? activeResult.source?.queryBuilder?.group_by || queryGroupBy : queryGroupBy;
   const totalPages = Math.max(1, Math.ceil((totalCount || 0) / activeResult.rowsPerPage));
   const numericColumns = dataset.schema.filter((column) => column.inferred_type === "numeric");
   const categoricalColumns = dataset.schema.filter(
@@ -161,11 +171,11 @@ export function createActiveResultModel({
     rowsPerPage: activeResult.rowsPerPage,
     filters: {
       activeLabels: activeFilterLabels,
-      backendFilters: activeFilters,
+      backendFilters: sourceFilters,
     },
     grouping: {
-      columns: queryGroupBy,
-      hasGrouping: queryGroupBy.length > 0,
+      columns: sourceGroupBy,
+      hasGrouping: sourceGroupBy.length > 0,
     },
     sorting: {
       column: activeResult.sortColumn,
@@ -182,6 +192,8 @@ export function createActiveResultModel({
       rowCount: totalCount,
       columns: sourceColumns,
       rows: activeResult.rows,
+      filters: sourceFilters,
+      queryBuilder: activeResult.source?.queryBuilder || null,
     },
     chartReady: {
       numericColumns,

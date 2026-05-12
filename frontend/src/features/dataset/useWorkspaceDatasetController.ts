@@ -165,6 +165,10 @@ function useWorkspaceDatasetController({
         rowsPerPage: 25,
         sortColumn: "",
         sortDirection: "ASC",
+        source: {
+          filters: [],
+          orderBy: null,
+        },
       });
       setFilteredResult(createEmptyResultState());
       setQueriedResult(createEmptyResultState());

@@ -1,7 +1,5 @@
 import { useState } from "react";
 import type { DatasetMetadata } from "../dataset/datasetTypes";
-import type { FilterDefinition } from "../filters/filterTypes";
-import type { AggregationState } from "../query-builder/queryBuilderTypes";
 import type { ActiveResultModel } from "../results/activeResultModel";
 import { getExportPayload, getQuerySourceType } from "../results/activeResultModel";
 import { exportDataset } from "../../services/api";
@@ -11,26 +9,10 @@ const MAX_QUERY_LIMIT = 1000;
 function useExportController({
   dataset,
   activeResultModel,
-  hasRunQuery,
-  queryLimit,
-  queryGroupBy,
-  querySelectedColumns,
-  activeAggregations,
-  querySortColumn,
-  querySortDirection,
-  buildBackendFilters,
   addHistory,
 }: {
   dataset: DatasetMetadata | null;
   activeResultModel: ActiveResultModel | null;
-  hasRunQuery: boolean;
-  queryLimit: string;
-  queryGroupBy: string[];
-  querySelectedColumns: string[];
-  activeAggregations: AggregationState[];
-  querySortColumn: string;
-  querySortDirection: "ASC" | "DESC";
-  buildBackendFilters: () => FilterDefinition[];
   addHistory: (action: string, detail: string, resultCount: number) => void;
 }) {
   const [isExporting, setIsExporting] = useState(false);
@@ -43,36 +25,29 @@ function useExportController({
     try {
       const exportPayload = getExportPayload(activeResultModel);
       const sourceType = getQuerySourceType(activeResultModel);
-      const isQueryExport = sourceType === "query" && hasRunQuery;
+      if (!exportPayload) return "We could not export the current results.";
+
+      const isQueryExport = sourceType === "query" && Boolean(exportPayload?.queryBuilder);
       const isFilteredExport = sourceType === "filtered";
+      const queryExportLimit = Math.min(
+        exportPayload?.queryBuilder?.limit || MAX_QUERY_LIMIT,
+        MAX_QUERY_LIMIT,
+      );
       const blob = await exportDataset(
         dataset.dataset_id,
         isQueryExport
           ? {
               source: "query_builder",
-              limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
+              limit: queryExportLimit,
               query_builder: {
-                selected_columns:
-                  activeAggregations.length > 0 ? queryGroupBy : querySelectedColumns,
-                group_by: queryGroupBy,
-                aggregations: activeAggregations.map((aggregation) => ({
-                  function: aggregation.function,
-                  column: aggregation.column || null,
-                })),
-                filters: buildBackendFilters(),
-                order_by: querySortColumn
-                  ? {
-                      column: querySortColumn,
-                      direction: querySortDirection,
-                    }
-                  : null,
-                limit: Math.min(Number(queryLimit) || MAX_QUERY_LIMIT, MAX_QUERY_LIMIT),
+                ...exportPayload.queryBuilder!,
+                limit: queryExportLimit,
                 page: 1,
               },
             }
           : {
-              source: "filter",
-              filters: isFilteredExport ? buildBackendFilters() : [],
+              source: isFilteredExport ? "filter" : "preview",
+              filters: isFilteredExport ? exportPayload?.filters || [] : [],
               order_by: activeResultModel.sorting.column
                 ? {
                     column: activeResultModel.sorting.column,
@@ -90,7 +65,11 @@ function useExportController({
       URL.revokeObjectURL(url);
       addHistory(
         "Export",
-        isQueryExport ? "Exported query result" : "Exported filtered result",
+        isQueryExport
+          ? "Exported query result"
+          : isFilteredExport
+            ? "Exported filtered result"
+            : "Exported preview result",
         exportPayload?.rowCount || activeResultModel.totalCount,
       );
       return null;
