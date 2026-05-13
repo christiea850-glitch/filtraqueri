@@ -3,6 +3,7 @@ import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
+import { useExplanationLayer } from "../explanations";
 import {
   getTaskConfigurationReadinessLabel,
   listMissingRequiredTaskInputs,
@@ -14,6 +15,7 @@ import useTaskLauncher from "./useTaskLauncher";
 function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => void }) {
   const { configuration } = useTaskConfiguration(task);
   const { analysisPlan } = useAnalysisPlan(task, configuration);
+  const { businessExplanation } = useExplanationLayer(task, analysisPlan);
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
     : [];
@@ -35,6 +37,23 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
         <h3>{task.label}</h3>
         <p>{task.description}</p>
       </div>
+      {businessExplanation && (
+        <div className="business-explanation-panel">
+          <span>{businessExplanation.title}</span>
+          <p>{businessExplanation.summary}</p>
+          <strong>{businessExplanation.businessMeaning}</strong>
+          <div>
+            {businessExplanation.expectedOutputs.map((output) => (
+              <small key={output}>{output}</small>
+            ))}
+          </div>
+          <div>
+            {businessExplanation.potentialInsights.map((insight) => (
+              <small key={insight}>{insight}</small>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="task-detail-grid">
         <span>
           Required inputs

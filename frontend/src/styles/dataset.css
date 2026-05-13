@@ -518,6 +518,52 @@
   line-height: 1.35;
 }
 
+.business-explanation-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.business-explanation-panel > span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.business-explanation-panel p,
+.business-explanation-panel strong {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.business-explanation-panel strong {
+  color: #172033;
+  font-weight: 850;
+}
+
+.business-explanation-panel div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.business-explanation-panel small {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .task-safe-note {
   padding: 8px;
   border-radius: 8px;
