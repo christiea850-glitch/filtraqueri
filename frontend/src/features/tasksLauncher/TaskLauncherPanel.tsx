@@ -4,6 +4,7 @@ import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
+import { useBusinessSemantics } from "../businessSemantics";
 import { useDataIntelligence } from "../dataIntelligence";
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import {
@@ -88,12 +89,26 @@ function TaskDetail({
     explanation: businessExplanation,
   });
   const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
-  const { recommendations, humanSummary: workflowRecommendationSummary } = useWorkflowRecommendations({
+  const {
+    recommendations,
+    humanSummary: workflowRecommendationSummary,
+    workflowRecommendationReport,
+  } = useWorkflowRecommendations({
     dataProfile,
     dialectRecommendation,
     guidedInputState: guidedInputs.state,
     planningReadiness,
     executionPreview,
+  });
+  const {
+    businessSemanticReport,
+    detectedSemanticEntities,
+    possibleBusinessKpis,
+    humanSummary: semanticSummary,
+  } = useBusinessSemantics({
+    dataset,
+    dataProfile,
+    workflowRecommendationReport,
   });
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
@@ -338,6 +353,31 @@ function TaskDetail({
               </article>
             ))}
           </div>
+        </div>
+      )}
+      {businessSemanticReport && (
+        <div className="business-semantics-panel compact" aria-label="Task business semantic intelligence">
+          <span>Business semantics</span>
+          <strong>{semanticSummary}</strong>
+          <div className="business-semantics-grid">
+            {detectedSemanticEntities.slice(0, mode === "analyst" ? 5 : 3).map((entity) => (
+              <article className="business-semantic-card" key={entity.id}>
+                <strong>{entity.label}</strong>
+                <span>{entity.confidence} confidence</span>
+                {mode === "analyst" && (
+                  <p>{entity.supportingMetadataSignals[0]?.description || "Detected from metadata."}</p>
+                )}
+              </article>
+            ))}
+          </div>
+          {possibleBusinessKpis.length > 0 && (
+            <div className="business-kpi-list">
+              <span>Possible KPIs</span>
+              {possibleBusinessKpis.slice(0, mode === "analyst" ? 5 : 3).map((kpi) => (
+                <small key={kpi.id}>{kpi.label}</small>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {relationshipPlan.hasWorkbookContext && (

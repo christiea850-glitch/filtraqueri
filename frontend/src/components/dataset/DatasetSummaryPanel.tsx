@@ -1,4 +1,5 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import {
@@ -179,9 +180,23 @@ function DatasetSummaryPanel({
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
-  const { recommendations, humanSummary: workflowSummary } = useWorkflowRecommendations({
+  const {
+    recommendations,
+    humanSummary: workflowSummary,
+    workflowRecommendationReport,
+  } = useWorkflowRecommendations({
     dataProfile,
     dialectRecommendation,
+  });
+  const {
+    businessSemanticReport,
+    detectedSemanticEntities,
+    possibleBusinessKpis,
+    humanSummary: semanticSummary,
+  } = useBusinessSemantics({
+    dataset,
+    dataProfile,
+    workflowRecommendationReport,
   });
 
   return (
@@ -319,6 +334,36 @@ function DatasetSummaryPanel({
               </article>
             ))}
           </div>
+        </section>
+      )}
+
+      {dataset && businessSemanticReport && (
+        <section className="business-semantics-panel" aria-label="Business semantic intelligence">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Business semantics</p>
+              <h2>Detected business context</h2>
+              <p>{semanticSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{detectedSemanticEntities.length}</span>
+          </div>
+          <div className="business-semantics-grid">
+            {detectedSemanticEntities.slice(0, 6).map((entity) => (
+              <article className="business-semantic-card" key={entity.id}>
+                <strong>{entity.label}</strong>
+                <span>{entity.confidence} confidence</span>
+                <p>{entity.supportingMetadataSignals[0]?.description || "Detected from metadata."}</p>
+              </article>
+            ))}
+          </div>
+          {possibleBusinessKpis.length > 0 && (
+            <div className="business-kpi-list">
+              <span>Possible KPIs</span>
+              {possibleBusinessKpis.slice(0, 5).map((kpi) => (
+                <small key={kpi.id}>{kpi.label}</small>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
