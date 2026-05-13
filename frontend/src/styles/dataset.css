@@ -404,6 +404,81 @@
   text-transform: none;
 }
 
+.task-validation-state {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.task-validation-state.incomplete {
+  border: 1px solid #fde68a;
+}
+
+.task-validation-state.valid {
+  border: 1px solid #86efac;
+}
+
+.task-validation-state.invalid,
+.task-validation-state.unsupported {
+  border: 1px solid #fecaca;
+}
+
+.task-validation-state strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.task-validation-state small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-configuration-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.task-configuration-list > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.task-configuration-list label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.task-configuration-list small {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.task-configuration-list input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+}
+
 .task-safe-note {
   padding: 8px;
   border-radius: 8px;

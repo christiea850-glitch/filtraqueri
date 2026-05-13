@@ -1,8 +1,21 @@
 import type { AnalyticsTask } from "../tasks";
+import {
+  getTaskConfigurationReadinessLabel,
+  listMissingRequiredTaskInputs,
+  useTaskConfiguration,
+} from "../taskConfiguration";
 import TaskCategorySection from "./TaskCategorySection";
 import useTaskLauncher from "./useTaskLauncher";
 
 function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => void }) {
+  const { configuration } = useTaskConfiguration(task);
+  const missingInputs = configuration
+    ? listMissingRequiredTaskInputs(task, configuration)
+    : [];
+  const readinessLabel = configuration
+    ? getTaskConfigurationReadinessLabel(configuration)
+    : "Task not ready";
+
   return (
     <aside className="task-detail-panel" aria-label="Task details">
       <div className="builder-block-header">
@@ -33,7 +46,38 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
           Future explanation
           <strong>{task.explanationTemplateKey}</strong>
         </span>
+        <span>
+          Validation readiness
+          <strong>{readinessLabel}</strong>
+        </span>
       </div>
+      {configuration && (
+        <div className={`task-validation-state ${configuration.validationState}`}>
+          <strong>{readinessLabel}</strong>
+          <small>
+            {missingInputs.length > 0
+              ? `${missingInputs.length} required input${missingInputs.length === 1 ? "" : "s"} missing`
+              : "All required metadata inputs are configured for future planning."}
+          </small>
+        </div>
+      )}
+      {task.requiredInputs.length > 0 && (
+        <div className="task-configuration-list">
+          <span>Required input placeholders</span>
+          {task.requiredInputs.map((input) => (
+            <label key={input.id}>
+              <small>{input.label}</small>
+              <input
+                type="text"
+                value=""
+                placeholder={input.placeholder || input.description}
+                readOnly
+                aria-label={`${input.label} placeholder`}
+              />
+            </label>
+          ))}
+        </div>
+      )}
       {task.optionalInputs.length > 0 && (
         <div className="task-detail-list">
           <span>Optional inputs</span>
