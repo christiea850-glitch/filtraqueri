@@ -8,6 +8,26 @@ export type ExplanationType =
   | "future_insight"
   | "readiness_status";
 
+export type ExplanationMode =
+  | "static_template"
+  | "metadata_aware"
+  | "result_aware"
+  | "ai_assisted"
+  | "analyst_inspection";
+
+export type ExplanationDynamicReadiness =
+  | "static_only"
+  | "metadata_ready"
+  | "result_summary_required"
+  | "ai_validation_required";
+
+export type ExplanationDataDependencyLevel =
+  | "none"
+  | "metadata"
+  | "result_summary"
+  | "active_result"
+  | "business_context";
+
 export type ExplanationTemplate = {
   templateKey: string;
   title: string;
@@ -29,4 +49,10 @@ export type BusinessExplanation = {
   supportedResultTypes: BusinessIntentResultType[];
   relatedExecutionSteps: AnalysisExecutionStepType[];
   explanationTemplateKey: string;
+  explanationMode: ExplanationMode;
+  dynamicReadiness: ExplanationDynamicReadiness;
+  dataDependencyLevel: ExplanationDataDependencyLevel;
+  futureResultDependencies: string[];
+  interpretationInputs: string[];
+  metadataAwareSummary: string | null;
 };

@@ -1,5 +1,6 @@
 import { getBusinessIntentById } from "../businessIntent";
 import type { AnalysisPlan } from "../analysisPlan";
+import type { RelationshipAwareTaskPlan } from "../relationshipAwarePlanning";
 import type { AnalyticsTask } from "../tasks";
 import { getExplanationTemplate } from "./explanationTemplates";
 import type { BusinessExplanation } from "./explanationTypes";
@@ -17,9 +18,11 @@ const fallbackTemplate = {
 export function buildBusinessExplanation({
   task,
   analysisPlan,
+  relationshipPlan,
 }: {
   task: AnalyticsTask;
   analysisPlan: AnalysisPlan | null;
+  relationshipPlan?: RelationshipAwareTaskPlan | null;
 }): BusinessExplanation {
   const template =
     getExplanationTemplate(task.explanationTemplateKey) || fallbackTemplate;
@@ -42,5 +45,28 @@ export function buildBusinessExplanation({
     supportedResultTypes: task.supportedResultTypes,
     relatedExecutionSteps: analysisPlan?.executionSteps.map((step) => step.type) || [],
     explanationTemplateKey: template.templateKey,
+    explanationMode: relationshipPlan?.metadataAwareExplanation
+      ? "metadata_aware"
+      : "static_template",
+    dynamicReadiness: relationshipPlan?.metadataAwareExplanation
+      ? "metadata_ready"
+      : "static_only",
+    dataDependencyLevel: relationshipPlan?.metadataAwareExplanation ? "metadata" : "none",
+    futureResultDependencies: [
+      "active result summary",
+      "row count metadata",
+      "metric distribution metadata",
+      "future deterministic insight outputs",
+    ],
+    interpretationInputs: [
+      "selected task",
+      "configured inputs",
+      "analysis plan steps",
+      "engine compatibility",
+      ...(relationshipPlan?.relatedWorksheets.length
+        ? ["workbook relationship previews"]
+        : []),
+    ],
+    metadataAwareSummary: relationshipPlan?.metadataAwareExplanation || null,
   };
 }

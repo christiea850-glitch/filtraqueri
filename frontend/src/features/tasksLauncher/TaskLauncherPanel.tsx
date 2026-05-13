@@ -1,3 +1,4 @@
+import type { DatasetMetadata } from "../dataset/datasetTypes";
 import type { AnalyticsTask } from "../tasks";
 import {
   getAnalysisPlanReadinessLabel,
@@ -6,6 +7,10 @@ import {
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import { useExplanationLayer } from "../explanations";
 import {
+  getRelationshipPlanningReadinessLabel,
+  useRelationshipAwarePlanning,
+} from "../relationshipAwarePlanning";
+import {
   getTaskConfigurationReadinessLabel,
   listMissingRequiredTaskInputs,
   useTaskConfiguration,
@@ -13,10 +18,19 @@ import {
 import TaskCategorySection from "./TaskCategorySection";
 import useTaskLauncher from "./useTaskLauncher";
 
-function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => void }) {
+function TaskDetail({
+  task,
+  dataset,
+  onClose,
+}: {
+  task: AnalyticsTask;
+  dataset: DatasetMetadata | null;
+  onClose: () => void;
+}) {
   const { configuration } = useTaskConfiguration(task);
   const { analysisPlan } = useAnalysisPlan(task, configuration);
-  const { businessExplanation } = useExplanationLayer(task, analysisPlan);
+  const relationshipPlan = useRelationshipAwarePlanning(task, dataset);
+  const { businessExplanation } = useExplanationLayer(task, analysisPlan, relationshipPlan);
   const engineCompatibility = useEngineAdapters(task, analysisPlan);
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
@@ -44,6 +58,9 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
           <span>{businessExplanation.title}</span>
           <p>{businessExplanation.summary}</p>
           <strong>{businessExplanation.businessMeaning}</strong>
+          {businessExplanation.metadataAwareSummary && (
+            <p>{businessExplanation.metadataAwareSummary}</p>
+          )}
           <div>
             {businessExplanation.expectedOutputs.map((output) => (
               <small key={output}>{output}</small>
@@ -53,6 +70,11 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
             {businessExplanation.potentialInsights.map((insight) => (
               <small key={insight}>{insight}</small>
             ))}
+          </div>
+          <div>
+            <small>{businessExplanation.explanationMode.replace(/_/g, " ")}</small>
+            <small>{businessExplanation.dynamicReadiness.replace(/_/g, " ")}</small>
+            <small>{businessExplanation.dataDependencyLevel.replace(/_/g, " ")}</small>
           </div>
         </div>
       )}
@@ -84,6 +106,10 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
         <span>
           Future plan state
           <strong>{planReadinessLabel}</strong>
+        </span>
+        <span>
+          Relationship planning
+          <strong>{getRelationshipPlanningReadinessLabel(relationshipPlan)}</strong>
         </span>
       </div>
       {configuration && (
@@ -124,6 +150,36 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
           ))}
         </div>
       )}
+      {relationshipPlan.hasWorkbookContext && (
+        <div className="relationship-aware-planning-panel">
+          <span>Relationship-aware planning</span>
+          <strong>{getRelationshipPlanningReadinessLabel(relationshipPlan)}</strong>
+          {relationshipPlan.relatedWorksheets.length > 0 && (
+            <div className="relationship-planning-chips">
+              {relationshipPlan.relatedWorksheets.map((worksheet) => (
+                <small key={worksheet}>{worksheet}</small>
+              ))}
+            </div>
+          )}
+          {relationshipPlan.suggestedRelationshipPaths.slice(0, 3).map((path) => (
+            <div className="relationship-planning-path" key={path.join("->")}>
+              {path.map((part, index) => (
+                <small key={part}>
+                  {index > 0 ? "-> " : ""}
+                  {part}
+                </small>
+              ))}
+            </div>
+          ))}
+          <div className="relationship-planning-chips">
+            <small>{relationshipPlan.highestConfidence || "no"} confidence</small>
+            <small>{relationshipPlan.futureJoinRequirementStatus.replace(/_/g, " ")}</small>
+          </div>
+          {relationshipPlan.readinessNotes.map((note) => (
+            <p key={note}>{note}</p>
+          ))}
+        </div>
+      )}
       <div className="engine-compatibility-panel">
         <span>Future engine compatibility</span>
         {engineCompatibility.compatibleEngines.map((result) => (
@@ -155,7 +211,7 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
   );
 }
 
-function TaskLauncherPanel() {
+function TaskLauncherPanel({ dataset = null }: { dataset?: DatasetMetadata | null }) {
   const { taskGroups, selectedTask, selectTask, clearSelectedTask } = useTaskLauncher();
 
   return (
@@ -182,7 +238,9 @@ function TaskLauncherPanel() {
             />
           ))}
         </div>
-        {selectedTask && <TaskDetail task={selectedTask} onClose={clearSelectedTask} />}
+        {selectedTask && (
+          <TaskDetail task={selectedTask} dataset={dataset} onClose={clearSelectedTask} />
+        )}
       </div>
     </section>
   );

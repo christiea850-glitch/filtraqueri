@@ -316,7 +316,7 @@ function DatasetSummaryPanel({
       </section>
 
       {dataset && (
-        <TaskLauncherPanel />
+        <TaskLauncherPanel dataset={dataset} />
       )}
 
       {dataset && (
