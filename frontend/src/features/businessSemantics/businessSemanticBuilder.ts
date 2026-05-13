@@ -47,7 +47,7 @@ const entityRules: EntityRule[] = [
   { category: "operational_event", label: "Operational event", terms: ["status", "event", "ticket", "incident", "workflow"] },
 ];
 
-const normalizeName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+const normalizeName = (value: string) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
 const matchesRule = (value: string, rule: EntityRule) => {
   const normalized = normalizeName(value);
@@ -80,12 +80,12 @@ const getRelatedWorksheets = (dataset: DatasetMetadata, rule: EntityRule) => {
   const workbookMetadata = getWorkbookMetadata(dataset);
   if (!workbookMetadata) return [];
 
-  return workbookMetadata.worksheets
+  return (workbookMetadata.worksheets || [])
     .filter(
       (worksheet) =>
         matchesRule(worksheet.sheetName, rule) ||
         matchesRule(worksheet.displayName, rule) ||
-        worksheet.schema.some((column) => matchesRule(column.name, rule)),
+        (worksheet.schema || []).some((column) => matchesRule(column.name, rule)),
     )
     .map((worksheet) => worksheet.displayName || worksheet.sheetName);
 };
@@ -95,7 +95,8 @@ const buildRuleEntity = (
   rule: EntityRule,
 ): BusinessSemanticEntity | null => {
   const workbookMetadata = getWorkbookMetadata(dataset);
-  const columnSignals = dataset.schema
+  const schema = Array.isArray(dataset.schema) ? dataset.schema : [];
+  const columnSignals = schema
     .filter((column) => matchesRule(column.name, rule))
     .slice(0, 5)
     .map((column) =>
@@ -308,7 +309,7 @@ const buildAnalystSummary = (entities: BusinessSemanticEntity[], kpis: BusinessK
   `${entities.length} semantic entit${entities.length === 1 ? "y" : "ies"} and ${kpis.length} KPI suggestion${kpis.length === 1 ? "" : "s"} detected from metadata.`;
 
 const schemaHasIdPattern = (schema: SchemaColumn[]) =>
-  schema.some((column) => normalizeName(column.name) === "id" || normalizeName(column.name).endsWith("_id"));
+  (Array.isArray(schema) ? schema : []).some((column) => normalizeName(column.name) === "id" || normalizeName(column.name).endsWith("_id"));
 
 export const buildBusinessSemanticReport = ({
   dataset,

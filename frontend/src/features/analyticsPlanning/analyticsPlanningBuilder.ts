@@ -36,6 +36,15 @@ const addStep = (steps: AnalyticsPlanStep[], step: AnalyticsPlanStep) => {
   if (!steps.some((existing) => existing.stepId === step.stepId)) steps.push(step);
 };
 
+const findStepId = (
+  steps: AnalyticsPlanStep[],
+  category: AnalyticsPlanStepCategory,
+  fallbackStepId: string,
+) => steps.find((step) => step.category === category)?.stepId || fallbackStepId;
+
+const existingStepIds = (stepIds: Array<string | null | undefined>) =>
+  stepIds.filter((stepId): stepId is string => Boolean(stepId));
+
 const createStep = (
   datasetId: string,
   index: number,
@@ -119,9 +128,12 @@ export const buildAnalyticsPlan = ({
     null;
   if (!resolvedDatasetId) return null;
 
-  const hasMetric = Boolean(dataProfile && dataProfile.possibleMetrics.length > 0);
-  const hasDimension = Boolean(dataProfile && dataProfile.possibleDimensions.length > 0);
-  const hasDate = Boolean(dataProfile && dataProfile.dateTimeFields.length > 0);
+  const possibleMetrics = dataProfile?.possibleMetrics || [];
+  const possibleDimensions = dataProfile?.possibleDimensions || [];
+  const dateTimeFields = dataProfile?.dateTimeFields || [];
+  const hasMetric = possibleMetrics.length > 0;
+  const hasDimension = possibleDimensions.length > 0;
+  const hasDate = dateTimeFields.length > 0;
   const relationshipPending = Boolean(
     dataProfile?.workbookRelationshipContext.hasWorkbookContext &&
       dataProfile.workbookRelationshipContext.acceptedRelationshipCount === 0,
@@ -163,62 +175,66 @@ export const buildAnalyticsPlan = ({
   const steps: AnalyticsPlanStep[] = [];
 
   addStep(steps, createStep(resolvedDatasetId, 1, "data_preparation", "Data preparation", "Inspect dataset metadata and available fields.", "ready", [], futureEngines));
+  const dataPreparationStepId = findStepId(steps, "data_preparation", "");
   if (relationshipPending || dataProfile?.workbookRelationshipContext.hasWorkbookContext) {
-    addStep(steps, createStep(resolvedDatasetId, 2, "relationship_validation", "Relationship validation", "Confirm workbook relationship metadata before connected analysis.", relationshipPending ? "relationship_pending" : "ready", [steps[0].stepId], futureEngines));
+    addStep(steps, createStep(resolvedDatasetId, 2, "relationship_validation", "Relationship validation", "Confirm workbook relationship metadata before connected analysis.", relationshipPending ? "relationship_pending" : "ready", existingStepIds([dataPreparationStepId]), futureEngines));
   }
-  addStep(steps, createStep(resolvedDatasetId, 3, "metric_selection", "Metric selection", "Select the metric field used by future KPI and analysis steps.", hasMetric ? "ready" : "metadata_pending", [steps[0].stepId], futureEngines));
-  addStep(steps, createStep(resolvedDatasetId, 4, "dimension_selection", "Dimension selection", "Select dimensions for grouping and comparisons.", hasDimension ? "ready" : "metadata_pending", [steps[0].stepId], futureEngines));
-  addStep(steps, createStep(resolvedDatasetId, 5, "grouping", "Grouping", "Prepare grouped analysis metadata.", hasDimension ? "ready" : "metadata_pending", [steps[2].stepId, steps[3].stepId], futureEngines));
-  addStep(steps, createStep(resolvedDatasetId, 6, "aggregation", "Aggregation", "Prepare metric aggregation intent.", hasMetric ? "ready" : "metadata_pending", [steps[2].stepId], futureEngines));
+  addStep(steps, createStep(resolvedDatasetId, 3, "metric_selection", "Metric selection", "Select the metric field used by future KPI and analysis steps.", hasMetric ? "ready" : "metadata_pending", existingStepIds([dataPreparationStepId]), futureEngines));
+  addStep(steps, createStep(resolvedDatasetId, 4, "dimension_selection", "Dimension selection", "Select dimensions for grouping and comparisons.", hasDimension ? "ready" : "metadata_pending", existingStepIds([dataPreparationStepId]), futureEngines));
+  const metricSelectionStepId = findStepId(steps, "metric_selection", dataPreparationStepId);
+  const dimensionSelectionStepId = findStepId(steps, "dimension_selection", dataPreparationStepId);
+  addStep(steps, createStep(resolvedDatasetId, 5, "grouping", "Grouping", "Prepare grouped analysis metadata.", hasDimension ? "ready" : "metadata_pending", existingStepIds([metricSelectionStepId, dimensionSelectionStepId]), futureEngines));
+  addStep(steps, createStep(resolvedDatasetId, 6, "aggregation", "Aggregation", "Prepare metric aggregation intent.", hasMetric ? "ready" : "metadata_pending", existingStepIds([metricSelectionStepId]), futureEngines));
+  const aggregationStepId = findStepId(steps, "aggregation", metricSelectionStepId);
 
   if (workflowRecommendationReport?.recommendations.some((item) => item.category === "trend_analysis")) {
-    addStep(steps, createStep(resolvedDatasetId, 7, "trend_analysis", "Trend analysis", "Prepare date-aware trend workflow metadata.", hasDate ? "ready" : "metadata_pending", [steps[2].stepId], futureEngines));
+    addStep(steps, createStep(resolvedDatasetId, 7, "trend_analysis", "Trend analysis", "Prepare date-aware trend workflow metadata.", hasDate ? "ready" : "metadata_pending", existingStepIds([metricSelectionStepId]), futureEngines));
   }
   if (
     workflowRecommendationReport?.recommendations.some((item) => item.category === "time_series_forecasting") ||
     executionPreview?.expectedFutureResultShape === "forecast_output"
   ) {
-    addStep(steps, createStep(resolvedDatasetId, 8, "forecasting", "Forecasting", "Prepare future forecasting workflow metadata.", hasDate ? "ready" : "metadata_pending", [steps[2].stepId], futureEngines));
+    addStep(steps, createStep(resolvedDatasetId, 8, "forecasting", "Forecasting", "Prepare future forecasting workflow metadata.", hasDate ? "ready" : "metadata_pending", existingStepIds([metricSelectionStepId]), futureEngines));
   }
   if (
     workflowRecommendationReport?.recommendations.some((item) => item.category === "statistical_testing") ||
     executionPreview?.expectedFutureResultShape === "statistical_output"
   ) {
-    addStep(steps, createStep(resolvedDatasetId, 9, "statistical_analysis", "Statistical analysis", "Prepare future statistical analysis metadata.", hasMetric ? "ready" : "metadata_pending", [steps[2].stepId], futureEngines));
+    addStep(steps, createStep(resolvedDatasetId, 9, "statistical_analysis", "Statistical analysis", "Prepare future statistical analysis metadata.", hasMetric ? "ready" : "metadata_pending", existingStepIds([metricSelectionStepId]), futureEngines));
   }
   if (workflowRecommendationReport?.recommendations.some((item) => item.category === "customer_segmentation")) {
-    addStep(steps, createStep(resolvedDatasetId, 10, "segmentation", "Segmentation", "Prepare segmentation metadata.", hasDimension ? "ready" : "metadata_pending", [steps[3].stepId], futureEngines));
+    addStep(steps, createStep(resolvedDatasetId, 10, "segmentation", "Segmentation", "Prepare segmentation metadata.", hasDimension ? "ready" : "metadata_pending", existingStepIds([dimensionSelectionStepId]), futureEngines));
   }
-  addStep(steps, createStep(resolvedDatasetId, 11, "dashboard_projection", "Dashboard projection", "Project future KPI cards and chart widgets.", "ready", [steps[5].stepId], futureEngines));
-  addStep(steps, createStep(resolvedDatasetId, 12, "explanation_generation", "Explanation generation", "Prepare future business explanation output.", "ready", [steps[5].stepId], futureEngines));
-  addStep(steps, createStep(resolvedDatasetId, 13, "export_projection", "Export projection", "Describe future exportable output metadata.", "ready", [steps[5].stepId], futureEngines));
+  addStep(steps, createStep(resolvedDatasetId, 11, "dashboard_projection", "Dashboard projection", "Project future KPI cards and chart widgets.", "ready", existingStepIds([aggregationStepId]), futureEngines));
+  addStep(steps, createStep(resolvedDatasetId, 12, "explanation_generation", "Explanation generation", "Prepare future business explanation output.", "ready", existingStepIds([aggregationStepId]), futureEngines));
+  addStep(steps, createStep(resolvedDatasetId, 13, "export_projection", "Export projection", "Describe future exportable output metadata.", "ready", existingStepIds([aggregationStepId]), futureEngines));
 
   const dependencies: AnalyticsPlanDependency[] = [
     {
       dependencyId: `${resolvedDatasetId}:dependency:forecast-date`,
       label: "Forecasting requires date field",
-      requiredByStepId: steps.find((step) => step.category === "forecasting")?.stepId || steps[0].stepId,
+      requiredByStepId: steps.find((step) => step.category === "forecasting")?.stepId || dataPreparationStepId,
       satisfied: hasDate,
       reason: "Forecasting requires date field metadata.",
     },
     {
       dependencyId: `${resolvedDatasetId}:dependency:kpi-metric`,
       label: "KPI tracking requires metric field",
-      requiredByStepId: steps.find((step) => step.category === "aggregation")?.stepId || steps[0].stepId,
+      requiredByStepId: steps.find((step) => step.category === "aggregation")?.stepId || dataPreparationStepId,
       satisfied: hasMetric,
       reason: "KPI tracking requires metric metadata.",
     },
     {
       dependencyId: `${resolvedDatasetId}:dependency:group-dimension`,
       label: "Grouped analysis requires dimension field",
-      requiredByStepId: steps.find((step) => step.category === "grouping")?.stepId || steps[0].stepId,
+      requiredByStepId: steps.find((step) => step.category === "grouping")?.stepId || dataPreparationStepId,
       satisfied: hasDimension,
       reason: "Grouped analysis requires dimension metadata.",
     },
     {
       dependencyId: `${resolvedDatasetId}:dependency:workbook-relationship`,
       label: "Workbook relationship workflows require confirmation",
-      requiredByStepId: steps.find((step) => step.category === "relationship_validation")?.stepId || steps[0].stepId,
+      requiredByStepId: steps.find((step) => step.category === "relationship_validation")?.stepId || dataPreparationStepId,
       satisfied: !relationshipPending,
       reason: "Workbook relationship workflows require relationship confirmation.",
     },

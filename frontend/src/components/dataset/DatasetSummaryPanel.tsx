@@ -178,10 +178,12 @@ function DatasetSummaryPanel({
   isSwitchingWorksheet,
 }: DatasetSummaryPanelProps) {
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
-    metadata.schema.reduce<Record<string, number>>((summary, column) => {
-      summary[column.inferred_type] = (summary[column.inferred_type] || 0) + 1;
+    (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
+      const type = column.inferred_type || "unknown";
+      summary[type] = (summary[type] || 0) + 1;
       return summary;
     }, {});
+  const safeRecentDatasets = Array.isArray(recentDatasets) ? recentDatasets : [];
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
@@ -588,16 +590,16 @@ function DatasetSummaryPanel({
             <p className="section-label">Recent files</p>
             <h2>Recent files</h2>
           </div>
-          <span className="dataset-count-pill">{recentDatasets.length}</span>
+          <span className="dataset-count-pill">{safeRecentDatasets.length}</span>
         </div>
 
-        {recentDatasets.length === 0 ? (
+        {safeRecentDatasets.length === 0 ? (
           <div className="dataset-empty-guidance compact-dataset-empty">
             <p>No recent files.</p>
           </div>
         ) : (
           <div className="recent-dataset-list">
-            {recentDatasets.map((session) => {
+            {safeRecentDatasets.filter((session) => session?.dataset).map((session) => {
               const metadata = session.dataset;
               const typeSummary = createSchemaTypeSummary(metadata);
 

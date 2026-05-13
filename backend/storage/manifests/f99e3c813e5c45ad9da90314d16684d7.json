@@ -5,7 +5,7 @@
   "active_dataset_id": "f99e3c813e5c45ad9da90314d16684d7",
   "active_result_id": "preview",
   "active_execution_id": null,
-  "current_mode": "analyst",
+  "current_mode": "human",
   "current_result_tab": "preview",
   "filter_metadata": {},
   "query_builder_metadata": {
@@ -61,7 +61,7 @@
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-13T20:59:55.177Z"
+    "updatedAt": "2026-05-13T21:09:54.512Z"
   },
   "datasets": [
     {
@@ -495,8 +495,8 @@
     }
   ],
   "created_at": "2026-05-12T22:50:01.907326+00:00",
-  "last_opened_at": "2026-05-13T20:59:55.294535+00:00",
-  "updated_at": "2026-05-13T20:59:55.299086+00:00",
+  "last_opened_at": "2026-05-13T21:13:45.165420+00:00",
+  "updated_at": "2026-05-13T21:13:45.167419+00:00",
   "workbook_metadata": {
     "workbook_id": "f99e3c813e5c45ad9da90314d16684d7",
     "workspace_id": "f99e3c813e5c45ad9da90314d16684d7",

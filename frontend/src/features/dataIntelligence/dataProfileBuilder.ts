@@ -7,7 +7,7 @@ import type {
   DataProfileShape,
 } from "./dataProfileTypes";
 
-const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+const normalizeName = (name: string) => String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
 const isPossibleIdField = (column: SchemaColumn) => {
   const name = normalizeName(column.name);
@@ -61,7 +61,8 @@ const buildFieldSignal = (
 const countColumnTypes = (schema: SchemaColumn[]): DataProfileColumnTypeSummary =>
   schema.reduce<DataProfileColumnTypeSummary>(
     (summary, column) => {
-      summary[column.inferred_type] += 1;
+      const type = column.inferred_type && column.inferred_type in summary ? column.inferred_type : "unknown";
+      summary[type] += 1;
       return summary;
     },
     {
@@ -76,44 +77,46 @@ const countColumnTypes = (schema: SchemaColumn[]): DataProfileColumnTypeSummary 
 
 const buildShape = (dataset: DatasetMetadata): DataProfileShape => {
   const workbookMetadata = getWorkbookMetadata(dataset);
-  const worksheetCount = workbookMetadata?.worksheets.length || 0;
+  const worksheetCount = Array.isArray(workbookMetadata?.worksheets) ? workbookMetadata.worksheets.length : 0;
+  const rowCount = Number.isFinite(dataset.row_count) ? dataset.row_count : 0;
+  const columnCount = Number.isFinite(dataset.column_count) ? dataset.column_count : 0;
 
   if (worksheetCount > 1) {
     return {
-      rowCount: dataset.row_count,
-      columnCount: dataset.column_count,
+      rowCount,
+      columnCount,
       worksheetCount,
       shapeLabel: "workbook",
     };
   }
-  if (dataset.row_count === 0 || dataset.column_count === 0) {
+  if (rowCount === 0 || columnCount === 0) {
     return {
-      rowCount: dataset.row_count,
-      columnCount: dataset.column_count,
+      rowCount,
+      columnCount,
       worksheetCount,
       shapeLabel: "empty",
     };
   }
-  if (dataset.column_count >= 40) {
+  if (columnCount >= 40) {
     return {
-      rowCount: dataset.row_count,
-      columnCount: dataset.column_count,
+      rowCount,
+      columnCount,
       worksheetCount,
       shapeLabel: "wide_table",
     };
   }
-  if (dataset.row_count >= 100000) {
+  if (rowCount >= 100000) {
     return {
-      rowCount: dataset.row_count,
-      columnCount: dataset.column_count,
+      rowCount,
+      columnCount,
       worksheetCount,
       shapeLabel: "large_table",
     };
   }
 
   return {
-    rowCount: dataset.row_count,
-    columnCount: dataset.column_count,
+    rowCount,
+    columnCount,
     worksheetCount,
     shapeLabel: "small_table",
   };
@@ -138,28 +141,29 @@ const buildHumanSummary = (profile: Pick<DataProfileReport, "shape" | "workbookR
 export const buildDataProfile = (dataset: DatasetMetadata | null): DataProfileReport | null => {
   if (!dataset) return null;
 
+  const schema = Array.isArray(dataset.schema) ? dataset.schema : [];
   const workbookMetadata = getWorkbookMetadata(dataset);
   const shape = buildShape(dataset);
-  const detectedColumnTypes = countColumnTypes(dataset.schema);
-  const numericFields = dataset.schema
+  const detectedColumnTypes = countColumnTypes(schema);
+  const numericFields = schema
     .filter((column) => column.inferred_type === "numeric")
     .map((column) => buildFieldSignal(column, ["Column is inferred as numeric."], "high"));
-  const categoricalFields = dataset.schema
+  const categoricalFields = schema
     .filter((column) => column.inferred_type === "categorical" || column.inferred_type === "boolean")
     .map((column) => buildFieldSignal(column, ["Column has categorical or boolean profile."], "high"));
-  const dateTimeFields = dataset.schema
+  const dateTimeFields = schema
     .filter((column) => column.inferred_type === "date")
     .map((column) => buildFieldSignal(column, ["Column is inferred as date/time."], "high"));
-  const possibleIdFields = dataset.schema
+  const possibleIdFields = schema
     .filter(isPossibleIdField)
     .map((column) =>
       buildFieldSignal(
         column,
         ["Column name looks like an identifier.", "Identifier fields may help relationship planning."],
-        column.unique_count > dataset.row_count * 0.75 ? "high" : "moderate",
+        (column.unique_count || 0) > (dataset.row_count || 0) * 0.75 ? "high" : "moderate",
       ),
     );
-  const possibleMetrics = dataset.schema
+  const possibleMetrics = schema
     .filter((column) => column.inferred_type === "numeric")
     .map((column) =>
       buildFieldSignal(
@@ -170,22 +174,22 @@ export const buildDataProfile = (dataset: DatasetMetadata | null): DataProfileRe
         isPossibleMetricField(column) ? "high" : "moderate",
       ),
     );
-  const possibleDimensions = dataset.schema
+  const possibleDimensions = schema
     .filter(isPossibleDimensionField)
     .map((column) =>
       buildFieldSignal(
         column,
         ["Categorical, text, or boolean columns can segment future results."],
-        column.unique_count <= Math.max(50, dataset.row_count * 0.25) ? "high" : "moderate",
+        (column.unique_count || 0) <= Math.max(50, (dataset.row_count || 0) * 0.25) ? "high" : "moderate",
       ),
     );
   const workbookRelationshipContext = {
-    hasWorkbookContext: Boolean(workbookMetadata && workbookMetadata.worksheets.length > 1),
-    worksheetCount: workbookMetadata?.worksheets.length || 0,
-    relationshipCandidateCount: workbookMetadata?.relationshipCandidates.length || 0,
-    acceptedRelationshipCount: workbookMetadata?.acceptedRelationshipContracts.length || 0,
+    hasWorkbookContext: Boolean(workbookMetadata && (workbookMetadata.worksheets || []).length > 1),
+    worksheetCount: workbookMetadata?.worksheets?.length || 0,
+    relationshipCandidateCount: workbookMetadata?.relationshipCandidates?.length || 0,
+    acceptedRelationshipCount: workbookMetadata?.acceptedRelationshipContracts?.length || 0,
     summary: workbookMetadata
-      ? `${workbookMetadata.worksheets.length} worksheet${workbookMetadata.worksheets.length === 1 ? "" : "s"} with ${workbookMetadata.relationshipCandidates.length} relationship candidate${workbookMetadata.relationshipCandidates.length === 1 ? "" : "s"}.`
+      ? `${workbookMetadata.worksheets?.length || 0} worksheet${(workbookMetadata.worksheets?.length || 0) === 1 ? "" : "s"} with ${workbookMetadata.relationshipCandidates?.length || 0} relationship candidate${(workbookMetadata.relationshipCandidates?.length || 0) === 1 ? "" : "s"}.`
       : "Single-table context; no workbook relationship metadata is present.",
   };
   const timeSeriesReadiness = {
