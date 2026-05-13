@@ -33,6 +33,31 @@ export type RelationshipReviewRequest = {
   notes?: string;
 };
 
+export type RelationshipContractDiagnostic = {
+  diagnostic_id: string;
+  contract_id: string;
+  severity: "healthy" | "warning" | "broken";
+  issue_type: string;
+  issue_summary: string;
+  suggested_action: string;
+  affected_source: string;
+  affected_target: string;
+  checked_at: string;
+};
+
+export type RelationshipContractDiagnosticsResponse = {
+  dataset_id: string;
+  workbook_id: string;
+  diagnostics: RelationshipContractDiagnostic[];
+  summary: {
+    healthy: number;
+    warning: number;
+    broken: number;
+    stale: number;
+    total_contracts: number;
+  };
+};
+
 async function parseError(response: Response, fallbackMessage: string) {
   try {
     const payload = await response.json();
@@ -152,6 +177,16 @@ export async function reviewWorkbookRelationship(
       body: JSON.stringify(request),
     },
     "Relationship review could not be saved.",
+  );
+}
+
+export async function getWorkbookContractDiagnostics(datasetId: string) {
+  return requestJson<RelationshipContractDiagnosticsResponse>(
+    `${API_BASE_URL}/datasets/${datasetId}/workbook/contract-diagnostics`,
+    {
+      method: "GET",
+    },
+    "Relationship contract diagnostics could not be loaded.",
   );
 }
 

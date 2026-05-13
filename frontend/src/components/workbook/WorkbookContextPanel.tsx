@@ -1,5 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata, SchemaColumn } from "../../features/dataset/datasetTypes";
+import {
+  getWorkbookContractDiagnostics,
+  type RelationshipContractDiagnostic,
+  type RelationshipContractDiagnosticsResponse,
+} from "../../services/api";
 import {
   getActiveWorksheet,
   getWorkbookMetadata,
@@ -172,6 +177,114 @@ function AcceptedRelationshipList({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ContractDiagnosticsPanel({
+  diagnostics,
+  worksheets,
+  contracts,
+}: {
+  diagnostics: RelationshipContractDiagnosticsResponse | null;
+  worksheets: WorksheetMetadata[];
+  contracts: AcceptedRelationshipContract[];
+}) {
+  const [severityFilter, setSeverityFilter] = useState("all");
+  const [worksheetFilter, setWorksheetFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const filteredDiagnostics = useMemo(() => {
+    const items = diagnostics?.diagnostics || [];
+    return items.filter((item) => {
+      const contract = contracts.find((current) => current.contractId === item.contract_id);
+      const matchesSeverity = severityFilter === "all" || item.severity === severityFilter;
+      const matchesType = typeFilter === "all" || contract?.relationshipType === typeFilter;
+      const matchesWorksheet =
+        worksheetFilter === "all" ||
+        contract?.sourceWorksheetId === worksheetFilter ||
+        contract?.targetWorksheetId === worksheetFilter;
+      return matchesSeverity && matchesType && matchesWorksheet;
+    });
+  }, [contracts, diagnostics, severityFilter, typeFilter, worksheetFilter]);
+
+  if (!diagnostics) {
+    return <p className="workbook-empty-note">Contract diagnostics have not been loaded.</p>;
+  }
+
+  return (
+    <div className="contract-diagnostics-panel" aria-label="Relationship contract diagnostics">
+      <div className="workbook-status-grid">
+        <span className="relationship-validation valid">
+          healthy {diagnostics.summary.healthy}
+        </span>
+        <span className="relationship-validation warning">
+          warning {diagnostics.summary.warning}
+        </span>
+        <span className="relationship-validation broken">
+          broken {diagnostics.summary.broken}
+        </span>
+        <span className="relationship-review-status pending">stale {diagnostics.summary.stale}</span>
+      </div>
+
+      <div className="relationship-review-controls">
+        <label>
+          <span>Severity</span>
+          <select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}>
+            <option value="all">All</option>
+            <option value="healthy">Healthy</option>
+            <option value="warning">Warning</option>
+            <option value="broken">Broken</option>
+          </select>
+        </label>
+        <label>
+          <span>Worksheet</span>
+          <select
+            value={worksheetFilter}
+            onChange={(event) => setWorksheetFilter(event.target.value)}
+          >
+            <option value="all">All</option>
+            {worksheets.map((worksheet) => (
+              <option key={worksheet.worksheetId} value={worksheet.worksheetId}>
+                {worksheet.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Type</span>
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="all">All</option>
+            <option value="one_to_many_candidate">One to many</option>
+            <option value="many_to_one_candidate">Many to one</option>
+            <option value="one_to_one_candidate">One to one</option>
+            <option value="unknown_candidate">Unknown</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="contract-diagnostic-list">
+        {filteredDiagnostics.map((item: RelationshipContractDiagnostic) => (
+          <button
+            type="button"
+            className={`contract-diagnostic-row ${item.severity}`}
+            key={item.diagnostic_id}
+            onClick={() => setExpandedId(expandedId === item.diagnostic_id ? null : item.diagnostic_id)}
+          >
+            <span className={`relationship-validation ${item.severity === "healthy" ? "valid" : item.severity}`}>
+              {item.severity}
+            </span>
+            <strong>{item.issue_summary}</strong>
+            <small>{item.affected_source} -&gt; {item.affected_target}</small>
+            {expandedId === item.diagnostic_id && (
+              <span className="diagnostic-action-chip">{item.suggested_action}</span>
+            )}
+          </button>
+        ))}
+        {filteredDiagnostics.length === 0 && (
+          <p className="workbook-empty-note">No diagnostics match these filters.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -461,6 +574,29 @@ function WorkbookContextPanel({
   onRelationshipReview,
 }: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
+  const [diagnostics, setDiagnostics] =
+    useState<RelationshipContractDiagnosticsResponse | null>(null);
+
+  useEffect(() => {
+    if (!dataset || !workbook || workbook.acceptedRelationshipContracts.length === 0) {
+      setDiagnostics(null);
+      return;
+    }
+
+    let isCurrent = true;
+    getWorkbookContractDiagnostics(dataset.dataset_id)
+      .then((response) => {
+        if (isCurrent) setDiagnostics(response);
+      })
+      .catch(() => {
+        if (isCurrent) setDiagnostics(null);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [dataset?.dataset_id, workbook?.updatedAt, workbook?.acceptedRelationshipContracts.length]);
+
   if (!workbook) return null;
 
   const activeWorksheet = getActiveWorksheet(workbook);
@@ -569,7 +705,21 @@ function WorkbookContextPanel({
           <span>Accepted relationships</span>
           <small>{workbook.acceptedRelationshipContracts.length.toLocaleString()} contracts</small>
         </div>
-        <AcceptedRelationshipList contracts={workbook.acceptedRelationshipContracts} />
+        <AcceptedRelationshipList
+          contracts={workbook.acceptedRelationshipContracts}
+        />
+      </div>
+
+      <div className="workbook-mapping-section">
+        <div className="builder-block-header">
+          <span>Contract diagnostics</span>
+          <small>{diagnostics?.summary.total_contracts || 0} contracts</small>
+        </div>
+        <ContractDiagnosticsPanel
+          diagnostics={diagnostics}
+          worksheets={workbook.worksheets}
+          contracts={workbook.acceptedRelationshipContracts}
+        />
       </div>
 
       {variant === "analyst" && (

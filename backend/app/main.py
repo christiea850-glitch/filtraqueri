@@ -18,6 +18,7 @@ from .workbook_contracts import (
     upsert_contract_for_candidate,
     validate_relationship_contracts,
 )
+from .workbook_contract_diagnostics import analyze_contract_diagnostics
 from .workbook_ingestion import ingest_workbook
 
 
@@ -1395,6 +1396,33 @@ def review_workbook_relationship(
         "candidate": candidate,
         "summary": summary,
         "workbook_metadata": workbook_metadata,
+    }
+
+
+@app.get("/datasets/{dataset_id}/workbook/contract-diagnostics")
+def get_workbook_contract_diagnostics(dataset_id: str) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    existing_tables: set[str] = set()
+    try:
+        with get_connection(dataset_id) as connection:
+            existing_tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+            }
+    except duckdb.Error as error:
+        raise HTTPException(status_code=400, detail=f"Contract diagnostics failed: {error}") from error
+
+    diagnostics = analyze_contract_diagnostics(workbook_metadata, existing_tables)
+    return {
+        "dataset_id": dataset_id,
+        "workbook_id": workbook_metadata.get("workbook_id"),
+        **diagnostics,
     }
 
 

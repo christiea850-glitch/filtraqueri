@@ -953,6 +953,71 @@
   color: #991b1b;
 }
 
+.contract-diagnostics-panel,
+.contract-diagnostic-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.contract-diagnostic-row {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.contract-diagnostic-row.healthy {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.contract-diagnostic-row.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.contract-diagnostic-row.broken {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.contract-diagnostic-row strong,
+.contract-diagnostic-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contract-diagnostic-row strong {
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.contract-diagnostic-row small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.diagnostic-action-chip {
+  justify-self: start;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 11px;
+  font-weight: 850;
+}
+
 .section-label {
   margin: 0 0 6px;
   color: #2563eb;
