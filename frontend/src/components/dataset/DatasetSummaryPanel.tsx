@@ -1,4 +1,5 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import { useDataIntelligence } from "../../features/dataIntelligence";
 import {
   getDatasetActiveWorksheet,
   listWorkbookWorksheets,
@@ -176,6 +177,7 @@ function DatasetSummaryPanel({
     }, {});
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
+  const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
 
   return (
     <div className="human-dataset-workspace">
@@ -248,6 +250,47 @@ function DatasetSummaryPanel({
           </div>
         )}
       </section>
+
+      {dataset && dataProfile && (
+        <section className="data-intelligence-panel" aria-label="Data intelligence profile">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Data intelligence</p>
+              <h2>Profile and future engine fit</h2>
+              <p>{humanSummary}</p>
+            </div>
+            <span className="dataset-count-pill">
+              {dialectRecommendation?.recommendedFutureEngine?.label || "Metadata only"}
+            </span>
+          </div>
+          <div className="data-intelligence-grid">
+            <span>
+              Shape
+              <strong>{dataProfile.shape.shapeLabel.replace(/_/g, " ")}</strong>
+            </span>
+            <span>
+              Metrics
+              <strong>{dataProfile.possibleMetrics.length}</strong>
+            </span>
+            <span>
+              Dimensions
+              <strong>{dataProfile.possibleDimensions.length}</strong>
+            </span>
+            <span>
+              Dates
+              <strong>{dataProfile.dateTimeFields.length}</strong>
+            </span>
+            <span>
+              Time-series
+              <strong>{dataProfile.timeSeriesReadiness.ready ? "Possible" : "Needs fields"}</strong>
+            </span>
+            <span>
+              Statistics
+              <strong>{dataProfile.statisticalReadiness.ready ? "Possible" : "Needs metrics"}</strong>
+            </span>
+          </div>
+        </section>
+      )}
 
       <section className="dataset-hub-panel" aria-label="Recent files">
         <div className="summary-header">
