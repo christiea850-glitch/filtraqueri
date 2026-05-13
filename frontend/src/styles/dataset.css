@@ -479,6 +479,70 @@
   font-size: 12px;
 }
 
+.guided-input-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.guided-input-list > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.guided-input-list label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.guided-input-list small {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.guided-input-list label > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.guided-input-list select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #172033;
+  font: inherit;
+  font-size: 12px;
+}
+
+.guided-input-list em {
+  color: #64748b;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.guided-input-list em.warning {
+  color: #92400e;
+}
+
+.guided-input-list em.error {
+  color: #991b1b;
+}
+
 .analysis-plan-preview {
   display: grid;
   gap: 8px;

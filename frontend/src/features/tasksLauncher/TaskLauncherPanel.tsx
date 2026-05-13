@@ -7,6 +7,11 @@ import {
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import { useExplanationLayer } from "../explanations";
 import {
+  getGuidedInputPrompt,
+  getGuidedInputValidationMessage,
+  useGuidedInputs,
+} from "../guidedInputs";
+import {
   getPlanningReadinessStatusLabel,
   getPlanningReadinessTone,
   usePlanningReadiness,
@@ -32,7 +37,13 @@ function TaskDetail({
   dataset: DatasetMetadata | null;
   onClose: () => void;
 }) {
-  const { configuration } = useTaskConfiguration(task);
+  const { configuration, updateInput } = useTaskConfiguration(task);
+  const guidedInputs = useGuidedInputs({
+    task,
+    dataset,
+    configuration,
+    onInputChange: updateInput,
+  });
   const { analysisPlan } = useAnalysisPlan(task, configuration);
   const relationshipPlan = useRelationshipAwarePlanning(task, dataset);
   const { businessExplanation } = useExplanationLayer(task, analysisPlan, relationshipPlan);
@@ -167,20 +178,36 @@ function TaskDetail({
         </div>
       )}
       {task.requiredInputs.length > 0 && (
-        <div className="task-configuration-list">
-          <span>Required input placeholders</span>
-          {task.requiredInputs.map((input) => (
+        <div className="guided-input-list">
+          <span>Guided input selection</span>
+          {[...task.requiredInputs, ...task.optionalInputs].map((input) => {
+            const options = guidedInputs.getOptionsForInput(input.id);
+            const selection = guidedInputs.getSelectionForInput(input.id);
+            const validation = getGuidedInputValidationMessage(guidedInputs.state, input.id);
+
+            return (
             <label key={input.id}>
-              <small>{input.label}</small>
-              <input
-                type="text"
-                value=""
-                placeholder={input.placeholder || input.description}
-                readOnly
-                aria-label={`${input.label} placeholder`}
-              />
+              <small>
+                {input.label}
+                {input.required ? " *" : ""}
+              </small>
+              <span>{getGuidedInputPrompt(input)}</span>
+              <select
+                value={selection?.value || ""}
+                onChange={(event) => guidedInputs.selectInputValue(input, event.target.value)}
+                aria-label={`${input.label} guided selection`}
+              >
+                <option value="">{input.placeholder || "Choose an option"}</option>
+                {options.map((option) => (
+                  <option key={option.id} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {validation && <em className={validation.severity}>{validation.message}</em>}
             </label>
-          ))}
+            );
+          })}
         </div>
       )}
       {analysisPlan && (
