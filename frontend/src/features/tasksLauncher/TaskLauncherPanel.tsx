@@ -4,6 +4,7 @@ import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
+import { useDataIntelligence } from "../dataIntelligence";
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import {
   getExecutionPreviewConfidenceLabel,
@@ -34,6 +35,7 @@ import {
   getTaskPlanPreviewConfidenceLabel,
   useTaskPlanPreview,
 } from "../taskPlanPreview";
+import { useWorkflowRecommendations } from "../workflowRecommendations";
 import TaskCategorySection from "./TaskCategorySection";
 import useTaskLauncher from "./useTaskLauncher";
 
@@ -84,6 +86,14 @@ function TaskDetail({
     engineCompatibility,
     planningReadiness,
     explanation: businessExplanation,
+  });
+  const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
+  const { recommendations, humanSummary: workflowRecommendationSummary } = useWorkflowRecommendations({
+    dataProfile,
+    dialectRecommendation,
+    guidedInputState: guidedInputs.state,
+    planningReadiness,
+    executionPreview,
   });
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
@@ -302,6 +312,34 @@ function TaskDetail({
           ))}
         </div>
       </div>
+      {recommendations.length > 0 && (
+        <div className="workflow-recommendation-panel compact" aria-label="Task workflow recommendations">
+          <span>Workflow recommendations</span>
+          <strong>{workflowRecommendationSummary}</strong>
+          <div className="workflow-recommendation-list">
+            {recommendations.slice(0, mode === "analyst" ? 4 : 2).map((recommendation) => (
+              <article className="workflow-recommendation-card" key={recommendation.id}>
+                <strong>{recommendation.label}</strong>
+                <p>{recommendation.humanSummary}</p>
+                <div>
+                  <small>{recommendation.confidence} confidence</small>
+                  <small>{recommendation.possibleFutureResultShapes[0]?.replace(/_/g, " ") || "future result"}</small>
+                </div>
+                {mode === "analyst" && (
+                  <div className="workflow-recommendation-analyst">
+                    {recommendation.supportingMetadataSignals.slice(0, 3).map((item) => (
+                      <p key={item.id}>{item.description}</p>
+                    ))}
+                    {recommendation.missingMetadataBlockers.slice(0, 2).map((blocker) => (
+                      <p key={blocker}>{blocker}</p>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
       {relationshipPlan.hasWorkbookContext && (
         <div className="relationship-aware-planning-panel">
           <span>Relationship-aware planning</span>

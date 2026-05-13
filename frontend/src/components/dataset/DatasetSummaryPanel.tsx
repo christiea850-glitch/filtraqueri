@@ -1,5 +1,6 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useDataIntelligence } from "../../features/dataIntelligence";
+import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import {
   getDatasetActiveWorksheet,
   listWorkbookWorksheets,
@@ -178,6 +179,10 @@ function DatasetSummaryPanel({
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
+  const { recommendations, humanSummary: workflowSummary } = useWorkflowRecommendations({
+    dataProfile,
+    dialectRecommendation,
+  });
 
   return (
     <div className="human-dataset-workspace">
@@ -288,6 +293,31 @@ function DatasetSummaryPanel({
               Statistics
               <strong>{dataProfile.statisticalReadiness.ready ? "Possible" : "Needs metrics"}</strong>
             </span>
+          </div>
+        </section>
+      )}
+
+      {dataset && recommendations.length > 0 && (
+        <section className="workflow-recommendation-panel" aria-label="Workflow recommendations">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Workflow recommendations</p>
+              <h2>Likely analysis paths</h2>
+              <p>{workflowSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{recommendations.length}</span>
+          </div>
+          <div className="workflow-recommendation-list">
+            {recommendations.slice(0, 4).map((recommendation) => (
+              <article className="workflow-recommendation-card" key={recommendation.id}>
+                <strong>{recommendation.label}</strong>
+                <p>{recommendation.humanSummary}</p>
+                <div>
+                  <small>{recommendation.confidence} confidence</small>
+                  <small>{recommendation.recommendedFutureEnginePath[0]?.replace(/_/g, " ") || "metadata only"}</small>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       )}

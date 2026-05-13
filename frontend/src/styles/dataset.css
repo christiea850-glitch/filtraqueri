@@ -1167,6 +1167,110 @@
   white-space: nowrap;
 }
 
+.workflow-recommendation-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.workflow-recommendation-panel.compact {
+  gap: 8px;
+  padding: 10px;
+  border-color: #dbeafe;
+  border-radius: 8px;
+}
+
+.workflow-recommendation-panel.compact > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.workflow-recommendation-panel.compact > strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.workflow-recommendation-panel .summary-header p:last-child {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.workflow-recommendation-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.workflow-recommendation-panel.compact .workflow-recommendation-list {
+  grid-template-columns: 1fr;
+}
+
+.workflow-recommendation-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.workflow-recommendation-card strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-recommendation-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.workflow-recommendation-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workflow-recommendation-card small {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.workflow-recommendation-analyst {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.workflow-recommendation-analyst p {
+  color: #64748b;
+  font-size: 11px;
+}
+
 .recent-dataset-list {
   display: grid;
   gap: 10px;
