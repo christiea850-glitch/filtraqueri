@@ -4,6 +4,7 @@ import {
   listWorkbookWorksheets,
   type WorksheetMetadata,
 } from "../../features/workbook";
+import { TaskLauncherPanel } from "../../features/tasksLauncher";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
 
 export type HumanIntent =
@@ -313,6 +314,10 @@ function DatasetSummaryPanel({
           </div>
         )}
       </section>
+
+      {dataset && (
+        <TaskLauncherPanel />
+      )}
 
       {dataset && (
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
