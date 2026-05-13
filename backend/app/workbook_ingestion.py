@@ -377,6 +377,7 @@ def ingest_workbook(
             for worksheet in worksheets
         ],
         relationship_candidates=relationship_candidates,
+        accepted_relationship_contracts=[],
         ingestion_profile=WorkbookIngestionProfile(
             max_worksheets=MAX_WORKSHEETS,
             max_rows_per_worksheet_profile=MAX_WORKSHEET_ROWS,

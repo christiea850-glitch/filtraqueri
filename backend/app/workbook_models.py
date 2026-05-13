@@ -85,6 +85,34 @@ class WorksheetRelationshipCandidate(BaseModel):
     review_notes: str | None = None
 
 
+class AcceptedRelationshipContract(BaseModel):
+    contract_id: str
+    source_worksheet_id: str
+    source_table_name: str
+    source_column_name: str
+    target_worksheet_id: str
+    target_table_name: str
+    target_column_name: str
+    relationship_type: Literal[
+        "one_to_one_candidate",
+        "one_to_many_candidate",
+        "many_to_one_candidate",
+        "unknown_candidate",
+    ] = "unknown_candidate"
+    confidence: float = Field(ge=0, le=1)
+    accepted_from_candidate_id: str
+    accepted_at: str
+    accepted_by: str | None = None
+    status: Literal["active", "invalid", "stale"] = "active"
+    validation_state: Literal["valid", "warning", "broken"] = "warning"
+    validation_summary: list[str] = Field(default_factory=list)
+    overlap_ratio: float = Field(default=0, ge=0, le=1)
+    source_unique_ratio: float = Field(default=0, ge=0, le=1)
+    target_unique_ratio: float = Field(default=0, ge=0, le=1)
+    inferred_type_compatible: bool = False
+    last_validated_at: str | None = None
+
+
 class WorkbookIngestionProfile(BaseModel):
     max_worksheets: int = Field(default=30, ge=1)
     max_rows_per_worksheet_profile: int = Field(default=5000, ge=1)
@@ -112,6 +140,7 @@ class WorkbookMetadata(BaseModel):
     worksheets: list[WorksheetMetadata] = Field(default_factory=list)
     table_mappings: list[WorksheetTableMapping] = Field(default_factory=list)
     relationship_candidates: list[WorksheetRelationshipCandidate] = Field(default_factory=list)
+    accepted_relationship_contracts: list[AcceptedRelationshipContract] = Field(default_factory=list)
     ingestion_profile: WorkbookIngestionProfile = Field(default_factory=WorkbookIngestionProfile)
     normalization: WorkbookNormalizationMetadata
     created_at: str

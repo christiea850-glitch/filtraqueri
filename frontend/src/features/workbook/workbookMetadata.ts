@@ -1,6 +1,7 @@
 import type {
   WorkbookIngestionProfile,
   WorkbookMetadata,
+  AcceptedRelationshipContract,
   WorksheetMetadata,
   WorksheetRelationshipCandidate,
 } from "./workbookTypes";
@@ -113,6 +114,7 @@ export const normalizeWorkbookMetadata = (
       originalIndex: worksheet.originalIndex,
     })),
     relationshipCandidates: workbook.relationshipCandidates || [],
+    acceptedRelationshipContracts: workbook.acceptedRelationshipContracts || [],
     ingestionProfile: {
       ...DEFAULT_WORKBOOK_INGESTION_PROFILE,
       ...workbook.ingestionProfile,
@@ -286,6 +288,63 @@ const normalizeRelationshipCandidate = (
   };
 };
 
+const normalizeAcceptedRelationshipContract = (
+  value: unknown,
+  index = 0,
+): AcceptedRelationshipContract => {
+  const contract = readObject(value);
+  const confidence = Math.min(1, Math.max(0, readNumber(contract.confidence, 0)));
+  const status =
+    contract.status === "active" || contract.status === "invalid" || contract.status === "stale"
+      ? contract.status
+      : "stale";
+  const validationState =
+    contract.validationState === "valid" ||
+    contract.validation_state === "valid" ||
+    contract.validationState === "warning" ||
+    contract.validation_state === "warning" ||
+    contract.validationState === "broken" ||
+    contract.validation_state === "broken"
+      ? ((contract.validationState ?? contract.validation_state) as "valid" | "warning" | "broken")
+      : "warning";
+
+  return {
+    contractId: readString(contract.contractId ?? contract.contract_id, `contract:${index + 1}`),
+    sourceWorksheetId: readString(contract.sourceWorksheetId ?? contract.source_worksheet_id, ""),
+    sourceTableName: readString(contract.sourceTableName ?? contract.source_table_name, ""),
+    sourceColumnName: readString(contract.sourceColumnName ?? contract.source_column_name, ""),
+    targetWorksheetId: readString(contract.targetWorksheetId ?? contract.target_worksheet_id, ""),
+    targetTableName: readString(contract.targetTableName ?? contract.target_table_name, ""),
+    targetColumnName: readString(contract.targetColumnName ?? contract.target_column_name, ""),
+    relationshipType: normalizeRelationshipType(
+      contract.relationshipType ?? contract.relationship_type,
+    ),
+    confidence,
+    acceptedFromCandidateId: readString(
+      contract.acceptedFromCandidateId ?? contract.accepted_from_candidate_id,
+      "",
+    ),
+    acceptedAt: readString(contract.acceptedAt ?? contract.accepted_at, ""),
+    acceptedBy:
+      typeof (contract.acceptedBy ?? contract.accepted_by) === "string"
+        ? ((contract.acceptedBy ?? contract.accepted_by) as string)
+        : null,
+    status,
+    validationState,
+    validationSummary: readArray<string>(contract.validationSummary ?? contract.validation_summary),
+    overlapRatio: readNumber(contract.overlapRatio ?? contract.overlap_ratio, 0),
+    sourceUniqueRatio: readNumber(contract.sourceUniqueRatio ?? contract.source_unique_ratio, 0),
+    targetUniqueRatio: readNumber(contract.targetUniqueRatio ?? contract.target_unique_ratio, 0),
+    inferredTypeCompatible: Boolean(
+      contract.inferredTypeCompatible ?? contract.inferred_type_compatible,
+    ),
+    lastValidatedAt:
+      typeof (contract.lastValidatedAt ?? contract.last_validated_at) === "string"
+        ? ((contract.lastValidatedAt ?? contract.last_validated_at) as string)
+        : null,
+  };
+};
+
 export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetadata | null => {
   if (!value || typeof value !== "object") return null;
 
@@ -351,6 +410,17 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
           candidate.targetWorksheetId &&
           candidate.sourceColumn &&
           candidate.targetColumn,
+      ),
+    acceptedRelationshipContracts: readArray(
+      workbook.acceptedRelationshipContracts ?? workbook.accepted_relationship_contracts,
+    )
+      .map((contract, index) => normalizeAcceptedRelationshipContract(contract, index))
+      .filter(
+        (contract) =>
+          contract.sourceWorksheetId &&
+          contract.targetWorksheetId &&
+          contract.sourceColumnName &&
+          contract.targetColumnName,
       ),
     ingestionProfile: DEFAULT_WORKBOOK_INGESTION_PROFILE,
     normalization: {

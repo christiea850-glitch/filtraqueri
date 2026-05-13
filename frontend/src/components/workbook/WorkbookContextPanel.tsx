@@ -3,6 +3,7 @@ import type { DatasetMetadata, SchemaColumn } from "../../features/dataset/datas
 import {
   getActiveWorksheet,
   getWorkbookMetadata,
+  type AcceptedRelationshipContract,
   type WorkbookIngestionProfile,
   type WorksheetRelationshipCandidate,
   type WorksheetMetadata,
@@ -76,6 +77,105 @@ const relationshipTypeLabel = (type: WorksheetRelationshipCandidate["relationshi
   return "unknown";
 };
 
+const validationLabel = (state: AcceptedRelationshipContract["validationState"]) => {
+  if (state === "valid") return "valid";
+  if (state === "broken") return "broken";
+  return "warning";
+};
+
+function AcceptedRelationshipList({
+  contracts,
+}: {
+  contracts: AcceptedRelationshipContract[];
+}) {
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const selectedContract =
+    contracts.find((contract) => contract.contractId === selectedContractId) || contracts[0] || null;
+
+  if (contracts.length === 0) {
+    return <p className="workbook-empty-note">No accepted relationship contracts yet.</p>;
+  }
+
+  return (
+    <div className="accepted-relationship-section" aria-label="Accepted relationship contracts">
+      <div className="accepted-relationship-list">
+        {contracts.map((contract) => (
+          <button
+            type="button"
+            className={`accepted-relationship-card ${contract.validationState} ${contract.status}`}
+            key={contract.contractId}
+            onClick={() => setSelectedContractId(contract.contractId)}
+          >
+            <span className={`relationship-validation ${contract.validationState}`}>
+              {validationLabel(contract.validationState)}
+            </span>
+            <strong>
+              {contract.sourceColumnName} -&gt; {contract.targetColumnName}
+            </strong>
+            <small>{relationshipTypeLabel(contract.relationshipType)}</small>
+            <span>
+              {contract.sourceTableName} -&gt; {contract.targetTableName}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {selectedContract && (
+        <div className="relationship-detail-panel" aria-label="Accepted relationship detail">
+          <div className="builder-block-header">
+            <span>Accepted contract</span>
+            <small>{selectedContract.status}</small>
+          </div>
+          <div className="workbook-summary-grid">
+            <span>
+              Validation
+              <strong>{selectedContract.validationState}</strong>
+            </span>
+            <span>
+              Confidence
+              <strong>{Math.round(selectedContract.confidence * 100)}%</strong>
+            </span>
+            <span>
+              Overlap
+              <strong>{Math.round(selectedContract.overlapRatio * 100)}%</strong>
+            </span>
+            <span>
+              Source unique
+              <strong>{Math.round(selectedContract.sourceUniqueRatio * 100)}%</strong>
+            </span>
+            <span>
+              Target unique
+              <strong>{Math.round(selectedContract.targetUniqueRatio * 100)}%</strong>
+            </span>
+            <span>
+              Type compatible
+              <strong>{selectedContract.inferredTypeCompatible ? "Yes" : "No"}</strong>
+            </span>
+          </div>
+          <div className="workbook-relationship-path">
+            <strong>
+              {selectedContract.sourceTableName}.{selectedContract.sourceColumnName}
+            </strong>
+            <span aria-hidden="true">-&gt;</span>
+            <strong>
+              {selectedContract.targetTableName}.{selectedContract.targetColumnName}
+            </strong>
+          </div>
+          <div className="workbook-evidence-list">
+            {selectedContract.validationSummary.map((summary) => (
+              <span key={summary}>{summary}</span>
+            ))}
+          </div>
+          <div className="workbook-relationship-tables">
+            <span>Accepted {selectedContract.acceptedAt || "unknown"}</span>
+            <span>Validated {selectedContract.lastValidatedAt || "not yet"}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RelationshipCandidateList({
   candidates,
   worksheets,
@@ -134,6 +234,9 @@ function RelationshipCandidateList({
       return right.confidence - left.confidence;
     });
   }, [candidates, confidenceFilter, normalizedSearch, reviewFilter, sortMode, worksheetFilter]);
+  const pendingCount = candidates.filter((candidate) => candidate.reviewStatus === "pending").length;
+  const acceptedCount = candidates.filter((candidate) => candidate.reviewStatus === "accepted").length;
+  const dismissedCount = candidates.filter((candidate) => candidate.reviewStatus === "dismissed").length;
 
   if (candidates.length === 0) {
     return <p className="workbook-empty-note">No relationship candidates profiled yet.</p>;
@@ -201,6 +304,11 @@ function RelationshipCandidateList({
             <option value="worksheet">Worksheet</option>
           </select>
         </label>
+      </div>
+      <div className="workbook-status-grid" aria-label="Relationship review summary">
+        <span className="relationship-review-status accepted">accepted {acceptedCount}</span>
+        <span className="relationship-review-status pending">pending {pendingCount}</span>
+        <span className="relationship-review-status dismissed">dismissed {dismissedCount}</span>
       </div>
 
       <div className="workbook-relationship-list" aria-label="Relationship candidates">
@@ -454,6 +562,14 @@ function WorkbookContextPanel({
           worksheets={workbook.worksheets}
           onRelationshipReview={onRelationshipReview}
         />
+      </div>
+
+      <div className="workbook-mapping-section">
+        <div className="builder-block-header">
+          <span>Accepted relationships</span>
+          <small>{workbook.acceptedRelationshipContracts.length.toLocaleString()} contracts</small>
+        </div>
+        <AcceptedRelationshipList contracts={workbook.acceptedRelationshipContracts} />
       </div>
 
       {variant === "analyst" && (

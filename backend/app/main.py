@@ -14,6 +14,10 @@ from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from .workbook_contracts import (
+    upsert_contract_for_candidate,
+    validate_relationship_contracts,
+)
 from .workbook_ingestion import ingest_workbook
 
 
@@ -218,8 +222,67 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
                 "review_notes": candidate.get("review_notes") if isinstance(candidate.get("review_notes"), str) else None,
             }
         )
+    accepted_contracts = (
+        value.get("accepted_relationship_contracts")
+        if isinstance(value.get("accepted_relationship_contracts"), list)
+        else []
+    )
+    normalized_contracts: list[dict[str, Any]] = []
+    for index, contract in enumerate(accepted_contracts):
+        if not isinstance(contract, dict):
+            continue
+        relationship_type = contract.get("relationship_type")
+        if relationship_type not in (
+            "one_to_one_candidate",
+            "one_to_many_candidate",
+            "many_to_one_candidate",
+            "unknown_candidate",
+        ):
+            relationship_type = "unknown_candidate"
+        status = contract.get("status")
+        if status not in ("active", "invalid", "stale"):
+            status = "stale"
+        validation_state = contract.get("validation_state")
+        if validation_state not in ("valid", "warning", "broken"):
+            validation_state = "warning"
+        try:
+            confidence = float(contract.get("confidence") or 0)
+            overlap_ratio = float(contract.get("overlap_ratio") or 0)
+            source_unique_ratio = float(contract.get("source_unique_ratio") or 0)
+            target_unique_ratio = float(contract.get("target_unique_ratio") or 0)
+        except (TypeError, ValueError):
+            confidence = 0
+            overlap_ratio = 0
+            source_unique_ratio = 0
+            target_unique_ratio = 0
 
-    return {
+        normalized_contracts.append(
+            {
+                **contract,
+                "contract_id": str(contract.get("contract_id") or f"contract:{index + 1}"),
+                "source_worksheet_id": str(contract.get("source_worksheet_id") or ""),
+                "source_table_name": str(contract.get("source_table_name") or ""),
+                "source_column_name": str(contract.get("source_column_name") or ""),
+                "target_worksheet_id": str(contract.get("target_worksheet_id") or ""),
+                "target_table_name": str(contract.get("target_table_name") or ""),
+                "target_column_name": str(contract.get("target_column_name") or ""),
+                "relationship_type": relationship_type,
+                "confidence": max(0, min(1, confidence)),
+                "accepted_from_candidate_id": str(contract.get("accepted_from_candidate_id") or ""),
+                "accepted_at": str(contract.get("accepted_at") or ""),
+                "accepted_by": contract.get("accepted_by") if isinstance(contract.get("accepted_by"), str) else None,
+                "status": status,
+                "validation_state": validation_state,
+                "validation_summary": contract.get("validation_summary") if isinstance(contract.get("validation_summary"), list) else [],
+                "overlap_ratio": max(0, min(1, overlap_ratio)),
+                "source_unique_ratio": max(0, min(1, source_unique_ratio)),
+                "target_unique_ratio": max(0, min(1, target_unique_ratio)),
+                "inferred_type_compatible": bool(contract.get("inferred_type_compatible")),
+                "last_validated_at": contract.get("last_validated_at") if isinstance(contract.get("last_validated_at"), str) else None,
+            }
+        )
+
+    normalized_metadata = {
         **value,
         "workbook_id": str(value.get("workbook_id") or "workbook"),
         "workspace_id": value.get("workspace_id"),
@@ -230,9 +293,12 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         "worksheets": normalized_worksheets,
         "table_mappings": table_mappings,
         "relationship_candidates": normalized_relationship_candidates,
+        "accepted_relationship_contracts": normalized_contracts,
         "ingestion_profile": value.get("ingestion_profile") if isinstance(value.get("ingestion_profile"), dict) else {},
         "normalization": value.get("normalization") if isinstance(value.get("normalization"), dict) else {},
     }
+    normalized_metadata["accepted_relationship_contracts"] = validate_relationship_contracts(normalized_metadata)
+    return normalized_metadata
 
 
 def normalize_workspace_name(value: Any, fallback: str) -> str:
@@ -1311,6 +1377,7 @@ def review_workbook_relationship(
     candidate["reviewed_by"] = "local-workspace" if review_status != "pending" else None
     candidate["review_notes"] = (request.notes or "").strip()[:500] or None
     workbook_metadata["relationship_candidates"] = candidates
+    workbook_metadata = upsert_contract_for_candidate(workbook_metadata, candidate, review_status)
     workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
     metadata["workbook_metadata"] = workbook_metadata
     dataset_sessions[dataset_id] = metadata

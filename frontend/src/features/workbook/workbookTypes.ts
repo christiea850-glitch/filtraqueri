@@ -82,6 +82,29 @@ export type WorksheetRelationshipCandidate = {
   reviewNotes: string | null;
 };
 
+export type AcceptedRelationshipContract = {
+  contractId: string;
+  sourceWorksheetId: WorksheetId;
+  sourceTableName: string;
+  sourceColumnName: string;
+  targetWorksheetId: WorksheetId;
+  targetTableName: string;
+  targetColumnName: string;
+  relationshipType: WorksheetRelationshipCandidate["relationshipType"];
+  confidence: number;
+  acceptedFromCandidateId: string;
+  acceptedAt: string;
+  acceptedBy: string | null;
+  status: "active" | "invalid" | "stale";
+  validationState: "valid" | "warning" | "broken";
+  validationSummary: string[];
+  overlapRatio: number;
+  sourceUniqueRatio: number;
+  targetUniqueRatio: number;
+  inferredTypeCompatible: boolean;
+  lastValidatedAt: string | null;
+};
+
 export type WorkbookIngestionProfile = {
   maxWorksheets: number;
   maxRowsPerWorksheetProfile: number;
@@ -102,6 +125,7 @@ export type WorkbookMetadata = {
   worksheets: WorksheetMetadata[];
   tableMappings: WorksheetTableMapping[];
   relationshipCandidates: WorksheetRelationshipCandidate[];
+  acceptedRelationshipContracts: AcceptedRelationshipContract[];
   ingestionProfile: WorkbookIngestionProfile;
   normalization: {
     version: number;

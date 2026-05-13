@@ -19,6 +19,7 @@ export {
   validateWorksheetMetadata,
 } from "./workbookMetadata";
 export type {
+  AcceptedRelationshipContract,
   WorkbookId,
   WorkbookIngestionProfile,
   WorkbookMetadata,
