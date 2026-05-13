@@ -25,6 +25,10 @@ import {
   listMissingRequiredTaskInputs,
   useTaskConfiguration,
 } from "../taskConfiguration";
+import {
+  getTaskPlanPreviewConfidenceLabel,
+  useTaskPlanPreview,
+} from "../taskPlanPreview";
 import TaskCategorySection from "./TaskCategorySection";
 import useTaskLauncher from "./useTaskLauncher";
 
@@ -54,6 +58,15 @@ function TaskDetail({
     analysisPlan,
     engineCompatibility,
     relationshipPlan,
+    explanation: businessExplanation,
+  });
+  const taskPlanPreview = useTaskPlanPreview({
+    task,
+    guidedInputState: guidedInputs.state,
+    analysisPlan,
+    relationshipPlan,
+    engineCompatibility,
+    planningReadiness,
     explanation: businessExplanation,
   });
   const missingInputs = configuration
@@ -221,6 +234,19 @@ function TaskDetail({
           ))}
         </div>
       )}
+      <div className="task-plan-preview-panel">
+        <span>Future workflow preview</span>
+        <strong>{taskPlanPreview.workflowSummary}</strong>
+        <small>{getTaskPlanPreviewConfidenceLabel(taskPlanPreview.confidence)}</small>
+        {taskPlanPreview.sections.map((section) => (
+          <div className="task-plan-preview-section" key={section.id}>
+            <span>{section.title}</span>
+            {section.lines.slice(0, 3).map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+          </div>
+        ))}
+      </div>
       {relationshipPlan.hasWorkbookContext && (
         <div className="relationship-aware-planning-panel">
           <span>Relationship-aware planning</span>
