@@ -571,6 +571,76 @@
   color: #1d4ed8;
 }
 
+.planning-readiness-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.planning-readiness-panel.ready {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.planning-readiness-panel.partial,
+.planning-readiness-panel.warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.planning-readiness-panel.blocked {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.planning-readiness-panel > span,
+.planning-readiness-list > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.planning-readiness-panel strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.planning-readiness-panel p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.planning-readiness-grid,
+.planning-readiness-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.planning-readiness-grid {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+}
+
+.planning-readiness-grid small,
+.planning-readiness-list small {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .engine-compatibility-panel {
   display: grid;
   gap: 8px;

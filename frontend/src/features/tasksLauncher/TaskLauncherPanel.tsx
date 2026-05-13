@@ -7,6 +7,11 @@ import {
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import { useExplanationLayer } from "../explanations";
 import {
+  getPlanningReadinessStatusLabel,
+  getPlanningReadinessTone,
+  usePlanningReadiness,
+} from "../planningReadiness";
+import {
   getRelationshipPlanningReadinessLabel,
   useRelationshipAwarePlanning,
 } from "../relationshipAwarePlanning";
@@ -32,6 +37,14 @@ function TaskDetail({
   const relationshipPlan = useRelationshipAwarePlanning(task, dataset);
   const { businessExplanation } = useExplanationLayer(task, analysisPlan, relationshipPlan);
   const engineCompatibility = useEngineAdapters(task, analysisPlan);
+  const planningReadiness = usePlanningReadiness({
+    task,
+    configuration,
+    analysisPlan,
+    engineCompatibility,
+    relationshipPlan,
+    explanation: businessExplanation,
+  });
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
     : [];
@@ -111,6 +124,37 @@ function TaskDetail({
           Relationship planning
           <strong>{getRelationshipPlanningReadinessLabel(relationshipPlan)}</strong>
         </span>
+        <span>
+          Unified readiness
+          <strong>{getPlanningReadinessStatusLabel(planningReadiness.status)}</strong>
+        </span>
+      </div>
+      <div className={`planning-readiness-panel ${getPlanningReadinessTone(planningReadiness.status)}`}>
+        <span>Planning readiness</span>
+        <strong>{getPlanningReadinessStatusLabel(planningReadiness.status)}</strong>
+        <p>{planningReadiness.beginnerSummary}</p>
+        <div className="planning-readiness-grid">
+          <small>{planningReadiness.confidenceLevel} confidence</small>
+          <small>{planningReadiness.supportedWorkflowScope.replace(/_/g, " ")}</small>
+          <small>{planningReadiness.explanationReadiness.replace(/_/g, " ")}</small>
+          <small>
+            {planningReadiness.engineCompatibilitySummary.compatibleEngines.length} engine options
+          </small>
+        </div>
+        {planningReadiness.futureExecutionBlockers.length > 0 && (
+          <div className="planning-readiness-list">
+            <span>Future blockers</span>
+            {planningReadiness.futureExecutionBlockers.slice(0, 3).map((blocker) => (
+              <small key={blocker}>{blocker}</small>
+            ))}
+          </div>
+        )}
+        <div className="planning-readiness-list">
+          <span>Future notes</span>
+          {planningReadiness.futureExecutionNotes.slice(0, 3).map((note) => (
+            <small key={note}>{note}</small>
+          ))}
+        </div>
       </div>
       {configuration && (
         <div className={`task-validation-state ${configuration.validationState}`}>
