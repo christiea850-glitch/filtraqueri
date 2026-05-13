@@ -1,10 +1,15 @@
-import type { DatasetMetadata } from "../dataset/datasetTypes";
+import type { DatasetMetadata, WorkspaceMode } from "../dataset/datasetTypes";
 import type { AnalyticsTask } from "../tasks";
 import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
+import {
+  getExecutionPreviewConfidenceLabel,
+  getExecutionPreviewResultShapeLabel,
+  useExecutionPreview,
+} from "../executionPreview";
 import { useExplanationLayer } from "../explanations";
 import {
   getGuidedInputPrompt,
@@ -35,10 +40,12 @@ import useTaskLauncher from "./useTaskLauncher";
 function TaskDetail({
   task,
   dataset,
+  mode,
   onClose,
 }: {
   task: AnalyticsTask;
   dataset: DatasetMetadata | null;
+  mode: WorkspaceMode;
   onClose: () => void;
 }) {
   const { configuration, updateInput } = useTaskConfiguration(task);
@@ -61,6 +68,15 @@ function TaskDetail({
     explanation: businessExplanation,
   });
   const taskPlanPreview = useTaskPlanPreview({
+    task,
+    guidedInputState: guidedInputs.state,
+    analysisPlan,
+    relationshipPlan,
+    engineCompatibility,
+    planningReadiness,
+    explanation: businessExplanation,
+  });
+  const { executionPreview } = useExecutionPreview({
     task,
     guidedInputState: guidedInputs.state,
     analysisPlan,
@@ -247,6 +263,45 @@ function TaskDetail({
           </div>
         ))}
       </div>
+      <div className="execution-preview-panel" aria-label="Future Execution Preview">
+        <span>Future Execution Preview</span>
+        <strong>{executionPreview.workflowSummary}</strong>
+        <div className="execution-preview-meta">
+          <small>{getExecutionPreviewConfidenceLabel(executionPreview)}</small>
+          <small>{getExecutionPreviewResultShapeLabel(executionPreview)}</small>
+          <small>{executionPreview.readinessStatus.replace(/_/g, " ")}</small>
+        </div>
+        {mode === "analyst" ? (
+          <>
+            <div className="execution-preview-stage-list">
+              {executionPreview.plannedStages.map((stage, index) => (
+                <div key={stage.stageId} className="execution-preview-stage">
+                  <small>{index + 1}</small>
+                  <div>
+                    <strong>{stage.label}</strong>
+                    <span>{stage.stageType.replace(/_/g, " ")}</span>
+                    <p>{stage.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="execution-preview-note-list">
+              <span>Analyst notes</span>
+              {executionPreview.analystNotes.slice(0, 5).map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p>{executionPreview.workflowSummary}</p>
+        )}
+        <div className="execution-preview-note-list">
+          <span>Safety notes</span>
+          {executionPreview.safetyNotes.slice(0, mode === "analyst" ? 5 : 3).map((note) => (
+            <p key={note}>{note}</p>
+          ))}
+        </div>
+      </div>
       {relationshipPlan.hasWorkbookContext && (
         <div className="relationship-aware-planning-panel">
           <span>Relationship-aware planning</span>
@@ -308,7 +363,13 @@ function TaskDetail({
   );
 }
 
-function TaskLauncherPanel({ dataset = null }: { dataset?: DatasetMetadata | null }) {
+function TaskLauncherPanel({
+  dataset = null,
+  mode = "human",
+}: {
+  dataset?: DatasetMetadata | null;
+  mode?: WorkspaceMode;
+}) {
   const { taskGroups, selectedTask, selectTask, clearSelectedTask } = useTaskLauncher();
 
   return (
@@ -336,7 +397,7 @@ function TaskLauncherPanel({ dataset = null }: { dataset?: DatasetMetadata | nul
           ))}
         </div>
         {selectedTask && (
-          <TaskDetail task={selectedTask} dataset={dataset} onClose={clearSelectedTask} />
+          <TaskDetail task={selectedTask} dataset={dataset} mode={mode} onClose={clearSelectedTask} />
         )}
       </div>
     </section>

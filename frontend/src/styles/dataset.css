@@ -634,6 +634,117 @@
   line-height: 1.35;
 }
 
+.execution-preview-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.execution-preview-panel > span,
+.execution-preview-note-list > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.execution-preview-panel > strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.execution-preview-meta,
+.execution-preview-note-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.execution-preview-meta small {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: capitalize;
+}
+
+.execution-preview-stage-list {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.execution-preview-stage {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.execution-preview-stage > small {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.execution-preview-stage div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.execution-preview-stage strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.execution-preview-stage span {
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.execution-preview-panel p,
+.execution-preview-stage p,
+.execution-preview-note-list p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.execution-preview-note-list {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
 .relationship-aware-planning-panel {
   display: grid;
   gap: 8px;
