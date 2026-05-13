@@ -1,6 +1,7 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
+import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import {
   getDatasetActiveWorksheet,
@@ -198,6 +199,14 @@ function DatasetSummaryPanel({
     dataProfile,
     workflowRecommendationReport,
   });
+  const {
+    opportunities: kpiOpportunities,
+    humanSummary: kpiSummary,
+  } = useKpiIntelligence({
+    dataProfile,
+    businessSemanticReport,
+    workflowRecommendationReport,
+  });
 
   return (
     <div className="human-dataset-workspace">
@@ -364,6 +373,31 @@ function DatasetSummaryPanel({
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {dataset && kpiOpportunities.length > 0 && (
+        <section className="kpi-intelligence-panel" aria-label="KPI intelligence opportunities">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">KPI intelligence</p>
+              <h2>Insight opportunities</h2>
+              <p>{kpiSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{kpiOpportunities.length}</span>
+          </div>
+          <div className="kpi-opportunity-list">
+            {kpiOpportunities.slice(0, 4).map((opportunity) => (
+              <article className="kpi-opportunity-card" key={opportunity.id}>
+                <strong>{opportunity.label}</strong>
+                <p>{opportunity.humanSummary}</p>
+                <div>
+                  <small>{opportunity.confidence} confidence</small>
+                  <small>{opportunity.possibleChartTypes[0]?.replace(/_/g, " ") || "chart metadata"}</small>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 

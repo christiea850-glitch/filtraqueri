@@ -36,6 +36,7 @@ import {
   getTaskPlanPreviewConfidenceLabel,
   useTaskPlanPreview,
 } from "../taskPlanPreview";
+import { useKpiIntelligence } from "../kpiIntelligence";
 import { useWorkflowRecommendations } from "../workflowRecommendations";
 import TaskCategorySection from "./TaskCategorySection";
 import useTaskLauncher from "./useTaskLauncher";
@@ -109,6 +110,17 @@ function TaskDetail({
     dataset,
     dataProfile,
     workflowRecommendationReport,
+  });
+  const {
+    opportunities: kpiOpportunities,
+    humanSummary: kpiSummary,
+  } = useKpiIntelligence({
+    dataProfile,
+    businessSemanticReport,
+    workflowRecommendationReport,
+    executionPreview,
+    guidedInputState: guidedInputs.state,
+    planningReadiness,
   });
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
@@ -378,6 +390,34 @@ function TaskDetail({
               ))}
             </div>
           )}
+        </div>
+      )}
+      {kpiOpportunities.length > 0 && (
+        <div className="kpi-intelligence-panel compact" aria-label="Task KPI intelligence opportunities">
+          <span>KPI intelligence</span>
+          <strong>{kpiSummary}</strong>
+          <div className="kpi-opportunity-list">
+            {kpiOpportunities.slice(0, mode === "analyst" ? 4 : 2).map((opportunity) => (
+              <article className="kpi-opportunity-card" key={opportunity.id}>
+                <strong>{opportunity.label}</strong>
+                <p>{opportunity.humanSummary}</p>
+                <div>
+                  <small>{opportunity.confidence} confidence</small>
+                  <small>{opportunity.possibleChartTypes[0]?.replace(/_/g, " ") || "chart metadata"}</small>
+                </div>
+                {mode === "analyst" && (
+                  <div className="kpi-opportunity-analyst">
+                    {opportunity.possibleKpiFormulas.slice(0, 2).map((formula) => (
+                      <p key={formula}>{formula}</p>
+                    ))}
+                    {opportunity.likelyBusinessQuestions.slice(0, 2).map((question) => (
+                      <p key={question}>{question}</p>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
         </div>
       )}
       {relationshipPlan.hasWorkbookContext && (
