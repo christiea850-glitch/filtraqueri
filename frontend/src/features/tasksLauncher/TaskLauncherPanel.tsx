@@ -1,5 +1,9 @@
 import type { AnalyticsTask } from "../tasks";
 import {
+  getAnalysisPlanReadinessLabel,
+  useAnalysisPlan,
+} from "../analysisPlan";
+import {
   getTaskConfigurationReadinessLabel,
   listMissingRequiredTaskInputs,
   useTaskConfiguration,
@@ -9,12 +13,14 @@ import useTaskLauncher from "./useTaskLauncher";
 
 function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => void }) {
   const { configuration } = useTaskConfiguration(task);
+  const { analysisPlan } = useAnalysisPlan(task, configuration);
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
     : [];
   const readinessLabel = configuration
     ? getTaskConfigurationReadinessLabel(configuration)
     : "Task not ready";
+  const planReadinessLabel = getAnalysisPlanReadinessLabel(analysisPlan);
 
   return (
     <aside className="task-detail-panel" aria-label="Task details">
@@ -50,6 +56,10 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
           Validation readiness
           <strong>{readinessLabel}</strong>
         </span>
+        <span>
+          Future plan state
+          <strong>{planReadinessLabel}</strong>
+        </span>
       </div>
       {configuration && (
         <div className={`task-validation-state ${configuration.validationState}`}>
@@ -75,6 +85,17 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
                 aria-label={`${input.label} placeholder`}
               />
             </label>
+          ))}
+        </div>
+      )}
+      {analysisPlan && (
+        <div className="analysis-plan-preview">
+          <span>Future execution-step preview</span>
+          {analysisPlan.executionSteps.map((step) => (
+            <div key={step.id}>
+              <strong>{step.label}</strong>
+              <small>{step.description}</small>
+            </div>
           ))}
         </div>
       )}
