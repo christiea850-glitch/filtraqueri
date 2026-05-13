@@ -4,6 +4,7 @@ import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
+import { useBusinessQuestions } from "../businessQuestionIntelligence";
 import { useBusinessSemantics } from "../businessSemantics";
 import { useDataIntelligence } from "../dataIntelligence";
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
@@ -113,10 +114,29 @@ function TaskDetail({
   });
   const {
     opportunities: kpiOpportunities,
+    kpiIntelligenceReport,
     humanSummary: kpiSummary,
   } = useKpiIntelligence({
     dataProfile,
     businessSemanticReport,
+    workflowRecommendationReport,
+    executionPreview,
+    guidedInputState: guidedInputs.state,
+    planningReadiness,
+  });
+  const {
+    interpretedQuestions,
+    humanSummary: questionSummary,
+  } = useBusinessQuestions({
+    datasetId: dataset?.dataset_id || null,
+    questions: [
+      task.label,
+      "Which products sell the most?",
+      "Are sales increasing?",
+      "Can this data support forecasting?",
+    ],
+    businessSemanticReport,
+    kpiIntelligenceReport,
     workflowRecommendationReport,
     executionPreview,
     guidedInputState: guidedInputs.state,
@@ -412,6 +432,34 @@ function TaskDetail({
                     ))}
                     {opportunity.likelyBusinessQuestions.slice(0, 2).map((question) => (
                       <p key={question}>{question}</p>
+                    ))}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+      {interpretedQuestions.length > 0 && (
+        <div className="business-question-panel compact" aria-label="Task business question intelligence">
+          <span>Business questions</span>
+          <strong>{questionSummary}</strong>
+          <div className="business-question-list">
+            {interpretedQuestions.slice(0, mode === "analyst" ? 4 : 2).map((interpretation) => (
+              <article className="business-question-card" key={interpretation.id}>
+                <strong>{interpretation.questionText}</strong>
+                <p>{interpretation.humanSummary}</p>
+                <div>
+                  <small>{interpretation.confidence} confidence</small>
+                  <small>{interpretation.detectedIntentCategory.replace(/_/g, " ")}</small>
+                </div>
+                {mode === "analyst" && (
+                  <div className="business-question-analyst">
+                    {interpretation.followUpSuggestions.slice(0, 2).map((suggestion) => (
+                      <p key={suggestion}>{suggestion}</p>
+                    ))}
+                    {interpretation.requiredMissingMetadata.slice(0, 2).map((missing) => (
+                      <p key={missing}>{missing}</p>
                     ))}
                   </div>
                 )}

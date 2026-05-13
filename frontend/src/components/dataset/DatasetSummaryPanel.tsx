@@ -1,4 +1,5 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
@@ -201,10 +202,27 @@ function DatasetSummaryPanel({
   });
   const {
     opportunities: kpiOpportunities,
+    kpiIntelligenceReport,
     humanSummary: kpiSummary,
   } = useKpiIntelligence({
     dataProfile,
     businessSemanticReport,
+    workflowRecommendationReport,
+  });
+  const {
+    interpretedQuestions,
+    humanSummary: questionSummary,
+  } = useBusinessQuestions({
+    datasetId: dataset?.dataset_id || null,
+    questions: [
+      "Which products sell the most?",
+      "Are sales increasing?",
+      "Which regions perform best?",
+      "Can this data support forecasting?",
+      "Which customers generate the most revenue?",
+    ],
+    businessSemanticReport,
+    kpiIntelligenceReport,
     workflowRecommendationReport,
   });
 
@@ -394,6 +412,31 @@ function DatasetSummaryPanel({
                 <div>
                   <small>{opportunity.confidence} confidence</small>
                   <small>{opportunity.possibleChartTypes[0]?.replace(/_/g, " ") || "chart metadata"}</small>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {dataset && interpretedQuestions.length > 0 && (
+        <section className="business-question-panel" aria-label="Business question intelligence">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Business questions</p>
+              <h2>Question intent mapping</h2>
+              <p>{questionSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{interpretedQuestions.length}</span>
+          </div>
+          <div className="business-question-list">
+            {interpretedQuestions.slice(0, 4).map((interpretation) => (
+              <article className="business-question-card" key={interpretation.id}>
+                <strong>{interpretation.questionText}</strong>
+                <p>{interpretation.humanSummary}</p>
+                <div>
+                  <small>{interpretation.confidence} confidence</small>
+                  <small>{interpretation.detectedIntentCategory.replace(/_/g, " ")}</small>
                 </div>
               </article>
             ))}
