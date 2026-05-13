@@ -5,6 +5,7 @@ import {
   useAnalysisPlan,
 } from "../analysisPlan";
 import { useAnalyticsIntentGraph } from "../analyticsIntentGraph";
+import { useAnalyticsPlanning } from "../analyticsPlanning";
 import { useBusinessQuestions } from "../businessQuestionIntelligence";
 import { useBusinessSemantics } from "../businessSemantics";
 import { useDataIntelligence } from "../dataIntelligence";
@@ -155,6 +156,20 @@ function TaskDetail({
     businessSemanticReport,
     kpiIntelligenceReport,
     businessQuestionReport,
+    executionPreview,
+    planningReadiness,
+  });
+  const {
+    analyticsPlan,
+    humanSummary: planningSummary,
+  } = useAnalyticsPlanning({
+    datasetId: dataset?.dataset_id || null,
+    dataProfile,
+    workflowRecommendationReport,
+    kpiIntelligenceReport,
+    businessSemanticReport,
+    businessQuestionReport,
+    analyticsIntentGraph,
     executionPreview,
     planningReadiness,
   });
@@ -510,6 +525,37 @@ function TaskDetail({
             <div className="analytics-intent-graph-notes">
               {analyticsIntentGraph.health.unresolvedDependencies.slice(0, 3).map((item) => (
                 <p key={item}>{item}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {analyticsPlan && (
+        <div className="analytics-planning-panel compact" aria-label="Task analytics planning engine">
+          <span>Analytics plan</span>
+          <strong>{planningSummary}</strong>
+          <div className="analytics-planning-grid">
+            <span>
+              Steps
+              <strong>{analyticsPlan.sizing.estimatedFutureStepCount}</strong>
+            </span>
+            <span>
+              Complexity
+              <strong>{analyticsPlan.complexity}</strong>
+            </span>
+            <span>
+              Outputs
+              <strong>{analyticsPlan.projectedOutputs.length}</strong>
+            </span>
+            <span>
+              Status
+              <strong>{analyticsPlan.status.replace(/_/g, " ")}</strong>
+            </span>
+          </div>
+          {mode === "analyst" && (
+            <div className="analytics-planning-steps">
+              {analyticsPlan.steps.slice(0, 5).map((step) => (
+                <p key={step.stepId}>{step.label}: {step.status.replace(/_/g, " ")}</p>
               ))}
             </div>
           )}

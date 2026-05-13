@@ -1,5 +1,6 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useAnalyticsIntentGraph } from "../../features/analyticsIntentGraph";
+import { useAnalyticsPlanning } from "../../features/analyticsPlanning";
 import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
@@ -238,6 +239,18 @@ function DatasetSummaryPanel({
     businessSemanticReport,
     kpiIntelligenceReport,
     businessQuestionReport,
+  });
+  const {
+    analyticsPlan,
+    humanSummary: planningSummary,
+  } = useAnalyticsPlanning({
+    datasetId: dataset?.dataset_id || null,
+    dataProfile,
+    workflowRecommendationReport,
+    kpiIntelligenceReport,
+    businessSemanticReport,
+    businessQuestionReport,
+    analyticsIntentGraph,
   });
 
   return (
@@ -488,6 +501,37 @@ function DatasetSummaryPanel({
             <span>
               Missing
               <strong>{analyticsIntentGraph.missingMetadataDependencies.length}</strong>
+            </span>
+          </div>
+        </section>
+      )}
+
+      {dataset && analyticsPlan && (
+        <section className="analytics-planning-panel" aria-label="Analytics planning engine">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Analytics plan</p>
+              <h2>Future workflow plan</h2>
+              <p>{planningSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{analyticsPlan.status.replace(/_/g, " ")}</span>
+          </div>
+          <div className="analytics-planning-grid">
+            <span>
+              Steps
+              <strong>{analyticsPlan.sizing.estimatedFutureStepCount}</strong>
+            </span>
+            <span>
+              Complexity
+              <strong>{analyticsPlan.complexity}</strong>
+            </span>
+            <span>
+              Outputs
+              <strong>{analyticsPlan.projectedOutputs.length}</strong>
+            </span>
+            <span>
+              Warnings
+              <strong>{analyticsPlan.warnings.length}</strong>
             </span>
           </div>
         </section>
