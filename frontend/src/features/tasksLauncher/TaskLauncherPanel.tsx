@@ -3,6 +3,7 @@ import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
+import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import { useExplanationLayer } from "../explanations";
 import {
   getTaskConfigurationReadinessLabel,
@@ -16,6 +17,7 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
   const { configuration } = useTaskConfiguration(task);
   const { analysisPlan } = useAnalysisPlan(task, configuration);
   const { businessExplanation } = useExplanationLayer(task, analysisPlan);
+  const engineCompatibility = useEngineAdapters(task, analysisPlan);
   const missingInputs = configuration
     ? listMissingRequiredTaskInputs(task, configuration)
     : [];
@@ -68,6 +70,10 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
           <strong>{task.supportedEngines.join(", ")}</strong>
         </span>
         <span>
+          Recommended future engine
+          <strong>{engineCompatibility.recommendedEngine?.label || "Not available yet"}</strong>
+        </span>
+        <span>
           Future explanation
           <strong>{task.explanationTemplateKey}</strong>
         </span>
@@ -118,6 +124,21 @@ function TaskDetail({ task, onClose }: { task: AnalyticsTask; onClose: () => voi
           ))}
         </div>
       )}
+      <div className="engine-compatibility-panel">
+        <span>Future engine compatibility</span>
+        {engineCompatibility.compatibleEngines.map((result) => (
+          <div key={result.engine.id} className="engine-compatibility-card">
+            <strong>{result.engine.label}</strong>
+            <small>{getEngineReadinessLabel(result.engine)}</small>
+            <p>{result.engine.description}</p>
+            <div>
+              {listEngineCapabilities(result.engine).map((capability) => (
+                <small key={capability}>{capability}</small>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
       {task.optionalInputs.length > 0 && (
         <div className="task-detail-list">
           <span>Optional inputs</span>
