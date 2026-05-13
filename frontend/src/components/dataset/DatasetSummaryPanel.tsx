@@ -1,4 +1,5 @@
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import { useAnalyticsIntentGraph } from "../../features/analyticsIntentGraph";
 import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
@@ -211,6 +212,7 @@ function DatasetSummaryPanel({
   });
   const {
     interpretedQuestions,
+    businessQuestionReport,
     humanSummary: questionSummary,
   } = useBusinessQuestions({
     datasetId: dataset?.dataset_id || null,
@@ -224,6 +226,18 @@ function DatasetSummaryPanel({
     businessSemanticReport,
     kpiIntelligenceReport,
     workflowRecommendationReport,
+  });
+  const {
+    analyticsIntentGraph,
+    humanSummary: graphSummary,
+  } = useAnalyticsIntentGraph({
+    datasetId: dataset?.dataset_id || null,
+    dataProfile,
+    dialectRecommendation,
+    workflowRecommendationReport,
+    businessSemanticReport,
+    kpiIntelligenceReport,
+    businessQuestionReport,
   });
 
   return (
@@ -440,6 +454,41 @@ function DatasetSummaryPanel({
                 </div>
               </article>
             ))}
+          </div>
+        </section>
+      )}
+
+      {dataset && analyticsIntentGraph && (
+        <section className="analytics-intent-graph-panel" aria-label="Analytics intent graph">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Intent graph</p>
+              <h2>Connected analytics metadata</h2>
+              <p>{graphSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{analyticsIntentGraph.confidence}</span>
+          </div>
+          <div className="analytics-intent-graph-grid">
+            <span>
+              Nodes
+              <strong>{analyticsIntentGraph.nodes.length}</strong>
+            </span>
+            <span>
+              Edges
+              <strong>{analyticsIntentGraph.edges.length}</strong>
+            </span>
+            <span>
+              Workflows
+              <strong>{analyticsIntentGraph.connectedWorkflows.length}</strong>
+            </span>
+            <span>
+              KPIs
+              <strong>{analyticsIntentGraph.connectedKpis.length}</strong>
+            </span>
+            <span>
+              Missing
+              <strong>{analyticsIntentGraph.missingMetadataDependencies.length}</strong>
+            </span>
           </div>
         </section>
       )}

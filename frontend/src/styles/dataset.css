@@ -1573,6 +1573,87 @@
   font-size: 11px;
 }
 
+.analytics-intent-graph-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.analytics-intent-graph-panel.compact {
+  gap: 8px;
+  padding: 10px;
+  border-color: #dbeafe;
+  border-radius: 8px;
+}
+
+.analytics-intent-graph-panel.compact > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.analytics-intent-graph-panel.compact > strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.analytics-intent-graph-panel .summary-header p:last-child {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.analytics-intent-graph-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+}
+
+.analytics-intent-graph-grid span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.analytics-intent-graph-grid strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.analytics-intent-graph-notes {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.analytics-intent-graph-notes p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .recent-dataset-list {
   display: grid;
   gap: 10px;

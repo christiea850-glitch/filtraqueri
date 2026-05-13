@@ -4,6 +4,7 @@ import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
 } from "../analysisPlan";
+import { useAnalyticsIntentGraph } from "../analyticsIntentGraph";
 import { useBusinessQuestions } from "../businessQuestionIntelligence";
 import { useBusinessSemantics } from "../businessSemantics";
 import { useDataIntelligence } from "../dataIntelligence";
@@ -126,6 +127,7 @@ function TaskDetail({
   });
   const {
     interpretedQuestions,
+    businessQuestionReport,
     humanSummary: questionSummary,
   } = useBusinessQuestions({
     datasetId: dataset?.dataset_id || null,
@@ -140,6 +142,20 @@ function TaskDetail({
     workflowRecommendationReport,
     executionPreview,
     guidedInputState: guidedInputs.state,
+    planningReadiness,
+  });
+  const {
+    analyticsIntentGraph,
+    humanSummary: graphSummary,
+  } = useAnalyticsIntentGraph({
+    datasetId: dataset?.dataset_id || null,
+    dataProfile,
+    dialectRecommendation,
+    workflowRecommendationReport,
+    businessSemanticReport,
+    kpiIntelligenceReport,
+    businessQuestionReport,
+    executionPreview,
     planningReadiness,
   });
   const missingInputs = configuration
@@ -466,6 +482,37 @@ function TaskDetail({
               </article>
             ))}
           </div>
+        </div>
+      )}
+      {analyticsIntentGraph && (
+        <div className="analytics-intent-graph-panel compact" aria-label="Task analytics intent graph">
+          <span>Intent graph</span>
+          <strong>{graphSummary}</strong>
+          <div className="analytics-intent-graph-grid">
+            <span>
+              Nodes
+              <strong>{analyticsIntentGraph.nodes.length}</strong>
+            </span>
+            <span>
+              Edges
+              <strong>{analyticsIntentGraph.edges.length}</strong>
+            </span>
+            <span>
+              Engines
+              <strong>{analyticsIntentGraph.recommendedFutureEngines.length}</strong>
+            </span>
+            <span>
+              Missing
+              <strong>{analyticsIntentGraph.health.unresolvedDependencies.length}</strong>
+            </span>
+          </div>
+          {mode === "analyst" && analyticsIntentGraph.health.unresolvedDependencies.length > 0 && (
+            <div className="analytics-intent-graph-notes">
+              {analyticsIntentGraph.health.unresolvedDependencies.slice(0, 3).map((item) => (
+                <p key={item}>{item}</p>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {relationshipPlan.hasWorkbookContext && (
