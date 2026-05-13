@@ -4,6 +4,7 @@ import { useAnalyticsPlanning } from "../../features/analyticsPlanning";
 import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
+import { useExecutionContracts } from "../../features/executionContracts";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import {
@@ -251,6 +252,19 @@ function DatasetSummaryPanel({
     businessSemanticReport,
     businessQuestionReport,
     analyticsIntentGraph,
+  });
+  const {
+    executionContract,
+    humanSummary: executionContractSummary,
+  } = useExecutionContracts({
+    datasetId: dataset?.dataset_id || null,
+    analyticsPlan,
+    analyticsIntentGraph,
+    dataProfile,
+    workflowRecommendationReport,
+    kpiIntelligenceReport,
+    businessSemanticReport,
+    businessQuestionReport,
   });
 
   return (
@@ -532,6 +546,37 @@ function DatasetSummaryPanel({
             <span>
               Warnings
               <strong>{analyticsPlan.warnings.length}</strong>
+            </span>
+          </div>
+        </section>
+      )}
+
+      {dataset && executionContract && (
+        <section className="execution-contract-panel" aria-label="Execution contract layer">
+          <div className="summary-header">
+            <div>
+              <p className="section-label">Execution contract</p>
+              <h2>Future execution boundary</h2>
+              <p>{executionContractSummary}</p>
+            </div>
+            <span className="dataset-count-pill">{executionContract.lifecycleState.replace(/_/g, " ")}</span>
+          </div>
+          <div className="execution-contract-grid">
+            <span>
+              Stages
+              <strong>{executionContract.sizing.estimatedExecutionStages}</strong>
+            </span>
+            <span>
+              Outputs
+              <strong>{executionContract.sizing.estimatedProjectedOutputs}</strong>
+            </span>
+            <span>
+              Engines
+              <strong>{executionContract.engines.length}</strong>
+            </span>
+            <span>
+              Readiness
+              <strong>{executionContract.readinessScore}</strong>
             </span>
           </div>
         </section>

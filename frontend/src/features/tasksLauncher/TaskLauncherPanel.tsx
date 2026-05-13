@@ -10,6 +10,7 @@ import { useBusinessQuestions } from "../businessQuestionIntelligence";
 import { useBusinessSemantics } from "../businessSemantics";
 import { useDataIntelligence } from "../dataIntelligence";
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
+import { useExecutionContracts } from "../executionContracts";
 import {
   getExecutionPreviewConfidenceLabel,
   getExecutionPreviewResultShapeLabel,
@@ -170,6 +171,21 @@ function TaskDetail({
     businessSemanticReport,
     businessQuestionReport,
     analyticsIntentGraph,
+    executionPreview,
+    planningReadiness,
+  });
+  const {
+    executionContract,
+    humanSummary: executionContractSummary,
+  } = useExecutionContracts({
+    datasetId: dataset?.dataset_id || null,
+    analyticsPlan,
+    analyticsIntentGraph,
+    dataProfile,
+    workflowRecommendationReport,
+    kpiIntelligenceReport,
+    businessSemanticReport,
+    businessQuestionReport,
     executionPreview,
     planningReadiness,
   });
@@ -556,6 +572,40 @@ function TaskDetail({
             <div className="analytics-planning-steps">
               {analyticsPlan.steps.slice(0, 5).map((step) => (
                 <p key={step.stepId}>{step.label}: {step.status.replace(/_/g, " ")}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {executionContract && (
+        <div className="execution-contract-panel compact" aria-label="Task execution contract layer">
+          <span>Execution contract</span>
+          <strong>{executionContractSummary}</strong>
+          <div className="execution-contract-grid">
+            <span>
+              Stages
+              <strong>{executionContract.sizing.estimatedExecutionStages}</strong>
+            </span>
+            <span>
+              Outputs
+              <strong>{executionContract.sizing.estimatedProjectedOutputs}</strong>
+            </span>
+            <span>
+              Engines
+              <strong>{executionContract.engines.length}</strong>
+            </span>
+            <span>
+              Score
+              <strong>{executionContract.readinessScore}</strong>
+            </span>
+          </div>
+          {mode === "analyst" && (
+            <div className="execution-contract-notes">
+              {executionContract.blockedReasons.slice(0, 3).map((reason) => (
+                <p key={reason}>{reason}</p>
+              ))}
+              {executionContract.relationshipDependencyChains.slice(0, 2).map((chain) => (
+                <p key={chain}>{chain}</p>
               ))}
             </div>
           )}
