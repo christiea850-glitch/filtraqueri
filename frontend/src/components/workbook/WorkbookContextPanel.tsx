@@ -14,6 +14,7 @@ import {
   type WorksheetMetadata,
   type WorksheetStatus,
 } from "../../features/workbook";
+import { useWorkbookRelationships, type WorkbookJoinPlanPreview } from "../../features/workbookRelationships";
 
 type WorkbookContextPanelProps = {
   dataset: DatasetMetadata | null;
@@ -70,6 +71,45 @@ function WorkbookProfileList({ profile }: { profile: WorkbookIngestionProfile })
           {label}
           <strong>{formatProfileValue(value)}</strong>
         </span>
+      ))}
+    </div>
+  );
+}
+
+function JoinPlanPreviewList({ previews }: { previews: WorkbookJoinPlanPreview[] }) {
+  if (previews.length === 0) {
+    return <p className="workbook-empty-note">No future join plan previews are available yet.</p>;
+  }
+
+  return (
+    <div className="workbook-join-preview-list" aria-label="Future workbook join plan previews">
+      {previews.map((preview) => (
+        <div className="workbook-join-preview-card" key={preview.id}>
+          <div className="workbook-relationship-path">
+            {preview.relatedSheets.map((sheet, index) => (
+              <strong key={`${preview.id}:${sheet}`}>
+                {index > 0 ? "-> " : ""}
+                {sheet}
+              </strong>
+            ))}
+          </div>
+          <p>{preview.expectedJoinBehavior}</p>
+          <div className="workbook-relationship-tables">
+            {preview.suggestedRelationshipPath.map((path) => (
+              <span key={`${preview.id}:${path}`}>{path}</span>
+            ))}
+          </div>
+          <div className="workbook-evidence-list">
+            {preview.supportedTaskCategories.map((category) => (
+              <span key={`${preview.id}:${category}`}>{category.replace(/_/g, " ")}</span>
+            ))}
+          </div>
+          <div className="workbook-join-notes">
+            {preview.futureExecutionNotes.map((note) => (
+              <small key={`${preview.id}:${note}`}>{note}</small>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -574,6 +614,7 @@ function WorkbookContextPanel({
   onRelationshipReview,
 }: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
+  const relationshipRegistry = useWorkbookRelationships(workbook);
   const [diagnostics, setDiagnostics] =
     useState<RelationshipContractDiagnosticsResponse | null>(null);
 
@@ -698,6 +739,14 @@ function WorkbookContextPanel({
           worksheets={workbook.worksheets}
           onRelationshipReview={onRelationshipReview}
         />
+      </div>
+
+      <div className="workbook-mapping-section">
+        <div className="builder-block-header">
+          <span>Future join plan previews</span>
+          <small>{relationshipRegistry?.joinPlanPreviews.length || 0} paths</small>
+        </div>
+        <JoinPlanPreviewList previews={relationshipRegistry?.joinPlanPreviews || []} />
       </div>
 
       <div className="workbook-mapping-section">

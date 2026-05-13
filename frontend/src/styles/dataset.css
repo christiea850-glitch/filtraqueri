@@ -1000,7 +1000,8 @@
 
 .workbook-mapping-list,
 .workbook-schema-list,
-.workbook-relationship-list {
+.workbook-relationship-list,
+.workbook-join-preview-list {
   display: grid;
   gap: 6px;
   max-height: 220px;
@@ -1097,6 +1098,36 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.workbook-join-preview-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workbook-join-preview-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.workbook-join-notes {
+  display: grid;
+  gap: 5px;
+}
+
+.workbook-join-notes small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.35;
 }
 
 .workbook-relationship-card.accepted {
