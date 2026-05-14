@@ -67,7 +67,6 @@ type WorkspaceShellProps = {
   ) => void;
 };
 
-const menuItems = ["Help"];
 const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_DEFAULT_WIDTH = 236;
@@ -210,7 +209,6 @@ function WorkspaceShell({
   activeView,
   workspaceMode,
   dataset,
-  recentDatasets,
   analystViews,
   errorMessage,
   runtimeContext,
@@ -219,12 +217,10 @@ function WorkspaceShell({
   onOpenFile,
   onViewChange,
   onModeChange,
-  onRecentDatasetClick,
   onRuntimePanelToggle,
   onRuntimeTrailSelect,
 }: WorkspaceShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isFocusMode, setIsFocusMode] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const hubs = workspaceHubs.map((hub) =>
@@ -316,7 +312,6 @@ function WorkspaceShell({
       className={[
         "app",
         isSidebarCollapsed ? "is-sidebar-collapsed" : "",
-        isFocusMode ? "is-workspace-focused" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -336,23 +331,14 @@ function WorkspaceShell({
           </div>
           <strong>FiltraQueri</strong>
         </div>
-        <nav className="menu-items" aria-label="Application menu">
-          {menuItems.map((item) => (
-            <button type="button" key={item}>
-              {item}
-            </button>
-          ))}
-        </nav>
-        <div className="workspace-status" aria-label="Current workspace">
-          <span>{workspaceModeTone}</span>
-          <strong>{dataset ? "Data loaded" : "No dataset open"}</strong>
-        </div>
         <button
           type="button"
-          className={`focus-toggle ${isFocusMode ? "is-active" : ""}`}
-          onClick={() => setIsFocusMode((currentValue) => !currentValue)}
+          className="workspace-switcher"
+          aria-label="Workspace identity"
+          onClick={() => (dataset ? onViewChange("dataset") : onOpenFile())}
         >
-          {isFocusMode ? "Exit Focus" : "Focus Mode"}
+          <span>{workspaceModeTone}</span>
+          <strong>{dataset ? "Active workspace" : "Open workspace"}</strong>
         </button>
         <div className="mode-switcher" aria-label="Workspace mode">
           <button
@@ -370,6 +356,9 @@ function WorkspaceShell({
             Analyst Mode
           </button>
         </div>
+        <button type="button" className="settings-button" onClick={() => onViewChange("settings")}>
+          Settings
+        </button>
       </header>
 
       <div className="workspace-shell">
@@ -386,38 +375,7 @@ function WorkspaceShell({
               </span>
               <span className="nav-label">{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
             </button>
-            <button type="button" className="sidebar-primary" onClick={onOpenFile} title="Open data">
-              <span className="nav-icon" aria-hidden="true">
-                <WorkspaceIcon name="upload" />
-              </span>
-              <span className="nav-label">Open data</span>
-            </button>
           </div>
-
-          {!isSidebarCollapsed && activeHub.id === "data" && (
-            <div className="sidebar-recents" aria-label="Recent files">
-              <p>Recent files</p>
-              {recentDatasets.length === 0 ? (
-                <span>No recent files</span>
-              ) : (
-                recentDatasets.map((session) => (
-                  <button
-                    type="button"
-                    key={session.dataset.dataset_id}
-                    className={dataset?.dataset_id === session.dataset.dataset_id ? "is-active" : ""}
-                    onClick={() => onRecentDatasetClick(session.dataset.dataset_id)}
-                    title={session.dataset.original_filename}
-                  >
-                    <strong>{session.dataset.original_filename}</strong>
-                    <span>
-                      {session.dataset.row_count.toLocaleString()} rows /{" "}
-                      {session.dataset.column_count.toLocaleString()} cols
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
 
           <nav className="hub-nav" aria-label="Workspace navigation">
             {groupedHubs.map((section) => (
@@ -542,16 +500,21 @@ function WorkspaceShell({
             <div className="runtime-context-body">
               <div className="runtime-context-header">
                 <p className="section-label">Investigation</p>
-                <h2>Next steps</h2>
-                <span>{runtimeModeLabel} / read-only</span>
+                <h2>Current step</h2>
               </div>
+
+              <section className="runtime-current-step" aria-label="Current investigation step">
+                <span>{activeSectionLabel}</span>
+                <strong>{workflowLabel}</strong>
+                <small>{investigationFocusLabel}</small>
+              </section>
 
               <section className="runtime-investigation-surface" aria-label="Contextual next steps">
                 {runtimeContext.recommendationGroups.length > 0 && (
                   <div className="runtime-next-steps" aria-label="Suggested next steps">
                     <div className="runtime-section-heading">
-                      <span>Suggested next steps</span>
-                      <small>Metadata-based guidance; nothing runs automatically</small>
+                      <span>Suggested next action</span>
+                      <small>Nothing runs automatically</small>
                     </div>
                     <div className="runtime-guidance-groups" aria-label="Ranked suggestions">
                       {runtimeContext.recommendationGroups.map((group) => (
@@ -588,10 +551,36 @@ function WorkspaceShell({
                 )}
               </section>
 
+              <section className="runtime-trail-section" aria-label="Investigation trail">
+                <div className="runtime-section-heading">
+                  <span>Trail</span>
+                  <small>Move through the current investigation</small>
+                </div>
+                <div className="runtime-trail-list" aria-label="Workspace path">
+                  {runtimeContext.trail.map((item) => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className={[
+                        item.status === "current" ? "is-current" : "",
+                        runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
+                    >
+                      <strong>{item.label}</strong>
+                      <span>{item.summary}</span>
+                      <small>{item.mode === "analyst" ? "Analyst" : "Human"}</small>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
               <details className="runtime-disclosure-section">
                 <summary>
-                  <span>Workspace path</span>
-                  <small>Trail and go-to actions</small>
+                  <span>More paths</span>
+                  <small>Return and go-to actions</small>
                 </summary>
                 <div className="runtime-disclosure-body">
                   {runtimeContext.returnContinuation && (
@@ -610,30 +599,6 @@ function WorkspaceShell({
                       <span>Return to the workspace point that opened this context.</span>
                     </button>
                   )}
-
-                  <div className="runtime-section-heading">
-                    <span>Path</span>
-                    <small>Move through the current investigation</small>
-                  </div>
-                  <div className="runtime-trail-list" aria-label="Workspace path">
-                    {runtimeContext.trail.map((item) => (
-                      <button
-                        type="button"
-                        key={item.id}
-                        className={[
-                          item.status === "current" ? "is-current" : "",
-                          runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
-                      >
-                        <strong>{item.label}</strong>
-                        <span>{item.summary}</span>
-                        <small>{item.mode === "analyst" ? "Analyst" : "Human"}</small>
-                      </button>
-                    ))}
-                  </div>
 
                   <div className="runtime-section-heading">
                     <span>Go to</span>

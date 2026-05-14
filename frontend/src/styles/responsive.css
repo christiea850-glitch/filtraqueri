@@ -127,17 +127,14 @@
   }
 
   .top-menu-bar {
-    align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    align-items: stretch;
     gap: 8px;
     padding: 12px;
   }
 
-  .menu-items {
-    flex-wrap: wrap;
-  }
-
-  .workspace-status {
+  .workspace-switcher {
+    justify-self: stretch;
     max-width: 100%;
   }
 
