@@ -6,6 +6,39 @@ import type { ActiveResultModel } from "../results/activeResultModel";
 import type { ResultTabKey } from "../results/resultTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../sqlWorkspacePersistence";
 
+export type RuntimeContextReference = {
+  datasetId: string | null;
+  datasetName: string | null;
+  workbookActiveWorksheetName: string | null;
+  workbookWorksheetCount: number;
+  resultTab: ResultTabKey | null;
+  mode: WorkspaceMode;
+  view: ActiveView;
+  activeExecutionId: string | null;
+};
+
+export type InvestigationContinuationOrigin =
+  | "workspace-trail"
+  | "runtime-panel"
+  | "human-intent"
+  | "analyst-context"
+  | "metadata-summary";
+
+export type ContextualInvestigationObject = {
+  id: string;
+  label: string;
+  objectType:
+    | "dataset"
+    | "result"
+    | "query-builder"
+    | "sql-workspace"
+    | "human-intent"
+    | "task"
+    | "metadata";
+  summary: string;
+  reference: RuntimeContextReference;
+};
+
 export type RuntimePanelSlot = {
   id: string;
   title: string;
@@ -23,6 +56,18 @@ export type InvestigationContinuation = {
   id: string;
   label: string;
   description: string;
+  origin: InvestigationContinuationOrigin;
+  originReference: RuntimeContextReference;
+  continuationContext: {
+    origin: InvestigationContinuationOrigin;
+    originatingDatasetId: string | null;
+    originatingWorkbookWorksheetName: string | null;
+    originatingResultTab: ResultTabKey | null;
+    originatingMode: WorkspaceMode;
+    originatingView: ActiveView;
+  };
+  relatedReferences: RuntimeContextReference[];
+  returnLabel: string;
   targetView: ActiveView;
   targetMode: WorkspaceMode;
   source:
@@ -37,11 +82,16 @@ export type InvestigationContinuation = {
 
 export type WorkspaceTrailItem = {
   id: string;
+  stableKey: string;
   label: string;
+  semanticKey: "data" | "build" | "results" | "analyst";
   view: ActiveView;
   mode: WorkspaceMode;
   status: "current" | "available" | "metadata";
   summary: string;
+  contextReference: RuntimeContextReference;
+  derivedContinuationContext: InvestigationContinuation["continuationContext"];
+  continuationId: string;
 };
 
 export type RuntimeContextSnapshot = {
@@ -87,13 +137,31 @@ export type WorkspaceRuntimeContext = {
   trail: WorkspaceTrailItem[];
   continuations: InvestigationContinuation[];
   panelSlots: RuntimePanelSlot[];
+  contextualObjects: ContextualInvestigationObject[];
+  selectedContextualObject: ContextualInvestigationObject | null;
+  returnContinuation: InvestigationContinuation | null;
   selectedTrailItemId: string | null;
+  modeContexts: {
+    human: RuntimeContextReference;
+    analyst: RuntimeContextReference;
+  };
 };
 
 export type WorkspaceRuntimePersistenceState = {
   selectedTrailItemId: string | null;
   isRuntimePanelCollapsed: boolean;
   selectedTaskId: string | null;
+  selectedContextualObjectId: string | null;
+  returnContinuationId: string | null;
+  continuationMetadata: {
+    id: string;
+    origin: InvestigationContinuationOrigin;
+    targetView: ActiveView;
+    targetMode: WorkspaceMode;
+    reference: RuntimeContextReference;
+    relatedReferences: RuntimeContextReference[];
+    continuationContext: InvestigationContinuation["continuationContext"];
+  } | null;
 };
 
 export type RuntimeDisclosureSlotProps = {
@@ -117,4 +185,6 @@ export type BuildWorkspaceRuntimeContextOptions = {
   executionRegistry: ExecutionRegistryState;
   humanIntentLabel: string | null;
   selectedTrailItemId: string | null;
+  selectedContextualObjectId: string | null;
+  returnContinuationId: string | null;
 };

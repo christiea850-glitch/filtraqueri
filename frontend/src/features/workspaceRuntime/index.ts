@@ -1,4 +1,12 @@
-export { buildWorkspaceRuntimeContext } from "./runtimeContext";
+export {
+  buildWorkspaceRuntimeContext,
+  getStableTrailItemId,
+} from "./runtimeContext";
+export {
+  createRuntimeNavigationSelection,
+  getContextualObjectIdForView,
+} from "./runtimeNavigationAdapter";
+export { normalizeRuntimeModeContext } from "./runtimeAdapters";
 export {
   loadRuntimePersistenceState,
   normalizeRuntimePersistenceState,
@@ -14,3 +22,7 @@ export type {
   WorkspaceRuntimePersistenceState,
   WorkspaceTrailItem,
 } from "./runtimeTypes";
+export type {
+  RuntimeNavigationRequest,
+  RuntimeNavigationSelection,
+} from "./runtimeNavigationAdapter";

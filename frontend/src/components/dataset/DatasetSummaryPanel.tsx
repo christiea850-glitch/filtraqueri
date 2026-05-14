@@ -721,14 +721,30 @@ function DatasetSummaryPanel({
       </section>
 
       {dataset && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-task-launcher"
+          label="Runtime slot"
+          title="Guided analytics tasks"
+          summary="Preview task inputs and metadata-only planning context."
+          badge="Tasks"
+        >
         <TaskLauncherPanel
           dataset={dataset}
           selectedTaskId={selectedTaskId}
           onSelectedTaskIdChange={onSelectedTaskIdChange}
         />
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-human-guidance"
+          label="Runtime slot"
+          title="Human Mode guidance"
+          summary="Choose a simple continuation into the existing Human Mode workflow."
+          badge="Human Mode"
+          defaultOpen
+        >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
             <p className="section-label">Guided analysis</p>
@@ -747,6 +763,7 @@ function DatasetSummaryPanel({
             ))}
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
     </div>
   );

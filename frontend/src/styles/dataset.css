@@ -13,10 +13,10 @@
 .runtime-disclosure-slot > summary {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   align-items: flex-start;
   min-width: 0;
-  padding: 14px;
+  padding: 12px;
   cursor: pointer;
   list-style: none;
 }
@@ -45,7 +45,7 @@
 
 .runtime-disclosure-slot > summary > span {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   flex: 1;
 }
@@ -61,7 +61,7 @@
 .runtime-disclosure-slot summary strong {
   overflow: hidden;
   color: #111827;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -92,8 +92,8 @@
 
 .runtime-disclosure-content {
   display: grid;
-  gap: 12px;
-  padding: 0 12px 12px;
+  gap: 10px;
+  padding: 0 10px 10px;
 }
 
 .human-guidance-panel {

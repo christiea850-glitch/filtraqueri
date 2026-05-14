@@ -459,6 +459,34 @@ function WorkspaceShell({
                 <span>Read-only</span>
               </div>
 
+              {runtimeContext.returnContinuation && (
+                <button
+                  type="button"
+                  className="runtime-return-button"
+                  onClick={() =>
+                    onRuntimeTrailSelect(
+                      runtimeContext.returnContinuation!.id,
+                      runtimeContext.returnContinuation!.originReference.view,
+                      runtimeContext.returnContinuation!.originReference.mode,
+                    )
+                  }
+                >
+                  <strong>{runtimeContext.returnContinuation.returnLabel}</strong>
+                  <span>
+                    {runtimeContext.returnContinuation.originReference.mode} /{" "}
+                    {runtimeContext.returnContinuation.originReference.view}
+                  </span>
+                </button>
+              )}
+
+              {runtimeContext.selectedContextualObject && (
+                <section className="runtime-selected-object">
+                  <span>{runtimeContext.selectedContextualObject.objectType.replace(/-/g, " ")}</span>
+                  <strong>{runtimeContext.selectedContextualObject.label}</strong>
+                  <p>{runtimeContext.selectedContextualObject.summary}</p>
+                </section>
+              )}
+
               <div className="runtime-trail-list" aria-label="Workspace trail">
                 {runtimeContext.trail.map((item) => (
                   <button
@@ -474,6 +502,7 @@ function WorkspaceShell({
                   >
                     <strong>{item.label}</strong>
                     <span>{item.summary}</span>
+                    <small>{item.mode}</small>
                   </button>
                 ))}
               </div>
@@ -495,6 +524,7 @@ function WorkspaceShell({
                   >
                     <strong>{continuation.label}</strong>
                     <small>{continuation.description}</small>
+                    <em>{continuation.origin.replace(/-/g, " ")}</em>
                   </button>
                 ))}
               </div>

@@ -33,6 +33,8 @@ import {
 import useWorkspaceOrchestrationSnapshot from "./features/workspace/useWorkspaceOrchestrationSnapshot";
 import {
   buildWorkspaceRuntimeContext,
+  createRuntimeNavigationSelection,
+  getContextualObjectIdForView,
   loadRuntimePersistenceState,
   saveRuntimePersistenceState,
 } from "./features/workspaceRuntime";
@@ -319,6 +321,8 @@ function App() {
         executionRegistry,
         humanIntentLabel: humanIntent ? humanIntentGuidance[humanIntent].label : null,
         selectedTrailItemId: runtimePersistence.selectedTrailItemId,
+        selectedContextualObjectId: runtimePersistence.selectedContextualObjectId,
+        returnContinuationId: runtimePersistence.returnContinuationId,
       }),
     [
       activeResultModel,
@@ -329,6 +333,8 @@ function App() {
       humanIntent,
       queryBuilderRuntimeSnapshot,
       runtimePersistence.selectedTrailItemId,
+      runtimePersistence.selectedContextualObjectId,
+      runtimePersistence.returnContinuationId,
       sqlWorkspaceMetadata,
       workspaceMode,
     ],
@@ -679,6 +685,17 @@ function App() {
       setHumanInsightBackTarget({ view: activeView, tab: activeResultTab });
     }
     if (tab) handleResultTabChange(tab);
+    setRuntimePersistence((currentState) =>
+      createRuntimeNavigationSelection({
+        runtimeContext: workspaceRuntimeContext,
+        currentPersistence: currentState,
+        request: {
+          id: `continue:human:${view}`,
+          targetView: view,
+          targetMode: "human",
+        },
+      }).persistence,
+    );
     updateDatasetSessionView(view);
   };
 
@@ -686,6 +703,15 @@ function App() {
     if (!humanInsightBackTarget) return;
 
     handleResultTabChange(humanInsightBackTarget.tab);
+    setRuntimePersistence((currentState) => ({
+      ...currentState,
+      selectedTrailItemId:
+        workspaceRuntimeContext.trail.find(
+          (item) => item.view === humanInsightBackTarget.view && item.mode === "human",
+        )?.id || currentState.selectedTrailItemId,
+      selectedContextualObjectId: getContextualObjectIdForView(humanInsightBackTarget.view),
+      returnContinuationId: null,
+    }));
     updateDatasetSessionView(humanInsightBackTarget.view);
     setHumanInsightBackTarget(null);
   };
@@ -1155,10 +1181,17 @@ function App() {
         }))
       }
       onRuntimeTrailSelect={(trailItemId, targetView, targetMode) => {
-        setRuntimePersistence((currentState) => ({
-          ...currentState,
-          selectedTrailItemId: trailItemId,
-        }));
+        setRuntimePersistence((currentState) =>
+          createRuntimeNavigationSelection({
+            runtimeContext: workspaceRuntimeContext,
+            currentPersistence: currentState,
+            request: {
+              id: trailItemId,
+              targetView,
+              targetMode,
+            },
+          }).persistence,
+        );
         if (targetMode !== workspaceMode) setWorkspaceMode(targetMode);
         updateDatasetSessionView(targetView);
       }}
