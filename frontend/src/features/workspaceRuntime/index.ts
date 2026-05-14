@@ -11,6 +11,7 @@ export {
   groupGuidanceRecommendations,
   rankInvestigationGuidance,
 } from "./runtimeGuidanceRankingAdapter";
+export { buildInvestigationNarrative } from "./runtimeNarrativeAdapter";
 export { normalizeRuntimeModeContext } from "./runtimeAdapters";
 export {
   loadRuntimePersistenceState,
@@ -21,6 +22,7 @@ export { default as RuntimeDisclosureSlot } from "./RuntimeDisclosureSlot";
 export type {
   InvestigationContinuation,
   InvestigationGuidanceItem,
+  InvestigationNarrative,
   GuidanceCategory,
   GuidanceContinuationLink,
   GuidanceContextWeight,
@@ -28,6 +30,10 @@ export type {
   GuidancePriority,
   GuidanceRecommendationGroup,
   GuidanceScore,
+  NarrativeConfidence,
+  NarrativeEvent,
+  NarrativeStage,
+  NarrativeSummary,
   RuntimeContextSnapshot,
   RuntimeDisclosureSlotProps,
   RuntimePanelSlot,

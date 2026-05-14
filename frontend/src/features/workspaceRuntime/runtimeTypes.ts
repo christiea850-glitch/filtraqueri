@@ -93,6 +93,40 @@ export type GuidanceRecommendationGroup = {
   metadataOnly: true;
 };
 
+export type NarrativeStage =
+  | "not-started"
+  | "data-opened"
+  | "context-selected"
+  | "analysis-forming"
+  | "result-review"
+  | "analyst-review";
+
+export type NarrativeConfidence = "low" | "medium" | "high";
+
+export type NarrativeEvent = {
+  id: string;
+  label: string;
+  summary: string;
+  stage: NarrativeStage;
+  reference: RuntimeContextReference;
+};
+
+export type NarrativeSummary = {
+  headline: string;
+  body: string;
+  nextStep: string;
+};
+
+export type InvestigationNarrative = {
+  id: string;
+  stage: NarrativeStage;
+  confidence: NarrativeConfidence;
+  summary: NarrativeSummary;
+  events: NarrativeEvent[];
+  mode: WorkspaceMode;
+  metadataOnly: true;
+};
+
 export type ContextualInvestigationObject = {
   id: string;
   label: string;
@@ -209,6 +243,7 @@ export type WorkspaceRuntimeContext = {
   continuations: InvestigationContinuation[];
   guidance: InvestigationGuidanceItem[];
   recommendationGroups: GuidanceRecommendationGroup[];
+  narrative: InvestigationNarrative;
   panelSlots: RuntimePanelSlot[];
   contextualObjects: ContextualInvestigationObject[];
   selectedContextualObject: ContextualInvestigationObject | null;

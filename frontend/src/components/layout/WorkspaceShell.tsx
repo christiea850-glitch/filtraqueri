@@ -507,6 +507,30 @@ function WorkspaceShell({
                 </section>
               )}
 
+              <details className="runtime-narrative-card">
+                <summary>
+                  <span>
+                    <small>Investigation story</small>
+                    <strong>{runtimeContext.narrative.summary.headline}</strong>
+                  </span>
+                  <em>{runtimeContext.narrative.confidence}</em>
+                </summary>
+                <div className="runtime-narrative-body">
+                  <p>{runtimeContext.narrative.summary.body}</p>
+                  <strong>{runtimeContext.narrative.summary.nextStep}</strong>
+                  {runtimeContext.narrative.events.length > 0 && (
+                    <ol>
+                      {runtimeContext.narrative.events.map((event) => (
+                        <li key={event.id}>
+                          <span>{event.label}</span>
+                          <small>{event.summary}</small>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </details>
+
               {runtimeContext.recommendationGroups.length > 0 && (
                 <>
                   <div className="runtime-section-heading">

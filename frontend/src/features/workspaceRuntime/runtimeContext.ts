@@ -9,6 +9,7 @@ import {
   groupGuidanceRecommendations,
   rankInvestigationGuidance,
 } from "./runtimeGuidanceRankingAdapter";
+import { buildInvestigationNarrative } from "./runtimeNarrativeAdapter";
 import type {
   BuildWorkspaceRuntimeContextOptions,
   ContextualInvestigationObject,
@@ -401,13 +402,19 @@ export const buildWorkspaceRuntimeContext = ({
   });
   const trail = createTrail({ activeView, mode, hasDataset: Boolean(dataset), snapshot });
   const selectedTrailItem = trail.find((item) => item.id === selectedTrailItemId);
+  const recommendationGroups = groupGuidanceRecommendations({ snapshot, guidance });
 
   return {
     snapshot,
     trail,
     continuations,
     guidance,
-    recommendationGroups: groupGuidanceRecommendations({ snapshot, guidance }),
+    recommendationGroups,
+    narrative: buildInvestigationNarrative({
+      snapshot,
+      selectedTrailItem: selectedTrailItem || null,
+      recommendationGroups,
+    }),
     panelSlots: createPanelSlots(snapshot),
     contextualObjects,
     selectedContextualObject:

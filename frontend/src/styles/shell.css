@@ -894,6 +894,120 @@ body.is-resizing-sidebar {
   color: #6d28d9;
 }
 
+.runtime-narrative-card {
+  min-width: 0;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.runtime-narrative-card > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 9px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.runtime-narrative-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.runtime-narrative-card > summary span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.runtime-narrative-card > summary small {
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.runtime-narrative-card > summary strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-narrative-card > summary em {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runtime-narrative-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 9px 9px;
+}
+
+.runtime-narrative-body p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.runtime-narrative-body > strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.runtime-narrative-body ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.runtime-narrative-body li {
+  color: #94a3b8;
+}
+
+.runtime-narrative-body li span,
+.runtime-narrative-body li small {
+  display: block;
+}
+
+.runtime-narrative-body li span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.runtime-narrative-body li small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-narrative-card {
+  border-color: #ddd6fe;
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-narrative-card > summary small {
+  color: #6d28d9;
+}
+
 .runtime-continuation-list > span {
   color: #64748b;
   font-size: 11px;
