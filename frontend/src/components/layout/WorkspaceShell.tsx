@@ -28,6 +28,11 @@ type HubItem = {
   }>;
 };
 
+type HubSection = {
+  label: string;
+  hubIds: HubId[];
+};
+
 type IconName =
   | "home"
   | "data"
@@ -66,6 +71,13 @@ const menuItems = ["Help"];
 const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_DEFAULT_WIDTH = 236;
+
+const hubSections: HubSection[] = [
+  { label: "Workspace", hubIds: ["home", "data"] },
+  { label: "Analytics", hubIds: ["explore", "build", "results"] },
+  { label: "Advanced", hubIds: ["analyst"] },
+  { label: "System", hubIds: ["settings"] },
+];
 
 const workspaceHubs: HubItem[] = [
   {
@@ -231,13 +243,31 @@ function WorkspaceShell({
     hubs.find((hub) => hub.subItems.some((item) => item.view === activeView)) ||
     hubs.find((hub) => hub.id === (workspaceMode === "analyst" ? "analyst" : "home")) ||
     hubs[0];
+  const activeSubItem =
+    activeHub.subItems.find((item) => item.view === activeView) || activeHub.subItems[0];
+  const groupedHubs = hubSections
+    .map((section) => ({
+      ...section,
+      hubs: section.hubIds
+        .map((hubId) => hubs.find((hub) => hub.id === hubId))
+        .filter((hub): hub is HubItem => Boolean(hub)),
+    }))
+    .filter((section) => section.hubs.length > 0);
+  const activeSectionLabel =
+    groupedHubs.find((section) => section.hubs.some((hub) => hub.id === activeHub.id))?.label ||
+    "Workspace";
   const runtimeModeLabel = workspaceMode === "analyst" ? "Analyst Mode" : "Human Mode";
+  const workspaceModeTone =
+    workspaceMode === "analyst" ? "Technical workspace" : "Guided workspace";
   const runtimeModeSummary =
     workspaceMode === "analyst"
       ? "Technical context is visible here, but execution stays under your control."
       : "Your data, questions, and results stay connected as one investigation.";
   const selectedContextTypeLabel =
     runtimeContext.selectedContextualObject?.objectType.replace(/-/g, " ") ?? "";
+  const investigationFocusLabel =
+    runtimeContext.selectedContextualObject?.label || activeSubItem?.label || activeHub.label;
+  const investigationBreadcrumb = `${activeSectionLabel} / ${activeHub.label}`;
 
   const changeHub = (hub: HubItem) => {
     if (hub.mode !== workspaceMode) onModeChange(hub.mode);
@@ -308,9 +338,10 @@ function WorkspaceShell({
             </button>
           ))}
         </nav>
-        <span className="workspace-status">
-          {dataset ? dataset.original_filename : "No dataset open"}
-        </span>
+        <div className="workspace-status" aria-label="Current workspace">
+          <span>{workspaceModeTone}</span>
+          <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
+        </div>
         <button
           type="button"
           className={`focus-toggle ${isFocusMode ? "is-active" : ""}`}
@@ -338,75 +369,87 @@ function WorkspaceShell({
 
       <div className="workspace-shell">
         <aside className="left-sidebar" aria-label="Workspace navigation">
-          <button
-            type="button"
-            className="sidebar-collapse-toggle"
-            onClick={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
-            aria-label={isSidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
-          >
-            <span className="nav-icon" aria-hidden="true">
-              <WorkspaceIcon name={isSidebarCollapsed ? "expand" : "collapse"} />
-            </span>
-            <span className="nav-label">{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
-          </button>
-          <button type="button" className="sidebar-primary" onClick={onOpenFile} title="Open data">
-            <span className="nav-icon" aria-hidden="true">
-              <WorkspaceIcon name="upload" />
-            </span>
-            <span className="nav-label">Open data</span>
-          </button>
-          <div className="sidebar-dataset-summary" aria-label="Active dataset">
-            <p>Dataset</p>
+          <div className="sidebar-shell-controls">
+            <button
+              type="button"
+              className="sidebar-collapse-toggle"
+              onClick={() => setIsSidebarCollapsed((currentValue) => !currentValue)}
+              aria-label={isSidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
+            >
+              <span className="nav-icon" aria-hidden="true">
+                <WorkspaceIcon name={isSidebarCollapsed ? "expand" : "collapse"} />
+              </span>
+              <span className="nav-label">{isSidebarCollapsed ? "Expand" : "Collapse"}</span>
+            </button>
+            <button type="button" className="sidebar-primary" onClick={onOpenFile} title="Open data">
+              <span className="nav-icon" aria-hidden="true">
+                <WorkspaceIcon name="upload" />
+              </span>
+              <span className="nav-label">Open data</span>
+            </button>
+          </div>
+
+          <div className="sidebar-workspace-card" aria-label="Active workspace">
+            <p>Workspace</p>
             {dataset ? (
               <>
                 <strong>{dataset.original_filename}</strong>
                 <span>
-                  {dataset.row_count.toLocaleString()} rows |{" "}
+                  {dataset.row_count.toLocaleString()} rows /{" "}
                   {dataset.column_count.toLocaleString()} columns
                 </span>
               </>
             ) : (
-              <span>No dataset open. Choose CSV.</span>
+              <span>Open a CSV to begin.</span>
             )}
           </div>
+
           {!isSidebarCollapsed && activeHub.id === "data" && (
-          <div className="sidebar-recents" aria-label="Recent files">
-            <p>Recent files</p>
-            {recentDatasets.length === 0 ? (
-              <span>No recent files</span>
-            ) : (
-              recentDatasets.map((session) => (
-                <button
-                  type="button"
-                  key={session.dataset.dataset_id}
-                  className={dataset?.dataset_id === session.dataset.dataset_id ? "is-active" : ""}
-                  onClick={() => onRecentDatasetClick(session.dataset.dataset_id)}
-                  title={session.dataset.original_filename}
-                >
-                  <strong>{session.dataset.original_filename}</strong>
-                  <span>
-                    {session.dataset.row_count.toLocaleString()} rows |{" "}
-                    {session.dataset.column_count.toLocaleString()} cols
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
+            <div className="sidebar-recents" aria-label="Recent files">
+              <p>Recent files</p>
+              {recentDatasets.length === 0 ? (
+                <span>No recent files</span>
+              ) : (
+                recentDatasets.map((session) => (
+                  <button
+                    type="button"
+                    key={session.dataset.dataset_id}
+                    className={dataset?.dataset_id === session.dataset.dataset_id ? "is-active" : ""}
+                    onClick={() => onRecentDatasetClick(session.dataset.dataset_id)}
+                    title={session.dataset.original_filename}
+                  >
+                    <strong>{session.dataset.original_filename}</strong>
+                    <span>
+                      {session.dataset.row_count.toLocaleString()} rows /{" "}
+                      {session.dataset.column_count.toLocaleString()} cols
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
           )}
-          <nav className="hub-nav" aria-label="Workspace hubs">
-            {hubs.map((hub) => (
-              <button
-                type="button"
-                key={hub.id}
-                className={activeHub.id === hub.id ? "is-active" : ""}
-                onClick={() => changeHub(hub)}
-                title={hub.label}
-              >
-                <span className="nav-icon" aria-hidden="true">
-                  <WorkspaceIcon name={hub.icon} />
-                </span>
-                <span className="nav-label">{hub.label}</span>
-              </button>
+
+          <nav className="hub-nav" aria-label="Workspace navigation">
+            {groupedHubs.map((section) => (
+              <section key={section.label} className="sidebar-nav-section">
+                {!isSidebarCollapsed && <p>{section.label}</p>}
+                <div>
+                  {section.hubs.map((hub) => (
+                    <button
+                      type="button"
+                      key={hub.id}
+                      className={activeHub.id === hub.id ? "is-active" : ""}
+                      onClick={() => changeHub(hub)}
+                      title={hub.label}
+                    >
+                      <span className="nav-icon" aria-hidden="true">
+                        <WorkspaceIcon name={hub.icon} />
+                      </span>
+                      <span className="nav-label">{hub.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
             ))}
           </nav>
 
@@ -440,6 +483,18 @@ function WorkspaceShell({
         />
 
         <main className="workspace-canvas">
+          <section className="workspace-context-header" aria-label="Current workspace context">
+            <div>
+              <p>{investigationBreadcrumb}</p>
+              <h1>{activeSubItem?.label || activeHub.label}</h1>
+              <span>{activeSubItem?.description || runtimeModeSummary}</span>
+            </div>
+            <div className="workspace-context-meta">
+              <span>{runtimeModeLabel}</span>
+              <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
+              <small>{investigationFocusLabel}</small>
+            </div>
+          </section>
           {errorMessage && activeView !== "welcome" && (
             <p className="error-message workspace-error">{errorMessage}</p>
           )}

@@ -63,6 +63,17 @@
     max-width: 100%;
   }
 
+  .workspace-context-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .workspace-context-meta {
+    max-width: none;
+    text-align: left;
+  }
+
   .workspace-shell {
     grid-template-columns: 1fr;
   }

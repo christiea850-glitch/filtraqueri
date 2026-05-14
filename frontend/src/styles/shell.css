@@ -37,7 +37,7 @@ body {
 .top-menu-bar {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   min-width: 0;
   padding: 0 16px;
   border-bottom: 1px solid #dbe5ef;
@@ -97,11 +97,24 @@ body {
 }
 
 .workspace-status {
+  display: grid;
+  gap: 1px;
   max-width: 280px;
   overflow: hidden;
-  color: #64748b;
+}
+
+.workspace-status span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.workspace-status strong {
+  overflow: hidden;
+  color: #334155;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -176,13 +189,13 @@ body {
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width, 236px) 6px minmax(0, 1fr) 308px;
+  grid-template-columns: var(--sidebar-width, 236px) 6px minmax(0, 1fr) 320px;
   min-height: 0;
   transition: grid-template-columns 180ms ease;
 }
 
 .app.is-sidebar-collapsed .workspace-shell {
-  grid-template-columns: 68px 0 minmax(0, 1fr) 308px;
+  grid-template-columns: 68px 0 minmax(0, 1fr) 320px;
 }
 
 .app.is-workspace-focused .workspace-canvas {
@@ -192,10 +205,12 @@ body {
 .app.is-workspace-focused .workspace-status,
 .app.is-sidebar-collapsed .workspace-brand strong,
 .app.is-sidebar-collapsed .sidebar-dataset-summary,
+.app.is-sidebar-collapsed .sidebar-workspace-card,
 .app.is-sidebar-collapsed .sidebar-recents p,
 .app.is-sidebar-collapsed .sidebar-recents strong,
 .app.is-sidebar-collapsed .sidebar-recents button > span:not(.nav-icon),
 .app.is-sidebar-collapsed .left-sidebar .nav-label,
+.app.is-sidebar-collapsed .sidebar-nav-section p,
 .app.is-sidebar-collapsed .analyst-sidebar-section p,
 .app.is-sidebar-collapsed .analyst-sidebar-section .nav-badge {
   display: none;
@@ -204,11 +219,11 @@ body {
 .left-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
-  padding: 18px 12px;
+  padding: 16px 12px;
   border-right: 1px solid #dbe5ef;
-  background: rgba(248, 251, 255, 0.9);
+  background: rgba(249, 251, 253, 0.94);
   transition: padding 180ms ease;
 }
 
@@ -276,6 +291,11 @@ body.is-resizing-sidebar {
     transform 150ms ease;
 }
 
+.sidebar-shell-controls {
+  display: grid;
+  gap: 8px;
+}
+
 .sidebar-primary {
   border: 1px solid #0f172a;
   background: #0f172a;
@@ -329,16 +349,18 @@ body.is-resizing-sidebar {
 }
 
 .sidebar-dataset-summary,
+.sidebar-workspace-card,
 .sidebar-recents {
   display: grid;
   gap: 7px;
-  padding: 12px;
-  border: 1px solid #dbe5ef;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.72);
+  padding: 11px 12px;
+  border: 1px solid rgba(219, 229, 239, 0.9);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .sidebar-dataset-summary p,
+.sidebar-workspace-card p,
 .sidebar-recents p {
   margin: 0;
   color: #64748b;
@@ -348,6 +370,7 @@ body.is-resizing-sidebar {
 }
 
 .sidebar-dataset-summary strong,
+.sidebar-workspace-card strong,
 .sidebar-recents strong {
   min-width: 0;
   overflow: hidden;
@@ -359,6 +382,7 @@ body.is-resizing-sidebar {
 }
 
 .sidebar-dataset-summary span,
+.sidebar-workspace-card span,
 .sidebar-recents span {
   min-width: 0;
   overflow: hidden;
@@ -415,7 +439,7 @@ body.is-resizing-sidebar {
 
 .left-sidebar nav {
   display: grid;
-  gap: 4px;
+  gap: 12px;
 }
 
 .left-sidebar nav button {
@@ -435,12 +459,38 @@ body.is-resizing-sidebar {
   box-shadow: inset 3px 0 0 #2563eb;
 }
 
+.sidebar-nav-section {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sidebar-nav-section + .sidebar-nav-section {
+  padding-top: 10px;
+  border-top: 1px solid rgba(219, 229, 239, 0.78);
+}
+
+.sidebar-nav-section p {
+  margin: 0;
+  padding: 0 10px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sidebar-nav-section > div {
+  display: grid;
+  gap: 4px;
+}
+
 .hub-subnav,
 .analyst-sidebar-section {
   display: grid;
   gap: 5px;
   padding-top: 12px;
-  border-top: 1px solid #dbe5ef;
+  border-top: 1px solid rgba(219, 229, 239, 0.82);
 }
 
 .hub-subnav p,
@@ -551,16 +601,90 @@ body.is-resizing-sidebar {
 .workspace-canvas {
   min-width: 0;
   min-height: 0;
-  padding: 24px;
+  padding: 22px 26px 28px;
   overflow: auto;
   transition: padding 180ms ease;
+}
+
+.workspace-context-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(219, 229, 239, 0.88);
+}
+
+.workspace-context-header > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workspace-context-header p,
+.workspace-context-header span,
+.workspace-context-header small {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.workspace-context-header p {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.workspace-context-header h1 {
+  display: block;
+  margin: 0;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.workspace-context-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  max-width: 280px;
+  padding: 10px 12px;
+  border: 1px solid rgba(219, 229, 239, 0.82);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.68);
+  text-align: right;
+}
+
+.workspace-context-meta span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.workspace-context-meta strong,
+.workspace-context-meta small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-context-meta strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 850;
 }
 
 .runtime-context-panel {
   min-width: 0;
   min-height: 0;
-  border-left: 1px solid #dbe5ef;
-  background: rgba(248, 251, 255, 0.86);
+  border-left: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(248, 251, 255, 0.92);
+  box-shadow: -14px 0 34px rgba(15, 23, 42, 0.04);
   overflow: auto;
 }
 
