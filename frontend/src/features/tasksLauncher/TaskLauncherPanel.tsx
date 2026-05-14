@@ -578,8 +578,8 @@ function TaskDetail({
         </div>
       )}
       {executionContract && (
-        <div className="execution-contract-panel compact" aria-label="Task execution contract layer">
-          <span>Execution contract</span>
+        <div className="execution-contract-panel compact" aria-label="Task run boundary layer">
+          <span>Run boundary</span>
           <strong>{executionContractSummary}</strong>
           <div className="execution-contract-grid">
             <span>

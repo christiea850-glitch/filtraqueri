@@ -3,6 +3,14 @@ import type { RuntimeDisclosureSlotProps } from "./runtimeTypes";
 
 const DISCLOSURE_STORAGE_PREFIX = "filtraqueri.runtimeDisclosure.";
 
+const HUMAN_DISCLOSURE_LABELS: Record<string, string> = {
+  "runtime slot": "Details",
+  "metadata pending": "Details pending",
+  "execution contract": "Run boundary",
+  adapter: "Context",
+  "runtime adapter": "SQL context",
+};
+
 function RuntimeDisclosureSlot({
   id,
   title,
@@ -20,7 +28,7 @@ function RuntimeDisclosureSlot({
       return defaultOpen;
     }
   });
-  const displayLabel = label.toLowerCase() === "runtime slot" ? "Details" : label;
+  const displayLabel = HUMAN_DISCLOSURE_LABELS[label.toLowerCase()] || label;
 
   useEffect(() => {
     try {

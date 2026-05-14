@@ -65,7 +65,7 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
             <strong>{planStepCount.toLocaleString()} notes</strong>
           </span>
           <span>
-            Runtime adapter
+            SQL dialect
             <strong>{selectedDialectProfile.displayName}</strong>
           </span>
           <span>

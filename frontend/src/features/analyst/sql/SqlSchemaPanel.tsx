@@ -34,7 +34,7 @@ function SqlSchemaPanel({
 
       <div className="sql-context-body">
         <div>
-          <p className="section-label">Runtime adapter</p>
+          <p className="section-label">SQL context</p>
           <h2>SQL context</h2>
         </div>
 

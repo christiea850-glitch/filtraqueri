@@ -639,15 +639,15 @@ function DatasetSummaryPanel({
         <RuntimeDisclosureSlot
           id="runtime-slot-execution-contract"
           label="Runtime slot"
-          title="Execution contract"
+          title="Run boundary"
           summary={executionContractSummary}
           badge={executionContract.lifecycleState.replace(/_/g, " ")}
         >
-        <section className="execution-contract-panel" aria-label="Execution contract layer">
+        <section className="execution-contract-panel" aria-label="Run boundary layer">
           <div className="summary-header">
             <div>
-              <p className="section-label">Execution contract</p>
-              <h2>Future execution boundary</h2>
+              <p className="section-label">Run boundary</p>
+              <h2>Future run boundary</h2>
               <p>{executionContractSummary}</p>
             </div>
             <span className="dataset-count-pill">{executionContract.lifecycleState.replace(/_/g, " ")}</span>
