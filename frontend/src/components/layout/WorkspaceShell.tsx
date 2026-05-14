@@ -507,6 +507,35 @@ function WorkspaceShell({
                 </section>
               )}
 
+              {runtimeContext.guidance.length > 0 && (
+                <>
+                  <div className="runtime-section-heading">
+                    <span>Suggested next step</span>
+                    <small>Advisory only; nothing runs automatically</small>
+                  </div>
+                  <div className="runtime-guidance-list" aria-label="Suggested next steps">
+                    {runtimeContext.guidance.map((guidance) => (
+                      <button
+                        type="button"
+                        key={guidance.id}
+                        className={guidance.priority === "primary" ? "is-primary" : ""}
+                        onClick={() =>
+                          onRuntimeTrailSelect(
+                            guidance.continuationLink.continuationId,
+                            guidance.continuationLink.targetView,
+                            guidance.continuationLink.targetMode,
+                          )
+                        }
+                      >
+                        <strong>{guidance.title}</strong>
+                        <span>{guidance.summary}</span>
+                        <small>{guidance.category.replace(/-/g, " ")}</small>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <div className="runtime-section-heading">
                 <span>Trail</span>
                 <small>Move through the current investigation</small>

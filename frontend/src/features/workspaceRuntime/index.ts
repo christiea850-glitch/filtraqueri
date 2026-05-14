@@ -6,6 +6,7 @@ export {
   createRuntimeNavigationSelection,
   getContextualObjectIdForView,
 } from "./runtimeNavigationAdapter";
+export { buildInvestigationGuidance } from "./runtimeGuidanceAdapter";
 export { normalizeRuntimeModeContext } from "./runtimeAdapters";
 export {
   loadRuntimePersistenceState,
@@ -15,6 +16,10 @@ export {
 export { default as RuntimeDisclosureSlot } from "./RuntimeDisclosureSlot";
 export type {
   InvestigationContinuation,
+  InvestigationGuidanceItem,
+  GuidanceCategory,
+  GuidanceContinuationLink,
+  GuidanceReason,
   RuntimeContextSnapshot,
   RuntimeDisclosureSlotProps,
   RuntimePanelSlot,

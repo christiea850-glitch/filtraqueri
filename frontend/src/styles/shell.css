@@ -672,6 +672,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list,
+.runtime-guidance-list,
 .runtime-continuation-list,
 .runtime-slot-list {
   display: grid;
@@ -680,6 +681,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list button,
+.runtime-guidance-list button,
 .runtime-continuation-list button,
 .runtime-return-button {
   display: grid;
@@ -696,6 +698,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list button:hover,
+.runtime-guidance-list button:hover,
 .runtime-continuation-list button:hover:not(:disabled),
 .runtime-return-button:hover,
 .runtime-trail-list button.is-current,
@@ -705,6 +708,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-context-panel.is-analyst-mode .runtime-trail-list button:hover,
+.runtime-context-panel.is-analyst-mode .runtime-guidance-list button:hover,
 .runtime-context-panel.is-analyst-mode .runtime-continuation-list button:hover:not(:disabled),
 .runtime-context-panel.is-analyst-mode .runtime-return-button:hover,
 .runtime-context-panel.is-analyst-mode .runtime-trail-list button.is-current,
@@ -719,6 +723,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list strong,
+.runtime-guidance-list strong,
 .runtime-continuation-list strong,
 .runtime-return-button strong {
   overflow: hidden;
@@ -730,6 +735,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list span,
+.runtime-guidance-list span,
 .runtime-continuation-list small,
 .runtime-return-button span {
   color: #64748b;
@@ -739,6 +745,7 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list small,
+.runtime-guidance-list small,
 .runtime-continuation-list em {
   justify-self: start;
   padding: 4px 7px;
@@ -749,6 +756,27 @@ body.is-resizing-sidebar {
   font-style: normal;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.runtime-guidance-list button {
+  border-color: #c7d2fe;
+  background: #ffffff;
+}
+
+.runtime-guidance-list button.is-primary {
+  border-color: #93c5fd;
+  background: #f8fbff;
+  box-shadow: inset 3px 0 0 rgba(37, 99, 235, 0.28);
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-guidance-list button {
+  border-color: #ddd6fe;
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-guidance-list button.is-primary {
+  border-color: #c4b5fd;
+  background: #f8f7ff;
+  box-shadow: inset 3px 0 0 rgba(124, 58, 237, 0.26);
 }
 
 .runtime-return-button {

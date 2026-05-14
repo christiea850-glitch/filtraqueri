@@ -22,7 +22,44 @@ export type InvestigationContinuationOrigin =
   | "runtime-panel"
   | "human-intent"
   | "analyst-context"
-  | "metadata-summary";
+  | "metadata-summary"
+  | "guidance";
+
+export type GuidanceCategory =
+  | "data-readiness"
+  | "result-review"
+  | "query-refinement"
+  | "workbook-relationships"
+  | "human-guidance"
+  | "analyst-review";
+
+export type GuidanceReason =
+  | "dataset-open-no-query"
+  | "results-ready-no-refinement"
+  | "workbook-relationships-unreviewed"
+  | "human-intent-without-analyst-context"
+  | "analyst-draft-with-result-context"
+  | "no-dataset-open";
+
+export type GuidanceContinuationLink = {
+  continuationId: string;
+  label: string;
+  targetView: ActiveView;
+  targetMode: WorkspaceMode;
+  disabled?: boolean;
+};
+
+export type InvestigationGuidanceItem = {
+  id: string;
+  title: string;
+  summary: string;
+  category: GuidanceCategory;
+  reason: GuidanceReason;
+  audience: WorkspaceMode;
+  priority: "primary" | "secondary";
+  metadataOnly: true;
+  continuationLink: GuidanceContinuationLink;
+};
 
 export type ContextualInvestigationObject = {
   id: string;
@@ -105,6 +142,8 @@ export type RuntimeContextSnapshot = {
     hasWorkbook: boolean;
     activeWorksheetName: string | null;
     worksheetCount: number;
+    relationshipCandidateCount: number;
+    acceptedRelationshipCount: number;
   };
   mode: WorkspaceMode;
   activeView: ActiveView;
@@ -136,6 +175,7 @@ export type WorkspaceRuntimeContext = {
   snapshot: RuntimeContextSnapshot;
   trail: WorkspaceTrailItem[];
   continuations: InvestigationContinuation[];
+  guidance: InvestigationGuidanceItem[];
   panelSlots: RuntimePanelSlot[];
   contextualObjects: ContextualInvestigationObject[];
   selectedContextualObject: ContextualInvestigationObject | null;

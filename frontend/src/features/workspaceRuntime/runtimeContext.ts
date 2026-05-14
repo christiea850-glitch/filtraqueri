@@ -1,8 +1,10 @@
 import {
+  getWorkbookMetadata,
   getDatasetActiveWorksheet,
   listWorkbookWorksheets,
 } from "../workbook";
 import { normalizeRuntimeModeContext } from "./runtimeAdapters";
+import { buildInvestigationGuidance } from "./runtimeGuidanceAdapter";
 import type {
   BuildWorkspaceRuntimeContextOptions,
   ContextualInvestigationObject,
@@ -337,6 +339,7 @@ export const buildWorkspaceRuntimeContext = ({
   selectedContextualObjectId,
   returnContinuationId,
 }: BuildWorkspaceRuntimeContextOptions): WorkspaceRuntimeContext => {
+  const workbook = getWorkbookMetadata(dataset);
   const worksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const latestExecution = executionRegistry.records[0] || null;
@@ -351,6 +354,8 @@ export const buildWorkspaceRuntimeContext = ({
       hasWorkbook: worksheets.length > 0,
       activeWorksheetName: activeWorksheet?.displayName || activeWorksheet?.sheetName || null,
       worksheetCount: worksheets.length,
+      relationshipCandidateCount: workbook?.relationshipCandidates.length || 0,
+      acceptedRelationshipCount: workbook?.acceptedRelationshipContracts.length || 0,
     },
     mode,
     activeView,
@@ -393,6 +398,7 @@ export const buildWorkspaceRuntimeContext = ({
     snapshot,
     trail,
     continuations,
+    guidance: buildInvestigationGuidance({ snapshot, continuations }),
     panelSlots: createPanelSlots(snapshot),
     contextualObjects,
     selectedContextualObject:
