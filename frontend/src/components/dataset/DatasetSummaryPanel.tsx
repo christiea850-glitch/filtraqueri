@@ -169,12 +169,9 @@ function WorksheetSelector({
 
 function DatasetSummaryPanel({
   dataset,
-  recentDatasets,
   onViewPreview,
   onHumanIntentSelect,
   onOpenDataset,
-  onActivateRecentDataset,
-  onRemoveRecentDataset,
   onClearCurrentDataset,
   onDeleteDataset,
   onWorksheetSelect,
@@ -188,7 +185,6 @@ function DatasetSummaryPanel({
       summary[type] = (summary[type] || 0) + 1;
       return summary;
     }, {});
-  const safeRecentDatasets = Array.isArray(recentDatasets) ? recentDatasets : [];
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
@@ -273,6 +269,13 @@ function DatasetSummaryPanel({
     businessSemanticReport,
     businessQuestionReport,
   });
+  const schemaTypeSummary = dataset ? createSchemaTypeSummary(dataset) : {};
+  const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
+  const dateColumnCount = detectedColumns.filter((column) => column.inferred_type === "date").length;
+  const numericColumnCount = detectedColumns.filter((column) => column.inferred_type === "numeric").length;
+  const textColumnCount = detectedColumns.filter(
+    (column) => column.inferred_type === "text" || column.inferred_type === "categorical",
+  ).length;
 
   return (
     <div className="human-dataset-workspace">
@@ -280,55 +283,73 @@ function DatasetSummaryPanel({
         <div className="summary-header">
           <div>
             <p className="section-label">Data</p>
-            <h2>{dataset ? "Current dataset" : "No dataset open. Choose CSV."}</h2>
+            <h2>{dataset ? "Data profile" : "Open data"}</h2>
           </div>
-          <div className="dataset-summary-actions dataset-hub-actions">
-            <button type="button" className="primary-button" onClick={onOpenDataset}>
-              Open data
-            </button>
-            {dataset && (
+          {dataset && (
+            <div className="dataset-summary-actions dataset-hub-actions">
               <button type="button" className="secondary-button" onClick={onClearCurrentDataset}>
                 Clear session
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {dataset ? (
-          <div className="dataset-current-card">
-            <div className="dataset-card-main">
-              <span className="dataset-id">ID: {dataset.dataset_id.slice(0, 8)}</span>
-              <h3 title={dataset.original_filename}>{dataset.original_filename}</h3>
-              <p title={dataset.table_name}>{dataset.table_name}</p>
+          <div className="data-profile-surface">
+            <div className="data-profile-overview">
+              <div>
+                <span>Detected structure</span>
+                <strong>{Object.keys(schemaTypeSummary).length.toLocaleString()} field types</strong>
+                <p>Column types and workbook structure are ready for review.</p>
+              </div>
+              <div className="dataset-card-actions">
+                <button type="button" className="secondary-button" onClick={onViewPreview}>
+                  View results
+                </button>
+                <button
+                  type="button"
+                  className="text-button danger-text-button"
+                  onClick={() => onDeleteDataset(dataset.dataset_id)}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
-            <div className="summary-grid dataset-hub-stats">
-              <div>
-                <span>Rows</span>
-                <strong>{dataset.row_count.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>Columns</span>
-                <strong>{dataset.column_count.toLocaleString()}</strong>
-              </div>
-              {Object.entries(createSchemaTypeSummary(dataset)).map(([type, count]) => (
-                <div key={type}>
-                  <span>{type}</span>
-                  <strong>{count}</strong>
+            <div className="data-profile-metrics" aria-label="Detected data profile">
+              <span>
+                Numeric
+                <strong>{numericColumnCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Text/category
+                <strong>{textColumnCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Date
+                <strong>{dateColumnCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Types
+                <strong>{Object.keys(schemaTypeSummary).length.toLocaleString()}</strong>
+              </span>
+            </div>
+            <section className="detected-columns-section" aria-label="Detected columns">
+              <div className="worksheet-selector-header">
+                <div>
+                  <p className="section-label">Detected columns</p>
+                  <h4>Column profile</h4>
                 </div>
-              ))}
-            </div>
-            <div className="dataset-card-actions">
-              <button type="button" className="secondary-button" onClick={onViewPreview}>
-                View results
-              </button>
-              <button
-                type="button"
-                className="text-button danger-text-button"
-                onClick={() => onDeleteDataset(dataset.dataset_id)}
-              >
-                Delete
-              </button>
-            </div>
+                <span className="dataset-count-pill">{detectedColumns.length.toLocaleString()}</span>
+              </div>
+              <div className="detected-column-list">
+                {detectedColumns.slice(0, 18).map((column) => (
+                  <span key={column.name} title={column.name}>
+                    <strong>{column.name}</strong>
+                    <small>{column.inferred_type || "unknown"}</small>
+                  </span>
+                ))}
+              </div>
+            </section>
             <WorksheetSelector
               worksheets={workbookWorksheets}
               activeWorksheetId={activeWorksheet?.worksheetId || null}
@@ -338,7 +359,7 @@ function DatasetSummaryPanel({
           </div>
         ) : (
           <div className="dataset-empty-guidance">
-            <p>No dataset open. Choose CSV.</p>
+            <p>No dataset open. Choose a CSV or Excel workbook to inspect its profile.</p>
             <button type="button" className="primary-button" onClick={onOpenDataset}>
               Choose CSV
             </button>
@@ -353,7 +374,6 @@ function DatasetSummaryPanel({
           title="Data intelligence"
           summary={humanSummary}
           badge={dialectRecommendation?.recommendedFutureEngine?.label || "Metadata only"}
-          defaultOpen
         >
         <section className="data-intelligence-panel" aria-label="Data intelligence profile">
           <div className="summary-header">
@@ -654,72 +674,6 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      <section className="dataset-hub-panel" aria-label="Recent files">
-        <div className="summary-header">
-          <div>
-            <p className="section-label">Recent files</p>
-            <h2>Recent files</h2>
-          </div>
-          <span className="dataset-count-pill">{safeRecentDatasets.length}</span>
-        </div>
-
-        {safeRecentDatasets.length === 0 ? (
-          <div className="dataset-empty-guidance compact-dataset-empty">
-            <p>No recent files.</p>
-          </div>
-        ) : (
-          <div className="recent-dataset-list">
-            {safeRecentDatasets.filter((session) => session?.dataset).map((session) => {
-              const metadata = session.dataset;
-              const typeSummary = createSchemaTypeSummary(metadata);
-
-              return (
-                <article className="recent-dataset-card" key={metadata.dataset_id}>
-                  <div className="dataset-card-main">
-                    <h3 title={metadata.original_filename}>{metadata.original_filename}</h3>
-                    <p title={metadata.table_name}>{metadata.table_name}</p>
-                  </div>
-                  <div className="recent-dataset-meta">
-                    <span>{metadata.row_count.toLocaleString()} rows</span>
-                    <span>{metadata.column_count.toLocaleString()} columns</span>
-                    {Object.entries(typeSummary)
-                      .slice(0, 4)
-                      .map(([type, count]) => (
-                        <span key={type}>
-                          {type}: {count}
-                        </span>
-                      ))}
-                  </div>
-                  <div className="dataset-card-actions">
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={() => onActivateRecentDataset(metadata.dataset_id)}
-                    >
-                      Open
-                    </button>
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => onRemoveRecentDataset(metadata.dataset_id)}
-                    >
-                      Remove
-                    </button>
-                    <button
-                      type="button"
-                      className="text-button danger-text-button"
-                      onClick={() => onDeleteDataset(metadata.dataset_id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
       {dataset && (
         <RuntimeDisclosureSlot
           id="runtime-slot-task-launcher"
@@ -743,7 +697,6 @@ function DatasetSummaryPanel({
           title="Human Mode guidance"
           summary="Choose a simple continuation into the existing Human Mode workflow."
           badge="Human Mode"
-          defaultOpen
         >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>

@@ -1345,7 +1345,7 @@ body.is-resizing-sidebar {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 28px;
+  margin-top: 18px;
 }
 
 .welcome-note {
@@ -1360,6 +1360,68 @@ body.is-resizing-sidebar {
   color: #64748b;
   font-size: 13px;
   font-weight: 700;
+}
+
+.home-continuation-surface {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  max-width: 720px;
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid #dbe5ef;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.home-continuation-surface > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.home-continuation-surface span,
+.home-recent-list > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.home-continuation-surface strong {
+  color: #172033;
+  font-size: 16px;
+  font-weight: 850;
+}
+
+.home-recent-list {
+  display: grid;
+  gap: 8px;
+  max-width: 720px;
+  margin-top: 22px;
+}
+
+.home-recent-list button {
+  overflow: hidden;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #dbe5ef;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.home-recent-list button:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
 }
 
 .standalone-panel {

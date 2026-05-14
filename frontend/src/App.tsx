@@ -1050,7 +1050,12 @@ function App() {
         selectedFileName={selectedFileName}
         buttonLabel="Choose CSV"
         context="Open data"
+        dataset={dataset}
+        recentDatasets={recentDatasets}
+        continueLabel={activeResultModel ? "Review results" : "Review data"}
         onFileChange={handleFileUpload}
+        onContinue={() => updateDatasetSessionView(activeResultModel ? "results" : "dataset")}
+        onRecentDatasetClick={activateRecentDataset}
       />
     ),
     dataset: () =>

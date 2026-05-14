@@ -244,13 +244,20 @@
 
   .dataset-current-card,
   .recent-dataset-card,
-  .dataset-empty-guidance {
+  .dataset-empty-guidance,
+  .data-profile-metrics {
     grid-template-columns: 1fr;
   }
 
   .dataset-card-actions,
   .dataset-hub-actions {
     justify-content: stretch;
+  }
+
+  .data-profile-overview,
+  .home-continuation-surface {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .dataset-id {

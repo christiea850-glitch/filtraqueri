@@ -258,9 +258,12 @@ function WorkspaceShell({
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeSubItem?.label || activeHub.label;
   const investigationBreadcrumb = `${activeSectionLabel} / ${activeHub.label}`;
-  const workflowLabel = activeSubItem?.label || activeHub.label;
+  const isLoadedHome = activeView === "welcome" && Boolean(dataset);
+  const workflowLabel = isLoadedHome ? "Continue" : activeSubItem?.label || activeHub.label;
   const workflowDescription =
-    workspaceMode === "analyst"
+    isLoadedHome
+      ? "Pick up the current investigation or open another file."
+      : workspaceMode === "analyst"
       ? "SQL and runtime context stay inspectable without automatic execution."
       : "Business flow, results, and next steps stay connected.";
   const activeWorksheetLabel =
