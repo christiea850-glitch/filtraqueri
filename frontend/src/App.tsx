@@ -125,7 +125,7 @@ function App() {
     view: ActiveView;
     tab: ResultTabKey;
   } | null>(null);
-  const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
+  const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(true);
   const [runtimePersistence, setRuntimePersistence] = useState(loadRuntimePersistenceState);
   const {
     registry: executionRegistry,
@@ -943,18 +943,6 @@ function App() {
         : activeResultModel.sourceType === "filtered"
           ? "Filtered result"
           : "Preview result";
-    const sourceSummary =
-      activeResultModel.sourceType === "query"
-        ? isAnalystMode
-          ? "Review source tab, query context, and export payload before using the result."
-          : "Review the answer shaped by your query before refining or exporting it."
-        : activeResultModel.sourceType === "filtered"
-          ? isAnalystMode
-            ? "Inspect the filtered result model and confirm the applied filter context."
-            : "Review what changed after filters narrowed the rows."
-          : isAnalystMode
-            ? "Inspect the preview source tab before moving into filters or query context."
-            : "Start with a calm scan of the dataset before shaping a question.";
     const takeaway =
       activeResultModel.sourceType === "query"
         ? activeResultModel.grouping.hasGrouping
@@ -981,76 +969,52 @@ function App() {
     return (
       <section
         className={[
-          "results-investigation-surface",
+          "results-review-strip",
           isAnalystMode ? "is-analyst-results" : "is-human-results",
         ]
           .filter(Boolean)
           .join(" ")}
-        aria-label="Results investigation summary"
+        aria-label="Results review context"
       >
-        <div className="results-investigation-header">
-          <div>
-            <p className="section-label">{isAnalystMode ? "Result review" : "Investigation review"}</p>
-            <h2>{sourceLabel}</h2>
-            <span>{sourceSummary}</span>
-          </div>
-          <div className="results-investigation-focus">
-            <span>{isAnalystMode ? "Source tab" : "Current focus"}</span>
-            <strong>{activeResultTab}</strong>
-            <small>
-              {activeResultModel.visibleColumns.length.toLocaleString()} visible columns /{" "}
-              {activeResultModel.rows.length.toLocaleString()} rows on this page
-            </small>
-          </div>
-        </div>
-
-        <div className="results-top-takeaway">
-          <span>Top takeaway</span>
+        <div className="results-review-takeaway">
+          <span>{isAnalystMode ? "Result note" : "Takeaway"}</span>
           <strong>{takeaway}</strong>
         </div>
 
-        <div className="results-context-cards" aria-label="Supporting result context">
-          <article>
-            <span>Result source</span>
+        <div className="results-review-facts" aria-label="Supporting result context">
+          <span>
+            <small>Source</small>
             <strong>{sourceLabel}</strong>
-            <small>{activeResultModel.sourceType}</small>
-          </article>
-          <article>
-            <span>Rows / columns</span>
+          </span>
+          <span>
+            <small>Result size</small>
             <strong>
               {activeResultModel.totalCount.toLocaleString()} rows /{" "}
-              {activeResultModel.visibleColumns.length.toLocaleString()} visible
+              {activeResultModel.visibleColumns.length.toLocaleString()} visible columns
             </strong>
-            <small>{hiddenColumnCount.toLocaleString()} hidden columns</small>
-          </article>
-          <article>
-            <span>Filters / sorting</span>
+          </span>
+          <span>
+            <small>Filters / sort</small>
             <strong>
               {activeFilterCount.toLocaleString()} filters / {activeSortLabel}
             </strong>
-            <small>
-              {activeResultModel.grouping.hasGrouping
-                ? `${activeResultModel.grouping.columns.length.toLocaleString()} group fields`
-                : "No grouping"}
-            </small>
-          </article>
-          <article>
-            <span>{isAnalystMode ? "Payload" : "Export"}</span>
+          </span>
+          <span>
+            <small>{isAnalystMode ? "Payload" : "Export"}</small>
             <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows yet"}</strong>
-            <small>{isAnalystMode ? "Export active payload" : "Export result"}</small>
-          </article>
-        </div>
-
-        <div className="results-continuation-row">
-          <span>{isAnalystMode ? "Suggested technical action" : "Suggested next step"}</span>
-          <strong>{continuationSuggestion}</strong>
-          <small>No automatic execution; use the existing controls below.</small>
+          </span>
+          <span>
+            <small>{isAnalystMode ? "Action" : "Next"}</small>
+            <strong>{continuationSuggestion}</strong>
+          </span>
         </div>
 
         <details className="results-technical-disclosure">
           <summary>
             <span>Technical result metadata</span>
-            <small>Read-only result model context</small>
+            <small>
+              {activeResultTab} / {activeResultModel.sourceType} / {hiddenColumnCount.toLocaleString()} hidden columns
+            </small>
           </summary>
           <div>
             <span>

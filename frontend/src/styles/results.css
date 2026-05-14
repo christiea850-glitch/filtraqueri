@@ -26,24 +26,22 @@
   backdrop-filter: blur(12px);
 }
 
-.results-investigation-surface {
+.results-review-strip {
   display: grid;
-  gap: 16px;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.35fr);
+  gap: 12px;
+  align-items: stretch;
   min-width: 0;
-  padding: clamp(18px, 1.7vw, 26px);
+  padding: 12px;
   border: 1px solid rgba(219, 229, 239, 0.82);
-  border-radius: 16px;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(240, 247, 255, 0.74)),
-    #ffffff;
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
 }
 
-.results-investigation-surface.is-analyst-results {
+.results-review-strip.is-analyst-results {
   border-color: rgba(196, 181, 253, 0.72);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 243, 255, 0.78)),
-    #ffffff;
+  background: rgba(250, 245, 255, 0.66);
 }
 
 .results-investigation-header {
@@ -68,9 +66,7 @@
   overflow-wrap: normal;
 }
 
-.results-investigation-header span,
-.results-investigation-focus span,
-.results-investigation-focus small,
+.results-review-facts small,
 .results-context-cards span,
 .results-context-cards small,
 .results-continuation-row span,
@@ -109,36 +105,67 @@
   text-transform: capitalize;
 }
 
-.results-top-takeaway {
+.results-review-takeaway {
   display: grid;
   gap: 5px;
-  padding: 14px 18px;
+  min-width: 0;
+  padding: 10px 12px;
   border-left: 4px solid #2563eb;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(239, 246, 255, 0.78);
 }
 
-.results-investigation-surface.is-analyst-results .results-top-takeaway {
+.results-review-strip.is-analyst-results .results-review-takeaway {
   border-left-color: #7c3aed;
   background: rgba(245, 243, 255, 0.82);
 }
 
-.results-top-takeaway span {
+.results-review-takeaway span,
+.results-review-facts small {
   color: #2563eb;
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.results-investigation-surface.is-analyst-results .results-top-takeaway span {
+.results-review-strip.is-analyst-results .results-review-takeaway span,
+.results-review-strip.is-analyst-results .results-review-facts small {
   color: #6d28d9;
 }
 
-.results-top-takeaway strong {
+.results-review-takeaway strong {
   color: #172033;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 850;
-  line-height: 1.45;
+  line-height: 1.38;
+}
+
+.results-review-facts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.results-review-facts > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-left: 1px solid rgba(219, 229, 239, 0.74);
+}
+
+.results-review-facts strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.results-review-strip .results-technical-disclosure {
+  grid-column: 1 / -1;
 }
 
 .results-context-cards {

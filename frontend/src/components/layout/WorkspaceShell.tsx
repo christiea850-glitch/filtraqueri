@@ -259,30 +259,20 @@ function WorkspaceShell({
   const runtimeModeLabel = workspaceMode === "analyst" ? "Analyst Mode" : "Human Mode";
   const workspaceModeTone =
     workspaceMode === "analyst" ? "Technical workspace" : "Guided workspace";
-  const runtimeModeSummary =
-    workspaceMode === "analyst"
-      ? "Technical context is visible here, but execution stays under your control."
-      : "Your data, questions, and results stay connected as one investigation.";
-  const selectedContextTypeLabel =
-    runtimeContext.selectedContextualObject?.objectType.replace(/-/g, " ") ?? "";
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeSubItem?.label || activeHub.label;
   const investigationBreadcrumb = `${activeSectionLabel} / ${activeHub.label}`;
   const workflowLabel = activeSubItem?.label || activeHub.label;
-  const workflowDescription = activeSubItem?.description || runtimeModeSummary;
-  const workbookLabel = runtimeContext.snapshot.workbook.hasWorkbook
-    ? runtimeContext.snapshot.workbook.activeWorksheetName ||
-      `${runtimeContext.snapshot.workbook.worksheetCount.toLocaleString()} worksheets`
-    : "Dataset table";
-  const resultLabel = runtimeContext.snapshot.activeResult.tab
-    ? `${runtimeContext.snapshot.activeResult.rowCount.toLocaleString()} result rows`
-    : "No active result";
-  const heroModeLabel =
-    workspaceMode === "analyst" ? "Technical review" : "Business investigation";
-  const heroSupportLabel =
+  const workflowDescription =
     workspaceMode === "analyst"
       ? "SQL and runtime context stay inspectable without automatic execution."
       : "Business flow, results, and next steps stay connected.";
+  const activeWorksheetLabel =
+    runtimeContext.snapshot.workbook.activeWorksheetName ||
+    (runtimeContext.snapshot.workbook.hasWorkbook ? "Workbook worksheet" : "Dataset table");
+  const datasetShapeLabel = dataset
+    ? `${dataset.row_count.toLocaleString()} rows / ${dataset.column_count.toLocaleString()} columns`
+    : "No rows loaded";
 
   const changeHub = (hub: HubItem) => {
     if (hub.mode !== workspaceMode) onModeChange(hub.mode);
@@ -355,7 +345,7 @@ function WorkspaceShell({
         </nav>
         <div className="workspace-status" aria-label="Current workspace">
           <span>{workspaceModeTone}</span>
-          <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
+          <strong>{dataset ? "Data loaded" : "No dataset open"}</strong>
         </div>
         <button
           type="button"
@@ -402,21 +392,6 @@ function WorkspaceShell({
               </span>
               <span className="nav-label">Open data</span>
             </button>
-          </div>
-
-          <div className="sidebar-workspace-card" aria-label="Active workspace">
-            <p>Workspace</p>
-            {dataset ? (
-              <>
-                <strong>{dataset.original_filename}</strong>
-                <span>
-                  {dataset.row_count.toLocaleString()} rows /{" "}
-                  {dataset.column_count.toLocaleString()} columns
-                </span>
-              </>
-            ) : (
-              <span>Open a CSV to begin.</span>
-            )}
           </div>
 
           {!isSidebarCollapsed && activeHub.id === "data" && (
@@ -500,59 +475,44 @@ function WorkspaceShell({
         <main className="workspace-canvas">
           <section
             className={[
-              "workspace-hero",
+              "workspace-page-heading",
               workspaceMode === "analyst" ? "is-analyst-workflow" : "is-human-workflow",
             ]
               .filter(Boolean)
               .join(" ")}
-            aria-label="Investigation workflow summary"
+            aria-label="Workspace heading"
           >
-            <div className="workspace-hero-copy">
+            <div>
               <p>{investigationBreadcrumb}</p>
-              <h1>{runtimeContext.narrative.summary.headline}</h1>
-              <span>{runtimeContext.narrative.summary.body}</span>
+              <h1>{workflowLabel}</h1>
             </div>
-            <div className="workspace-hero-focus">
-              <span>{heroModeLabel}</span>
-              <strong>{workflowLabel}</strong>
-              <small>{runtimeContext.narrative.summary.nextStep}</small>
-            </div>
-            <div className="workspace-hero-context" aria-label="Supporting workspace context">
-              <article>
-                <span>Data</span>
-                <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
-                <small>
-                  {dataset
-                    ? `${dataset.row_count.toLocaleString()} rows / ${dataset.column_count.toLocaleString()} columns`
-                    : "Open a CSV to start"}
-                </small>
-              </article>
-              <article>
-                <span>Workbook</span>
-                <strong>{workbookLabel}</strong>
-                <small>
-                  {runtimeContext.snapshot.workbook.hasWorkbook
-                    ? `${runtimeContext.snapshot.workbook.worksheetCount.toLocaleString()} worksheets`
-                    : "Single dataset context"}
-                </small>
-              </article>
-              <article>
-                <span>Result focus</span>
-                <strong>{resultLabel}</strong>
-                <small>{investigationFocusLabel}</small>
-              </article>
-            </div>
+            <span>{workflowDescription}</span>
+          </section>
+
+          <section className="workspace-context-strip" aria-label="Workspace context">
+            <span>
+              <small>Dataset</small>
+              <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
+            </span>
+            <span>
+              <small>Worksheet</small>
+              <strong>{activeWorksheetLabel}</strong>
+            </span>
+            <span>
+              <small>Rows / columns</small>
+              <strong>{datasetShapeLabel}</strong>
+            </span>
+            <span>
+              <small>Mode</small>
+              <strong>{runtimeModeLabel}</strong>
+            </span>
+            <span>
+              <small>Focus</small>
+              <strong>{investigationFocusLabel}</strong>
+            </span>
           </section>
 
           <section className="workspace-active-flow" aria-label="Active workflow">
-            <div className="workspace-flow-heading">
-              <div>
-                <p>{runtimeModeLabel}</p>
-                <h2>{workflowLabel}</h2>
-                <span>{workflowDescription}</span>
-              </div>
-              <small>{heroSupportLabel}</small>
-            </div>
             {errorMessage && activeView !== "welcome" && (
               <p className="error-message workspace-error">{errorMessage}</p>
             )}
@@ -581,52 +541,12 @@ function WorkspaceShell({
           {!isRuntimePanelCollapsed && (
             <div className="runtime-context-body">
               <div className="runtime-context-header">
-                <p className="section-label">Workspace guide</p>
-                <h2>Investigation</h2>
-                <p>{runtimeModeSummary}</p>
-                <span>{runtimeModeLabel} / assistive only</span>
+                <p className="section-label">Investigation</p>
+                <h2>Next steps</h2>
+                <span>{runtimeModeLabel} / read-only</span>
               </div>
 
-              <section className="runtime-investigation-surface" aria-label="Current investigation summary">
-                {runtimeContext.selectedContextualObject ? (
-                  <section className="runtime-selected-object" aria-label="Selected investigation focus">
-                    <span>Current focus</span>
-                    <strong>{runtimeContext.selectedContextualObject.label}</strong>
-                    <p>{runtimeContext.selectedContextualObject.summary}</p>
-                    <small>{selectedContextTypeLabel}</small>
-                  </section>
-                ) : (
-                  <section className="runtime-selected-object is-empty" aria-label="Selected investigation focus">
-                    <span>Current focus</span>
-                    <strong>Nothing pinned yet</strong>
-                    <p>Pick a workspace path item or a go-to action to anchor this investigation.</p>
-                  </section>
-                )}
-
-                <details className="runtime-narrative-card">
-                  <summary>
-                    <span>
-                      <small>Story</small>
-                      <strong>{runtimeContext.narrative.summary.headline}</strong>
-                    </span>
-                    <em>{runtimeContext.narrative.confidence}</em>
-                  </summary>
-                  <div className="runtime-narrative-body">
-                    <p>{runtimeContext.narrative.summary.body}</p>
-                    <strong>{runtimeContext.narrative.summary.nextStep}</strong>
-                    {runtimeContext.narrative.events.length > 0 && (
-                      <ol>
-                        {runtimeContext.narrative.events.map((event) => (
-                          <li key={event.id}>
-                            <span>{event.label}</span>
-                            <small>{event.summary}</small>
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                  </div>
-                </details>
-
+              <section className="runtime-investigation-surface" aria-label="Contextual next steps">
                 {runtimeContext.recommendationGroups.length > 0 && (
                   <div className="runtime-next-steps" aria-label="Suggested next steps">
                     <div className="runtime-section-heading">

@@ -4,6 +4,48 @@
     #ffffff;
 }
 
+.query-builder-workflow-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.38fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(219, 229, 239, 0.82);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
+}
+
+.query-builder-workflow-strip > div:first-child {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding-right: 10px;
+  border-right: 1px solid rgba(219, 229, 239, 0.76);
+}
+
+.query-builder-workflow-strip > div:first-child span,
+.query-progress-rail strong,
+.query-guidance-grid span,
+.query-advanced-disclosure summary span,
+.query-technical-disclosure summary span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.query-builder-workflow-strip > div:first-child strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .query-builder-hero {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(250px, 0.55fr);
@@ -63,18 +105,6 @@
   background: rgba(255, 255, 255, 0.76);
 }
 
-.query-builder-hero-focus span,
-.query-builder-context-grid span,
-.query-progress-rail strong,
-.query-guidance-grid span,
-.query-advanced-disclosure summary span,
-.query-technical-disclosure summary span {
-  color: #475569;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
 .query-builder-hero-focus strong {
   overflow: hidden;
   color: #172033;
@@ -112,17 +142,17 @@
 .query-progress-rail {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 0;
 }
 
 .query-progress-rail span {
   display: grid;
   gap: 3px;
   min-width: 0;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid rgba(219, 229, 239, 0.82);
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(248, 250, 252, 0.78);
 }
 

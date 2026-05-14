@@ -113,12 +113,6 @@ function VisualQueryBuilderPanel({
       : selectedColumns.length > 0
         ? "Selected-field result"
         : "Dataset preview";
-  const workflowHeroTitle = isAnalystMode
-    ? "Build execution context"
-    : "What would you like to understand?";
-  const workflowHeroSummary = isAnalystMode
-    ? "Inspect projection, grouping logic, filters, and output limits before running the existing query path."
-    : "Choose the fields, filters, comparisons, and output shape that answer your business question.";
   const progressItems = [
     {
       label: "Data selected",
@@ -149,48 +143,19 @@ function VisualQueryBuilderPanel({
 
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
-      <div className="query-builder-hero">
+      <div className="query-builder-workflow-strip" aria-label="Query workflow status">
         <div>
-          <p className="section-label">{isAnalystMode ? "Analyst workflow" : "Guided query"}</p>
-          <h2>{workflowHeroTitle}</h2>
-          <span>{workflowHeroSummary}</span>
-        </div>
-        <div className="query-builder-hero-focus">
           <span>{isAnalystMode ? "Prepared result" : "Expected result"}</span>
           <strong>{expectedResultType}</strong>
-          <small>{datasetName}</small>
         </div>
-        <div className="query-builder-context-grid" aria-label="Query builder context">
-          <article>
-            <span>Dataset</span>
-            <strong>{datasetName}</strong>
-            <small>{schema.length.toLocaleString()} fields available</small>
-          </article>
-          <article>
-            <span>Worksheet</span>
-            <strong>{worksheetName}</strong>
-            <small>{activeFilterCount.toLocaleString()} active filters</small>
-          </article>
-          <article>
-            <span>Grouping</span>
-            <strong>{groupBy.length > 0 ? "Active" : "Not grouped"}</strong>
-            <small>{activeAggregations.length.toLocaleString()} aggregations ready</small>
-          </article>
-          <article>
-            <span>{isAnalystMode ? "Projection" : "Question shape"}</span>
-            <strong>{selectedColumns.length.toLocaleString()} fields</strong>
-            <small>{rowLimit || "No"} row limit</small>
-          </article>
+        <div className="query-progress-rail" aria-label="Query workflow progress">
+          {progressItems.map((item) => (
+            <span key={item.label} className={item.complete ? "is-complete" : ""}>
+              <strong>{item.label}</strong>
+              <small>{item.detail}</small>
+            </span>
+          ))}
         </div>
-      </div>
-
-      <div className="query-progress-rail" aria-label="Query workflow progress">
-        {progressItems.map((item) => (
-          <span key={item.label} className={item.complete ? "is-complete" : ""}>
-            <strong>{item.label}</strong>
-            <small>{item.detail}</small>
-          </span>
-        ))}
       </div>
 
       <div className="query-builder-header">
@@ -216,16 +181,6 @@ function VisualQueryBuilderPanel({
             <small>{step.helper}</small>
           </button>
         ))}
-      </div>
-
-      <div className="query-summary-strip" aria-label="Query builder summary">
-        <span>{selectedColumns.length} columns</span>
-        <span>{groupBy.length} groups</span>
-        <span>{activeAggregations.length} aggregations</span>
-        <span title={sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}>
-          {sortColumn ? `${sortColumn} ${sortDirection}` : "No sorting"}
-        </span>
-        <span>{rowLimit || "No"} row limit</span>
       </div>
 
       {activeStep === "data" && (
