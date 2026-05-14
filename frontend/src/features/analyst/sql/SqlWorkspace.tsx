@@ -15,7 +15,7 @@ type SqlWorkspaceProps = {
 };
 
 function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
-  const [isSchemaCollapsed, setIsSchemaCollapsed] = useState(false);
+  const [isSchemaCollapsed, setIsSchemaCollapsed] = useState(true);
   const [isSqlSideCollapsed, setIsSqlSideCollapsed] = useState(false);
   const {
     savedDrafts,

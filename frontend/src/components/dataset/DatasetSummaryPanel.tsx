@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useAnalyticsIntentGraph } from "../../features/analyticsIntentGraph";
 import { useAnalyticsPlanning } from "../../features/analyticsPlanning";
@@ -14,6 +15,7 @@ import {
   type WorksheetMetadata,
 } from "../../features/workbook";
 import { TaskLauncherPanel } from "../../features/tasksLauncher";
+import DrillInDetailPanel from "../layout/DrillInDetailPanel";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
 
 export type HumanIntent =
@@ -45,6 +47,8 @@ type DatasetSummaryPanelProps = {
   selectedTaskId?: string | null;
   onSelectedTaskIdChange?: (taskId: string | null) => void;
 };
+
+type DataDrillInView = "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
 
 export const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
@@ -179,6 +183,7 @@ function DatasetSummaryPanel({
   selectedTaskId,
   onSelectedTaskIdChange,
 }: DatasetSummaryPanelProps) {
+  const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView | null>(null);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -276,6 +281,7 @@ function DatasetSummaryPanel({
   const textColumnCount = detectedColumns.filter(
     (column) => column.inferred_type === "text" || column.inferred_type === "categorical",
   ).length;
+  const closeDrillIn = () => setActiveDrillInView(null);
 
   return (
     <div className="human-dataset-workspace">
@@ -333,29 +339,28 @@ function DatasetSummaryPanel({
                 <strong>{Object.keys(schemaTypeSummary).length.toLocaleString()}</strong>
               </span>
             </div>
-            <section className="detected-columns-section" aria-label="Detected columns">
-              <div className="worksheet-selector-header">
-                <div>
-                  <p className="section-label">Detected columns</p>
-                  <h4>Column profile</h4>
-                </div>
-                <span className="dataset-count-pill">{detectedColumns.length.toLocaleString()}</span>
-              </div>
-              <div className="detected-column-list">
-                {detectedColumns.slice(0, 18).map((column) => (
-                  <span key={column.name} title={column.name}>
-                    <strong>{column.name}</strong>
-                    <small>{column.inferred_type || "unknown"}</small>
-                  </span>
-                ))}
-              </div>
-            </section>
-            <WorksheetSelector
-              worksheets={workbookWorksheets}
-              activeWorksheetId={activeWorksheet?.worksheetId || null}
-              isSwitchingWorksheet={isSwitchingWorksheet}
-              onWorksheetSelect={onWorksheetSelect}
-            />
+            <div className="drill-in-summary-grid" aria-label="Data detail summaries">
+              <button type="button" onClick={() => setActiveDrillInView("columns")}>
+                <span>Detected columns</span>
+                <strong>{detectedColumns.length.toLocaleString()}</strong>
+                <small>Open column list</small>
+              </button>
+              <button type="button" onClick={() => setActiveDrillInView("worksheets")}>
+                <span>Worksheets</span>
+                <strong>{workbookWorksheets.length.toLocaleString()}</strong>
+                <small>Review workbook sheets</small>
+              </button>
+              <button type="button" onClick={() => setActiveDrillInView("dataIntelligence")}>
+                <span>Data intelligence</span>
+                <strong>{dataProfile ? dataProfile.shape.shapeLabel.replace(/_/g, " ") : "Profile"}</strong>
+                <small>Open metadata details</small>
+              </button>
+              <button type="button" onClick={() => setActiveDrillInView("businessSemantics")}>
+                <span>Business semantics</span>
+                <strong>{detectedSemanticEntities.length.toLocaleString()}</strong>
+                <small>Review business context</small>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="dataset-empty-guidance">
@@ -367,7 +372,56 @@ function DatasetSummaryPanel({
         )}
       </section>
 
-      {dataset && dataProfile && (
+      {dataset && activeDrillInView === "columns" && (
+        <DrillInDetailPanel
+          eyebrow="Data detail"
+          title="Detected columns"
+          summary="Column details are shown here so the main Data page stays compact."
+          onBack={closeDrillIn}
+        >
+          <section className="detected-columns-section" aria-label="Detected columns">
+            <div className="worksheet-selector-header">
+              <div>
+                <p className="section-label">Detected columns</p>
+                <h4>Column profile</h4>
+              </div>
+              <span className="dataset-count-pill">{detectedColumns.length.toLocaleString()}</span>
+            </div>
+            <div className="detected-column-list">
+              {detectedColumns.map((column) => (
+                <span key={column.name} title={column.name}>
+                  <strong>{column.name}</strong>
+                  <small>{column.inferred_type || "unknown"}</small>
+                </span>
+              ))}
+            </div>
+          </section>
+        </DrillInDetailPanel>
+      )}
+
+      {dataset && activeDrillInView === "worksheets" && (
+        <DrillInDetailPanel
+          eyebrow="Workbook detail"
+          title="Worksheets"
+          summary="Switch worksheets without leaving the Data workspace."
+          onBack={closeDrillIn}
+        >
+          <WorksheetSelector
+            worksheets={workbookWorksheets}
+            activeWorksheetId={activeWorksheet?.worksheetId || null}
+            isSwitchingWorksheet={isSwitchingWorksheet}
+            onWorksheetSelect={onWorksheetSelect}
+          />
+        </DrillInDetailPanel>
+      )}
+
+      {dataset && dataProfile && activeDrillInView === "dataIntelligence" && (
+        <DrillInDetailPanel
+          eyebrow="Data detail"
+          title="Data intelligence"
+          summary={humanSummary}
+          onBack={closeDrillIn}
+        >
         <RuntimeDisclosureSlot
           id="runtime-slot-data-intelligence"
           label="Runtime slot"
@@ -414,9 +468,10 @@ function DatasetSummaryPanel({
           </div>
         </section>
         </RuntimeDisclosureSlot>
+        </DrillInDetailPanel>
       )}
 
-      {dataset && recommendations.length > 0 && (
+      {dataset && recommendations.length > 0 && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-workflow-recommendations"
           label="Runtime slot"
@@ -449,7 +504,14 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && businessSemanticReport && (
+      {dataset && activeDrillInView === "businessSemantics" && (
+        <DrillInDetailPanel
+          eyebrow="Business detail"
+          title="Business semantics"
+          summary={semanticSummary || "Business context is derived from available metadata only."}
+          onBack={closeDrillIn}
+        >
+        {businessSemanticReport && (
         <RuntimeDisclosureSlot
           id="runtime-slot-business-semantics"
           label="Runtime slot"
@@ -485,9 +547,14 @@ function DatasetSummaryPanel({
           )}
         </section>
         </RuntimeDisclosureSlot>
+        )}
+        {!businessSemanticReport && (
+          <p className="compact-empty">No business semantic metadata is available for this dataset yet.</p>
+        )}
+        </DrillInDetailPanel>
       )}
 
-      {dataset && kpiOpportunities.length > 0 && (
+      {dataset && kpiOpportunities.length > 0 && activeDrillInView === "businessSemantics" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-kpi-intelligence"
           label="Runtime slot"
@@ -520,7 +587,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && interpretedQuestions.length > 0 && (
+      {dataset && interpretedQuestions.length > 0 && activeDrillInView === "businessSemantics" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-business-questions"
           label="Runtime slot"
@@ -553,7 +620,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && analyticsIntentGraph && (
+      {dataset && analyticsIntentGraph && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-intent-graph"
           label="Runtime slot"
@@ -596,7 +663,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && analyticsPlan && (
+      {dataset && analyticsPlan && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-analytics-plan"
           label="Runtime slot"
@@ -635,7 +702,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && executionContract && (
+      {dataset && executionContract && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-execution-contract"
           label="Runtime slot"
@@ -674,7 +741,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && (
+      {dataset && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-task-launcher"
           label="Runtime slot"
@@ -690,7 +757,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
       )}
 
-      {dataset && (
+      {dataset && activeDrillInView === "businessSemantics" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-human-guidance"
           label="Runtime slot"

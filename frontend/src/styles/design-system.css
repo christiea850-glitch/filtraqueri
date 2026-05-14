@@ -498,6 +498,108 @@ h1 span:last-child {
   background: #fff7f7;
 }
 
+/* UX-F16: reusable in-page drill-in detail pattern */
+.drill-in-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--fq-space-3);
+  min-width: 0;
+}
+
+.drill-in-summary-grid button {
+  display: grid;
+  gap: var(--fq-space-1);
+  min-width: 0;
+  padding: var(--fq-space-3);
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-md);
+  background: var(--fq-surface);
+  color: var(--fq-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drill-in-summary-grid button:hover,
+.drill-in-summary-grid button:focus-visible {
+  border-color: var(--fq-border-strong);
+  background: var(--fq-surface-muted);
+}
+
+.drill-in-summary-grid span,
+.drill-in-summary-grid small {
+  overflow: hidden;
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drill-in-summary-grid strong {
+  overflow: hidden;
+  color: var(--fq-text);
+  font-size: 15px;
+  font-weight: var(--fq-font-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drill-in-detail-panel {
+  display: grid;
+  gap: var(--fq-space-4);
+  min-width: 0;
+  padding: var(--fq-space-4);
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-md);
+  background: var(--fq-surface);
+}
+
+.drill-in-detail-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--fq-space-3);
+  align-items: start;
+  min-width: 0;
+}
+
+.drill-in-detail-header h3 {
+  margin: 0;
+  color: var(--fq-text);
+  font-size: 18px;
+  font-weight: var(--fq-font-heading);
+}
+
+.drill-in-detail-header p:not(.section-label) {
+  margin: 4px 0 0;
+  color: var(--fq-text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.drill-in-back-button {
+  white-space: nowrap;
+}
+
+.drill-in-detail-body {
+  display: grid;
+  gap: var(--fq-space-3);
+  min-width: 0;
+}
+
+.drill-in-detail-body > .runtime-disclosure-slot {
+  margin: 0;
+}
+
+.drill-in-detail-panel .detected-column-list {
+  max-height: min(58vh, 680px);
+  overflow: auto;
+}
+
+.sql-workspace.is-schema-collapsed {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
 /* UX-F15: canonical layout governance enforcement */
 .workspace-switcher {
   display: block;
