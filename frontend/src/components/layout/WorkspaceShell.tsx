@@ -67,9 +67,9 @@ type WorkspaceShellProps = {
   ) => void;
 };
 
-const SIDEBAR_MIN_WIDTH = 180;
-const SIDEBAR_MAX_WIDTH = 360;
-const SIDEBAR_DEFAULT_WIDTH = 236;
+const SIDEBAR_MIN_WIDTH = 132;
+const SIDEBAR_MAX_WIDTH = 220;
+const SIDEBAR_DEFAULT_WIDTH = 168;
 
 const hubSections: HubSection[] = [
   { label: "Workspace", hubIds: ["home", "data"] },
@@ -335,6 +335,8 @@ function WorkspaceShell({
       className={[
         "app",
         isSidebarCollapsed ? "is-sidebar-collapsed" : "",
+        `view-${activeView}`,
+        `mode-${workspaceMode}`,
       ]
         .filter(Boolean)
         .join(" ")}
