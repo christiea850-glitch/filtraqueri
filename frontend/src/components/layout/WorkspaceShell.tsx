@@ -268,6 +268,21 @@ function WorkspaceShell({
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeSubItem?.label || activeHub.label;
   const investigationBreadcrumb = `${activeSectionLabel} / ${activeHub.label}`;
+  const workflowLabel = activeSubItem?.label || activeHub.label;
+  const workflowDescription = activeSubItem?.description || runtimeModeSummary;
+  const workbookLabel = runtimeContext.snapshot.workbook.hasWorkbook
+    ? runtimeContext.snapshot.workbook.activeWorksheetName ||
+      `${runtimeContext.snapshot.workbook.worksheetCount.toLocaleString()} worksheets`
+    : "Dataset table";
+  const resultLabel = runtimeContext.snapshot.activeResult.tab
+    ? `${runtimeContext.snapshot.activeResult.rowCount.toLocaleString()} result rows`
+    : "No active result";
+  const heroModeLabel =
+    workspaceMode === "analyst" ? "Technical review" : "Business investigation";
+  const heroSupportLabel =
+    workspaceMode === "analyst"
+      ? "SQL and runtime context stay inspectable without automatic execution."
+      : "Business flow, results, and next steps stay connected.";
 
   const changeHub = (hub: HubItem) => {
     if (hub.mode !== workspaceMode) onModeChange(hub.mode);
@@ -483,22 +498,66 @@ function WorkspaceShell({
         />
 
         <main className="workspace-canvas">
-          <section className="workspace-context-header" aria-label="Current workspace context">
-            <div>
+          <section
+            className={[
+              "workspace-hero",
+              workspaceMode === "analyst" ? "is-analyst-workflow" : "is-human-workflow",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label="Investigation workflow summary"
+          >
+            <div className="workspace-hero-copy">
               <p>{investigationBreadcrumb}</p>
-              <h1>{activeSubItem?.label || activeHub.label}</h1>
-              <span>{activeSubItem?.description || runtimeModeSummary}</span>
+              <h1>{runtimeContext.narrative.summary.headline}</h1>
+              <span>{runtimeContext.narrative.summary.body}</span>
             </div>
-            <div className="workspace-context-meta">
-              <span>{runtimeModeLabel}</span>
-              <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
-              <small>{investigationFocusLabel}</small>
+            <div className="workspace-hero-focus">
+              <span>{heroModeLabel}</span>
+              <strong>{workflowLabel}</strong>
+              <small>{runtimeContext.narrative.summary.nextStep}</small>
+            </div>
+            <div className="workspace-hero-context" aria-label="Supporting workspace context">
+              <article>
+                <span>Data</span>
+                <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
+                <small>
+                  {dataset
+                    ? `${dataset.row_count.toLocaleString()} rows / ${dataset.column_count.toLocaleString()} columns`
+                    : "Open a CSV to start"}
+                </small>
+              </article>
+              <article>
+                <span>Workbook</span>
+                <strong>{workbookLabel}</strong>
+                <small>
+                  {runtimeContext.snapshot.workbook.hasWorkbook
+                    ? `${runtimeContext.snapshot.workbook.worksheetCount.toLocaleString()} worksheets`
+                    : "Single dataset context"}
+                </small>
+              </article>
+              <article>
+                <span>Result focus</span>
+                <strong>{resultLabel}</strong>
+                <small>{investigationFocusLabel}</small>
+              </article>
             </div>
           </section>
-          {errorMessage && activeView !== "welcome" && (
-            <p className="error-message workspace-error">{errorMessage}</p>
-          )}
-          {children}
+
+          <section className="workspace-active-flow" aria-label="Active workflow">
+            <div className="workspace-flow-heading">
+              <div>
+                <p>{runtimeModeLabel}</p>
+                <h2>{workflowLabel}</h2>
+                <span>{workflowDescription}</span>
+              </div>
+              <small>{heroSupportLabel}</small>
+            </div>
+            {errorMessage && activeView !== "welcome" && (
+              <p className="error-message workspace-error">{errorMessage}</p>
+            )}
+            {children}
+          </section>
         </main>
 
         <aside

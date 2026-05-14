@@ -63,13 +63,25 @@
     max-width: 100%;
   }
 
-  .workspace-context-header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 12px;
+  .workspace-hero {
+    grid-template-columns: 1fr;
+    padding: 18px;
   }
 
-  .workspace-context-meta {
+  .workspace-hero-copy h1 {
+    font-size: 28px;
+  }
+
+  .workspace-hero-context {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-flow-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-flow-heading > small {
     max-width: none;
     text-align: left;
   }
