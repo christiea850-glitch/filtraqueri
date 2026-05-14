@@ -1,4 +1,58 @@
+@media (min-width: 1440px) {
+  .workspace-shell {
+    grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr) 276px;
+  }
+
+  .app.is-sidebar-collapsed .workspace-shell {
+    grid-template-columns: 64px 0 minmax(0, 1fr) 276px;
+  }
+
+  .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+    grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr) 44px;
+  }
+
+  .app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+    grid-template-columns: 64px 0 minmax(0, 1fr) 44px;
+  }
+
+  .workspace-hero,
+  .query-builder-hero,
+  .results-investigation-header {
+    grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.48fr);
+  }
+
+  .workspace-canvas {
+    padding-inline: clamp(34px, 2.8vw, 56px);
+  }
+
+  .runtime-context-header h2 {
+    font-size: 17px;
+  }
+}
+
 @media (max-width: 1080px) {
+  .workspace-shell,
+  .app.is-sidebar-collapsed .workspace-shell {
+    grid-template-columns: 72px 0 minmax(0, 1fr) 280px;
+  }
+
+  .workspace-shell:has(.runtime-context-panel.is-collapsed),
+  .app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+    grid-template-columns: 72px 0 minmax(0, 1fr) 44px;
+  }
+
+  .left-sidebar {
+    align-items: center;
+    padding: 12px 8px;
+  }
+
+  .left-sidebar .nav-label,
+  .sidebar-workspace-card,
+  .sidebar-nav-section p,
+  .hub-subnav {
+    display: none;
+  }
+
   .results-context-strip {
     grid-template-columns: 1fr;
   }

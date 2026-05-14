@@ -668,7 +668,7 @@ function WorkspaceShell({
                 )}
               </section>
 
-              <details className="runtime-disclosure-section" open>
+              <details className="runtime-disclosure-section">
                 <summary>
                   <span>Workspace path</span>
                   <small>Trail and go-to actions</small>

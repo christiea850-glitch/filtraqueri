@@ -6,10 +6,10 @@
 
 .query-builder-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(250px, 0.55fr);
+  gap: 20px;
   min-width: 0;
-  padding: 20px;
+  padding: clamp(18px, 1.7vw, 26px);
   border: 1px solid rgba(219, 229, 239, 0.82);
   border-radius: 16px;
   background:
@@ -28,7 +28,7 @@
 .query-builder-hero h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 28px;
+  font-size: clamp(23px, 1.7vw, 31px);
   font-weight: 850;
   line-height: 1.1;
 }
@@ -88,7 +88,7 @@
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -112,7 +112,7 @@
 .query-progress-rail {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 10px;
   margin-top: 12px;
 }
 
@@ -151,7 +151,7 @@
   z-index: 2;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
   margin-top: 12px;
   padding: 4px 0;
   background: rgba(255, 255, 255, 0.86);
@@ -163,7 +163,7 @@
   gap: 2px;
   min-width: 0;
   min-height: 64px;
-  padding: 9px 10px;
+  padding: 9px;
   border: 1px solid #dbe5ef;
   border-radius: 12px;
   background: #ffffff;
@@ -217,7 +217,7 @@
 
 .query-workflow-tabs strong {
   color: #111827;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 850;
 }
 
@@ -342,10 +342,10 @@
 
 .query-stage-panel {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   margin-top: 12px;
   min-width: 0;
-  padding: 14px;
+  padding: 16px;
   border: 1px solid #dbe5ef;
   border-radius: 14px;
   background: #ffffff;
@@ -390,8 +390,8 @@
 
 .query-stage-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
-  gap: 12px;
+  grid-template-columns: minmax(280px, 0.75fr) minmax(420px, 1.25fr);
+  gap: 16px;
   align-items: start;
 }
 
@@ -412,7 +412,7 @@
 .query-review-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 12px;
 }
 
 .query-review-grid div {

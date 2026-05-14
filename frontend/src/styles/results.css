@@ -11,7 +11,7 @@
 
 .results-workspace {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -28,9 +28,9 @@
 
 .results-investigation-surface {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
-  padding: 20px;
+  padding: clamp(18px, 1.7vw, 26px);
   border: 1px solid rgba(219, 229, 239, 0.82);
   border-radius: 16px;
   background:
@@ -48,8 +48,8 @@
 
 .results-investigation-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.45fr) minmax(250px, 0.55fr);
+  gap: 22px;
   align-items: start;
 }
 
@@ -62,8 +62,10 @@
 .results-investigation-header h2 {
   margin: 0;
   color: #0f172a;
-  font-size: 24px;
+  font-size: clamp(21px, 1.55vw, 28px);
   font-weight: 850;
+  line-height: 1.12;
+  overflow-wrap: normal;
 }
 
 .results-investigation-header span,
@@ -110,7 +112,7 @@
 .results-top-takeaway {
   display: grid;
   gap: 5px;
-  padding: 14px 16px;
+  padding: 14px 18px;
   border-left: 4px solid #2563eb;
   border-radius: 10px;
   background: rgba(239, 246, 255, 0.78);
@@ -142,7 +144,7 @@
 .results-context-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -150,7 +152,7 @@
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 12px;
+  padding: 12px 14px;
   border: 1px solid rgba(219, 229, 239, 0.78);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.64);
@@ -168,8 +170,8 @@
 
 .results-continuation-row {
   display: grid;
-  grid-template-columns: minmax(140px, auto) minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(180px, auto) minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
   min-width: 0;
   padding: 10px 12px;
@@ -235,8 +237,8 @@
 
 .results-context-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.55fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.55fr);
+  gap: 12px;
   align-items: stretch;
 }
 
@@ -761,12 +763,12 @@
 }
 
 .results-workspace .data-grid-table {
-  max-height: min(72vh, 800px);
+  max-height: min(70vh, 820px);
   overflow: auto;
 }
 
 .results-workspace .data-grid-table table {
-  min-width: max(1120px, 100%);
+  min-width: max(1180px, 100%);
 }
 
 .app.is-workspace-focused .results-workspace .data-grid-table {
