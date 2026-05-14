@@ -20,6 +20,7 @@ function RuntimeDisclosureSlot({
       return defaultOpen;
     }
   });
+  const displayLabel = label.toLowerCase() === "runtime slot" ? "Details" : label;
 
   useEffect(() => {
     try {
@@ -40,7 +41,7 @@ function RuntimeDisclosureSlot({
     >
       <summary>
         <span>
-          <small>{label}</small>
+          <small>{displayLabel}</small>
           <strong>{title}</strong>
           <em>{summary}</em>
         </span>

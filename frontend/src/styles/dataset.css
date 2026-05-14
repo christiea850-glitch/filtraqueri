@@ -2819,3 +2819,160 @@
   font-weight: 650;
 }
 
+/* UX-F13: enterprise visual language stabilization */
+.runtime-disclosure-slot,
+.human-guidance-panel,
+.human-intent-panel,
+.human-insight-panel,
+.task-category-section,
+.task-detail-panel,
+.task-launcher-card,
+.task-validation-state,
+.task-configuration-list,
+.guided-input-list,
+.analysis-plan-preview,
+.task-plan-preview-panel,
+.execution-preview-panel,
+.relationship-aware-planning-panel,
+.planning-readiness-panel,
+.engine-compatibility-panel,
+.business-explanation-panel,
+.analytics-intent-graph-panel,
+.analytics-planning-panel,
+.execution-contract-panel,
+.worksheet-item,
+.workbook-relationship-card,
+.workbook-join-preview-card,
+.relationship-detail-panel,
+.accepted-relationship-card,
+.contract-diagnostic-row,
+.summary-grid div {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.runtime-disclosure-slot > summary {
+  padding: 10px;
+}
+
+.runtime-disclosure-slot > summary::before {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+}
+
+.runtime-disclosure-slot summary small,
+.section-label,
+.human-insight-header > span,
+.human-insight-metrics span,
+.human-insight-actions > span,
+.human-suggestion-grid span,
+.task-launcher-card small,
+.task-launcher-card-meta,
+.task-detail-grid span,
+.task-detail-list,
+.task-validation-state small,
+.task-configuration-list > span,
+.guided-input-list > span,
+.analysis-plan-preview > span,
+.task-plan-preview-panel > span,
+.task-plan-preview-section > span,
+.execution-preview-panel > span,
+.execution-preview-note-list > span,
+.relationship-aware-planning-panel > span,
+.planning-readiness-panel > span,
+.planning-readiness-list > span,
+.engine-compatibility-panel > span,
+.business-explanation-panel > span,
+.analytics-intent-graph-panel.compact > span,
+.analytics-planning-panel.compact > span,
+.execution-contract-panel.compact > span,
+.summary-grid span,
+.schema-pill small,
+.worksheet-status,
+.workbook-summary-grid span,
+.workbook-profile-list span,
+.relationship-review-controls label,
+.relationship-notes-control,
+.relationship-confidence,
+.relationship-validation,
+.diagnostic-action-chip {
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.summary-header h2,
+.filters-header h2,
+.query-builder-header h2,
+.empty-state h2,
+.human-guidance-panel h2,
+.human-intent-panel h2,
+.task-detail-panel h3,
+.worksheet-selector-header h4,
+.workbook-context-header h3 {
+  font-weight: 600;
+}
+
+.runtime-disclosure-slot summary strong,
+.runtime-disclosure-slot summary b,
+.human-suggestion-grid strong,
+.task-launcher-card strong,
+.task-detail-grid strong,
+.task-detail-list small,
+.task-validation-state strong,
+.guided-input-list small,
+.analysis-plan-preview strong,
+.task-plan-preview-panel > strong,
+.execution-preview-panel > strong,
+.execution-preview-stage strong,
+.relationship-aware-planning-panel strong,
+.planning-readiness-panel strong,
+.engine-compatibility-card strong,
+.business-explanation-panel strong,
+.analytics-intent-graph-panel.compact > strong,
+.analytics-planning-panel.compact > strong,
+.execution-contract-panel.compact > strong,
+.summary-grid strong,
+.schema-pill,
+.worksheet-name,
+.workbook-summary-grid strong,
+.workbook-profile-list strong,
+.workbook-mapping-row span,
+.workbook-column-name,
+.workbook-mapping-row strong,
+.workbook-type-badge,
+.workbook-relationship-path strong,
+.accepted-relationship-card strong,
+.contract-diagnostic-row strong {
+  font-weight: 600;
+}
+
+.human-guidance-panel:hover,
+.human-intent-panel:hover,
+.human-insight-metrics > div:hover,
+.human-suggestion-grid button:hover,
+.human-insight-back-button:hover,
+.task-launcher-card:hover,
+.summary-grid div:hover,
+.schema-pill:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.human-intent-panel,
+.human-insight-panel,
+.human-insight-back-button,
+.relationship-detail-panel,
+.workbook-join-preview-card {
+  border-color: #e2e8f0;
+  background: #ffffff;
+}
+
+.human-intent-panel strong,
+.human-suggestion-grid span,
+.workbook-mapping-row strong {
+  color: #334155;
+}
+

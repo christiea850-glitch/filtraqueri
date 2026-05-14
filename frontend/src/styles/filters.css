@@ -236,3 +236,39 @@
   margin-top: 14px;
 }
 
+/* UX-F13: enterprise visual language stabilization */
+.explore-question-surface,
+.active-filter-summary,
+.filter-card {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.explore-question-surface h2,
+.filter-card-header span {
+  font-weight: 600;
+}
+
+.explore-question-list > span,
+.explore-custom-question span,
+.active-filter-summary span,
+.filter-search span,
+.filter-card-header small {
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.active-filter-summary strong {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 500;
+}
+
+.explore-question-list button:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+}
+

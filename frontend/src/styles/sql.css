@@ -516,3 +516,69 @@
   font-weight: 750;
 }
 
+/* UX-F13: enterprise visual language stabilization */
+.sql-inspection-overview,
+.sql-context-panel,
+.sql-editor-panel,
+.sql-preview-panel,
+.sql-draft-panel,
+.sql-inspection-metrics span,
+.sql-suggestion-grid button,
+.sql-template-list button,
+.sql-keyword-list button,
+.sql-guidance-context,
+.sql-draft-list article,
+.sql-draft-list button,
+.sql-helper-empty {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.sql-inspection-overview h2,
+.sql-context-panel h2,
+.sql-editor-toolbar h2,
+.sql-preview-panel h2,
+.sql-suggestion-grid strong,
+.sql-template-list strong,
+.sql-guidance-context strong,
+.sql-draft-list article strong,
+.sql-draft-list strong {
+  font-weight: 600;
+}
+
+.sql-inspection-metrics span,
+.sql-suggestion-grid span,
+.sql-template-list span,
+.sql-keyword-list button,
+.sql-dialect-selector,
+.sql-editor-footer,
+.sql-guidance-context span,
+.sql-draft-list article span,
+.sql-draft-list span {
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.sql-suggestion-grid button:hover,
+.sql-template-list button:hover,
+.sql-keyword-list button:hover,
+.sql-draft-list button:hover,
+.sql-schema-chip:hover,
+.sql-context-panel:hover,
+.sql-editor-panel:hover,
+.sql-preview-panel:hover,
+.sql-draft-panel:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.sql-keyword-list button:hover,
+.sql-suggestion-grid button:hover,
+.sql-template-list button:hover,
+.sql-draft-list button:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+

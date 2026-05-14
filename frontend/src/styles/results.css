@@ -947,3 +947,93 @@
   line-height: 1.4;
 }
 
+/* UX-F13: enterprise visual language stabilization */
+.results-review-strip,
+.results-investigation-focus,
+.results-business-takeaway,
+.results-insight-row > span,
+.results-context-cards article,
+.results-continuation-row,
+.results-technical-disclosure,
+.session-panel,
+.history-panel,
+.data-grid-section,
+.history-list article {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.results-review-strip.is-analyst-results {
+  border-color: #d8dee8;
+  background: #ffffff;
+}
+
+.results-investigation-header h2,
+.session-panel h2,
+.history-panel h2,
+.data-grid-toolbar h2 {
+  font-weight: 600;
+}
+
+.results-investigation-focus span,
+.results-context-cards span,
+.results-continuation-row span,
+.results-technical-disclosure summary span,
+.results-business-takeaway span,
+.results-review-facts small,
+.results-insight-row small,
+.session-stat-list span,
+.active-context p,
+.find-column-control span,
+.columns-menu-header span,
+.results-grid-feedback span,
+.results-grid-feedback strong,
+.pagination-bar span,
+.large-page-helper,
+.history-list time,
+.history-list span {
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.results-business-takeaway {
+  border-left-color: #94a3b8;
+}
+
+.results-review-strip.is-analyst-results .results-business-takeaway {
+  border-left-color: #94a3b8;
+  background: #ffffff;
+}
+
+.results-review-strip.is-analyst-results .results-business-takeaway span,
+.results-review-strip.is-analyst-results .results-review-facts small {
+  color: #64748b;
+}
+
+.results-investigation-focus strong,
+.results-business-takeaway strong,
+.results-insight-row strong,
+.results-review-facts strong,
+.results-context-cards strong,
+.results-continuation-row strong,
+.results-technical-disclosure strong,
+.session-stat-list strong,
+.history-list strong {
+  font-weight: 600;
+}
+
+.data-grid-section:hover,
+.session-panel:hover,
+.history-panel:hover,
+.history-list article:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+.schema-type-list strong,
+.results-grid-feedback span {
+  color: #475569;
+}
+

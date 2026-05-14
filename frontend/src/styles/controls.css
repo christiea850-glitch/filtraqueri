@@ -138,3 +138,38 @@
   transform: translateY(-1px);
 }
 
+/* UX-F13: enterprise visual language stabilization */
+.primary-button,
+.secondary-button,
+.text-button,
+.icon-button {
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.secondary-button,
+.text-button,
+.icon-button,
+.panel-collapse-button,
+.collapsed-panel-bar {
+  border-color: #dbe5ef;
+  background: #ffffff;
+  color: #475569;
+}
+
+.text-button:hover,
+.icon-button:hover,
+.panel-collapse-button:hover,
+.collapsed-panel-bar:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #172033;
+  box-shadow: none;
+}
+
+.collapsed-panel-bar,
+.panel-collapse-button {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+

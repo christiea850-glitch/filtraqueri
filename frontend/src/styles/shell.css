@@ -2,12 +2,30 @@
   box-sizing: border-box;
 }
 
+:root {
+  --fq-font-body: 400;
+  --fq-font-label: 500;
+  --fq-font-title: 600;
+  --fq-font-brand: 800;
+  --fq-color-canvas: #f8fafc;
+  --fq-color-panel: #ffffff;
+  --fq-color-border: #e2e8f0;
+  --fq-color-border-strong: #cbd5e1;
+  --fq-color-text: #172033;
+  --fq-color-muted: #64748b;
+  --fq-color-meta: #475569;
+  --fq-color-blue: #2563eb;
+  --fq-radius-panel: 12px;
+  --fq-shadow-soft: 0 8px 18px rgba(15, 23, 42, 0.035);
+}
+
 body {
   margin: 0;
   color: #172033;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  font-weight: var(--fq-font-body);
   background: #f8fafc;
   min-width: 320px;
 }
@@ -1750,6 +1768,119 @@ h1 span:last-child {
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease;
+}
+
+/* UX-F13 visual language stabilization */
+.workspace-page-heading h1,
+.summary-header h2,
+.filters-header h2,
+.query-builder-header h2,
+.runtime-context-header h2,
+.welcome-copy h2,
+.export-panel h2,
+.settings-panel h2,
+.analyst-workspace-panel h2 {
+  font-weight: var(--fq-font-title);
+  letter-spacing: 0;
+}
+
+.workspace-page-heading h1 {
+  font-size: clamp(20px, 1.25vw, 24px);
+}
+
+.section-label,
+.workspace-page-heading p,
+.workspace-context-strip small,
+.runtime-section-heading span,
+.runtime-current-step span,
+.runtime-current-step small,
+.runtime-panel-slot span,
+.runtime-panel-slot small,
+.runtime-disclosure-section > summary span {
+  color: var(--fq-color-muted);
+  font-weight: var(--fq-font-label);
+  letter-spacing: 0.04em;
+}
+
+.workspace-page-heading > span,
+.workspace-context-strip strong,
+.runtime-trail-list span,
+.runtime-guidance-list span,
+.runtime-continuation-list small,
+.runtime-return-button span,
+.runtime-panel-slot p,
+.welcome-copy > p:not(.section-label):not(.welcome-note),
+.tagline,
+.subtitle {
+  font-weight: var(--fq-font-body);
+}
+
+.workspace-context-strip,
+.runtime-current-step,
+.runtime-trail-section,
+.runtime-disclosure-section,
+.runtime-panel-slot,
+.welcome-screen,
+.export-panel,
+.settings-panel,
+.analyst-workspace-panel,
+.dataset-summary,
+.dataset-hub-panel,
+.filters-panel,
+.query-builder-panel,
+.empty-state {
+  border-color: var(--fq-color-border);
+  border-radius: var(--fq-radius-panel);
+  background: var(--fq-color-panel);
+  box-shadow: none;
+}
+
+.runtime-context-body {
+  gap: 7px;
+}
+
+.runtime-context-header {
+  padding-bottom: 2px;
+}
+
+.runtime-current-step,
+.runtime-trail-section {
+  padding: 7px;
+}
+
+.runtime-trail-list button,
+.runtime-guidance-list button,
+.runtime-continuation-list button,
+.runtime-return-button {
+  padding: 8px;
+  border-color: var(--fq-color-border);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.runtime-trail-list strong,
+.runtime-guidance-list strong,
+.runtime-continuation-list strong,
+.runtime-return-button strong,
+.runtime-current-step strong,
+.runtime-panel-slot > strong {
+  font-weight: var(--fq-font-title);
+}
+
+.runtime-guidance-list em,
+.runtime-trail-list small,
+.runtime-guidance-list small,
+.runtime-continuation-list em {
+  background: #f8fafc;
+  color: var(--fq-color-muted);
+  font-weight: var(--fq-font-label);
+}
+
+.workspace-brand strong,
+h1,
+h1 span:first-child,
+h1 span:last-child {
+  font-weight: var(--fq-font-brand);
 }
 
 .empty-state {

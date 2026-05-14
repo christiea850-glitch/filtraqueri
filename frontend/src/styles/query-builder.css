@@ -765,3 +765,79 @@
   margin-top: 14px;
 }
 
+/* UX-F13: enterprise visual language stabilization */
+.query-builder-workflow-strip,
+.query-builder-hero,
+.query-builder-hero-focus,
+.query-approval-strip,
+.query-approval-facts span,
+.query-workflow-tabs button,
+.query-guidance-grid article,
+.query-advanced-disclosure,
+.query-technical-disclosure,
+.query-stage-panel,
+.query-review-grid div,
+.builder-block,
+.field-chip,
+.query-column-empty {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.query-builder-hero {
+  background: #ffffff;
+}
+
+.query-builder-workflow-strip > div:first-child span,
+.query-progress-rail strong,
+.query-guidance-grid span,
+.query-advanced-disclosure summary span,
+.query-technical-disclosure summary span,
+.query-approval-strip > div:first-child span,
+.query-approval-facts span,
+.query-workflow-tabs span,
+.query-review-grid span,
+.query-column-search span {
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.query-builder-workflow-strip > div:first-child strong,
+.query-builder-hero h2,
+.query-builder-hero-focus strong,
+.query-builder-context-grid strong,
+.query-approval-strip > div:first-child strong,
+.query-approval-facts strong,
+.query-workflow-tabs strong,
+.query-guidance-grid strong,
+.query-technical-disclosure strong,
+.query-stage-heading h3,
+.query-review-grid strong,
+.builder-block-header span,
+.field-chip {
+  font-weight: 600;
+}
+
+.query-progress-rail span.is-complete,
+.query-workflow-tabs button.is-active {
+  border-color: #2563eb;
+  background: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.query-progress-rail span.is-complete strong,
+.query-workflow-tabs button.is-active span {
+  color: #2563eb;
+}
+
+.query-workflow-tabs button:hover,
+.query-stage-panel:hover,
+.query-review-grid div:hover,
+.builder-block:hover,
+.field-chip:hover {
+  box-shadow: none;
+  transform: none;
+}
+
