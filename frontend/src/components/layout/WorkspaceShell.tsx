@@ -252,9 +252,6 @@ function WorkspaceShell({
   const activeSectionLabel =
     groupedHubs.find((section) => section.hubs.some((hub) => hub.id === activeHub.id))?.label ||
     "Workspace";
-  const runtimeModeLabel = workspaceMode === "analyst" ? "Analyst Mode" : "Human Mode";
-  const workspaceModeTone =
-    workspaceMode === "analyst" ? "Technical workspace" : "Guided workspace";
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeSubItem?.label || activeHub.label;
   const investigationBreadcrumb = `${activeSectionLabel} / ${activeHub.label}`;
@@ -290,6 +287,11 @@ function WorkspaceShell({
   const datasetShapeLabel = dataset
     ? `${dataset.row_count.toLocaleString()} rows / ${dataset.column_count.toLocaleString()} columns`
     : "No rows loaded";
+  const workspaceIdentityLabel =
+    dataset?.original_filename || (workspaceMode === "analyst" ? "Analyst workspace" : "Workspace");
+  const primaryRecommendationGroup = runtimeContext.recommendationGroups[0] || null;
+  const primaryRecommendationItems = primaryRecommendationGroup?.items.slice(0, 2) || [];
+  const compactTrail = runtimeContext.trail.slice(-5);
 
   const changeHub = (hub: HubItem) => {
     if (hub.mode !== workspaceMode) onModeChange(hub.mode);
@@ -358,8 +360,7 @@ function WorkspaceShell({
           aria-label="Workspace identity"
           onClick={() => (dataset ? onViewChange("dataset") : onOpenFile())}
         >
-          <span>{workspaceModeTone}</span>
-          <strong>{dataset ? "Active workspace" : "Open workspace"}</strong>
+          <strong>{workspaceIdentityLabel}</strong>
         </button>
         <div className="mode-switcher" aria-label="Workspace mode">
           <button
@@ -421,24 +422,6 @@ function WorkspaceShell({
               </section>
             ))}
           </nav>
-
-          {!isSidebarCollapsed && (
-            <div className="hub-subnav" aria-label={`${activeHub.label} navigation`}>
-              <p>{activeHub.label}</p>
-              {activeHub.subItems.map((item) => (
-                <button
-                  type="button"
-                  key={item.view}
-                  className={activeView === item.view ? "is-active" : ""}
-                  onClick={() => onViewChange(item.view)}
-                  title={item.label}
-                >
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </aside>
         <button
           type="button"
@@ -480,10 +463,6 @@ function WorkspaceShell({
             <span>
               <small>Rows / columns</small>
               <strong>{datasetShapeLabel}</strong>
-            </span>
-            <span>
-              <small>Mode</small>
-              <strong>{runtimeModeLabel}</strong>
             </span>
             <span>
               <small>Focus</small>
@@ -531,42 +510,38 @@ function WorkspaceShell({
               </section>
 
               <section className="runtime-investigation-surface" aria-label="Contextual next steps">
-                {runtimeContext.recommendationGroups.length > 0 && (
+                {primaryRecommendationGroup && primaryRecommendationItems.length > 0 && (
                   <div className="runtime-next-steps" aria-label="Suggested next steps">
                     <div className="runtime-section-heading">
                       <span>Suggested next action</span>
                       <small>Nothing runs automatically</small>
                     </div>
                     <div className="runtime-guidance-groups" aria-label="Ranked suggestions">
-                      {runtimeContext.recommendationGroups.map((group) => (
-                        <section key={group.id} className="runtime-guidance-group">
-                          <div>
-                            <strong>{group.title}</strong>
-                            <small>{group.summary}</small>
-                          </div>
-                          <div className="runtime-guidance-list">
-                            {group.items.map((guidance) => (
-                              <button
-                                type="button"
-                                key={guidance.id}
-                                className={`is-${guidance.priority}`}
-                                onClick={() =>
-                                  onRuntimeTrailSelect(
-                                    guidance.continuationLink.continuationId,
-                                    guidance.continuationLink.targetView,
-                                    guidance.continuationLink.targetMode,
-                                  )
-                                }
-                              >
-                                <strong>{guidance.title}</strong>
-                                <span>{guidance.summary}</span>
-                                <em>{guidance.score.explanation}</em>
-                                <small>{guidance.priority} priority</small>
-                              </button>
-                            ))}
-                          </div>
-                        </section>
-                      ))}
+                      <section key={primaryRecommendationGroup.id} className="runtime-guidance-group">
+                        <div>
+                          <strong>{primaryRecommendationGroup.title}</strong>
+                        </div>
+                        <div className="runtime-guidance-list">
+                          {primaryRecommendationItems.map((guidance) => (
+                            <button
+                              type="button"
+                              key={guidance.id}
+                              className={`is-${guidance.priority}`}
+                              onClick={() =>
+                                onRuntimeTrailSelect(
+                                  guidance.continuationLink.continuationId,
+                                  guidance.continuationLink.targetView,
+                                  guidance.continuationLink.targetMode,
+                                )
+                              }
+                            >
+                              <strong>{guidance.title}</strong>
+                              <span>{guidance.summary}</span>
+                              <small>{guidance.priority} priority</small>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
                     </div>
                   </div>
                 )}
@@ -578,7 +553,7 @@ function WorkspaceShell({
                   <small>Move through the current investigation</small>
                 </div>
                 <div className="runtime-trail-list" aria-label="Workspace path">
-                  {runtimeContext.trail.map((item) => (
+                  {compactTrail.map((item) => (
                     <button
                       type="button"
                       key={item.id}

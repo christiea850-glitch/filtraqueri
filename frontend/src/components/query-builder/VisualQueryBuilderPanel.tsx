@@ -111,49 +111,76 @@ function VisualQueryBuilderPanel({
       : selectedColumns.length > 0
         ? "Selected-field result"
         : "Dataset preview";
-  const progressItems = [
-    {
-      label: "Data selected",
-      complete: selectedColumns.length > 0,
-      detail: `${selectedColumns.length} fields`,
-    },
-    {
-      label: "Filters added",
-      complete: activeFilterCount > 0,
-      detail: `${activeFilterCount} filters`,
-    },
-    {
-      label: "Grouping active",
-      complete: groupBy.length > 0 || activeAggregations.length > 0,
-      detail: `${groupBy.length} groups / ${activeAggregations.length} summaries`,
-    },
-    {
-      label: "Preview ready",
-      complete: selectedColumns.length > 0 || groupBy.length > 0 || activeAggregations.length > 0,
-      detail: expectedResultType,
-    },
-    {
-      label: "Execution ready",
-      complete: Boolean(rowLimit) || selectedColumns.length > 0 || activeAggregations.length > 0,
-      detail: rowLimit ? `${rowLimit} row limit` : "Review first",
-    },
-  ];
-  const approvalSummary = [
-    { label: "Data source", value: "Current workspace" },
-    {
-      label: "Fields selected",
-      value: selectedColumns.length > 0 ? selectedColumns.length.toLocaleString() : "Grouped result",
-    },
-    { label: "Filters active", value: activeFilterCount.toLocaleString() },
-    {
-      label: "Grouping active",
-      value:
-        groupBy.length > 0 || activeAggregations.length > 0
-          ? `${groupBy.length.toLocaleString()} groups / ${activeAggregations.length.toLocaleString()} measures`
-          : "None",
-    },
-    { label: "Row limit", value: rowLimit || "No limit" },
-  ];
+  const progressItems = isAnalystMode
+    ? [
+        {
+          label: "Data selected",
+          complete: selectedColumns.length > 0,
+          detail: `${selectedColumns.length} fields`,
+        },
+        {
+          label: "Filters added",
+          complete: activeFilterCount > 0,
+          detail: `${activeFilterCount} filters`,
+        },
+        {
+          label: "Grouping active",
+          complete: groupBy.length > 0 || activeAggregations.length > 0,
+          detail: `${groupBy.length} groups / ${activeAggregations.length} summaries`,
+        },
+        {
+          label: "Preview ready",
+          complete: selectedColumns.length > 0 || groupBy.length > 0 || activeAggregations.length > 0,
+          detail: expectedResultType,
+        },
+        {
+          label: "Execution ready",
+          complete: Boolean(rowLimit) || selectedColumns.length > 0 || activeAggregations.length > 0,
+          detail: rowLimit ? `${rowLimit} row limit` : "Review first",
+        },
+      ]
+    : [
+        {
+          label: "Data selected",
+          complete: selectedColumns.length > 0,
+          detail: `${selectedColumns.length} fields`,
+        },
+        {
+          label: "Filters added",
+          complete: activeFilterCount > 0,
+          detail: `${activeFilterCount} filters`,
+        },
+        {
+          label: "Review ready",
+          complete: selectedColumns.length > 0 || groupBy.length > 0 || activeAggregations.length > 0,
+          detail: expectedResultType,
+        },
+      ];
+  const approvalSummary = isAnalystMode
+    ? [
+        { label: "Data source", value: "Current workspace" },
+        {
+          label: "Fields selected",
+          value: selectedColumns.length > 0 ? selectedColumns.length.toLocaleString() : "Grouped result",
+        },
+        { label: "Filters active", value: activeFilterCount.toLocaleString() },
+        {
+          label: "Grouping active",
+          value:
+            groupBy.length > 0 || activeAggregations.length > 0
+              ? `${groupBy.length.toLocaleString()} groups / ${activeAggregations.length.toLocaleString()} measures`
+              : "None",
+        },
+        { label: "Row limit", value: rowLimit || "No limit" },
+      ]
+    : [
+        {
+          label: "Fields selected",
+          value: selectedColumns.length > 0 ? selectedColumns.length.toLocaleString() : "Grouped result",
+        },
+        { label: "Filters active", value: activeFilterCount.toLocaleString() },
+        { label: "Row limit", value: rowLimit || "No limit" },
+      ];
 
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
