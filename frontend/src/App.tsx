@@ -930,6 +930,150 @@ function App() {
     </section>
   );
 
+  const renderResultsInvestigationSurface = () => {
+    if (!activeResultModel) return null;
+
+    const isAnalystMode = workspaceMode === "analyst";
+    const sourceLabel =
+      activeResultModel.sourceType === "query"
+        ? "Query result"
+        : activeResultModel.sourceType === "filtered"
+          ? "Filtered result"
+          : "Preview result";
+    const sourceSummary =
+      activeResultModel.sourceType === "query"
+        ? isAnalystMode
+          ? "Review source tab, query context, and export payload before using the result."
+          : "Review the answer shaped by your query before refining or exporting it."
+        : activeResultModel.sourceType === "filtered"
+          ? isAnalystMode
+            ? "Inspect the filtered result model and confirm the applied filter context."
+            : "Review what changed after filters narrowed the rows."
+          : isAnalystMode
+            ? "Inspect the preview source tab before moving into filters or query context."
+            : "Start with a calm scan of the dataset before shaping a question.";
+    const takeaway =
+      activeResultModel.sourceType === "query"
+        ? activeResultModel.grouping.hasGrouping
+          ? "Grouped output is ready to review. Compare groups, then refine the question if the answer needs another angle."
+          : "Query output is ready to review. Check the selected fields, then decide whether to refine or export."
+        : activeResultModel.sourceType === "filtered"
+          ? "Filtered rows are ready for review. Look for what changed, then continue refining or export the active result."
+          : "Preview rows are ready. Use this pass to understand structure before filtering, grouping, or exporting.";
+    const continuationSuggestion = isAnalystMode
+      ? activeResultModel.sourceType === "query"
+        ? "Check query context"
+        : "Inspect result model"
+      : activeResultModel.sourceType === "query"
+        ? "Compare groups"
+        : activeResultModel.sourceType === "filtered"
+          ? "Refine question"
+          : "Review what changed";
+    const activeSortLabel = activeResultModel.sorting.column
+      ? `${activeResultModel.sorting.column} ${activeResultModel.sorting.direction}`
+      : "No sort";
+    const activeFilterCount = activeResultModel.filters.activeLabels.length;
+    const hiddenColumnCount = activeResultModel.columns.length - activeResultModel.visibleColumns.length;
+
+    return (
+      <section
+        className={[
+          "results-investigation-surface",
+          isAnalystMode ? "is-analyst-results" : "is-human-results",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label="Results investigation summary"
+      >
+        <div className="results-investigation-header">
+          <div>
+            <p className="section-label">{isAnalystMode ? "Result review" : "Investigation review"}</p>
+            <h2>{sourceLabel}</h2>
+            <span>{sourceSummary}</span>
+          </div>
+          <div className="results-investigation-focus">
+            <span>{isAnalystMode ? "Source tab" : "Current focus"}</span>
+            <strong>{activeResultTab}</strong>
+            <small>
+              {activeResultModel.visibleColumns.length.toLocaleString()} visible columns /{" "}
+              {activeResultModel.rows.length.toLocaleString()} rows on this page
+            </small>
+          </div>
+        </div>
+
+        <div className="results-top-takeaway">
+          <span>Top takeaway</span>
+          <strong>{takeaway}</strong>
+        </div>
+
+        <div className="results-context-cards" aria-label="Supporting result context">
+          <article>
+            <span>Result source</span>
+            <strong>{sourceLabel}</strong>
+            <small>{activeResultModel.sourceType}</small>
+          </article>
+          <article>
+            <span>Rows / columns</span>
+            <strong>
+              {activeResultModel.totalCount.toLocaleString()} rows /{" "}
+              {activeResultModel.visibleColumns.length.toLocaleString()} visible
+            </strong>
+            <small>{hiddenColumnCount.toLocaleString()} hidden columns</small>
+          </article>
+          <article>
+            <span>Filters / sorting</span>
+            <strong>
+              {activeFilterCount.toLocaleString()} filters / {activeSortLabel}
+            </strong>
+            <small>
+              {activeResultModel.grouping.hasGrouping
+                ? `${activeResultModel.grouping.columns.length.toLocaleString()} group fields`
+                : "No grouping"}
+            </small>
+          </article>
+          <article>
+            <span>{isAnalystMode ? "Payload" : "Export"}</span>
+            <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows yet"}</strong>
+            <small>{isAnalystMode ? "Export active payload" : "Export result"}</small>
+          </article>
+        </div>
+
+        <div className="results-continuation-row">
+          <span>{isAnalystMode ? "Suggested technical action" : "Suggested next step"}</span>
+          <strong>{continuationSuggestion}</strong>
+          <small>No automatic execution; use the existing controls below.</small>
+        </div>
+
+        <details className="results-technical-disclosure">
+          <summary>
+            <span>Technical result metadata</span>
+            <small>Read-only result model context</small>
+          </summary>
+          <div>
+            <span>
+              Source tab
+              <strong>{activeResultModel.sourceTab}</strong>
+            </span>
+            <span>
+              Page
+              <strong>
+                {activeResultModel.page} of {activeResultModel.totalPages}
+              </strong>
+            </span>
+            <span>
+              Rows per page
+              <strong>{activeResultModel.rowsPerPage.toLocaleString()}</strong>
+            </span>
+            <span>
+              Export columns
+              <strong>{activeResultModel.export.columns.length.toLocaleString()}</strong>
+            </span>
+          </div>
+        </details>
+      </section>
+    );
+  };
+
   const humanViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
     welcome: () => (
       <UploadPanel
@@ -1023,6 +1167,7 @@ function App() {
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
           <section className="results-workspace" aria-label="Data exploration workspace">
+            {renderResultsInvestigationSurface()}
             <div className="results-workspace-header">
               <button
                 type="button"
