@@ -507,30 +507,41 @@ function WorkspaceShell({
                 </section>
               )}
 
-              {runtimeContext.guidance.length > 0 && (
+              {runtimeContext.recommendationGroups.length > 0 && (
                 <>
                   <div className="runtime-section-heading">
-                    <span>Suggested next step</span>
-                    <small>Advisory only; nothing runs automatically</small>
+                    <span>Recommendations</span>
+                    <small>Ranked from metadata only; nothing runs automatically</small>
                   </div>
-                  <div className="runtime-guidance-list" aria-label="Suggested next steps">
-                    {runtimeContext.guidance.map((guidance) => (
-                      <button
-                        type="button"
-                        key={guidance.id}
-                        className={guidance.priority === "primary" ? "is-primary" : ""}
-                        onClick={() =>
-                          onRuntimeTrailSelect(
-                            guidance.continuationLink.continuationId,
-                            guidance.continuationLink.targetView,
-                            guidance.continuationLink.targetMode,
-                          )
-                        }
-                      >
-                        <strong>{guidance.title}</strong>
-                        <span>{guidance.summary}</span>
-                        <small>{guidance.category.replace(/-/g, " ")}</small>
-                      </button>
+                  <div className="runtime-guidance-groups" aria-label="Ranked recommendations">
+                    {runtimeContext.recommendationGroups.map((group) => (
+                      <section key={group.id} className="runtime-guidance-group">
+                        <div>
+                          <strong>{group.title}</strong>
+                          <small>{group.summary}</small>
+                        </div>
+                        <div className="runtime-guidance-list">
+                          {group.items.map((guidance) => (
+                            <button
+                              type="button"
+                              key={guidance.id}
+                              className={`is-${guidance.priority}`}
+                              onClick={() =>
+                                onRuntimeTrailSelect(
+                                  guidance.continuationLink.continuationId,
+                                  guidance.continuationLink.targetView,
+                                  guidance.continuationLink.targetMode,
+                                )
+                              }
+                            >
+                              <strong>{guidance.title}</strong>
+                              <span>{guidance.summary}</span>
+                              <em>{guidance.score.explanation}</em>
+                              <small>{guidance.priority} priority</small>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
                     ))}
                   </div>
                 </>

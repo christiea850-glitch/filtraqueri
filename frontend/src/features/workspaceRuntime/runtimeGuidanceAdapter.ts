@@ -1,5 +1,6 @@
 import type {
   GuidanceContinuationLink,
+  GuidanceScore,
   GuidanceReason,
   InvestigationContinuation,
   InvestigationGuidanceItem,
@@ -31,7 +32,7 @@ const createGuidanceItem = ({
   category,
   reason,
   continuationId,
-  priority = "secondary",
+  priority = "medium",
 }: {
   snapshot: RuntimeContextSnapshot;
   continuations: InvestigationContinuation[];
@@ -54,8 +55,38 @@ const createGuidanceItem = ({
     reason,
     audience: snapshot.mode,
     priority,
+    score: createUnrankedGuidanceScore(priority),
     metadataOnly: true,
     continuationLink,
+  };
+};
+
+const createUnrankedGuidanceScore = (
+  priority: InvestigationGuidanceItem["priority"],
+): GuidanceScore => {
+  if (priority === "high") {
+    return {
+      value: 80,
+      priority,
+      explanation: "High-priority metadata signal.",
+      weights: [],
+    };
+  }
+
+  if (priority === "low") {
+    return {
+      value: 35,
+      priority,
+      explanation: "Lower-priority metadata signal.",
+      weights: [],
+    };
+  }
+
+  return {
+    value: 55,
+    priority,
+    explanation: "Medium-priority metadata signal.",
+    weights: [],
   };
 };
 
@@ -92,7 +123,7 @@ export const buildInvestigationGuidance = ({
         category: "data-readiness",
         reason: "no-dataset-open",
         continuationId: "continue:human:dataset",
-        priority: "primary",
+        priority: "high",
       }),
     );
   }
@@ -111,7 +142,7 @@ export const buildInvestigationGuidance = ({
         category: "query-refinement",
         reason: "dataset-open-no-query",
         continuationId: "continue:human:queryBuilder",
-        priority: "primary",
+        priority: "high",
       }),
     );
   }
@@ -144,7 +175,7 @@ export const buildInvestigationGuidance = ({
         category: "workbook-relationships",
         reason: "workbook-relationships-unreviewed",
         continuationId: "continue:human:dataset",
-        priority: hasQueryShape ? "secondary" : "primary",
+        priority: hasQueryShape ? "medium" : "high",
       }),
     );
   } else if (hasWorkbookRelationships && snapshot.mode === "analyst") {
@@ -198,6 +229,5 @@ export const buildInvestigationGuidance = ({
 
   return guidance
     .filter((item): item is InvestigationGuidanceItem => Boolean(item))
-    .filter((item) => !item.continuationLink.disabled)
-    .slice(0, 4);
+    .filter((item) => !item.continuationLink.disabled);
 };

@@ -7,6 +7,10 @@ export {
   getContextualObjectIdForView,
 } from "./runtimeNavigationAdapter";
 export { buildInvestigationGuidance } from "./runtimeGuidanceAdapter";
+export {
+  groupGuidanceRecommendations,
+  rankInvestigationGuidance,
+} from "./runtimeGuidanceRankingAdapter";
 export { normalizeRuntimeModeContext } from "./runtimeAdapters";
 export {
   loadRuntimePersistenceState,
@@ -19,7 +23,11 @@ export type {
   InvestigationGuidanceItem,
   GuidanceCategory,
   GuidanceContinuationLink,
+  GuidanceContextWeight,
   GuidanceReason,
+  GuidancePriority,
+  GuidanceRecommendationGroup,
+  GuidanceScore,
   RuntimeContextSnapshot,
   RuntimeDisclosureSlotProps,
   RuntimePanelSlot,

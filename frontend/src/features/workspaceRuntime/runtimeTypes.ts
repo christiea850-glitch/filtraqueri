@@ -33,6 +33,22 @@ export type GuidanceCategory =
   | "human-guidance"
   | "analyst-review";
 
+export type GuidancePriority = "high" | "medium" | "low";
+
+export type GuidanceContextWeight = {
+  id: string;
+  label: string;
+  value: number;
+  reason: string;
+};
+
+export type GuidanceScore = {
+  value: number;
+  priority: GuidancePriority;
+  explanation: string;
+  weights: GuidanceContextWeight[];
+};
+
 export type GuidanceReason =
   | "dataset-open-no-query"
   | "results-ready-no-refinement"
@@ -56,9 +72,25 @@ export type InvestigationGuidanceItem = {
   category: GuidanceCategory;
   reason: GuidanceReason;
   audience: WorkspaceMode;
-  priority: "primary" | "secondary";
+  priority: GuidancePriority;
+  score: GuidanceScore;
   metadataOnly: true;
   continuationLink: GuidanceContinuationLink;
+};
+
+export type GuidanceRecommendationGroup = {
+  id:
+    | "start-investigation"
+    | "continue-analysis"
+    | "inspect-relationships"
+    | "review-sql-context"
+    | "review-results";
+  title: string;
+  summary: string;
+  audience: WorkspaceMode;
+  items: InvestigationGuidanceItem[];
+  topScore: number;
+  metadataOnly: true;
 };
 
 export type ContextualInvestigationObject = {
@@ -176,6 +208,7 @@ export type WorkspaceRuntimeContext = {
   trail: WorkspaceTrailItem[];
   continuations: InvestigationContinuation[];
   guidance: InvestigationGuidanceItem[];
+  recommendationGroups: GuidanceRecommendationGroup[];
   panelSlots: RuntimePanelSlot[];
   contextualObjects: ContextualInvestigationObject[];
   selectedContextualObject: ContextualInvestigationObject | null;

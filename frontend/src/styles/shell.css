@@ -672,12 +672,45 @@ body.is-resizing-sidebar {
 }
 
 .runtime-trail-list,
+.runtime-guidance-groups,
 .runtime-guidance-list,
 .runtime-continuation-list,
 .runtime-slot-list {
   display: grid;
   gap: 6px;
   min-width: 0;
+}
+
+.runtime-guidance-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.runtime-guidance-group > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.runtime-guidance-group > div:first-child strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-guidance-group > div:first-child small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .runtime-trail-list button,
@@ -763,20 +796,36 @@ body.is-resizing-sidebar {
   background: #ffffff;
 }
 
-.runtime-guidance-list button.is-primary {
+.runtime-guidance-list button.is-high {
   border-color: #93c5fd;
   background: #f8fbff;
   box-shadow: inset 3px 0 0 rgba(37, 99, 235, 0.28);
+}
+
+.runtime-guidance-list button.is-medium {
+  border-color: #c7d2fe;
+}
+
+.runtime-guidance-list button.is-low {
+  border-style: dashed;
 }
 
 .runtime-context-panel.is-analyst-mode .runtime-guidance-list button {
   border-color: #ddd6fe;
 }
 
-.runtime-context-panel.is-analyst-mode .runtime-guidance-list button.is-primary {
+.runtime-context-panel.is-analyst-mode .runtime-guidance-list button.is-high {
   border-color: #c4b5fd;
   background: #f8f7ff;
   box-shadow: inset 3px 0 0 rgba(124, 58, 237, 0.26);
+}
+
+.runtime-guidance-list em {
+  color: #475569;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
 .runtime-return-button {

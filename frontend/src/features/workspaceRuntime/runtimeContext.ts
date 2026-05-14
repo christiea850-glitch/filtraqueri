@@ -5,6 +5,10 @@ import {
 } from "../workbook";
 import { normalizeRuntimeModeContext } from "./runtimeAdapters";
 import { buildInvestigationGuidance } from "./runtimeGuidanceAdapter";
+import {
+  groupGuidanceRecommendations,
+  rankInvestigationGuidance,
+} from "./runtimeGuidanceRankingAdapter";
 import type {
   BuildWorkspaceRuntimeContextOptions,
   ContextualInvestigationObject,
@@ -391,6 +395,10 @@ export const buildWorkspaceRuntimeContext = ({
     humanIntentLabel,
     snapshot,
   });
+  const guidance = rankInvestigationGuidance({
+    snapshot,
+    guidance: buildInvestigationGuidance({ snapshot, continuations }),
+  });
   const trail = createTrail({ activeView, mode, hasDataset: Boolean(dataset), snapshot });
   const selectedTrailItem = trail.find((item) => item.id === selectedTrailItemId);
 
@@ -398,7 +406,8 @@ export const buildWorkspaceRuntimeContext = ({
     snapshot,
     trail,
     continuations,
-    guidance: buildInvestigationGuidance({ snapshot, continuations }),
+    guidance,
+    recommendationGroups: groupGuidanceRecommendations({ snapshot, guidance }),
     panelSlots: createPanelSlots(snapshot),
     contextualObjects,
     selectedContextualObject:
