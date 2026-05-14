@@ -564,6 +564,15 @@ body.is-resizing-sidebar {
   overflow: auto;
 }
 
+.runtime-context-panel.is-analyst-mode {
+  border-left-color: #c4b5fd;
+  background: linear-gradient(180deg, rgba(250, 245, 255, 0.86), rgba(248, 251, 255, 0.92));
+}
+
+.runtime-context-panel.is-human-mode {
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.88), rgba(255, 255, 255, 0.94));
+}
+
 .runtime-context-panel.is-collapsed {
   width: 48px;
 }
@@ -606,7 +615,8 @@ body.is-resizing-sidebar {
 
 .runtime-context-header {
   display: grid;
-  gap: 3px;
+  gap: 4px;
+  padding: 2px 2px 4px;
 }
 
 .runtime-context-header h2 {
@@ -614,6 +624,14 @@ body.is-resizing-sidebar {
   color: #111827;
   font-size: 18px;
   font-weight: 850;
+}
+
+.runtime-context-header p:not(.section-label) {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .runtime-context-header > span {
@@ -625,6 +643,32 @@ body.is-resizing-sidebar {
   font-size: 11px;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-context-header > span {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.runtime-section-heading {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 5px;
+}
+
+.runtime-section-heading span {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.runtime-section-heading small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .runtime-trail-list,
@@ -658,6 +702,15 @@ body.is-resizing-sidebar {
 .runtime-trail-list button.is-selected {
   border-color: #bfdbfe;
   background: #eff6ff;
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-trail-list button:hover,
+.runtime-context-panel.is-analyst-mode .runtime-continuation-list button:hover:not(:disabled),
+.runtime-context-panel.is-analyst-mode .runtime-return-button:hover,
+.runtime-context-panel.is-analyst-mode .runtime-trail-list button.is-current,
+.runtime-context-panel.is-analyst-mode .runtime-trail-list button.is-selected {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
 }
 
 .runtime-continuation-list button:disabled {
@@ -704,6 +757,12 @@ body.is-resizing-sidebar {
   box-shadow: inset 3px 0 0 rgba(37, 99, 235, 0.36);
 }
 
+.runtime-context-panel.is-analyst-mode .runtime-return-button {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  box-shadow: inset 3px 0 0 rgba(124, 58, 237, 0.32);
+}
+
 .runtime-selected-object {
   display: grid;
   gap: 5px;
@@ -736,6 +795,26 @@ body.is-resizing-sidebar {
   font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.runtime-selected-object small {
+  justify-self: start;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runtime-selected-object.is-empty {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-selected-object span {
+  color: #6d28d9;
 }
 
 .runtime-continuation-list > span {

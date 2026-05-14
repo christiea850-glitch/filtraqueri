@@ -231,6 +231,11 @@ function WorkspaceShell({
     hubs.find((hub) => hub.subItems.some((item) => item.view === activeView)) ||
     hubs.find((hub) => hub.id === (workspaceMode === "analyst" ? "analyst" : "home")) ||
     hubs[0];
+  const runtimeModeLabel = workspaceMode === "analyst" ? "Analyst Mode" : "Human Mode";
+  const runtimeModeSummary =
+    workspaceMode === "analyst"
+      ? "SQL drafts and analyst metadata stay isolated."
+      : "Guided data, builder, and result context stay connected.";
 
   const changeHub = (hub: HubItem) => {
     if (hub.mode !== workspaceMode) onModeChange(hub.mode);
@@ -440,7 +445,13 @@ function WorkspaceShell({
         </main>
 
         <aside
-          className={`runtime-context-panel ${isRuntimePanelCollapsed ? "is-collapsed" : ""}`}
+          className={[
+            "runtime-context-panel",
+            workspaceMode === "analyst" ? "is-analyst-mode" : "is-human-mode",
+            isRuntimePanelCollapsed ? "is-collapsed" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           aria-label="Workspace runtime context"
         >
           <button
@@ -455,8 +466,9 @@ function WorkspaceShell({
             <div className="runtime-context-body">
               <div className="runtime-context-header">
                 <p className="section-label">Investigation</p>
-                <h2>Runtime context</h2>
-                <span>Read-only</span>
+                <h2>Context trail</h2>
+                <p>{runtimeModeSummary}</p>
+                <span>{runtimeModeLabel} / read-only</span>
               </div>
 
               {runtimeContext.returnContinuation && (
@@ -473,20 +485,32 @@ function WorkspaceShell({
                 >
                   <strong>{runtimeContext.returnContinuation.returnLabel}</strong>
                   <span>
-                    {runtimeContext.returnContinuation.originReference.mode} /{" "}
-                    {runtimeContext.returnContinuation.originReference.view}
+                    Back to the investigation point that opened this context.
                   </span>
                 </button>
               )}
 
-              {runtimeContext.selectedContextualObject && (
-                <section className="runtime-selected-object">
-                  <span>{runtimeContext.selectedContextualObject.objectType.replace(/-/g, " ")}</span>
+              {runtimeContext.selectedContextualObject ? (
+                <section className="runtime-selected-object" aria-label="Selected investigation context">
+                  <span>Selected context</span>
                   <strong>{runtimeContext.selectedContextualObject.label}</strong>
                   <p>{runtimeContext.selectedContextualObject.summary}</p>
+                  <small>
+                    {runtimeContext.selectedContextualObject.objectType.replace(/-/g, " ")}
+                  </small>
+                </section>
+              ) : (
+                <section className="runtime-selected-object is-empty" aria-label="Selected investigation context">
+                  <span>Selected context</span>
+                  <strong>No context pinned</strong>
+                  <p>Choose a trail step or continuation to pin a workspace context here.</p>
                 </section>
               )}
 
+              <div className="runtime-section-heading">
+                <span>Trail</span>
+                <small>Move through the current investigation</small>
+              </div>
               <div className="runtime-trail-list" aria-label="Workspace trail">
                 {runtimeContext.trail.map((item) => (
                   <button
@@ -502,13 +526,16 @@ function WorkspaceShell({
                   >
                     <strong>{item.label}</strong>
                     <span>{item.summary}</span>
-                    <small>{item.mode}</small>
+                    <small>{item.mode === "analyst" ? "Analyst" : "Human"}</small>
                   </button>
                 ))}
               </div>
 
-              <div className="runtime-continuation-list" aria-label="Continuations">
+              <div className="runtime-section-heading">
                 <span>Continue</span>
+                <small>Open a related workspace without executing anything</small>
+              </div>
+              <div className="runtime-continuation-list" aria-label="Continuations">
                 {runtimeContext.continuations.map((continuation) => (
                   <button
                     type="button"
@@ -529,6 +556,10 @@ function WorkspaceShell({
                 ))}
               </div>
 
+              <div className="runtime-section-heading">
+                <span>Status</span>
+                <small>Read-only runtime metadata</small>
+              </div>
               <div className="runtime-slot-list" aria-label="Runtime panel slots">
                 {runtimeContext.panelSlots.map((slot) => (
                   <section key={slot.id} className="runtime-panel-slot">

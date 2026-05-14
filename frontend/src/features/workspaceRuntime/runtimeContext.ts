@@ -16,6 +16,9 @@ import type {
 
 const emptyDatasetName = "No dataset open";
 
+const formatViewLabel = (view: RuntimeContextReference["view"]) =>
+  view.replace(/([A-Z])/g, " $1").toLowerCase();
+
 const createRuntimeReference = (
   snapshot: RuntimeContextSnapshot,
   overrides: Partial<RuntimeContextReference> = {},
@@ -100,31 +103,31 @@ const createTrail = ({
 
   return [
     createItem({
-      label: "Data",
+      label: hasDataset ? "Data context" : "Start here",
       semanticKey: "data",
       view: hasDataset ? "dataset" : "welcome",
       itemMode: "human",
       status: activeView === "dataset" || activeView === "welcome" ? "current" : "available",
-      summary: hasDataset ? "Dataset context is available." : "Open data to begin.",
+      summary: hasDataset ? "Review dataset and workbook context." : "Open a dataset to begin.",
     }),
     createItem({
-      label: "Build",
+      label: "Build query",
       semanticKey: "build",
       view: "queryBuilder",
       itemMode: "human",
       status: activeView === "queryBuilder" ? "current" : hasDataset ? "available" : "metadata",
-      summary: "Query Builder state remains schema-driven.",
+      summary: "Shape a guided query from the current schema.",
     }),
     createItem({
-      label: "Results",
+      label: "Review results",
       semanticKey: "results",
       view: "results",
       itemMode: "human",
       status: activeView === "results" ? "current" : hasDataset ? "available" : "metadata",
-      summary: "Results use the active result model.",
+      summary: "Inspect the active result without changing it.",
     }),
     createItem({
-      label: "Analyst",
+      label: "Analyst SQL",
       semanticKey: "analyst",
       view: "sqlWorkspace",
       itemMode: "analyst",
@@ -181,7 +184,7 @@ const createContinuations = ({
         createRuntimeReference(snapshot, { view: "results", mode: "human" }),
         createRuntimeReference(snapshot, { view: "sqlWorkspace", mode: "analyst" }),
       ],
-      returnLabel: `Return to ${activeView.replace(/([A-Z])/g, " $1").toLowerCase()}`,
+      returnLabel: `Return to ${formatViewLabel(activeView)}`,
       targetView,
       targetMode,
       source,
@@ -192,8 +195,8 @@ const createContinuations = ({
   return [
     createContinuation({
       id: "continue:human:dataset",
-      label: hasDataset ? "Review data" : "Open data",
-      description: hasDataset ? "Inspect dataset and workbook metadata." : "Choose a CSV or workbook.",
+      label: hasDataset ? "Return to data context" : "Open data",
+      description: hasDataset ? "Go back to the dataset and workbook summary." : "Choose a CSV or workbook.",
       targetView: hasDataset ? "dataset" : "welcome",
       targetMode: "human",
       source: "dataset",
@@ -201,8 +204,8 @@ const createContinuations = ({
     }),
     createContinuation({
       id: "continue:human:results",
-      label: "Inspect results",
-      description: "Continue through the current active result model.",
+      label: "Review current result",
+      description: "Open the existing result view without rerunning anything.",
       targetView: "results",
       targetMode: "human",
       source: "results",
@@ -211,10 +214,10 @@ const createContinuations = ({
     }),
     createContinuation({
       id: "continue:human:queryBuilder",
-      label: humanIntentLabel ? `Continue ${humanIntentLabel}` : "Build query",
+      label: humanIntentLabel ? `Continue ${humanIntentLabel}` : "Open Query Builder",
       description: humanIntentLabel
-        ? "Use the existing Human Mode guided query setup."
-        : "Open the existing Query Builder.",
+        ? "Resume the guided Human Mode setup."
+        : "Continue with the current schema-driven builder.",
       targetView: "queryBuilder",
       targetMode: "human",
       source: humanIntentLabel ? "human-intent" : "query-builder",
@@ -223,8 +226,8 @@ const createContinuations = ({
     }),
     createContinuation({
       id: "continue:analyst:sqlWorkspace",
-      label: mode === "analyst" || activeView === "sqlWorkspace" ? "Inspect SQL" : "Open Analyst Mode",
-      description: "Review SQL drafts and validation without running real SQL.",
+      label: mode === "analyst" || activeView === "sqlWorkspace" ? "Stay in Analyst SQL" : "Open Analyst SQL",
+      description: "Review drafts and validation metadata only.",
       targetView: "sqlWorkspace",
       targetMode: "analyst",
       source: "analyst",
@@ -238,28 +241,36 @@ const createContextualObjects = (snapshot: RuntimeContextSnapshot): ContextualIn
     id: "context:dataset",
     label: snapshot.dataset.name,
     objectType: "dataset",
-    summary: `${snapshot.dataset.rowCount.toLocaleString()} rows and ${snapshot.dataset.columnCount.toLocaleString()} columns.`,
+    summary: snapshot.dataset.datasetId
+      ? `${snapshot.dataset.rowCount.toLocaleString()} rows and ${snapshot.dataset.columnCount.toLocaleString()} columns.`
+      : "No dataset is open yet.",
     reference: createRuntimeReference(snapshot, { view: "dataset", mode: "human" }),
   },
   {
     id: "context:result",
     label: snapshot.activeResult.tab || "No active result",
     objectType: "result",
-    summary: `${snapshot.activeResult.sourceType} result, page ${snapshot.activeResult.page} of ${snapshot.activeResult.totalPages}.`,
+    summary:
+      snapshot.activeResult.sourceType === "none"
+        ? "No active result has been selected."
+        : `${snapshot.activeResult.sourceType} result, page ${snapshot.activeResult.page} of ${snapshot.activeResult.totalPages}.`,
     reference: createRuntimeReference(snapshot, { view: "results", mode: "human" }),
   },
   {
     id: "context:query-builder",
     label: "Query Builder",
     objectType: "query-builder",
-    summary: `${snapshot.queryBuilder.selectedColumns.length} selected columns, ${snapshot.queryBuilder.groupBy.length} groups.`,
+    summary:
+      snapshot.queryBuilder.selectedColumns.length === 0 && snapshot.queryBuilder.groupBy.length === 0
+        ? "No builder selections yet."
+        : `${snapshot.queryBuilder.selectedColumns.length} selected columns, ${snapshot.queryBuilder.groupBy.length} groups.`,
     reference: createRuntimeReference(snapshot, { view: "queryBuilder", mode: "human" }),
   },
   {
     id: "context:sql-workspace",
     label: "SQL Workspace",
     objectType: "sql-workspace",
-    summary: `${snapshot.sql.selectedDialect} dialect, ${snapshot.sql.hasDrafts ? "drafts available" : "no saved drafts"}.`,
+    summary: `${snapshot.sql.selectedDialect} dialect, ${snapshot.sql.hasDrafts ? "drafts available" : "no saved drafts"}. Metadata only.`,
     reference: createRuntimeReference(snapshot, { view: "sqlWorkspace", mode: "analyst" }),
   },
 ];
@@ -268,10 +279,10 @@ const createPanelSlots = (snapshot: RuntimeContextSnapshot): RuntimePanelSlot[] 
   {
     id: "slot:runtime-context",
     label: "Runtime",
-    title: "Workspace context",
+    title: "Current workspace",
     summary: snapshot.dataset.datasetId
-      ? `${snapshot.dataset.name} is active in ${snapshot.mode} mode.`
-      : "No dataset is active.",
+      ? `${snapshot.dataset.name} is open in ${snapshot.mode === "human" ? "Human" : "Analyst"} Mode.`
+      : "Open a dataset to connect this investigation trail.",
     status: snapshot.activeView,
     metadataOnly: true,
     items: [
@@ -283,7 +294,7 @@ const createPanelSlots = (snapshot: RuntimeContextSnapshot): RuntimePanelSlot[] 
   {
     id: "slot:result-context",
     label: "Results",
-    title: "Active result",
+    title: "Result position",
     summary: `${snapshot.activeResult.rowCount.toLocaleString()} rows through ${snapshot.activeResult.sourceType}.`,
     status: snapshot.activeResult.tab || "none",
     metadataOnly: true,
@@ -296,8 +307,8 @@ const createPanelSlots = (snapshot: RuntimeContextSnapshot): RuntimePanelSlot[] 
   {
     id: "slot:intelligence-boundary",
     label: "Boundary",
-    title: "Intelligence boundary",
-    summary: "Planning, graph, KPI, semantic, and contract layers remain metadata only.",
+    title: "Safety boundary",
+    summary: "Context, planning, KPI, semantic, and contract layers are read-only metadata here.",
     status: "read-only",
     metadataOnly: true,
     items: [
