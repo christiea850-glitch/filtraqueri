@@ -265,6 +265,10 @@ function WorkspaceShell({
       ? "Choose question"
       : activeView === "queryBuilder"
         ? "Build query"
+        : activeView === "results"
+          ? "Review result"
+          : activeView === "sqlWorkspace"
+            ? "Inspect SQL"
         : activeSubItem?.label || activeHub.label;
   const workflowDescription =
     isLoadedHome
@@ -273,6 +277,10 @@ function WorkspaceShell({
         ? "Start with a business question, then narrow the rows that matter."
         : activeView === "queryBuilder"
           ? "Construct the query context and approve it before anything runs."
+          : activeView === "results"
+            ? "Review what the result means, then choose the next investigation move."
+            : activeView === "sqlWorkspace"
+              ? "Inspect SQL, runtime context, readiness, and warnings before execution."
       : workspaceMode === "analyst"
       ? "SQL and runtime context stay inspectable without automatic execution."
       : "Business flow, results, and next steps stay connected.";

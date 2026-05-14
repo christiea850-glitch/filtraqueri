@@ -28,7 +28,7 @@
 
 .results-review-strip {
   display: grid;
-  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
   gap: 12px;
   align-items: stretch;
   min-width: 0;
@@ -105,7 +105,7 @@
   text-transform: capitalize;
 }
 
-.results-review-takeaway {
+.results-business-takeaway {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -115,12 +115,12 @@
   background: rgba(239, 246, 255, 0.78);
 }
 
-.results-review-strip.is-analyst-results .results-review-takeaway {
+.results-review-strip.is-analyst-results .results-business-takeaway {
   border-left-color: #7c3aed;
   background: rgba(245, 243, 255, 0.82);
 }
 
-.results-review-takeaway span,
+.results-business-takeaway span,
 .results-review-facts small {
   color: #2563eb;
   font-size: 11px;
@@ -128,21 +128,61 @@
   text-transform: uppercase;
 }
 
-.results-review-strip.is-analyst-results .results-review-takeaway span,
+.results-review-strip.is-analyst-results .results-business-takeaway span,
 .results-review-strip.is-analyst-results .results-review-facts small {
   color: #6d28d9;
 }
 
-.results-review-takeaway strong {
+.results-business-takeaway strong {
   color: #172033;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 850;
   line-height: 1.38;
 }
 
+.results-business-takeaway small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.results-insight-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.results-insight-row > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.results-insight-row small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.results-insight-row strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .results-review-facts {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   min-width: 0;
 }

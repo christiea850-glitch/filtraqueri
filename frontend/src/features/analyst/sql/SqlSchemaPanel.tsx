@@ -34,13 +34,8 @@ function SqlSchemaPanel({
 
       <div className="sql-context-body">
         <div>
-          <p className="section-label">Dataset</p>
-          <h2>{dataset ? dataset.original_filename : "No dataset open"}</h2>
-        </div>
-        <div className="session-stat-list">
-          <span>{dataset ? dataset.table_name : "No dataset open."}</span>
-          <strong>{dataset ? `${dataset.row_count.toLocaleString()} rows` : "No dataset open."}</strong>
-          <strong>{dataset ? `${dataset.column_count.toLocaleString()} columns` : "No dataset open."}</strong>
+          <p className="section-label">Runtime adapter</p>
+          <h2>SQL context</h2>
         </div>
 
         <WorkbookContextPanel dataset={dataset} variant="analyst" />

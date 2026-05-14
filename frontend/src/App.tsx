@@ -946,11 +946,11 @@ function App() {
     const takeaway =
       activeResultModel.sourceType === "query"
         ? activeResultModel.grouping.hasGrouping
-          ? "Grouped output is ready to review. Compare groups, then refine the question if the answer needs another angle."
-          : "Query output is ready to review. Check the selected fields, then decide whether to refine or export."
+          ? `Grouped result is ready. Compare ${activeResultModel.grouping.columns.join(", ")} before refining or exporting.`
+          : "Query output is ready. Review the selected fields before refining or exporting."
         : activeResultModel.sourceType === "filtered"
-          ? "Filtered rows are ready for review. Look for what changed, then continue refining or export the active result."
-          : "Preview rows are ready. Use this pass to understand structure before filtering, grouping, or exporting.";
+          ? "Filtered rows are ready. Review what changed before refining or exporting."
+          : "Preview rows are ready. Use this pass to understand structure before filtering or grouping.";
     const continuationSuggestion = isAnalystMode
       ? activeResultModel.sourceType === "query"
         ? "Check query context"
@@ -965,6 +965,24 @@ function App() {
       : "No sort";
     const activeFilterCount = activeResultModel.filters.activeLabels.length;
     const hiddenColumnCount = activeResultModel.columns.length - activeResultModel.visibleColumns.length;
+    const topContributorLabel = activeResultModel.grouping.hasGrouping
+      ? `Compare by ${activeResultModel.grouping.columns[0]}`
+      : activeResultModel.chartReady.groupingCandidates[0]
+        ? `Segment by ${activeResultModel.chartReady.groupingCandidates[0].name}`
+        : "Choose a category to compare";
+    const highlightLabel =
+      activeResultModel.insightReady.missingValueCount > 0
+        ? `${activeResultModel.insightReady.missingValueColumns.length.toLocaleString()} columns contain empty values`
+        : activeResultModel.chartReady.isLargeResult
+          ? "Large result; review filters before exporting"
+          : activeResultModel.sorting.column
+            ? `Sorted by ${activeResultModel.sorting.column}`
+            : "No obvious quality flags in current metadata";
+    const chartSupportLabel =
+      activeResultModel.chartReady.categoricalColumns.length > 0 &&
+      activeResultModel.chartReady.numericColumns.length > 0
+        ? "Chart support available"
+        : "Table review recommended";
 
     return (
       <section
@@ -976,9 +994,29 @@ function App() {
           .join(" ")}
         aria-label="Results review context"
       >
-        <div className="results-review-takeaway">
-          <span>{isAnalystMode ? "Result note" : "Takeaway"}</span>
+        <div className="results-business-takeaway">
+          <span>{isAnalystMode ? "Result inspection" : "Business takeaway"}</span>
           <strong>{takeaway}</strong>
+          <small>{chartSupportLabel}</small>
+        </div>
+
+        <div className="results-insight-row" aria-label="Lightweight result insights">
+          <span>
+            <small>Top contributor</small>
+            <strong>{topContributorLabel}</strong>
+          </span>
+          <span>
+            <small>Highlight</small>
+            <strong>{highlightLabel}</strong>
+          </span>
+          <span>
+            <small>Supporting view</small>
+            <strong>{chartSupportLabel}</strong>
+          </span>
+          <span>
+            <small>{isAnalystMode ? "Payload" : "Continuation"}</small>
+            <strong>{continuationSuggestion}</strong>
+          </span>
         </div>
 
         <div className="results-review-facts" aria-label="Supporting result context">
@@ -987,11 +1025,8 @@ function App() {
             <strong>{sourceLabel}</strong>
           </span>
           <span>
-            <small>Result size</small>
-            <strong>
-              {activeResultModel.totalCount.toLocaleString()} rows /{" "}
-              {activeResultModel.visibleColumns.length.toLocaleString()} visible columns
-            </strong>
+            <small>Result rows</small>
+            <strong>{activeResultModel.totalCount.toLocaleString()}</strong>
           </span>
           <span>
             <small>Filters / sort</small>
@@ -1002,10 +1037,6 @@ function App() {
           <span>
             <small>{isAnalystMode ? "Payload" : "Export"}</small>
             <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows yet"}</strong>
-          </span>
-          <span>
-            <small>{isAnalystMode ? "Action" : "Next"}</small>
-            <strong>{continuationSuggestion}</strong>
           </span>
         </div>
 

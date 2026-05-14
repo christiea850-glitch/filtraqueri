@@ -34,6 +34,9 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     insertSql,
     loadDraft,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
+  const readinessLabel = dataset ? "Dataset context ready" : "Open data to inspect queries";
+  const warningCount = sqlAnalysis.validation.diagnostics.length;
+  const planStepCount = sqlAnalysis.explanationCards.length + sqlAnalysis.diagnostics.length;
 
   return (
     <section
@@ -46,6 +49,36 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
         .join(" ")}
       aria-label="SQL workspace"
     >
+      <section className="sql-inspection-overview" aria-label="SQL inspection overview">
+        <div>
+          <p className="section-label">Analyst inspection</p>
+          <h2>Verify SQL before execution</h2>
+          <span>Inspection and verification only. Monaco and execution behavior are unchanged.</span>
+        </div>
+        <div className="sql-inspection-metrics">
+          <span>
+            Query generated
+            <strong>{characterCount > 0 ? "Draft present" : "No draft"}</strong>
+          </span>
+          <span>
+            Execution plan
+            <strong>{planStepCount.toLocaleString()} notes</strong>
+          </span>
+          <span>
+            Runtime adapter
+            <strong>{selectedDialectProfile.displayName}</strong>
+          </span>
+          <span>
+            Readiness
+            <strong>{readinessLabel}</strong>
+          </span>
+          <span>
+            Warnings
+            <strong>{warningCount.toLocaleString()}</strong>
+          </span>
+        </div>
+      </section>
+
       <SqlSchemaPanel
         dataset={dataset}
         columnSuggestions={suggestions}

@@ -58,6 +58,7 @@
   .workspace-context-strip,
   .results-review-strip,
   .results-review-facts,
+  .results-insight-row,
   .results-investigation-header,
   .results-context-cards,
   .results-technical-disclosure > div {
@@ -77,6 +78,8 @@
   }
 
   .sql-workspace,
+  .sql-inspection-overview,
+  .sql-inspection-metrics,
   .sql-main-panel {
     grid-template-columns: 1fr;
     min-height: 0;
@@ -339,6 +342,7 @@
 
   .results-review-strip,
   .results-review-facts,
+  .results-insight-row,
   .results-investigation-header,
   .results-context-cards,
   .results-technical-disclosure > div {
@@ -346,6 +350,11 @@
   }
 
   .sql-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-inspection-overview,
+  .sql-inspection-metrics {
     grid-template-columns: 1fr;
   }
 
