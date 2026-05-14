@@ -1095,6 +1095,7 @@ function App() {
             schema={dataset.schema}
             filterValues={filterValues}
             applying={isFiltering}
+            workspaceMode={workspaceMode}
             errorMessage={errorMessage}
             onFilterChange={updateFilter}
             onApplyFilters={applyFilters}

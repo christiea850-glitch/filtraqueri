@@ -37,18 +37,16 @@ const builderSteps: Array<{
   label: string;
   helper: string;
 }> = [
-  { id: "data", label: "Select data", helper: "Choose fields" },
-  { id: "question", label: "Define question", helper: "Shape focus" },
-  { id: "filters", label: "Apply filters", helper: "Narrow scope" },
-  { id: "group", label: "Group & compare", helper: "Summarize" },
-  { id: "review", label: "Review output", helper: "Sort and limit" },
-  { id: "execute", label: "Execute review", helper: "Run safely" },
+  { id: "data", label: "Fields", helper: "Select output" },
+  { id: "question", label: "Measure", helper: "Choose intent" },
+  { id: "filters", label: "Filter", helper: "Review scope" },
+  { id: "group", label: "Group by", helper: "Compare" },
+  { id: "review", label: "Sort / limit", helper: "Shape output" },
+  { id: "execute", label: "Review & run", helper: "Approve" },
 ];
 
 function VisualQueryBuilderPanel({
   schema,
-  datasetName,
-  worksheetName,
   activeFilterCount,
   workspaceMode,
   selectedColumns,
@@ -140,6 +138,22 @@ function VisualQueryBuilderPanel({
       detail: rowLimit ? `${rowLimit} row limit` : "Review first",
     },
   ];
+  const approvalSummary = [
+    { label: "Data source", value: "Current workspace" },
+    {
+      label: "Fields selected",
+      value: selectedColumns.length > 0 ? selectedColumns.length.toLocaleString() : "Grouped result",
+    },
+    { label: "Filters active", value: activeFilterCount.toLocaleString() },
+    {
+      label: "Grouping active",
+      value:
+        groupBy.length > 0 || activeAggregations.length > 0
+          ? `${groupBy.length.toLocaleString()} groups / ${activeAggregations.length.toLocaleString()} measures`
+          : "None",
+    },
+    { label: "Row limit", value: rowLimit || "No limit" },
+  ];
 
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
@@ -160,13 +174,28 @@ function VisualQueryBuilderPanel({
 
       <div className="query-builder-header">
         <div>
-          <p className="section-label">Active workflow</p>
+          <p className="section-label">Build</p>
           <h2>{builderSteps.find((step) => step.id === activeStep)?.label || "Build query"}</h2>
+        </div>
+      </div>
+
+      <section className="query-approval-strip" aria-label="Review before running query">
+        <div>
+          <span>Review before run</span>
+          <strong>Nothing runs until you approve.</strong>
+        </div>
+        <div className="query-approval-facts">
+          {approvalSummary.map((item) => (
+            <span key={item.label}>
+              {item.label}
+              <strong>{item.value}</strong>
+            </span>
+          ))}
         </div>
         <button type="button" className="primary-button" onClick={onRunQuery}>
           {running ? "Running..." : "Run query"}
         </button>
-      </div>
+      </section>
 
       <div className="query-workflow-tabs" aria-label="Query builder workflow">
         {builderSteps.map((step, index) => (
@@ -350,7 +379,7 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel">
           <div className="query-stage-heading">
             <div>
-              <h3>{isAnalystMode ? "Inspect grouping logic" : "Group & compare"}</h3>
+              <h3>{isAnalystMode ? "Inspect grouping logic" : "Group by"}</h3>
               <p>
                 {isAnalystMode
                   ? "Configure summary logic for the result context."
@@ -449,7 +478,7 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel compact-query-stage">
           <div className="query-stage-heading">
             <div>
-              <h3>{isAnalystMode ? "Prepare result projection" : "Preview before running"}</h3>
+              <h3>{isAnalystMode ? "Prepare result projection" : "Sort / limit"}</h3>
               <p>Review output order and size before using the existing run action.</p>
             </div>
           </div>
@@ -556,12 +585,12 @@ function VisualQueryBuilderPanel({
             </summary>
             <div>
               <span>
-                Dataset
-                <strong>{datasetName}</strong>
+                Data source
+                <strong>Current workspace</strong>
               </span>
               <span>
-                Worksheet
-                <strong>{worksheetName}</strong>
+                Selected fields
+                <strong>{selectedColumns.length.toLocaleString()}</strong>
               </span>
               <span>
                 Filters

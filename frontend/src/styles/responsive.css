@@ -111,6 +111,8 @@
   }
 
   .query-builder-workflow-strip,
+  .query-approval-strip,
+  .query-approval-facts,
   .query-builder-hero,
   .query-builder-context-grid,
   .query-progress-rail,
@@ -289,8 +291,11 @@
   }
 
   .builder-grid,
+  .explore-question-surface,
   .query-workflow-tabs,
   .query-builder-workflow-strip,
+  .query-approval-strip,
+  .query-approval-facts,
   .query-builder-hero,
   .query-builder-context-grid,
   .query-progress-rail,

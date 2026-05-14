@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
-import type { SchemaColumn } from "../../features/dataset/datasetTypes";
+import type { SchemaColumn, WorkspaceMode } from "../../features/dataset/datasetTypes";
 import type { FilterState } from "../../features/filters/filterTypes";
 
 type DynamicFiltersPanelProps = {
   schema: SchemaColumn[];
   filterValues: Record<string, FilterState>;
   applying: boolean;
+  workspaceMode: WorkspaceMode;
   errorMessage?: string;
   onFilterChange: (columnName: string, value: FilterState) => void;
   onApplyFilters: () => void;
@@ -16,13 +17,16 @@ function DynamicFiltersPanel({
   schema,
   filterValues,
   applying,
+  workspaceMode,
   errorMessage,
   onFilterChange,
   onApplyFilters,
   onResetFilters,
 }: DynamicFiltersPanelProps) {
   const [columnSearch, setColumnSearch] = useState("");
+  const [customQuestion, setCustomQuestion] = useState("");
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
+  const isAnalystMode = workspaceMode === "analyst";
 
   const formatDateValue = (value: unknown) => {
     if (!value) return "";
@@ -55,13 +59,57 @@ function DynamicFiltersPanel({
         : schema,
     [normalizedSearch, schema],
   );
+  const suggestedQuestions = isAnalystMode
+    ? [
+        "Which columns define the safest filter scope?",
+        "Which fields should be inspected before query construction?",
+        "Which subset should be reviewed before building output?",
+      ]
+    : [
+        "What would you like to understand?",
+        "Which customers, products, or regions should we focus on?",
+        "What changed after narrowing this view?",
+      ];
 
   return (
     <section className="filters-panel" aria-label="Dynamic filters">
+      <section className="explore-question-surface" aria-label="Guided exploration questions">
+        <div>
+          <p className="section-label">{isAnalystMode ? "Inspectable scope" : "Explore"}</p>
+          <h2>{isAnalystMode ? "Choose a query scope" : "What would you like to understand?"}</h2>
+          <p>
+            {isAnalystMode
+              ? "Use filters to prepare inspectable query context. Nothing runs from here."
+              : "Start with a business question, then narrow the rows that matter."}
+          </p>
+        </div>
+        <div className="explore-question-list" aria-label="Suggested questions">
+          <span>Suggested questions</span>
+          {suggestedQuestions.map((question) => (
+            <button
+              type="button"
+              key={question}
+              onClick={() => setCustomQuestion(question)}
+            >
+              {question}
+            </button>
+          ))}
+        </div>
+        <label className="explore-custom-question">
+          <span>Optional custom question</span>
+          <input
+            type="text"
+            value={customQuestion}
+            onChange={(event) => setCustomQuestion(event.target.value)}
+            placeholder="Type a question to guide your filter choices"
+          />
+        </label>
+      </section>
+
       <div className="filters-header">
         <div>
-          <p className="section-label">Filters</p>
-          <h2>Refine rows</h2>
+          <p className="section-label">Filter scope</p>
+          <h2>{isAnalystMode ? "Inspect filter context" : "Narrow the question"}</h2>
         </div>
         <div className="filter-actions">
           <button
