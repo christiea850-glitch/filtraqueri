@@ -7,6 +7,7 @@ import { useDataIntelligence } from "../../features/dataIntelligence";
 import { useExecutionContracts } from "../../features/executionContracts";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
+import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
 import {
   getDatasetActiveWorksheet,
   listWorkbookWorksheets,
@@ -41,6 +42,8 @@ type DatasetSummaryPanelProps = {
   onDeleteDataset: (datasetId: string) => void;
   onWorksheetSelect: (worksheetId: string) => void;
   isSwitchingWorksheet: boolean;
+  selectedTaskId?: string | null;
+  onSelectedTaskIdChange?: (taskId: string | null) => void;
 };
 
 export const humanGuidanceCards: HumanGuidanceCard[] = [
@@ -176,6 +179,8 @@ function DatasetSummaryPanel({
   onDeleteDataset,
   onWorksheetSelect,
   isSwitchingWorksheet,
+  selectedTaskId,
+  onSelectedTaskIdChange,
 }: DatasetSummaryPanelProps) {
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
@@ -342,6 +347,14 @@ function DatasetSummaryPanel({
       </section>
 
       {dataset && dataProfile && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-data-intelligence"
+          label="Runtime slot"
+          title="Data intelligence"
+          summary={humanSummary}
+          badge={dialectRecommendation?.recommendedFutureEngine?.label || "Metadata only"}
+          defaultOpen
+        >
         <section className="data-intelligence-panel" aria-label="Data intelligence profile">
           <div className="summary-header">
             <div>
@@ -380,9 +393,17 @@ function DatasetSummaryPanel({
             </span>
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && recommendations.length > 0 && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-workflow-recommendations"
+          label="Runtime slot"
+          title="Workflow recommendations"
+          summary={workflowSummary}
+          badge={`${recommendations.length}`}
+        >
         <section className="workflow-recommendation-panel" aria-label="Workflow recommendations">
           <div className="summary-header">
             <div>
@@ -405,9 +426,17 @@ function DatasetSummaryPanel({
             ))}
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && businessSemanticReport && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-business-semantics"
+          label="Runtime slot"
+          title="Business semantics"
+          summary={semanticSummary}
+          badge={`${detectedSemanticEntities.length}`}
+        >
         <section className="business-semantics-panel" aria-label="Business semantic intelligence">
           <div className="summary-header">
             <div>
@@ -435,9 +464,17 @@ function DatasetSummaryPanel({
             </div>
           )}
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && kpiOpportunities.length > 0 && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-kpi-intelligence"
+          label="Runtime slot"
+          title="KPI intelligence"
+          summary={kpiSummary}
+          badge={`${kpiOpportunities.length}`}
+        >
         <section className="kpi-intelligence-panel" aria-label="KPI intelligence opportunities">
           <div className="summary-header">
             <div>
@@ -460,9 +497,17 @@ function DatasetSummaryPanel({
             ))}
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && interpretedQuestions.length > 0 && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-business-questions"
+          label="Runtime slot"
+          title="Business questions"
+          summary={questionSummary}
+          badge={`${interpretedQuestions.length}`}
+        >
         <section className="business-question-panel" aria-label="Business question intelligence">
           <div className="summary-header">
             <div>
@@ -485,9 +530,17 @@ function DatasetSummaryPanel({
             ))}
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && analyticsIntentGraph && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-intent-graph"
+          label="Runtime slot"
+          title="Intent graph"
+          summary={graphSummary}
+          badge={analyticsIntentGraph.confidence}
+        >
         <section className="analytics-intent-graph-panel" aria-label="Analytics intent graph">
           <div className="summary-header">
             <div>
@@ -520,9 +573,17 @@ function DatasetSummaryPanel({
             </span>
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && analyticsPlan && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-analytics-plan"
+          label="Runtime slot"
+          title="Analytics plan"
+          summary={planningSummary}
+          badge={analyticsPlan.status.replace(/_/g, " ")}
+        >
         <section className="analytics-planning-panel" aria-label="Analytics planning engine">
           <div className="summary-header">
             <div>
@@ -551,9 +612,17 @@ function DatasetSummaryPanel({
             </span>
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       {dataset && executionContract && (
+        <RuntimeDisclosureSlot
+          id="runtime-slot-execution-contract"
+          label="Runtime slot"
+          title="Execution contract"
+          summary={executionContractSummary}
+          badge={executionContract.lifecycleState.replace(/_/g, " ")}
+        >
         <section className="execution-contract-panel" aria-label="Execution contract layer">
           <div className="summary-header">
             <div>
@@ -582,6 +651,7 @@ function DatasetSummaryPanel({
             </span>
           </div>
         </section>
+        </RuntimeDisclosureSlot>
       )}
 
       <section className="dataset-hub-panel" aria-label="Recent files">
@@ -651,7 +721,11 @@ function DatasetSummaryPanel({
       </section>
 
       {dataset && (
-        <TaskLauncherPanel dataset={dataset} />
+        <TaskLauncherPanel
+          dataset={dataset}
+          selectedTaskId={selectedTaskId}
+          onSelectedTaskIdChange={onSelectedTaskIdChange}
+        />
       )}
 
       {dataset && (

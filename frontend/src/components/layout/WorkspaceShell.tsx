@@ -5,6 +5,7 @@ import type {
   DatasetSession,
   WorkspaceMode,
 } from "../../features/dataset/datasetTypes";
+import type { WorkspaceRuntimeContext } from "../../features/workspaceRuntime";
 
 type AnalystNavItem = {
   view: ActiveView;
@@ -46,11 +47,19 @@ type WorkspaceShellProps = {
   recentDatasets: DatasetSession[];
   analystViews: AnalystNavItem[];
   errorMessage: string;
+  runtimeContext: WorkspaceRuntimeContext;
+  isRuntimePanelCollapsed: boolean;
   children: ReactNode;
   onOpenFile: () => void;
   onViewChange: (view: ActiveView) => void;
   onModeChange: (mode: WorkspaceMode) => void;
   onRecentDatasetClick: (datasetId: string) => void;
+  onRuntimePanelToggle: () => void;
+  onRuntimeTrailSelect: (
+    trailItemId: string,
+    targetView: ActiveView,
+    targetMode: WorkspaceMode,
+  ) => void;
 };
 
 const menuItems = ["Help"];
@@ -192,11 +201,15 @@ function WorkspaceShell({
   recentDatasets,
   analystViews,
   errorMessage,
+  runtimeContext,
+  isRuntimePanelCollapsed,
   children,
   onOpenFile,
   onViewChange,
   onModeChange,
   onRecentDatasetClick,
+  onRuntimePanelToggle,
+  onRuntimeTrailSelect,
 }: WorkspaceShellProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -425,6 +438,92 @@ function WorkspaceShell({
           )}
           {children}
         </main>
+
+        <aside
+          className={`runtime-context-panel ${isRuntimePanelCollapsed ? "is-collapsed" : ""}`}
+          aria-label="Workspace runtime context"
+        >
+          <button
+            type="button"
+            className="runtime-panel-toggle"
+            onClick={onRuntimePanelToggle}
+            aria-expanded={!isRuntimePanelCollapsed}
+          >
+            {isRuntimePanelCollapsed ? "Context" : "Hide context"}
+          </button>
+          {!isRuntimePanelCollapsed && (
+            <div className="runtime-context-body">
+              <div className="runtime-context-header">
+                <p className="section-label">Investigation</p>
+                <h2>Runtime context</h2>
+                <span>Read-only</span>
+              </div>
+
+              <div className="runtime-trail-list" aria-label="Workspace trail">
+                {runtimeContext.trail.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={[
+                      item.status === "current" ? "is-current" : "",
+                      runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
+                  >
+                    <strong>{item.label}</strong>
+                    <span>{item.summary}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="runtime-continuation-list" aria-label="Continuations">
+                <span>Continue</span>
+                {runtimeContext.continuations.map((continuation) => (
+                  <button
+                    type="button"
+                    key={continuation.id}
+                    disabled={continuation.disabled}
+                    onClick={() =>
+                      onRuntimeTrailSelect(
+                        continuation.id,
+                        continuation.targetView,
+                        continuation.targetMode,
+                      )
+                    }
+                  >
+                    <strong>{continuation.label}</strong>
+                    <small>{continuation.description}</small>
+                  </button>
+                ))}
+              </div>
+
+              <div className="runtime-slot-list" aria-label="Runtime panel slots">
+                {runtimeContext.panelSlots.map((slot) => (
+                  <section key={slot.id} className="runtime-panel-slot">
+                    <div>
+                      <span>{slot.label}</span>
+                      {slot.status && <small>{slot.status}</small>}
+                    </div>
+                    <strong>{slot.title}</strong>
+                    <p>{slot.summary}</p>
+                    {slot.items && (
+                      <div className="runtime-slot-items">
+                        {slot.items.map((item) => (
+                          <span key={`${slot.id}-${item.label}`}>
+                            {item.label}
+                            <strong>{item.value}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   );

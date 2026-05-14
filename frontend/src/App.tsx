@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import DatasetSummaryPanel, {
   DatasetSessionPanel,
   type HumanIntent,
@@ -27,9 +27,15 @@ import useQueryHistory from "./features/history/useQueryHistory";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import {
+  createQueryBuilderSnapshot,
   coordinateExecutionResult,
 } from "./features/workspace/workspaceOrchestration";
 import useWorkspaceOrchestrationSnapshot from "./features/workspace/useWorkspaceOrchestrationSnapshot";
+import {
+  buildWorkspaceRuntimeContext,
+  loadRuntimePersistenceState,
+  saveRuntimePersistenceState,
+} from "./features/workspaceRuntime";
 import type { WorkspaceExecutionResult } from "./features/execution/workspaceExecutionTypes";
 import useActiveResultModel, {
   getCurrentPageMetadata,
@@ -118,6 +124,7 @@ function App() {
     tab: ResultTabKey;
   } | null>(null);
   const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(false);
+  const [runtimePersistence, setRuntimePersistence] = useState(loadRuntimePersistenceState);
   const {
     registry: executionRegistry,
     recordExecutionResult,
@@ -250,6 +257,29 @@ function App() {
     activeResultModel,
     addHistory,
   });
+  const queryBuilderRuntimeSnapshot = useMemo(
+    () =>
+      createQueryBuilderSnapshot({
+        selectedColumns: querySelectedColumns,
+        groupBy: queryGroupBy,
+        aggregations: queryAggregations,
+        sortColumn: querySortColumn,
+        sortDirection: querySortDirection,
+        limit: queryLimit,
+        hasRunQuery,
+        latestRequest: activeResult.source?.queryBuilder || null,
+      }),
+    [
+      activeResult.source?.queryBuilder,
+      hasRunQuery,
+      queryAggregations,
+      queryGroupBy,
+      queryLimit,
+      querySelectedColumns,
+      querySortColumn,
+      querySortDirection,
+    ],
+  );
   useWorkspaceOrchestrationSnapshot({
     dataset,
     recentDatasets,
@@ -276,6 +306,33 @@ function App() {
     hasRunQuery,
     latestQueryRequest: activeResult.source?.queryBuilder || null,
   });
+  const workspaceRuntimeContext = useMemo(
+    () =>
+      buildWorkspaceRuntimeContext({
+        dataset,
+        mode: workspaceMode,
+        activeView,
+        activeResultTab,
+        activeResultModel,
+        queryBuilder: queryBuilderRuntimeSnapshot,
+        sqlWorkspaceMetadata,
+        executionRegistry,
+        humanIntentLabel: humanIntent ? humanIntentGuidance[humanIntent].label : null,
+        selectedTrailItemId: runtimePersistence.selectedTrailItemId,
+      }),
+    [
+      activeResultModel,
+      activeResultTab,
+      activeView,
+      dataset,
+      executionRegistry,
+      humanIntent,
+      queryBuilderRuntimeSnapshot,
+      runtimePersistence.selectedTrailItemId,
+      sqlWorkspaceMetadata,
+      workspaceMode,
+    ],
+  );
 
   const schemaTypeSummary = dataset
     ? dataset.schema.reduce<Record<string, number>>((summary, column) => {
@@ -836,6 +893,10 @@ function App() {
     }
   }, [activeView, shouldOpenFilePicker]);
 
+  useEffect(() => {
+    saveRuntimePersistenceState(runtimePersistence);
+  }, [runtimePersistence]);
+
   const renderNoDatasetView = () => (
     <section className="empty-state">
       <p className="section-label">No dataset</p>
@@ -874,6 +935,13 @@ function App() {
             onDeleteDataset={confirmFutureDatasetDelete}
             onWorksheetSelect={handleWorksheetSelect}
             isSwitchingWorksheet={isSwitchingWorksheet}
+            selectedTaskId={runtimePersistence.selectedTaskId}
+            onSelectedTaskIdChange={(selectedTaskId) =>
+              setRuntimePersistence((currentState) => ({
+                ...currentState,
+                selectedTaskId,
+              }))
+            }
           />
         </>
       ),
@@ -1069,6 +1137,8 @@ function App() {
       recentDatasets={recentDatasets}
       analystViews={analystNavItems}
       errorMessage={errorMessage}
+      runtimeContext={workspaceRuntimeContext}
+      isRuntimePanelCollapsed={runtimePersistence.isRuntimePanelCollapsed}
       onOpenFile={() => {
         openDatasetPicker();
       }}
@@ -1078,6 +1148,20 @@ function App() {
         updateDatasetSessionView(mode === "human" ? (dataset ? "results" : "welcome") : "sqlWorkspace");
       }}
       onRecentDatasetClick={activateRecentDataset}
+      onRuntimePanelToggle={() =>
+        setRuntimePersistence((currentState) => ({
+          ...currentState,
+          isRuntimePanelCollapsed: !currentState.isRuntimePanelCollapsed,
+        }))
+      }
+      onRuntimeTrailSelect={(trailItemId, targetView, targetMode) => {
+        setRuntimePersistence((currentState) => ({
+          ...currentState,
+          selectedTrailItemId: trailItemId,
+        }));
+        if (targetMode !== workspaceMode) setWorkspaceMode(targetMode);
+        updateDatasetSessionView(targetView);
+      }}
     >
       {renderWorkspaceView()}
     </WorkspaceShell>

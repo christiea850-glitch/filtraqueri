@@ -176,13 +176,13 @@ body {
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width, 236px) 6px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 236px) 6px minmax(0, 1fr) 308px;
   min-height: 0;
   transition: grid-template-columns 180ms ease;
 }
 
 .app.is-sidebar-collapsed .workspace-shell {
-  grid-template-columns: 68px 0 minmax(0, 1fr);
+  grid-template-columns: 68px 0 minmax(0, 1fr) 308px;
 }
 
 .app.is-workspace-focused .workspace-canvas {
@@ -554,6 +554,200 @@ body.is-resizing-sidebar {
   padding: 24px;
   overflow: auto;
   transition: padding 180ms ease;
+}
+
+.runtime-context-panel {
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid #dbe5ef;
+  background: rgba(248, 251, 255, 0.86);
+  overflow: auto;
+}
+
+.runtime-context-panel.is-collapsed {
+  width: 48px;
+}
+
+.workspace-shell:has(.runtime-context-panel.is-collapsed) {
+  grid-template-columns: var(--sidebar-width, 236px) 6px minmax(0, 1fr) 48px;
+}
+
+.app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+  grid-template-columns: 68px 0 minmax(0, 1fr) 48px;
+}
+
+.runtime-panel-toggle {
+  width: calc(100% - 20px);
+  min-height: 32px;
+  margin: 12px 10px;
+  border: 1px solid #dbe5ef;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.runtime-context-panel.is-collapsed .runtime-panel-toggle {
+  width: 32px;
+  min-height: 100px;
+  margin: 12px 8px;
+  padding: 0;
+  writing-mode: vertical-rl;
+}
+
+.runtime-context-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 16px;
+}
+
+.runtime-context-header {
+  display: grid;
+  gap: 3px;
+}
+
+.runtime-context-header h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.runtime-context-header > span {
+  justify-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runtime-trail-list,
+.runtime-continuation-list,
+.runtime-slot-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.runtime-trail-list button,
+.runtime-continuation-list button {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.runtime-trail-list button:hover,
+.runtime-continuation-list button:hover:not(:disabled),
+.runtime-trail-list button.is-current,
+.runtime-trail-list button.is-selected {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.runtime-continuation-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.runtime-trail-list strong,
+.runtime-continuation-list strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-trail-list span,
+.runtime-continuation-list small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.runtime-continuation-list > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runtime-panel-slot {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbe5ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.runtime-panel-slot > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.runtime-panel-slot span,
+.runtime-panel-slot small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.runtime-panel-slot > strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.runtime-panel-slot p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.runtime-slot-items {
+  display: grid;
+  gap: 6px;
+}
+
+.runtime-slot-items span {
+  display: grid;
+  gap: 3px;
+  padding: 7px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.runtime-slot-items strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .workspace-card {

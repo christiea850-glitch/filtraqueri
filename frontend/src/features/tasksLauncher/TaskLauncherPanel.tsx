@@ -675,11 +675,18 @@ function TaskDetail({
 function TaskLauncherPanel({
   dataset = null,
   mode = "human",
+  selectedTaskId,
+  onSelectedTaskIdChange,
 }: {
   dataset?: DatasetMetadata | null;
   mode?: WorkspaceMode;
+  selectedTaskId?: string | null;
+  onSelectedTaskIdChange?: (taskId: string | null) => void;
 }) {
-  const { taskGroups, selectedTask, selectTask, clearSelectedTask } = useTaskLauncher();
+  const { taskGroups, selectedTask, selectTask, clearSelectedTask } = useTaskLauncher({
+    selectedTaskId,
+    onSelectedTaskIdChange,
+  });
 
   return (
     <section className="task-launcher-panel" aria-label="Human mode analytics task launcher">
