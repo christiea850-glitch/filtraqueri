@@ -234,8 +234,10 @@ function WorkspaceShell({
   const runtimeModeLabel = workspaceMode === "analyst" ? "Analyst Mode" : "Human Mode";
   const runtimeModeSummary =
     workspaceMode === "analyst"
-      ? "SQL drafts and analyst metadata stay isolated."
-      : "Guided data, builder, and result context stay connected.";
+      ? "Technical context is visible here, but execution stays under your control."
+      : "Your data, questions, and results stay connected as one investigation.";
+  const selectedContextTypeLabel =
+    runtimeContext.selectedContextualObject?.objectType.replace(/-/g, " ") ?? "";
 
   const changeHub = (hub: HubItem) => {
     if (hub.mode !== workspaceMode) onModeChange(hub.mode);
@@ -460,192 +462,202 @@ function WorkspaceShell({
             onClick={onRuntimePanelToggle}
             aria-expanded={!isRuntimePanelCollapsed}
           >
-            {isRuntimePanelCollapsed ? "Context" : "Hide context"}
+            {isRuntimePanelCollapsed ? "Investigation" : "Hide investigation"}
           </button>
           {!isRuntimePanelCollapsed && (
             <div className="runtime-context-body">
               <div className="runtime-context-header">
-                <p className="section-label">Investigation</p>
-                <h2>Context trail</h2>
+                <p className="section-label">Workspace guide</p>
+                <h2>Investigation</h2>
                 <p>{runtimeModeSummary}</p>
-                <span>{runtimeModeLabel} / read-only</span>
+                <span>{runtimeModeLabel} / assistive only</span>
               </div>
 
-              {runtimeContext.returnContinuation && (
-                <button
-                  type="button"
-                  className="runtime-return-button"
-                  onClick={() =>
-                    onRuntimeTrailSelect(
-                      runtimeContext.returnContinuation!.id,
-                      runtimeContext.returnContinuation!.originReference.view,
-                      runtimeContext.returnContinuation!.originReference.mode,
-                    )
-                  }
-                >
-                  <strong>{runtimeContext.returnContinuation.returnLabel}</strong>
-                  <span>
-                    Back to the investigation point that opened this context.
-                  </span>
-                </button>
-              )}
+              <section className="runtime-investigation-surface" aria-label="Current investigation summary">
+                {runtimeContext.selectedContextualObject ? (
+                  <section className="runtime-selected-object" aria-label="Selected investigation focus">
+                    <span>Current focus</span>
+                    <strong>{runtimeContext.selectedContextualObject.label}</strong>
+                    <p>{runtimeContext.selectedContextualObject.summary}</p>
+                    <small>{selectedContextTypeLabel}</small>
+                  </section>
+                ) : (
+                  <section className="runtime-selected-object is-empty" aria-label="Selected investigation focus">
+                    <span>Current focus</span>
+                    <strong>Nothing pinned yet</strong>
+                    <p>Pick a workspace path item or a go-to action to anchor this investigation.</p>
+                  </section>
+                )}
 
-              {runtimeContext.selectedContextualObject ? (
-                <section className="runtime-selected-object" aria-label="Selected investigation context">
-                  <span>Selected context</span>
-                  <strong>{runtimeContext.selectedContextualObject.label}</strong>
-                  <p>{runtimeContext.selectedContextualObject.summary}</p>
-                  <small>
-                    {runtimeContext.selectedContextualObject.objectType.replace(/-/g, " ")}
-                  </small>
-                </section>
-              ) : (
-                <section className="runtime-selected-object is-empty" aria-label="Selected investigation context">
-                  <span>Selected context</span>
-                  <strong>No context pinned</strong>
-                  <p>Choose a trail step or continuation to pin a workspace context here.</p>
-                </section>
-              )}
+                <details className="runtime-narrative-card">
+                  <summary>
+                    <span>
+                      <small>Story</small>
+                      <strong>{runtimeContext.narrative.summary.headline}</strong>
+                    </span>
+                    <em>{runtimeContext.narrative.confidence}</em>
+                  </summary>
+                  <div className="runtime-narrative-body">
+                    <p>{runtimeContext.narrative.summary.body}</p>
+                    <strong>{runtimeContext.narrative.summary.nextStep}</strong>
+                    {runtimeContext.narrative.events.length > 0 && (
+                      <ol>
+                        {runtimeContext.narrative.events.map((event) => (
+                          <li key={event.id}>
+                            <span>{event.label}</span>
+                            <small>{event.summary}</small>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
+                </details>
 
-              <details className="runtime-narrative-card">
-                <summary>
-                  <span>
-                    <small>Investigation story</small>
-                    <strong>{runtimeContext.narrative.summary.headline}</strong>
-                  </span>
-                  <em>{runtimeContext.narrative.confidence}</em>
-                </summary>
-                <div className="runtime-narrative-body">
-                  <p>{runtimeContext.narrative.summary.body}</p>
-                  <strong>{runtimeContext.narrative.summary.nextStep}</strong>
-                  {runtimeContext.narrative.events.length > 0 && (
-                    <ol>
-                      {runtimeContext.narrative.events.map((event) => (
-                        <li key={event.id}>
-                          <span>{event.label}</span>
-                          <small>{event.summary}</small>
-                        </li>
+                {runtimeContext.recommendationGroups.length > 0 && (
+                  <div className="runtime-next-steps" aria-label="Suggested next steps">
+                    <div className="runtime-section-heading">
+                      <span>Suggested next steps</span>
+                      <small>Metadata-based guidance; nothing runs automatically</small>
+                    </div>
+                    <div className="runtime-guidance-groups" aria-label="Ranked suggestions">
+                      {runtimeContext.recommendationGroups.map((group) => (
+                        <section key={group.id} className="runtime-guidance-group">
+                          <div>
+                            <strong>{group.title}</strong>
+                            <small>{group.summary}</small>
+                          </div>
+                          <div className="runtime-guidance-list">
+                            {group.items.map((guidance) => (
+                              <button
+                                type="button"
+                                key={guidance.id}
+                                className={`is-${guidance.priority}`}
+                                onClick={() =>
+                                  onRuntimeTrailSelect(
+                                    guidance.continuationLink.continuationId,
+                                    guidance.continuationLink.targetView,
+                                    guidance.continuationLink.targetMode,
+                                  )
+                                }
+                              >
+                                <strong>{guidance.title}</strong>
+                                <span>{guidance.summary}</span>
+                                <em>{guidance.score.explanation}</em>
+                                <small>{guidance.priority} priority</small>
+                              </button>
+                            ))}
+                          </div>
+                        </section>
                       ))}
-                    </ol>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <details className="runtime-disclosure-section" open>
+                <summary>
+                  <span>Workspace path</span>
+                  <small>Trail and go-to actions</small>
+                </summary>
+                <div className="runtime-disclosure-body">
+                  {runtimeContext.returnContinuation && (
+                    <button
+                      type="button"
+                      className="runtime-return-button"
+                      onClick={() =>
+                        onRuntimeTrailSelect(
+                          runtimeContext.returnContinuation!.id,
+                          runtimeContext.returnContinuation!.originReference.view,
+                          runtimeContext.returnContinuation!.originReference.mode,
+                        )
+                      }
+                    >
+                      <strong>{runtimeContext.returnContinuation.returnLabel}</strong>
+                      <span>Return to the workspace point that opened this context.</span>
+                    </button>
                   )}
+
+                  <div className="runtime-section-heading">
+                    <span>Path</span>
+                    <small>Move through the current investigation</small>
+                  </div>
+                  <div className="runtime-trail-list" aria-label="Workspace path">
+                    {runtimeContext.trail.map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={[
+                          item.status === "current" ? "is-current" : "",
+                          runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
+                      >
+                        <strong>{item.label}</strong>
+                        <span>{item.summary}</span>
+                        <small>{item.mode === "analyst" ? "Analyst" : "Human"}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="runtime-section-heading">
+                    <span>Go to</span>
+                    <small>Open related workspaces without running anything</small>
+                  </div>
+                  <div className="runtime-continuation-list" aria-label="Go-to investigation actions">
+                    {runtimeContext.continuations.map((continuation) => (
+                      <button
+                        type="button"
+                        key={continuation.id}
+                        disabled={continuation.disabled}
+                        onClick={() =>
+                          onRuntimeTrailSelect(
+                            continuation.id,
+                            continuation.targetView,
+                            continuation.targetMode,
+                          )
+                        }
+                      >
+                        <strong>{continuation.label}</strong>
+                        <small>{continuation.description}</small>
+                        <em>{continuation.origin.replace(/-/g, " ")}</em>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </details>
 
-              {runtimeContext.recommendationGroups.length > 0 && (
-                <>
-                  <div className="runtime-section-heading">
-                    <span>Recommendations</span>
-                    <small>Ranked from metadata only; nothing runs automatically</small>
-                  </div>
-                  <div className="runtime-guidance-groups" aria-label="Ranked recommendations">
-                    {runtimeContext.recommendationGroups.map((group) => (
-                      <section key={group.id} className="runtime-guidance-group">
+              <details className="runtime-disclosure-section">
+                <summary>
+                  <span>Technical metadata</span>
+                  <small>Read-only runtime details</small>
+                </summary>
+                <div className="runtime-disclosure-body">
+                  <div className="runtime-slot-list" aria-label="Read-only runtime metadata">
+                    {runtimeContext.panelSlots.map((slot) => (
+                      <section key={slot.id} className="runtime-panel-slot">
                         <div>
-                          <strong>{group.title}</strong>
-                          <small>{group.summary}</small>
+                          <span>{slot.label}</span>
+                          {slot.status && <small>{slot.status}</small>}
                         </div>
-                        <div className="runtime-guidance-list">
-                          {group.items.map((guidance) => (
-                            <button
-                              type="button"
-                              key={guidance.id}
-                              className={`is-${guidance.priority}`}
-                              onClick={() =>
-                                onRuntimeTrailSelect(
-                                  guidance.continuationLink.continuationId,
-                                  guidance.continuationLink.targetView,
-                                  guidance.continuationLink.targetMode,
-                                )
-                              }
-                            >
-                              <strong>{guidance.title}</strong>
-                              <span>{guidance.summary}</span>
-                              <em>{guidance.score.explanation}</em>
-                              <small>{guidance.priority} priority</small>
-                            </button>
-                          ))}
-                        </div>
+                        <strong>{slot.title}</strong>
+                        <p>{slot.summary}</p>
+                        {slot.items && (
+                          <div className="runtime-slot-items">
+                            {slot.items.map((item) => (
+                              <span key={`${slot.id}-${item.label}`}>
+                                {item.label}
+                                <strong>{item.value}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </section>
                     ))}
                   </div>
-                </>
-              )}
-
-              <div className="runtime-section-heading">
-                <span>Trail</span>
-                <small>Move through the current investigation</small>
-              </div>
-              <div className="runtime-trail-list" aria-label="Workspace trail">
-                {runtimeContext.trail.map((item) => (
-                  <button
-                    type="button"
-                    key={item.id}
-                    className={[
-                      item.status === "current" ? "is-current" : "",
-                      runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
-                  >
-                    <strong>{item.label}</strong>
-                    <span>{item.summary}</span>
-                    <small>{item.mode === "analyst" ? "Analyst" : "Human"}</small>
-                  </button>
-                ))}
-              </div>
-
-              <div className="runtime-section-heading">
-                <span>Continue</span>
-                <small>Open a related workspace without executing anything</small>
-              </div>
-              <div className="runtime-continuation-list" aria-label="Continuations">
-                {runtimeContext.continuations.map((continuation) => (
-                  <button
-                    type="button"
-                    key={continuation.id}
-                    disabled={continuation.disabled}
-                    onClick={() =>
-                      onRuntimeTrailSelect(
-                        continuation.id,
-                        continuation.targetView,
-                        continuation.targetMode,
-                      )
-                    }
-                  >
-                    <strong>{continuation.label}</strong>
-                    <small>{continuation.description}</small>
-                    <em>{continuation.origin.replace(/-/g, " ")}</em>
-                  </button>
-                ))}
-              </div>
-
-              <div className="runtime-section-heading">
-                <span>Status</span>
-                <small>Read-only runtime metadata</small>
-              </div>
-              <div className="runtime-slot-list" aria-label="Runtime panel slots">
-                {runtimeContext.panelSlots.map((slot) => (
-                  <section key={slot.id} className="runtime-panel-slot">
-                    <div>
-                      <span>{slot.label}</span>
-                      {slot.status && <small>{slot.status}</small>}
-                    </div>
-                    <strong>{slot.title}</strong>
-                    <p>{slot.summary}</p>
-                    {slot.items && (
-                      <div className="runtime-slot-items">
-                        {slot.items.map((item) => (
-                          <span key={`${slot.id}-${item.label}`}>
-                            {item.label}
-                            <strong>{item.value}</strong>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </section>
-                ))}
-              </div>
+                </div>
+              </details>
             </div>
           )}
         </aside>

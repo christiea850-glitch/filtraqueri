@@ -609,7 +609,7 @@ body.is-resizing-sidebar {
 
 .runtime-context-body {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 0 10px 14px;
 }
 
@@ -654,7 +654,7 @@ body.is-resizing-sidebar {
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding-top: 5px;
+  padding-top: 3px;
 }
 
 .runtime-section-heading span {
@@ -685,10 +685,10 @@ body.is-resizing-sidebar {
   display: grid;
   gap: 6px;
   min-width: 0;
-  padding: 7px;
-  border: 1px solid #dbe5ef;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.62);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .runtime-guidance-group > div:first-child {
@@ -845,7 +845,7 @@ body.is-resizing-sidebar {
   gap: 5px;
   min-width: 0;
   padding: 9px;
-  border: 1px solid #dbeafe;
+  border: 1px solid #dbe5ef;
   border-radius: 8px;
   background: #ffffff;
 }
@@ -892,6 +892,28 @@ body.is-resizing-sidebar {
 
 .runtime-context-panel.is-analyst-mode .runtime-selected-object span {
   color: #6d28d9;
+}
+
+.runtime-investigation-surface {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #dbe5ef;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-investigation-surface {
+  border-color: #ddd6fe;
+  background: rgba(250, 245, 255, 0.58);
+}
+
+.runtime-next-steps {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 2px;
 }
 
 .runtime-narrative-card {
@@ -1006,6 +1028,54 @@ body.is-resizing-sidebar {
 
 .runtime-context-panel.is-analyst-mode .runtime-narrative-card > summary small {
   color: #6d28d9;
+}
+
+.runtime-disclosure-section {
+  min-width: 0;
+  border: 1px solid #dbe5ef;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.runtime-context-panel.is-analyst-mode .runtime-disclosure-section {
+  border-color: #ddd6fe;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.runtime-disclosure-section > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.runtime-disclosure-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.runtime-disclosure-section > summary span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.runtime-disclosure-section > summary small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.runtime-disclosure-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 8px 8px;
 }
 
 .runtime-continuation-list > span {
