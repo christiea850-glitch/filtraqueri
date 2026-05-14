@@ -1341,3 +1341,229 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* UX-F19: true canvas-first workspace width pass */
+.workspace-shell {
+  grid-template-columns: var(--sidebar-width, 152px) 2px minmax(0, 1fr) minmax(180px, 220px);
+}
+
+.app.is-sidebar-collapsed .workspace-shell {
+  grid-template-columns: 48px 0 minmax(0, 1fr) minmax(180px, 220px);
+}
+
+.view-results .workspace-shell,
+.view-sqlWorkspace .workspace-shell {
+  grid-template-columns: var(--sidebar-width, 152px) 2px minmax(0, 1fr) 44px;
+}
+
+.view-results.is-sidebar-collapsed .workspace-shell,
+.view-sqlWorkspace.is-sidebar-collapsed .workspace-shell {
+  grid-template-columns: 48px 0 minmax(0, 1fr) 44px;
+}
+
+.view-results .runtime-context-panel,
+.view-sqlWorkspace .runtime-context-panel {
+  width: 44px;
+  overflow: hidden;
+}
+
+.view-results .runtime-context-panel .runtime-context-body,
+.view-sqlWorkspace .runtime-context-panel .runtime-context-body {
+  display: none;
+}
+
+.view-results .runtime-context-panel .runtime-panel-toggle,
+.view-sqlWorkspace .runtime-context-panel .runtime-panel-toggle {
+  width: 30px;
+  min-height: 116px;
+  margin: 12px 7px;
+  padding: 0;
+  writing-mode: vertical-rl;
+}
+
+.left-sidebar {
+  padding-inline: 6px;
+}
+
+.sidebar-collapse-toggle,
+.left-sidebar nav button {
+  min-height: 32px;
+  padding-inline: 8px;
+}
+
+.workspace-canvas {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding-inline: clamp(12px, 1.4vw, 22px);
+}
+
+.workspace-active-flow,
+.results-workspace,
+.human-dataset-workspace,
+.query-builder-panel,
+.filters-panel,
+.dataset-hub-panel,
+.data-profile-surface,
+.sql-workspace,
+.workspace-split-pane,
+.workspace-split-primary {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.workspace-page-heading {
+  margin-bottom: 10px;
+}
+
+.workspace-context-strip {
+  margin-bottom: 12px;
+}
+
+.view-results .workspace-canvas,
+.view-sqlWorkspace .workspace-canvas,
+.view-filters .workspace-canvas,
+.view-dataset .workspace-canvas,
+.view-queryBuilder .workspace-canvas {
+  padding-inline: clamp(10px, 1vw, 18px);
+}
+
+.view-results .workspace-split-pane {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  gap: var(--fq-space-2);
+}
+
+.view-results .workspace-split-secondary {
+  max-height: calc(100vh - 104px);
+}
+
+.view-results .data-grid-section {
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.view-results .data-grid-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  gap: 8px;
+}
+
+.view-results .results-toolbar-tools {
+  gap: 6px;
+}
+
+.view-results .data-grid-table {
+  max-height: min(82vh, 960px);
+  overflow: auto;
+}
+
+.view-results .data-grid-table table {
+  min-width: max(1520px, 100%);
+}
+
+.view-results .data-grid-table th {
+  padding: 8px 9px;
+  vertical-align: top;
+}
+
+.view-results .data-grid-table td {
+  padding: 7px 9px;
+  line-height: 1.35;
+}
+
+.view-results .table-container {
+  border-radius: 8px;
+}
+
+.view-results .results-side-context {
+  gap: var(--fq-space-2);
+}
+
+.view-results .results-side-context .results-review-strip,
+.view-results .results-side-context .session-panel,
+.view-results .results-side-context .history-panel {
+  padding: 8px;
+}
+
+.view-results .results-side-context .results-business-takeaway strong,
+.view-results .results-side-context .results-insight-row strong,
+.view-results .results-side-context .results-review-facts strong {
+  white-space: normal;
+}
+
+.view-sqlWorkspace .sql-workspace {
+  grid-template-columns: 44px minmax(0, 1fr);
+  min-height: min(860px, calc(100vh - 74px));
+}
+
+.view-sqlWorkspace .sql-workspace:not(.is-schema-collapsed) {
+  grid-template-columns: minmax(190px, 230px) minmax(0, 1fr);
+}
+
+.view-sqlWorkspace .sql-main-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+  gap: var(--fq-space-2);
+}
+
+.view-sqlWorkspace .sql-editor-panel {
+  padding: 8px;
+}
+
+.view-sqlWorkspace .sql-editor-toolbar {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+}
+
+.view-sqlWorkspace .sql-editor-host,
+.view-sqlWorkspace .sql-monaco-editor,
+.view-sqlWorkspace .sql-editor-host .sql-editor-input {
+  min-height: min(76vh, 820px);
+}
+
+.view-sqlWorkspace .sql-side-panel {
+  gap: var(--fq-space-2);
+}
+
+.view-filters .explore-question-surface {
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+}
+
+.view-filters .filters-grid {
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+
+.view-filters .filters-panel,
+.view-dataset .dataset-hub-panel,
+.view-queryBuilder .query-builder-panel {
+  padding: 14px;
+}
+
+.view-dataset .drill-in-summary-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+@media (max-width: 1280px) {
+  .workspace-shell,
+  .app.is-sidebar-collapsed .workspace-shell,
+  .view-results .workspace-shell,
+  .view-sqlWorkspace .workspace-shell,
+  .view-results.is-sidebar-collapsed .workspace-shell,
+  .view-sqlWorkspace.is-sidebar-collapsed .workspace-shell {
+    grid-template-columns: 48px 0 minmax(0, 1fr) 44px;
+  }
+}
+
+@media (max-width: 1080px) {
+  .view-results .workspace-split-pane,
+  .view-sqlWorkspace .sql-main-panel,
+  .view-filters .explore-question-surface {
+    grid-template-columns: 1fr;
+  }
+
+  .view-sqlWorkspace .sql-workspace,
+  .view-sqlWorkspace .sql-workspace:not(.is-schema-collapsed) {
+    grid-template-columns: 1fr;
+  }
+}
