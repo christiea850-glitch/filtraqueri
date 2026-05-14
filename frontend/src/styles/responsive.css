@@ -54,6 +54,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: none;
   }
+
+  .query-builder-hero,
+  .query-builder-context-grid,
+  .query-progress-rail,
+  .query-workflow-tabs,
+  .query-technical-disclosure > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -224,6 +232,11 @@
 
   .builder-grid,
   .query-workflow-tabs,
+  .query-builder-hero,
+  .query-builder-context-grid,
+  .query-progress-rail,
+  .query-guidance-grid,
+  .query-technical-disclosure > div,
   .query-stage-grid,
   .compact-query-stage .query-stage-grid,
   .query-review-grid,

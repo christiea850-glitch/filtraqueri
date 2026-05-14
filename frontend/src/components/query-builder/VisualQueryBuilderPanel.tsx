@@ -1,10 +1,14 @@
 import { useMemo, useState } from "react";
-import type { SchemaColumn } from "../../features/dataset/datasetTypes";
+import type { SchemaColumn, WorkspaceMode } from "../../features/dataset/datasetTypes";
 import type { AggregationState } from "../../features/query-builder/queryBuilderTypes";
 import type { SortDirection } from "../../features/results/resultTypes";
 
 type VisualQueryBuilderPanelProps = {
   schema: SchemaColumn[];
+  datasetName: string;
+  worksheetName: string;
+  activeFilterCount: number;
+  workspaceMode: WorkspaceMode;
   selectedColumns: string[];
   groupBy: string[];
   aggregations: AggregationState[];
@@ -26,21 +30,27 @@ type VisualQueryBuilderPanelProps = {
   onRunQuery: () => void;
 };
 
-type BuilderStep = "columns" | "group" | "sort" | "preview";
+type BuilderStep = "data" | "question" | "filters" | "group" | "review" | "execute";
 
 const builderSteps: Array<{
   id: BuilderStep;
   label: string;
   helper: string;
 }> = [
-  { id: "columns", label: "Columns", helper: "Choose fields" },
-  { id: "group", label: "Group", helper: "Summarize" },
-  { id: "sort", label: "Sort", helper: "Order rows" },
-  { id: "preview", label: "Run", helper: "Review" },
+  { id: "data", label: "Select data", helper: "Choose fields" },
+  { id: "question", label: "Define question", helper: "Shape focus" },
+  { id: "filters", label: "Apply filters", helper: "Narrow scope" },
+  { id: "group", label: "Group & compare", helper: "Summarize" },
+  { id: "review", label: "Review output", helper: "Sort and limit" },
+  { id: "execute", label: "Execute review", helper: "Run safely" },
 ];
 
 function VisualQueryBuilderPanel({
   schema,
+  datasetName,
+  worksheetName,
+  activeFilterCount,
+  workspaceMode,
   selectedColumns,
   groupBy,
   aggregations,
@@ -61,7 +71,7 @@ function VisualQueryBuilderPanel({
   onRowLimitChange,
   onRunQuery,
 }: VisualQueryBuilderPanelProps) {
-  const [activeStep, setActiveStep] = useState<BuilderStep>("columns");
+  const [activeStep, setActiveStep] = useState<BuilderStep>("data");
   const [columnSearch, setColumnSearch] = useState("");
   const normalizedSearch = columnSearch.trim().toLowerCase();
   const visibleSchema = useMemo(
@@ -96,13 +106,97 @@ function VisualQueryBuilderPanel({
   const activeAggregations = aggregations.filter(
     (aggregation) => aggregation.function === "COUNT" || aggregation.column,
   );
+  const isAnalystMode = workspaceMode === "analyst";
+  const expectedResultType =
+    groupBy.length > 0 || activeAggregations.length > 0
+      ? "Grouped summary"
+      : selectedColumns.length > 0
+        ? "Selected-field result"
+        : "Dataset preview";
+  const workflowHeroTitle = isAnalystMode
+    ? "Build execution context"
+    : "What would you like to understand?";
+  const workflowHeroSummary = isAnalystMode
+    ? "Inspect projection, grouping logic, filters, and output limits before running the existing query path."
+    : "Choose the fields, filters, comparisons, and output shape that answer your business question.";
+  const progressItems = [
+    {
+      label: "Data selected",
+      complete: selectedColumns.length > 0,
+      detail: `${selectedColumns.length} fields`,
+    },
+    {
+      label: "Filters added",
+      complete: activeFilterCount > 0,
+      detail: `${activeFilterCount} filters`,
+    },
+    {
+      label: "Grouping active",
+      complete: groupBy.length > 0 || activeAggregations.length > 0,
+      detail: `${groupBy.length} groups / ${activeAggregations.length} summaries`,
+    },
+    {
+      label: "Preview ready",
+      complete: selectedColumns.length > 0 || groupBy.length > 0 || activeAggregations.length > 0,
+      detail: expectedResultType,
+    },
+    {
+      label: "Execution ready",
+      complete: Boolean(rowLimit) || selectedColumns.length > 0 || activeAggregations.length > 0,
+      detail: rowLimit ? `${rowLimit} row limit` : "Review first",
+    },
+  ];
 
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
+      <div className="query-builder-hero">
+        <div>
+          <p className="section-label">{isAnalystMode ? "Analyst workflow" : "Guided query"}</p>
+          <h2>{workflowHeroTitle}</h2>
+          <span>{workflowHeroSummary}</span>
+        </div>
+        <div className="query-builder-hero-focus">
+          <span>{isAnalystMode ? "Prepared result" : "Expected result"}</span>
+          <strong>{expectedResultType}</strong>
+          <small>{datasetName}</small>
+        </div>
+        <div className="query-builder-context-grid" aria-label="Query builder context">
+          <article>
+            <span>Dataset</span>
+            <strong>{datasetName}</strong>
+            <small>{schema.length.toLocaleString()} fields available</small>
+          </article>
+          <article>
+            <span>Worksheet</span>
+            <strong>{worksheetName}</strong>
+            <small>{activeFilterCount.toLocaleString()} active filters</small>
+          </article>
+          <article>
+            <span>Grouping</span>
+            <strong>{groupBy.length > 0 ? "Active" : "Not grouped"}</strong>
+            <small>{activeAggregations.length.toLocaleString()} aggregations ready</small>
+          </article>
+          <article>
+            <span>{isAnalystMode ? "Projection" : "Question shape"}</span>
+            <strong>{selectedColumns.length.toLocaleString()} fields</strong>
+            <small>{rowLimit || "No"} row limit</small>
+          </article>
+        </div>
+      </div>
+
+      <div className="query-progress-rail" aria-label="Query workflow progress">
+        {progressItems.map((item) => (
+          <span key={item.label} className={item.complete ? "is-complete" : ""}>
+            <strong>{item.label}</strong>
+            <small>{item.detail}</small>
+          </span>
+        ))}
+      </div>
+
       <div className="query-builder-header">
         <div>
-          <p className="section-label">Query builder</p>
-          <h2>Build query</h2>
+          <p className="section-label">Active workflow</p>
+          <h2>{builderSteps.find((step) => step.id === activeStep)?.label || "Build query"}</h2>
         </div>
         <button type="button" className="primary-button" onClick={onRunQuery}>
           {running ? "Running..." : "Run query"}
@@ -134,12 +228,16 @@ function VisualQueryBuilderPanel({
         <span>{rowLimit || "No"} row limit</span>
       </div>
 
-      {activeStep === "columns" && (
+      {activeStep === "data" && (
         <div className="query-stage-panel">
           <div className="query-stage-heading">
             <div>
-              <h3>Choose columns</h3>
-              <p>Select fields.</p>
+              <h3>{isAnalystMode ? "Prepare result projection" : "Select data"}</h3>
+              <p>
+                {isAnalystMode
+                  ? "Choose the fields that should be present in the result context."
+                  : "Choose the fields that belong in this question."}
+              </p>
             </div>
             <small>
               {selectedColumns.length} selected, {schema.length} available
@@ -157,43 +255,49 @@ function VisualQueryBuilderPanel({
               />
             </label>
 
-            <div className="query-bulk-actions" aria-label="Visible column suggestions">
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => onSelectedColumnsChange(schema.map((column) => column.name))}
-              >
-                Select All
-              </button>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => onSelectedColumnsChange([])}
-              >
-                Clear All
-              </button>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => onSelectedColumnsChange(numericColumns)}
-              >
-                Numeric Only
-              </button>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => onSelectedColumnsChange(categoricalColumns)}
-              >
-                Categorical Only
-              </button>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => onSelectedColumnsChange(recommendedColumns)}
-              >
-                Recommended
-              </button>
-            </div>
+            <details className="query-advanced-disclosure">
+              <summary>
+                <span>Selection shortcuts</span>
+                <small>Optional helpers</small>
+              </summary>
+              <div className="query-bulk-actions" aria-label="Visible column suggestions">
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => onSelectedColumnsChange(schema.map((column) => column.name))}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => onSelectedColumnsChange([])}
+                >
+                  Clear All
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => onSelectedColumnsChange(numericColumns)}
+                >
+                  Numeric Only
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => onSelectedColumnsChange(categoricalColumns)}
+                >
+                  Categorical Only
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => onSelectedColumnsChange(recommendedColumns)}
+                >
+                  Recommended
+                </button>
+              </div>
+            </details>
           </div>
 
           <div className="field-chip-scroll">
@@ -217,12 +321,86 @@ function VisualQueryBuilderPanel({
         </div>
       )}
 
+      {activeStep === "question" && (
+        <div className="query-stage-panel">
+          <div className="query-stage-heading">
+            <div>
+              <h3>{isAnalystMode ? "Review query structure" : "Define question"}</h3>
+              <p>
+                {isAnalystMode
+                  ? "Confirm the projection and summary shape before adding execution detail."
+                  : "Frame what you want to learn before running a result."}
+              </p>
+            </div>
+            <small>{expectedResultType}</small>
+          </div>
+
+          <div className="query-guidance-grid">
+            <article>
+              <span>{isAnalystMode ? "Projection" : "Business question"}</span>
+              <strong>{selectedColumns.length > 0 ? "Fields selected" : "Choose fields"}</strong>
+              <p>
+                {isAnalystMode
+                  ? "The selected fields define the result projection."
+                  : "Start with the columns that help answer the business question."}
+              </p>
+            </article>
+            <article>
+              <span>{isAnalystMode ? "Grouping logic" : "Compare categories"}</span>
+              <strong>{groupBy.length > 0 ? "Comparison active" : "Optional"}</strong>
+              <p>
+                {isAnalystMode
+                  ? "Grouping and aggregations define summary logic."
+                  : "Use grouping when the question compares teams, categories, dates, or segments."}
+              </p>
+            </article>
+          </div>
+        </div>
+      )}
+
+      {activeStep === "filters" && (
+        <div className="query-stage-panel">
+          <div className="query-stage-heading">
+            <div>
+              <h3>{isAnalystMode ? "Inspect filter scope" : "Filter your business question"}</h3>
+              <p>
+                {activeFilterCount > 0
+                  ? `${activeFilterCount.toLocaleString()} filters are already shaping this workspace.`
+                  : "No filters are active. Use the Filters workspace when the question needs a narrower scope."}
+              </p>
+            </div>
+            <small>Metadata only</small>
+          </div>
+
+          <div className="query-guidance-grid">
+            <article>
+              <span>Current scope</span>
+              <strong>{activeFilterCount.toLocaleString()} filters</strong>
+              <p>Filters are reviewed here only; this panel does not apply or mutate filters.</p>
+            </article>
+            <article>
+              <span>{isAnalystMode ? "Execution context" : "Question scope"}</span>
+              <strong>{activeFilterCount > 0 ? "Scoped" : "Full dataset"}</strong>
+              <p>
+                {isAnalystMode
+                  ? "Existing filters remain part of the result context when present."
+                  : "Add filters when you want to focus on a subset before comparing results."}
+              </p>
+            </article>
+          </div>
+        </div>
+      )}
+
       {activeStep === "group" && (
         <div className="query-stage-panel">
           <div className="query-stage-heading">
             <div>
-              <h3>Group</h3>
-              <p>Summarize rows.</p>
+              <h3>{isAnalystMode ? "Inspect grouping logic" : "Group & compare"}</h3>
+              <p>
+                {isAnalystMode
+                  ? "Configure summary logic for the result context."
+                  : "Compare categories, segments, dates, or groups."}
+              </p>
             </div>
             <button type="button" className="text-button" onClick={onAddAggregation}>
               Add aggregation
@@ -312,12 +490,12 @@ function VisualQueryBuilderPanel({
         </div>
       )}
 
-      {activeStep === "sort" && (
+      {activeStep === "review" && (
         <div className="query-stage-panel compact-query-stage">
           <div className="query-stage-heading">
             <div>
-              <h3>Sort</h3>
-              <p>Order and limit rows.</p>
+              <h3>{isAnalystMode ? "Prepare result projection" : "Preview before running"}</h3>
+              <p>Review output order and size before using the existing run action.</p>
             </div>
           </div>
 
@@ -366,12 +544,16 @@ function VisualQueryBuilderPanel({
         </div>
       )}
 
-      {activeStep === "preview" && (
+      {activeStep === "execute" && (
         <div className="query-stage-panel preview-query-stage">
           <div className="query-stage-heading">
             <div>
-              <h3>Review</h3>
-              <p>Review, then run.</p>
+              <h3>{isAnalystMode ? "Execute review" : "Review output"}</h3>
+              <p>
+                {isAnalystMode
+                  ? "Confirm structure, then run through the existing Query Builder path."
+                  : "Review the shape, then run when the question feels ready."}
+              </p>
             </div>
             <button type="button" className="primary-button" onClick={onRunQuery}>
               {running ? "Running..." : "Run query"}
@@ -411,6 +593,31 @@ function VisualQueryBuilderPanel({
               </p>
             </div>
           </div>
+
+          <details className="query-technical-disclosure">
+            <summary>
+              <span>Technical query metadata</span>
+              <small>Read-only workflow context</small>
+            </summary>
+            <div>
+              <span>
+                Dataset
+                <strong>{datasetName}</strong>
+              </span>
+              <span>
+                Worksheet
+                <strong>{worksheetName}</strong>
+              </span>
+              <span>
+                Filters
+                <strong>{activeFilterCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Result type
+                <strong>{expectedResultType}</strong>
+              </span>
+            </div>
+          </details>
         </div>
       )}
 

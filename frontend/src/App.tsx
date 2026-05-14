@@ -236,6 +236,9 @@ function App() {
   const activeFilters =
     activeResultTab === "preview" ? [] : activeResult.source?.filters || draftFilters;
   const activeFilterLabels = createFilterLabels(activeFilters);
+  const activeWorkbookWorksheet = dataset?.workbook_metadata?.worksheets.find(
+    (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
+  );
   const buildActiveBackendFilters = () => buildBackendFilters(dataset);
   const {
     activeResultModel,
@@ -1137,6 +1140,14 @@ function App() {
           {renderHumanIntentGuidance()}
           <VisualQueryBuilderPanel
             schema={dataset.schema}
+            datasetName={dataset.original_filename}
+            worksheetName={
+              activeWorkbookWorksheet?.displayName ||
+              activeWorkbookWorksheet?.sheetName ||
+              dataset.table_name
+            }
+            activeFilterCount={activeFilterLabels.length}
+            workspaceMode={workspaceMode}
             selectedColumns={querySelectedColumns}
             groupBy={queryGroupBy}
             aggregations={queryAggregations}
