@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
+import WorkspaceTabs from "../../../components/layout/WorkspaceTabs";
 import SqlEditorPanel, { SqlDraftPanel, SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
@@ -17,6 +18,7 @@ type SqlWorkspaceProps = {
 function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
   const [isSchemaCollapsed, setIsSchemaCollapsed] = useState(true);
   const [isSqlSideCollapsed, setIsSqlSideCollapsed] = useState(false);
+  const [activeAnalystView, setActiveAnalystView] = useState<"sql" | "schema" | "context" | "runtime">("sql");
   const {
     savedDrafts,
     characterCount,
@@ -37,6 +39,17 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
   const readinessLabel = dataset ? "Dataset context ready" : "Open data to inspect queries";
   const warningCount = sqlAnalysis.validation.diagnostics.length;
   const planStepCount = sqlAnalysis.explanationCards.length + sqlAnalysis.diagnostics.length;
+  const analystTabs = [
+    { id: "sql", label: "SQL" },
+    { id: "schema", label: "Schema" },
+    { id: "context", label: "Context" },
+    { id: "runtime", label: "Runtime" },
+  ] satisfies Array<{ id: "sql" | "schema" | "context" | "runtime"; label: string }>;
+
+  const changeAnalystView = (view: "sql" | "schema" | "context" | "runtime") => {
+    setActiveAnalystView(view);
+    if (view === "schema") setIsSchemaCollapsed(false);
+  };
 
   return (
     <section
@@ -103,6 +116,12 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
           }}
         />
         <div className="sql-side-panel">
+          <WorkspaceTabs
+            items={analystTabs}
+            activeItem={activeAnalystView}
+            label="Analyst workspace views"
+            onChange={changeAnalystView}
+          />
           <button
             type="button"
             className="panel-collapse-button sql-side-collapse-button"
@@ -112,17 +131,32 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
           </button>
           {!isSqlSideCollapsed && (
             <>
-              <SqlPreviewGrid previewResult={previewResult} />
-              <SqlGuidancePanel
-                diagnostics={sqlAnalysis.diagnostics}
-                guidanceCards={sqlAnalysis.explanationCards}
-                dialectContext={{ selectedDialectProfile }}
-                validation={sqlAnalysis.validation}
-              />
-              <SqlDraftPanel
-                savedDrafts={savedDrafts}
-                onLoadDraft={loadDraft}
-              />
+              {activeAnalystView === "sql" && <SqlPreviewGrid previewResult={previewResult} />}
+              {activeAnalystView === "schema" && (
+                <section className="sql-draft-panel" aria-label="Schema view">
+                  <div className="sql-draft-list">
+                    <div className="builder-block-header">
+                      <span>Schema</span>
+                      <small>{isSchemaCollapsed ? "Collapsed" : "Open"}</small>
+                    </div>
+                    <p>Use the schema rail on the left to inspect columns, suggestions, keywords, and templates.</p>
+                  </div>
+                </section>
+              )}
+              {activeAnalystView === "context" && (
+                <SqlGuidancePanel
+                  diagnostics={sqlAnalysis.diagnostics}
+                  guidanceCards={sqlAnalysis.explanationCards}
+                  dialectContext={{ selectedDialectProfile }}
+                  validation={sqlAnalysis.validation}
+                />
+              )}
+              {activeAnalystView === "runtime" && (
+                <SqlDraftPanel
+                  savedDrafts={savedDrafts}
+                  onLoadDraft={loadDraft}
+                />
+              )}
             </>
           )}
         </div>

@@ -15,7 +15,9 @@ import {
   type WorksheetMetadata,
 } from "../../features/workbook";
 import { TaskLauncherPanel } from "../../features/tasksLauncher";
+import CompactStatGrid from "../layout/CompactStatGrid";
 import DrillInDetailPanel from "../layout/DrillInDetailPanel";
+import WorkspaceTabs from "../layout/WorkspaceTabs";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
 
 export type HumanIntent =
@@ -48,7 +50,7 @@ type DatasetSummaryPanelProps = {
   onSelectedTaskIdChange?: (taskId: string | null) => void;
 };
 
-type DataDrillInView = "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
+type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
 
 export const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
@@ -183,7 +185,7 @@ function DatasetSummaryPanel({
   selectedTaskId,
   onSelectedTaskIdChange,
 }: DatasetSummaryPanelProps) {
-  const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView | null>(null);
+  const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -281,7 +283,20 @@ function DatasetSummaryPanel({
   const textColumnCount = detectedColumns.filter(
     (column) => column.inferred_type === "text" || column.inferred_type === "categorical",
   ).length;
-  const closeDrillIn = () => setActiveDrillInView(null);
+  const closeDrillIn = () => setActiveDrillInView("overview");
+  const dataTabs = [
+    { id: "overview", label: "Overview" },
+    { id: "columns", label: "Columns" },
+    { id: "worksheets", label: "Worksheets" },
+    { id: "dataIntelligence", label: "Intelligence" },
+    { id: "businessSemantics", label: "Semantics" },
+  ] satisfies Array<{ id: DataDrillInView; label: string }>;
+  const profileStats = [
+    { label: "Numeric", value: numericColumnCount.toLocaleString() },
+    { label: "Text/category", value: textColumnCount.toLocaleString() },
+    { label: "Date", value: dateColumnCount.toLocaleString() },
+    { label: "Types", value: Object.keys(schemaTypeSummary).length.toLocaleString() },
+  ];
 
   return (
     <div className="human-dataset-workspace">
@@ -302,6 +317,12 @@ function DatasetSummaryPanel({
 
         {dataset ? (
           <div className="data-profile-surface">
+            <WorkspaceTabs
+              items={dataTabs}
+              activeItem={activeDrillInView}
+              label="Data views"
+              onChange={setActiveDrillInView}
+            />
             <div className="data-profile-overview">
               <div>
                 <span>Detected structure</span>
@@ -321,25 +342,9 @@ function DatasetSummaryPanel({
                 </button>
               </div>
             </div>
-            <div className="data-profile-metrics" aria-label="Detected data profile">
-              <span>
-                Numeric
-                <strong>{numericColumnCount.toLocaleString()}</strong>
-              </span>
-              <span>
-                Text/category
-                <strong>{textColumnCount.toLocaleString()}</strong>
-              </span>
-              <span>
-                Date
-                <strong>{dateColumnCount.toLocaleString()}</strong>
-              </span>
-              <span>
-                Types
-                <strong>{Object.keys(schemaTypeSummary).length.toLocaleString()}</strong>
-              </span>
-            </div>
-            <div className="drill-in-summary-grid" aria-label="Data detail summaries">
+            <CompactStatGrid items={profileStats} label="Detected data profile" />
+            {activeDrillInView === "overview" && (
+              <div className="drill-in-summary-grid" aria-label="Data detail summaries">
               <button type="button" onClick={() => setActiveDrillInView("columns")}>
                 <span>Detected columns</span>
                 <strong>{detectedColumns.length.toLocaleString()}</strong>
@@ -361,6 +366,7 @@ function DatasetSummaryPanel({
                 <small>Review business context</small>
               </button>
             </div>
+            )}
           </div>
         ) : (
           <div className="dataset-empty-guidance">

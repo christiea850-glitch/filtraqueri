@@ -600,6 +600,163 @@ h1 span:last-child {
   grid-template-columns: 58px minmax(0, 1fr);
 }
 
+/* UX-F17: multi-view workspace density primitives */
+.workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fq-space-2);
+  min-width: 0;
+  padding: 3px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-md);
+  background: var(--fq-surface-muted);
+}
+
+.workspace-tabs button {
+  flex: 1 1 auto;
+  min-width: max-content;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--fq-radius-sm);
+  background: transparent;
+  color: var(--fq-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--fq-font-label);
+  cursor: pointer;
+}
+
+.workspace-tabs button.is-active {
+  border-color: var(--fq-action);
+  background: var(--fq-surface);
+  color: var(--fq-text);
+}
+
+.workspace-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.workspace-split-pane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.32fr);
+  gap: var(--fq-space-4);
+  align-items: start;
+  min-width: 0;
+}
+
+.workspace-split-primary,
+.workspace-split-secondary {
+  display: grid;
+  gap: var(--fq-space-3);
+  min-width: 0;
+}
+
+.workspace-split-secondary {
+  position: sticky;
+  top: var(--fq-space-4);
+  max-height: calc(100vh - 140px);
+  overflow: auto;
+}
+
+.compact-stat-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fq-space-2);
+  min-width: 0;
+}
+
+.compact-stat-grid > span,
+.metadata-row {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  background: var(--fq-surface-muted);
+}
+
+.compact-stat-grid > span {
+  flex: 1 1 120px;
+}
+
+.compact-stat-grid small,
+.metadata-row small {
+  overflow: hidden;
+  color: var(--fq-text-muted);
+  font-size: 11px;
+  font-weight: var(--fq-font-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-stat-grid strong,
+.metadata-row strong {
+  overflow: hidden;
+  color: var(--fq-text);
+  font-size: 13px;
+  font-weight: var(--fq-font-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.results-side-context,
+.results-side-context .results-context-strip {
+  display: grid;
+  gap: var(--fq-space-3);
+  min-width: 0;
+}
+
+.results-side-context .results-review-strip,
+.results-side-context .results-context-strip,
+.results-side-context .session-panel,
+.results-side-context .history-panel {
+  grid-template-columns: 1fr;
+}
+
+.results-side-context .results-insight-row,
+.results-side-context .results-review-facts {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.results-side-context .workbook-context-panel {
+  display: none;
+}
+
+.sql-side-panel > .workspace-tabs {
+  align-self: start;
+}
+
+@media (max-width: 1180px) {
+  .workspace-split-pane {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-split-secondary {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-tabs button {
+    min-width: 0;
+  }
+
+  .drill-in-detail-header {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* UX-F15: canonical layout governance enforcement */
 .workspace-switcher {
   display: block;
