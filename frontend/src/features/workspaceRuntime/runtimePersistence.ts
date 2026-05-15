@@ -10,7 +10,7 @@ const RUNTIME_STORAGE_KEY = "filtraqueri.workspaceRuntime";
 
 const defaultRuntimePersistenceState: WorkspaceRuntimePersistenceState = {
   selectedTrailItemId: null,
-  isRuntimePanelCollapsed: false,
+  isRuntimePanelCollapsed: true,
   selectedTaskId: null,
   selectedContextualObjectId: null,
   returnContinuationId: null,

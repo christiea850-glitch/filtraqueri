@@ -1220,8 +1220,14 @@ function App() {
                   />
                 }
                 secondary={
-                  <div className="results-side-context">
-                    {renderResultsInvestigationSurface()}
+                  <div
+                    className={[
+                      "results-side-context",
+                      isResultsContextCollapsed ? "is-collapsed" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <button
                       type="button"
                       className="text-button"
@@ -1238,17 +1244,20 @@ function App() {
                         Context hidden | {activeFilterLabels.length} filters | {queryHistory.length} history
                       </button>
                     ) : (
-                      <div className="results-context-strip" aria-label="Results context">
-                        <DatasetSessionPanel
-                          dataset={dataset}
-                          schemaTypeSummary={schemaTypeSummary}
-                          activeFilterLabels={activeFilterLabels}
-                          queryGroupBy={activeResultModel.grouping.columns || queryGroupBy}
-                          onRelationshipReview={handleRelationshipReview}
-                        />
+                      <>
+                        {renderResultsInvestigationSurface()}
+                        <div className="results-context-strip" aria-label="Results context">
+                          <DatasetSessionPanel
+                            dataset={dataset}
+                            schemaTypeSummary={schemaTypeSummary}
+                            activeFilterLabels={activeFilterLabels}
+                            queryGroupBy={activeResultModel.grouping.columns || queryGroupBy}
+                            onRelationshipReview={handleRelationshipReview}
+                          />
 
-                        <QueryHistoryPanel history={queryHistory} />
-                      </div>
+                          <QueryHistoryPanel history={queryHistory} />
+                        </div>
+                      </>
                     )}
                   </div>
                 }

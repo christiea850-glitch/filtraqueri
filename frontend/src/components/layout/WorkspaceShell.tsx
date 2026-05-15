@@ -67,9 +67,9 @@ type WorkspaceShellProps = {
   ) => void;
 };
 
-const SIDEBAR_MIN_WIDTH = 124;
-const SIDEBAR_MAX_WIDTH = 160;
-const SIDEBAR_DEFAULT_WIDTH = 152;
+const SIDEBAR_MIN_WIDTH = 112;
+const SIDEBAR_MAX_WIDTH = 140;
+const SIDEBAR_DEFAULT_WIDTH = 128;
 
 const hubSections: HubSection[] = [
   { label: "Workspace", hubIds: ["home", "data"] },

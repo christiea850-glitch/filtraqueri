@@ -1567,3 +1567,217 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* UX-F20: true wide canvas shell reflow */
+#root {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border-inline: 0;
+}
+
+.workspace-shell {
+  grid-template-columns: var(--sidebar-width, 128px) 2px minmax(0, 1fr) minmax(176px, 208px);
+  width: 100%;
+  min-width: 0;
+}
+
+.app.is-sidebar-collapsed .workspace-shell {
+  grid-template-columns: 48px 0 minmax(0, 1fr) minmax(176px, 208px);
+}
+
+.workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-dataset .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-queryBuilder .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-results .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-sqlWorkspace .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+  grid-template-columns: var(--sidebar-width, 128px) 2px minmax(0, 1fr) 44px;
+}
+
+.app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-dataset.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-queryBuilder.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-results.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed),
+.view-sqlWorkspace.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+  grid-template-columns: 48px 0 minmax(0, 1fr) 44px;
+}
+
+.view-results .runtime-context-panel:not(.is-collapsed),
+.view-sqlWorkspace .runtime-context-panel:not(.is-collapsed) {
+  width: auto;
+  overflow: auto;
+}
+
+.view-results .runtime-context-panel:not(.is-collapsed) .runtime-context-body,
+.view-sqlWorkspace .runtime-context-panel:not(.is-collapsed) .runtime-context-body {
+  display: grid;
+}
+
+.runtime-context-panel.is-collapsed .runtime-panel-toggle {
+  width: 30px;
+  min-height: 116px;
+  margin: 12px 7px;
+  padding: 0;
+  writing-mode: vertical-rl;
+}
+
+.left-sidebar {
+  padding-inline: 7px;
+}
+
+.sidebar-collapse-toggle,
+.left-sidebar nav button {
+  gap: 6px;
+  min-height: 36px;
+  padding-inline: 9px;
+  font-size: 13px;
+}
+
+.nav-icon {
+  min-width: 22px;
+  min-height: 22px;
+}
+
+.workspace-canvas {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding-inline: clamp(8px, 0.9vw, 16px);
+}
+
+.view-dataset .workspace-canvas,
+.view-queryBuilder .workspace-canvas,
+.view-results .workspace-canvas,
+.view-sqlWorkspace .workspace-canvas {
+  padding-inline: clamp(8px, 0.8vw, 14px);
+}
+
+.workspace-active-flow,
+.dataset-summary,
+.dataset-hub-panel,
+.query-builder-panel,
+.results-workspace,
+.sql-workspace,
+.workspace-split-pane,
+.workspace-split-primary {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.view-results .workspace-split-pane {
+  grid-template-columns: minmax(0, 1fr) minmax(184px, 220px);
+  gap: 8px;
+}
+
+.view-results .workspace-split-pane:has(.results-side-context.is-collapsed) {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.view-results .workspace-split-secondary {
+  max-height: calc(100vh - 98px);
+}
+
+.view-results .results-side-context.is-collapsed {
+  gap: 6px;
+  align-content: start;
+}
+
+.view-results .results-side-context.is-collapsed .text-button,
+.view-results .results-side-context.is-collapsed .collapsed-panel-bar {
+  width: 34px;
+  min-height: 112px;
+  padding: 8px 0;
+  overflow: hidden;
+  writing-mode: vertical-rl;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.view-results .data-grid-section {
+  padding: 6px;
+}
+
+.view-results .data-grid-table {
+  max-height: min(84vh, 980px);
+  overflow: auto;
+}
+
+.view-results .data-grid-table table {
+  min-width: max(1600px, 100%);
+}
+
+.view-sqlWorkspace .sql-workspace {
+  grid-template-columns: 44px minmax(0, 1fr);
+  min-height: min(880px, calc(100vh - 70px));
+}
+
+.view-sqlWorkspace .sql-workspace:not(.is-schema-collapsed) {
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+}
+
+.view-sqlWorkspace .sql-main-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 250px);
+  gap: 8px;
+}
+
+.view-sqlWorkspace .sql-workspace.is-sql-side-collapsed .sql-main-panel {
+  grid-template-columns: minmax(0, 1fr) 44px;
+}
+
+.view-sqlWorkspace .sql-editor-panel,
+.view-sqlWorkspace .sql-preview-panel,
+.view-sqlWorkspace .sql-draft-panel {
+  padding: 8px;
+}
+
+.view-sqlWorkspace .sql-editor-host,
+.view-sqlWorkspace .sql-monaco-editor,
+.view-sqlWorkspace .sql-editor-host .sql-editor-input {
+  min-height: min(78vh, 840px);
+}
+
+@media (max-width: 1280px) {
+  .workspace-shell,
+  .app.is-sidebar-collapsed .workspace-shell,
+  .workspace-shell:has(.runtime-context-panel.is-collapsed),
+  .app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed),
+  .view-results .workspace-shell:has(.runtime-context-panel.is-collapsed),
+  .view-sqlWorkspace .workspace-shell:has(.runtime-context-panel.is-collapsed),
+  .view-results.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed),
+  .view-sqlWorkspace.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
+    grid-template-columns: 48px 0 minmax(0, 1fr) 44px;
+  }
+
+  .left-sidebar .nav-label,
+  .sidebar-nav-section p {
+    display: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .view-results .workspace-split-pane,
+  .view-results .workspace-split-pane:has(.results-side-context.is-collapsed),
+  .view-sqlWorkspace .sql-main-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .view-results .workspace-split-secondary {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .view-results .results-side-context.is-collapsed .text-button,
+  .view-results .results-side-context.is-collapsed .collapsed-panel-bar {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 10px;
+    writing-mode: horizontal-tb;
+  }
+
+  .view-sqlWorkspace .sql-workspace,
+  .view-sqlWorkspace .sql-workspace:not(.is-schema-collapsed) {
+    grid-template-columns: 1fr;
+  }
+}
