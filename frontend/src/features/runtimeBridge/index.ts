@@ -5,6 +5,7 @@ export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeGovernance";
 export * from "./runtimeAnalysisPackageAdapters";
 export * from "./runtimeGraphAdapters";
+export * from "./runtimeInvestigationWorkspaceAdapters";
 export * from "./runtimeBridgeIds";
 export * from "./runtimeBridgeIntegrity";
 export * from "./runtimeBridgeNormalize";
