@@ -3,6 +3,7 @@ export * from "./runtimeBridgeArtifacts";
 export * from "./runtimeBridgeBuilderTypes";
 export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeGovernance";
+export * from "./runtimeGraphAdapters";
 export * from "./runtimeBridgeIds";
 export * from "./runtimeBridgeIntegrity";
 export * from "./runtimeBridgeNormalize";
