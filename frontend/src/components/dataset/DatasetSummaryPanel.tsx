@@ -29,7 +29,7 @@ export type HumanIntent =
   | "unusual_values"
   | "simple_chart";
 
-export type HumanGuidanceCard = {
+type HumanGuidanceCard = {
   intent: HumanIntent;
   label: string;
 };
@@ -52,7 +52,7 @@ type DatasetSummaryPanelProps = {
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
 
-export const humanGuidanceCards: HumanGuidanceCard[] = [
+const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
   { intent: "missing_values", label: "Missing values" },
   { intent: "top_categories", label: "Top categories" },
@@ -358,7 +358,7 @@ function DatasetSummaryPanel({
               <button type="button" onClick={() => setActiveDrillInView("dataIntelligence")}>
                 <span>Data intelligence</span>
                 <strong>{dataProfile ? dataProfile.shape.shapeLabel.replace(/_/g, " ") : "Profile"}</strong>
-                <small>Open metadata details</small>
+                <small>Open details</small>
               </button>
               <button type="button" onClick={() => setActiveDrillInView("businessSemantics")}>
                 <span>Business semantics</span>
@@ -430,20 +430,20 @@ function DatasetSummaryPanel({
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-data-intelligence"
-          label="Runtime slot"
+          label="Details"
           title="Data intelligence"
           summary={humanSummary}
-          badge={dialectRecommendation?.recommendedFutureEngine?.label || "Metadata only"}
+          badge={dialectRecommendation?.recommendedFutureEngine?.label || "Review only"}
         >
         <section className="data-intelligence-panel" aria-label="Data intelligence profile">
           <div className="summary-header">
             <div>
               <p className="section-label">Data intelligence</p>
-              <h2>Profile and future engine fit</h2>
+              <h2>Profile and analysis fit</h2>
               <p>{humanSummary}</p>
             </div>
             <span className="dataset-count-pill">
-              {dialectRecommendation?.recommendedFutureEngine?.label || "Metadata only"}
+              {dialectRecommendation?.recommendedFutureEngine?.label || "Review only"}
             </span>
           </div>
           <div className="data-intelligence-grid">
@@ -480,7 +480,7 @@ function DatasetSummaryPanel({
       {dataset && recommendations.length > 0 && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-workflow-recommendations"
-          label="Runtime slot"
+          label="Details"
           title="Workflow recommendations"
           summary={workflowSummary}
           badge={`${recommendations.length}`}
@@ -501,7 +501,7 @@ function DatasetSummaryPanel({
                 <p>{recommendation.humanSummary}</p>
                 <div>
                   <small>{recommendation.confidence} confidence</small>
-                  <small>{recommendation.recommendedFutureEnginePath[0]?.replace(/_/g, " ") || "metadata only"}</small>
+                  <small>{recommendation.recommendedFutureEnginePath[0]?.replace(/_/g, " ") || "review only"}</small>
                 </div>
               </article>
             ))}
@@ -514,13 +514,13 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Business detail"
           title="Business semantics"
-          summary={semanticSummary || "Business context is derived from available metadata only."}
+          summary={semanticSummary || "Business context is derived from the available data profile."}
           onBack={closeDrillIn}
         >
         {businessSemanticReport && (
         <RuntimeDisclosureSlot
           id="runtime-slot-business-semantics"
-          label="Runtime slot"
+          label="Details"
           title="Business semantics"
           summary={semanticSummary}
           badge={`${detectedSemanticEntities.length}`}
@@ -539,7 +539,7 @@ function DatasetSummaryPanel({
               <article className="business-semantic-card" key={entity.id}>
                 <strong>{entity.label}</strong>
                 <span>{entity.confidence} confidence</span>
-                <p>{entity.supportingMetadataSignals[0]?.description || "Detected from metadata."}</p>
+                <p>{entity.supportingMetadataSignals[0]?.description || "Detected from the data profile."}</p>
               </article>
             ))}
           </div>
@@ -555,7 +555,7 @@ function DatasetSummaryPanel({
         </RuntimeDisclosureSlot>
         )}
         {!businessSemanticReport && (
-          <p className="compact-empty">No business semantic metadata is available for this dataset yet.</p>
+          <p className="compact-empty">No business context is available for this dataset yet.</p>
         )}
         </DrillInDetailPanel>
       )}
@@ -563,7 +563,7 @@ function DatasetSummaryPanel({
       {dataset && kpiOpportunities.length > 0 && activeDrillInView === "businessSemantics" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-kpi-intelligence"
-          label="Runtime slot"
+          label="Details"
           title="KPI intelligence"
           summary={kpiSummary}
           badge={`${kpiOpportunities.length}`}
@@ -584,7 +584,7 @@ function DatasetSummaryPanel({
                 <p>{opportunity.humanSummary}</p>
                 <div>
                   <small>{opportunity.confidence} confidence</small>
-                  <small>{opportunity.possibleChartTypes[0]?.replace(/_/g, " ") || "chart metadata"}</small>
+                  <small>{opportunity.possibleChartTypes[0]?.replace(/_/g, " ") || "chart option"}</small>
                 </div>
               </article>
             ))}
@@ -596,7 +596,7 @@ function DatasetSummaryPanel({
       {dataset && interpretedQuestions.length > 0 && activeDrillInView === "businessSemantics" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-business-questions"
-          label="Runtime slot"
+          label="Details"
           title="Business questions"
           summary={questionSummary}
           badge={`${interpretedQuestions.length}`}
@@ -629,7 +629,7 @@ function DatasetSummaryPanel({
       {dataset && analyticsIntentGraph && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-intent-graph"
-          label="Runtime slot"
+          label="Details"
           title="Intent graph"
           summary={graphSummary}
           badge={analyticsIntentGraph.confidence}
@@ -638,7 +638,7 @@ function DatasetSummaryPanel({
           <div className="summary-header">
             <div>
               <p className="section-label">Intent graph</p>
-              <h2>Connected analytics metadata</h2>
+              <h2>Connected analysis context</h2>
               <p>{graphSummary}</p>
             </div>
             <span className="dataset-count-pill">{analyticsIntentGraph.confidence}</span>
@@ -661,7 +661,7 @@ function DatasetSummaryPanel({
               <strong>{analyticsIntentGraph.connectedKpis.length}</strong>
             </span>
             <span>
-              Missing
+              Needs review
               <strong>{analyticsIntentGraph.missingMetadataDependencies.length}</strong>
             </span>
           </div>
@@ -672,16 +672,16 @@ function DatasetSummaryPanel({
       {dataset && analyticsPlan && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-analytics-plan"
-          label="Runtime slot"
+          label="Details"
           title="Analytics plan"
           summary={planningSummary}
           badge={analyticsPlan.status.replace(/_/g, " ")}
         >
-        <section className="analytics-planning-panel" aria-label="Analytics planning engine">
+        <section className="analytics-planning-panel" aria-label="Analytics planning">
           <div className="summary-header">
             <div>
               <p className="section-label">Analytics plan</p>
-              <h2>Future workflow plan</h2>
+              <h2>Possible workflow plan</h2>
               <p>{planningSummary}</p>
             </div>
             <span className="dataset-count-pill">{analyticsPlan.status.replace(/_/g, " ")}</span>
@@ -711,7 +711,7 @@ function DatasetSummaryPanel({
       {dataset && executionContract && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-execution-contract"
-          label="Runtime slot"
+          label="Details"
           title="Run boundary"
           summary={executionContractSummary}
           badge={executionContract.lifecycleState.replace(/_/g, " ")}
@@ -720,7 +720,7 @@ function DatasetSummaryPanel({
           <div className="summary-header">
             <div>
               <p className="section-label">Run boundary</p>
-              <h2>Future run boundary</h2>
+              <h2>Run boundary</h2>
               <p>{executionContractSummary}</p>
             </div>
             <span className="dataset-count-pill">{executionContract.lifecycleState.replace(/_/g, " ")}</span>
@@ -735,7 +735,7 @@ function DatasetSummaryPanel({
               <strong>{executionContract.sizing.estimatedProjectedOutputs}</strong>
             </span>
             <span>
-              Engines
+              Analysis paths
               <strong>{executionContract.engines.length}</strong>
             </span>
             <span>
@@ -750,9 +750,9 @@ function DatasetSummaryPanel({
       {dataset && activeDrillInView === "dataIntelligence" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-task-launcher"
-          label="Runtime slot"
+          label="Details"
           title="Guided analytics tasks"
-          summary="Preview task inputs and metadata-only planning context."
+          summary="Preview task inputs and planning context."
           badge="Tasks"
         >
         <TaskLauncherPanel
@@ -766,7 +766,7 @@ function DatasetSummaryPanel({
       {dataset && activeDrillInView === "businessSemantics" && (
         <RuntimeDisclosureSlot
           id="runtime-slot-human-guidance"
-          label="Runtime slot"
+          label="Details"
           title="Human Mode guidance"
           summary="Choose a simple continuation into the existing Human Mode workflow."
           badge="Human Mode"

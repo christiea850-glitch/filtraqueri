@@ -245,15 +245,15 @@ function TaskDetail({
           <strong>{task.supportedResultTypes.join(", ")}</strong>
         </span>
         <span>
-          Supported engines
+          Supported analysis paths
           <strong>{task.supportedEngines.join(", ")}</strong>
         </span>
         <span>
-          Recommended future engine
+          Recommended path
           <strong>{engineCompatibility.recommendedEngine?.label || "Not available yet"}</strong>
         </span>
         <span>
-          Future explanation
+          Explanation
           <strong>{task.explanationTemplateKey}</strong>
         </span>
         <span>
@@ -261,7 +261,7 @@ function TaskDetail({
           <strong>{readinessLabel}</strong>
         </span>
         <span>
-          Future plan state
+          Plan state
           <strong>{planReadinessLabel}</strong>
         </span>
         <span>
@@ -282,19 +282,19 @@ function TaskDetail({
           <small>{planningReadiness.supportedWorkflowScope.replace(/_/g, " ")}</small>
           <small>{planningReadiness.explanationReadiness.replace(/_/g, " ")}</small>
           <small>
-            {planningReadiness.engineCompatibilitySummary.compatibleEngines.length} engine options
+            {planningReadiness.engineCompatibilitySummary.compatibleEngines.length} analysis options
           </small>
         </div>
         {planningReadiness.futureExecutionBlockers.length > 0 && (
           <div className="planning-readiness-list">
-            <span>Future blockers</span>
+            <span>Needs review</span>
             {planningReadiness.futureExecutionBlockers.slice(0, 3).map((blocker) => (
               <small key={blocker}>{blocker}</small>
             ))}
           </div>
         )}
         <div className="planning-readiness-list">
-          <span>Future notes</span>
+          <span>Notes</span>
           {planningReadiness.futureExecutionNotes.slice(0, 3).map((note) => (
             <small key={note}>{note}</small>
           ))}
@@ -529,11 +529,11 @@ function TaskDetail({
               <strong>{analyticsIntentGraph.edges.length}</strong>
             </span>
             <span>
-              Engines
+              Analysis paths
               <strong>{analyticsIntentGraph.recommendedFutureEngines.length}</strong>
             </span>
             <span>
-              Missing
+              Needs review
               <strong>{analyticsIntentGraph.health.unresolvedDependencies.length}</strong>
             </span>
           </div>
@@ -547,7 +547,7 @@ function TaskDetail({
         </div>
       )}
       {analyticsPlan && (
-        <div className="analytics-planning-panel compact" aria-label="Task analytics planning engine">
+        <div className="analytics-planning-panel compact" aria-label="Task analytics planning">
           <span>Analytics plan</span>
           <strong>{planningSummary}</strong>
           <div className="analytics-planning-grid">
@@ -591,7 +591,7 @@ function TaskDetail({
               <strong>{executionContract.sizing.estimatedProjectedOutputs}</strong>
             </span>
             <span>
-              Engines
+              Analysis paths
               <strong>{executionContract.engines.length}</strong>
             </span>
             <span>
@@ -642,7 +642,7 @@ function TaskDetail({
         </div>
       )}
       <div className="engine-compatibility-panel">
-        <span>Future engine compatibility</span>
+        <span>Analysis support</span>
         {engineCompatibility.compatibleEngines.map((result) => (
           <div key={result.engine.id} className="engine-compatibility-card">
             <strong>{result.engine.label}</strong>
@@ -665,8 +665,7 @@ function TaskDetail({
         </div>
       )}
       <p className="task-safe-note">
-        This task preview is metadata only. Execution, SQL generation, and AI planning are not
-        connected yet.
+        This is a preview only. Nothing runs, and no SQL is created from this view.
       </p>
     </aside>
   );

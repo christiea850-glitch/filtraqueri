@@ -1781,3 +1781,202 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* UX-F21: canonical chrome cleanup */
+html,
+body,
+#root,
+.app {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.left-sidebar {
+  background: var(--fq-bg-app);
+}
+
+.left-sidebar nav {
+  gap: var(--fq-space-3);
+}
+
+.sidebar-dataset-summary,
+.sidebar-workspace-card,
+.sidebar-recents,
+.hub-subnav,
+.analyst-sidebar-section {
+  display: none;
+}
+
+.workspace-page-heading {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.34fr);
+  margin-bottom: var(--fq-space-2);
+  padding-bottom: var(--fq-space-2);
+}
+
+.workspace-page-heading h1 {
+  font-size: clamp(20px, 1vw, 23px);
+  font-weight: var(--fq-font-heading);
+}
+
+.workspace-page-heading > span {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.workspace-context-strip {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--fq-space-2);
+  margin-bottom: var(--fq-space-4);
+  padding: var(--fq-space-2) var(--fq-space-3);
+}
+
+.workspace-context-strip > span {
+  min-width: 0;
+  padding-right: var(--fq-space-2);
+}
+
+.workspace-context-strip strong {
+  max-width: 100%;
+}
+
+.runtime-context-body {
+  gap: var(--fq-space-3);
+  padding: var(--fq-space-3) var(--fq-space-2);
+}
+
+.runtime-context-header {
+  gap: var(--fq-space-1);
+  padding: 0;
+}
+
+.runtime-context-header h2 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--fq-text);
+  font-size: 15px;
+  font-weight: var(--fq-font-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-context-header .section-label,
+.runtime-context-header > span,
+.runtime-section-heading span {
+  color: var(--fq-text-muted);
+  font-size: 11px;
+  font-weight: var(--fq-font-label);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.runtime-context-header > span {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-investigation-surface,
+.runtime-next-steps,
+.runtime-trail-section {
+  gap: var(--fq-space-2);
+}
+
+.runtime-trail-section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.runtime-guidance-list button,
+.runtime-trail-list button {
+  padding: var(--fq-space-2);
+  border-color: var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  background: var(--fq-surface);
+  box-shadow: none;
+}
+
+.runtime-guidance-list button.is-high,
+.runtime-guidance-list button.is-medium,
+.runtime-guidance-list button.is-low {
+  border-color: var(--fq-border);
+  border-style: solid;
+  background: var(--fq-surface);
+  box-shadow: none;
+}
+
+.runtime-guidance-list small,
+.runtime-guidance-list em,
+.runtime-trail-list small,
+.runtime-continuation-list em {
+  display: none;
+}
+
+.runtime-guidance-list strong,
+.runtime-trail-list strong {
+  color: var(--fq-text);
+  font-size: 13px;
+  font-weight: var(--fq-font-heading);
+}
+
+.runtime-guidance-list span,
+.runtime-trail-list span {
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-body);
+}
+
+.runtime-trail-list button.is-current,
+.runtime-trail-list button.is-selected,
+.runtime-trail-list button:hover,
+.runtime-guidance-list button:hover {
+  border-color: var(--fq-border-strong);
+  background: var(--fq-surface-muted);
+}
+
+.runtime-disclosure-section,
+.runtime-panel-slot,
+.runtime-current-step,
+.runtime-return-button,
+.runtime-continuation-list {
+  display: none;
+}
+
+.human-dataset-workspace .runtime-disclosure-slot summary small {
+  text-transform: none;
+}
+
+.human-dataset-workspace .runtime-disclosure-slot summary b,
+.human-dataset-workspace .dataset-count-pill {
+  background: var(--fq-surface-muted);
+  color: var(--fq-text-muted);
+}
+
+.query-builder-panel,
+.dataset-hub-panel,
+.data-profile-surface,
+.results-review-strip,
+.session-panel,
+.history-panel,
+.sql-editor-panel,
+.sql-context-panel,
+.sql-preview-panel,
+.sql-draft-panel {
+  box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .workspace-page-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-page-heading > span {
+    justify-self: start;
+    max-width: none;
+    text-align: left;
+  }
+}

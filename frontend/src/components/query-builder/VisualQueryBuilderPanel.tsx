@@ -134,7 +134,7 @@ function VisualQueryBuilderPanel({
           detail: expectedResultType,
         },
         {
-          label: "Execution ready",
+          label: "Ready to run",
           complete: Boolean(rowLimit) || selectedColumns.length > 0 || activeAggregations.length > 0,
           detail: rowLimit ? `${rowLimit} row limit` : "Review first",
         },
@@ -380,7 +380,7 @@ function VisualQueryBuilderPanel({
                   : "No filters are active. Use the Filters workspace when the question needs a narrower scope."}
               </p>
             </div>
-            <small>Metadata only</small>
+            <small>Review only</small>
           </div>
 
           <div className="query-guidance-grid">
@@ -506,7 +506,7 @@ function VisualQueryBuilderPanel({
           <div className="query-stage-heading">
             <div>
               <h3>{isAnalystMode ? "Prepare result projection" : "Sort / limit"}</h3>
-              <p>Review output order and size before using the existing run action.</p>
+              <p>Review output order and size before running.</p>
             </div>
           </div>
 
@@ -559,7 +559,7 @@ function VisualQueryBuilderPanel({
         <div className="query-stage-panel preview-query-stage">
           <div className="query-stage-heading">
             <div>
-              <h3>{isAnalystMode ? "Execute review" : "Review output"}</h3>
+              <h3>{isAnalystMode ? "Execution review" : "Review output"}</h3>
               <p>
                 {isAnalystMode
                   ? "Confirm structure, then run through the existing Query Builder path."
@@ -607,8 +607,8 @@ function VisualQueryBuilderPanel({
 
           <details className="query-technical-disclosure">
             <summary>
-              <span>Technical query metadata</span>
-              <small>Read-only workflow context</small>
+              <span>{isAnalystMode ? "Technical query details" : "Query details"}</span>
+              <small>Read-only review</small>
             </summary>
             <div>
               <span>

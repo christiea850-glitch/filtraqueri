@@ -978,7 +978,7 @@ function App() {
           ? "Large result; review filters before exporting"
           : activeResultModel.sorting.column
             ? `Sorted by ${activeResultModel.sorting.column}`
-            : "No obvious quality flags in current metadata";
+            : "No obvious quality flags in this result";
     const chartSupportLabel =
       activeResultModel.chartReady.categoricalColumns.length > 0 &&
       activeResultModel.chartReady.numericColumns.length > 0
@@ -1043,7 +1043,7 @@ function App() {
 
         <details className="results-technical-disclosure">
           <summary>
-            <span>Technical result metadata</span>
+            <span>{isAnalystMode ? "Technical result details" : "Result details"}</span>
             <small>
               {activeResultTab} / {activeResultModel.sourceType} / {hiddenColumnCount.toLocaleString()} hidden columns
             </small>

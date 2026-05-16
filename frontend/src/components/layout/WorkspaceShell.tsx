@@ -273,7 +273,7 @@ function WorkspaceShell({
       : activeView === "filters"
         ? "Start with a business question, then narrow the rows that matter."
         : activeView === "queryBuilder"
-          ? "Construct the query context and approve it before anything runs."
+          ? "Choose fields, shape the result, and run only when ready."
           : activeView === "results"
             ? "Review what the result means, then choose the next investigation move."
             : activeView === "sqlWorkspace"
@@ -289,8 +289,7 @@ function WorkspaceShell({
     : "No rows loaded";
   const workspaceIdentityLabel =
     dataset?.original_filename || (workspaceMode === "analyst" ? "Analyst workspace" : "Workspace");
-  const primaryRecommendationGroup = runtimeContext.recommendationGroups[0] || null;
-  const primaryRecommendationItems = primaryRecommendationGroup?.items.slice(0, 2) || [];
+  const primaryRecommendationItem = runtimeContext.recommendationGroups[0]?.items[0] || null;
   const compactTrail = runtimeContext.trail.slice(-5);
 
   const changeHub = (hub: HubItem) => {
@@ -502,48 +501,31 @@ function WorkspaceShell({
             <div className="runtime-context-body">
               <div className="runtime-context-header">
                 <p className="section-label">Investigation</p>
-                <h2>Current step</h2>
+                <h2>{workflowLabel}</h2>
+                <span>{investigationFocusLabel}</span>
               </div>
 
-              <section className="runtime-current-step" aria-label="Current investigation step">
-                <span>{activeSectionLabel}</span>
-                <strong>{workflowLabel}</strong>
-                <small>{investigationFocusLabel}</small>
-              </section>
-
-              <section className="runtime-investigation-surface" aria-label="Contextual next steps">
-                {primaryRecommendationGroup && primaryRecommendationItems.length > 0 && (
-                  <div className="runtime-next-steps" aria-label="Suggested next steps">
+              <section className="runtime-investigation-surface" aria-label="Suggested next step">
+                {primaryRecommendationItem && (
+                  <div className="runtime-next-steps">
                     <div className="runtime-section-heading">
                       <span>Suggested next action</span>
-                      <small>Nothing runs automatically</small>
+                      <small>Choose when you are ready</small>
                     </div>
-                    <div className="runtime-guidance-groups" aria-label="Ranked suggestions">
-                      <section key={primaryRecommendationGroup.id} className="runtime-guidance-group">
-                        <div>
-                          <strong>{primaryRecommendationGroup.title}</strong>
-                        </div>
-                        <div className="runtime-guidance-list">
-                          {primaryRecommendationItems.map((guidance) => (
-                            <button
-                              type="button"
-                              key={guidance.id}
-                              className={`is-${guidance.priority}`}
-                              onClick={() =>
-                                onRuntimeTrailSelect(
-                                  guidance.continuationLink.continuationId,
-                                  guidance.continuationLink.targetView,
-                                  guidance.continuationLink.targetMode,
-                                )
-                              }
-                            >
-                              <strong>{guidance.title}</strong>
-                              <span>{guidance.summary}</span>
-                              <small>{guidance.priority} priority</small>
-                            </button>
-                          ))}
-                        </div>
-                      </section>
+                    <div className="runtime-guidance-list">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onRuntimeTrailSelect(
+                            primaryRecommendationItem.continuationLink.continuationId,
+                            primaryRecommendationItem.continuationLink.targetView,
+                            primaryRecommendationItem.continuationLink.targetMode,
+                          )
+                        }
+                      >
+                        <strong>{primaryRecommendationItem.title}</strong>
+                        <span>{primaryRecommendationItem.summary}</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -569,92 +551,10 @@ function WorkspaceShell({
                     >
                       <strong>{item.label}</strong>
                       <span>{item.summary}</span>
-                      <small>{item.mode === "analyst" ? "Analyst" : "Human"}</small>
                     </button>
                   ))}
                 </div>
               </section>
-
-              <details className="runtime-disclosure-section">
-                <summary>
-                  <span>More paths</span>
-                  <small>Return and go-to actions</small>
-                </summary>
-                <div className="runtime-disclosure-body">
-                  {runtimeContext.returnContinuation && (
-                    <button
-                      type="button"
-                      className="runtime-return-button"
-                      onClick={() =>
-                        onRuntimeTrailSelect(
-                          runtimeContext.returnContinuation!.id,
-                          runtimeContext.returnContinuation!.originReference.view,
-                          runtimeContext.returnContinuation!.originReference.mode,
-                        )
-                      }
-                    >
-                      <strong>{runtimeContext.returnContinuation.returnLabel}</strong>
-                      <span>Return to the workspace point that opened this context.</span>
-                    </button>
-                  )}
-
-                  <div className="runtime-section-heading">
-                    <span>Go to</span>
-                    <small>Open related workspaces without running anything</small>
-                  </div>
-                  <div className="runtime-continuation-list" aria-label="Go-to investigation actions">
-                    {runtimeContext.continuations.map((continuation) => (
-                      <button
-                        type="button"
-                        key={continuation.id}
-                        disabled={continuation.disabled}
-                        onClick={() =>
-                          onRuntimeTrailSelect(
-                            continuation.id,
-                            continuation.targetView,
-                            continuation.targetMode,
-                          )
-                        }
-                      >
-                        <strong>{continuation.label}</strong>
-                        <small>{continuation.description}</small>
-                        <em>{continuation.origin.replace(/-/g, " ")}</em>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </details>
-
-              <details className="runtime-disclosure-section">
-                <summary>
-                  <span>Technical metadata</span>
-                  <small>Read-only runtime details</small>
-                </summary>
-                <div className="runtime-disclosure-body">
-                  <div className="runtime-slot-list" aria-label="Read-only runtime metadata">
-                    {runtimeContext.panelSlots.map((slot) => (
-                      <section key={slot.id} className="runtime-panel-slot">
-                        <div>
-                          <span>{slot.label}</span>
-                          {slot.status && <small>{slot.status}</small>}
-                        </div>
-                        <strong>{slot.title}</strong>
-                        <p>{slot.summary}</p>
-                        {slot.items && (
-                          <div className="runtime-slot-items">
-                            {slot.items.map((item) => (
-                              <span key={`${slot.id}-${item.label}`}>
-                                {item.label}
-                                <strong>{item.value}</strong>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </section>
-                    ))}
-                  </div>
-                </div>
-              </details>
             </div>
           )}
         </aside>
