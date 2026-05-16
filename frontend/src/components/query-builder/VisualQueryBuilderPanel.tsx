@@ -2,6 +2,10 @@ import { useMemo, useState } from "react";
 import type { SchemaColumn, WorkspaceMode } from "../../features/dataset/datasetTypes";
 import type { AggregationState } from "../../features/query-builder/queryBuilderTypes";
 import type { SortDirection } from "../../features/results/resultTypes";
+import {
+  createSchemaDisplayProfiles,
+  getDisplayColumnName,
+} from "../../features/dataIntelligence/structuralPresentation";
 
 type VisualQueryBuilderPanelProps = {
   schema: SchemaColumn[];
@@ -72,16 +76,20 @@ function VisualQueryBuilderPanel({
   const [activeStep, setActiveStep] = useState<BuilderStep>("data");
   const [columnSearch, setColumnSearch] = useState("");
   const normalizedSearch = columnSearch.trim().toLowerCase();
+  const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
   const visibleSchema = useMemo(
     () =>
       normalizedSearch
         ? schema.filter(
             (column) =>
               column.name.toLowerCase().includes(normalizedSearch) ||
+              getDisplayColumnName(displayColumnProfiles, column.name)
+                .toLowerCase()
+                .includes(normalizedSearch) ||
               column.inferred_type.toLowerCase().includes(normalizedSearch),
           )
         : schema,
-    [normalizedSearch, schema],
+    [displayColumnProfiles, normalizedSearch, schema],
   );
   const numericColumns = schema
     .filter((column) => column.inferred_type === "numeric")
@@ -320,7 +328,12 @@ function VisualQueryBuilderPanel({
                     checked={selectedColumns.includes(column.name)}
                     onChange={() => onToggleSelectedColumn(column.name)}
                   />
-                  <span>{column.name}</span>
+                  <span>
+                    {getDisplayColumnName(displayColumnProfiles, column.name)}
+                    {getDisplayColumnName(displayColumnProfiles, column.name) !== column.name && (
+                      <small>{column.name}</small>
+                    )}
+                  </span>
                 </label>
               ))}
             </div>
@@ -435,7 +448,7 @@ function VisualQueryBuilderPanel({
               >
                 {schema.map((column) => (
                   <option key={column.name} value={column.name} title={column.name}>
-                    {column.name}
+                    {getDisplayColumnName(displayColumnProfiles, column.name)}
                   </option>
                 ))}
               </select>
@@ -481,7 +494,7 @@ function VisualQueryBuilderPanel({
                         )
                         .map((column) => (
                           <option key={column.name} value={column.name} title={column.name}>
-                            {column.name}
+                            {getDisplayColumnName(displayColumnProfiles, column.name)}
                           </option>
                         ))}
                     </select>
@@ -524,7 +537,7 @@ function VisualQueryBuilderPanel({
                   <option value="">No sorting</option>
                   {Array.from(new Set(sortOptions)).map((column) => (
                     <option key={column} value={column} title={column}>
-                      {column}
+                      {getDisplayColumnName(displayColumnProfiles, column)}
                     </option>
                   ))}
                 </select>
@@ -576,7 +589,10 @@ function VisualQueryBuilderPanel({
               <span>Columns</span>
               <strong>{selectedColumns.length || "Grouped result"}</strong>
               <p title={selectedColumns.join(", ")}>
-                {selectedColumns.slice(0, 6).join(", ") ||
+                {selectedColumns
+                  .slice(0, 6)
+                  .map((column) => getDisplayColumnName(displayColumnProfiles, column))
+                  .join(", ") ||
                   "Uses grouped fields when summaries are active."}
               </p>
             </div>
@@ -584,7 +600,7 @@ function VisualQueryBuilderPanel({
               <span>Grouping</span>
               <strong>{groupBy.length || "None"}</strong>
               <p title={groupBy.join(", ")}>
-                {groupBy.join(", ") || "None"}
+                {groupBy.map((column) => getDisplayColumnName(displayColumnProfiles, column)).join(", ") || "None"}
               </p>
             </div>
             <div>
@@ -592,7 +608,14 @@ function VisualQueryBuilderPanel({
               <strong>{activeAggregations.length || "None"}</strong>
               <p>
                 {activeAggregations
-                  .map((aggregation) => `${aggregation.function} ${aggregation.column || "rows"}`)
+                  .map(
+                    (aggregation) =>
+                      `${aggregation.function} ${
+                        aggregation.column
+                          ? getDisplayColumnName(displayColumnProfiles, aggregation.column)
+                          : "rows"
+                      }`,
+                  )
                   .join(", ") || "None"}
               </p>
             </div>

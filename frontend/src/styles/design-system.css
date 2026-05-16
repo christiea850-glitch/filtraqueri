@@ -1980,3 +1980,197 @@ body,
     text-align: left;
   }
 }
+
+/* UX-F22: structural data intelligence cleanup */
+.semantic-hint-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fq-space-2);
+  align-items: center;
+  min-width: 0;
+  padding: var(--fq-space-2) 0;
+  border-block: 1px solid var(--fq-border);
+}
+
+.semantic-hint-strip > span {
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-label);
+}
+
+.semantic-hint-strip small {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  max-width: 220px;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-pill);
+  background: var(--fq-surface-muted);
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-body);
+}
+
+.semantic-hint-strip strong {
+  overflow: hidden;
+  color: var(--fq-text);
+  font-weight: var(--fq-font-heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detected-column-list span {
+  align-content: start;
+  border-radius: var(--fq-radius-xs);
+}
+
+.detected-column-list em,
+.filter-card-header em,
+.field-chip small,
+.columns-menu-list small,
+.source-column-name {
+  display: block;
+  overflow: hidden;
+  color: var(--fq-text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: var(--fq-font-body);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-card-header span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.field-chip span {
+  display: grid;
+  gap: 1px;
+}
+
+.columns-menu-list span {
+  display: grid;
+  gap: 2px;
+}
+
+.filters-panel,
+.query-builder-panel,
+.dataset-hub-panel {
+  border-radius: var(--fq-radius-md);
+}
+
+.filters-control-strip,
+.query-builder-workflow-strip,
+.query-approval-strip,
+.query-stage-panel,
+.data-profile-surface,
+.runtime-disclosure-slot {
+  border-color: var(--fq-border);
+  border-radius: var(--fq-radius-sm);
+  box-shadow: none;
+}
+
+.query-guidance-grid article,
+.query-review-grid div,
+.builder-block,
+.filter-card,
+.task-category-section,
+.task-detail-panel {
+  border-color: var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  box-shadow: none;
+}
+
+.view-results .data-grid-section {
+  border-radius: var(--fq-radius-sm);
+  background: var(--fq-surface);
+}
+
+.view-results .data-grid-toolbar {
+  align-items: center;
+  border-bottom: 1px solid var(--fq-border);
+}
+
+.view-results .data-grid-table {
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  background: var(--fq-surface);
+}
+
+.view-results .data-grid-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.view-results .data-grid-table thead th {
+  background: #f1f5f9;
+  color: var(--fq-text);
+  box-shadow: inset 0 -1px 0 var(--fq-border);
+}
+
+.view-results .data-grid-table thead th.is-column-match {
+  background: #e8eef8;
+  color: var(--fq-text);
+}
+
+.view-results .data-grid-table th button {
+  gap: 4px;
+}
+
+.view-results .data-grid-table .column-letter {
+  min-width: 20px;
+  border-color: var(--fq-border);
+  background: var(--fq-surface);
+  color: var(--fq-text-muted);
+  font-weight: var(--fq-font-label);
+}
+
+.view-results .data-grid-table .column-name {
+  color: var(--fq-text);
+  font-weight: var(--fq-font-heading);
+}
+
+.view-results .data-grid-table td {
+  border-bottom: 1px solid #edf2f7;
+  color: var(--fq-text);
+}
+
+.view-results .data-grid-table tbody tr:nth-child(even):not(.is-structural-row) td,
+.view-results .data-grid-table tbody tr:nth-child(even):not(.is-structural-row) .row-number-cell {
+  background: #fcfdff;
+}
+
+.view-results .data-grid-table tbody tr.is-structural-row td,
+.view-results .data-grid-table tbody tr.is-structural-row .row-number-cell {
+  background: #f8fafc;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.view-results .data-grid-table tbody tr.is-structural-row td {
+  border-bottom-style: dashed;
+}
+
+.view-results .data-grid-table .row-number-cell {
+  background: #f8fafc;
+  box-shadow: 1px 0 0 var(--fq-border);
+}
+
+.view-results .data-grid-table .row-number-header {
+  background: #e8eef8;
+  color: var(--fq-text);
+}
+
+.row-structure-label {
+  display: block;
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: var(--fq-font-body);
+  text-align: right;
+}

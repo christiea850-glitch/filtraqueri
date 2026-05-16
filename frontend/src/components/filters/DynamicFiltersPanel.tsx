@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import type { SchemaColumn, WorkspaceMode } from "../../features/dataset/datasetTypes";
 import type { FilterState } from "../../features/filters/filterTypes";
+import {
+  createSchemaDisplayProfiles,
+  getBusinessRoleLabel,
+} from "../../features/dataIntelligence/structuralPresentation";
 
 type DynamicFiltersPanelProps = {
   schema: SchemaColumn[];
@@ -27,6 +31,7 @@ function DynamicFiltersPanel({
   const [customQuestion, setCustomQuestion] = useState("");
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const isAnalystMode = workspaceMode === "analyst";
+  const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
 
   const formatDateValue = (value: unknown) => {
     if (!value) return "";
@@ -43,9 +48,7 @@ function DynamicFiltersPanel({
         (value.values && value.values.length > 0),
     );
 
-  const activeFilterLabels = schema
-    .filter((column) => hasActiveFilter(filterValues[column.name]))
-    .map((column) => column.name);
+  const activeFilterColumns = schema.filter((column) => hasActiveFilter(filterValues[column.name]));
 
   const normalizedSearch = columnSearch.trim().toLowerCase();
   const visibleSchema = useMemo(
@@ -54,10 +57,15 @@ function DynamicFiltersPanel({
         ? schema.filter(
             (column) =>
               column.name.toLowerCase().includes(normalizedSearch) ||
+              (displayColumnProfiles
+                .find((profile) => profile.sourceName === column.name)
+                ?.displayName.toLowerCase()
+                .includes(normalizedSearch) ??
+                false) ||
               column.inferred_type.toLowerCase().includes(normalizedSearch),
           )
         : schema,
-    [normalizedSearch, schema],
+    [displayColumnProfiles, normalizedSearch, schema],
   );
   const suggestedQuestions = isAnalystMode
     ? [
@@ -134,14 +142,23 @@ function DynamicFiltersPanel({
           className="collapsed-panel-bar"
           onClick={() => setIsControlsCollapsed(false)}
         >
-          Filters hidden | {activeFilterLabels.length} active | {visibleSchema.length} columns
+          Filters hidden | {activeFilterColumns.length} active | {visibleSchema.length} columns
         </button>
       ) : (
         <div className="filters-control-strip">
           <div className="active-filter-summary" aria-label="Active filter summary">
             <span>Filters</span>
-            {activeFilterLabels.length > 0 ? (
-              activeFilterLabels.map((label) => <strong key={label}>{label}</strong>)
+            {activeFilterColumns.length > 0 ? (
+              activeFilterColumns.map((column) => {
+                const displayProfile =
+                  displayColumnProfiles.find((profile) => profile.sourceName === column.name) || null;
+
+                return (
+                  <strong key={column.name} title={column.name}>
+                    {displayProfile?.displayName || column.name}
+                  </strong>
+                );
+              })
             ) : (
               <small>None yet</small>
             )}
@@ -163,6 +180,8 @@ function DynamicFiltersPanel({
         <div className="filters-grid">
           {visibleSchema.map((column) => {
             const currentFilter = filterValues[column.name] || {};
+            const displayProfile =
+              displayColumnProfiles.find((profile) => profile.sourceName === column.name) || null;
             const sampleValues = column.sample_values
               .filter((value) => value !== null && value !== undefined)
               .map((value) => String(value));
@@ -170,8 +189,17 @@ function DynamicFiltersPanel({
             return (
               <div className="filter-card" key={column.name}>
                 <div className="filter-card-header">
-                  <span>{column.name}</span>
-                  <small>{column.inferred_type}</small>
+                  <span title={column.name}>
+                    {displayProfile?.displayName || column.name}
+                    {displayProfile && displayProfile.displayName !== column.name && (
+                      <em>{column.name}</em>
+                    )}
+                  </span>
+                  <small>
+                    {displayProfile?.role
+                      ? getBusinessRoleLabel(displayProfile.role)
+                      : column.inferred_type}
+                  </small>
                 </div>
 
                 {column.inferred_type === "numeric" && (

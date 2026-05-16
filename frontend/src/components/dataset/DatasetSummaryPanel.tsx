@@ -10,6 +10,10 @@ import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
 import {
+  createSchemaDisplayProfiles,
+  getBusinessRoleLabel,
+} from "../../features/dataIntelligence/structuralPresentation";
+import {
   getDatasetActiveWorksheet,
   listWorkbookWorksheets,
   type WorksheetMetadata,
@@ -278,6 +282,8 @@ function DatasetSummaryPanel({
   });
   const schemaTypeSummary = dataset ? createSchemaTypeSummary(dataset) : {};
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
+  const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
+  const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
   const dateColumnCount = detectedColumns.filter((column) => column.inferred_type === "date").length;
   const numericColumnCount = detectedColumns.filter((column) => column.inferred_type === "numeric").length;
   const textColumnCount = detectedColumns.filter(
@@ -325,9 +331,9 @@ function DatasetSummaryPanel({
             />
             <div className="data-profile-overview">
               <div>
-                <span>Detected structure</span>
+                <span>Business table</span>
                 <strong>{Object.keys(schemaTypeSummary).length.toLocaleString()} field types</strong>
-                <p>Column types and workbook structure are ready for review.</p>
+                <p>Column labels and workbook structure are cleaned up for review.</p>
               </div>
               <div className="dataset-card-actions">
                 <button type="button" className="secondary-button" onClick={onViewPreview}>
@@ -343,6 +349,17 @@ function DatasetSummaryPanel({
               </div>
             </div>
             <CompactStatGrid items={profileStats} label="Detected data profile" />
+            {semanticHints.length > 0 && (
+              <div className="semantic-hint-strip" aria-label="Business field hints">
+                <span>Likely business fields</span>
+                {semanticHints.map((profile) => (
+                  <small key={profile.sourceName} title={profile.sourceName}>
+                    {getBusinessRoleLabel(profile.role)}
+                    <strong>{profile.displayName}</strong>
+                  </small>
+                ))}
+              </div>
+            )}
             {activeDrillInView === "overview" && (
               <div className="drill-in-summary-grid" aria-label="Data detail summaries">
               <button type="button" onClick={() => setActiveDrillInView("columns")}>
@@ -394,12 +411,25 @@ function DatasetSummaryPanel({
               <span className="dataset-count-pill">{detectedColumns.length.toLocaleString()}</span>
             </div>
             <div className="detected-column-list">
-              {detectedColumns.map((column) => (
-                <span key={column.name} title={column.name}>
-                  <strong>{column.name}</strong>
-                  <small>{column.inferred_type || "unknown"}</small>
+              {detectedColumns.map((column) => {
+                const displayProfile =
+                  displayColumnProfiles.find((profile) => profile.sourceName === column.name) ||
+                  null;
+
+                return (
+                <span key={column.name} title={displayProfile?.displayName !== column.name ? column.name : undefined}>
+                  <strong>{displayProfile?.displayName || column.name}</strong>
+                  <small>
+                    {displayProfile?.role
+                      ? getBusinessRoleLabel(displayProfile.role)
+                      : column.inferred_type || "unknown"}
+                  </small>
+                  {displayProfile && displayProfile.displayName !== column.name && (
+                    <em>Source: {column.name}</em>
+                  )}
                 </span>
-              ))}
+                );
+              })}
             </div>
           </section>
         </DrillInDetailPanel>
@@ -481,14 +511,14 @@ function DatasetSummaryPanel({
         <RuntimeDisclosureSlot
           id="runtime-slot-workflow-recommendations"
           label="Details"
-          title="Workflow recommendations"
+          title="Suggested analysis paths"
           summary={workflowSummary}
           badge={`${recommendations.length}`}
         >
-        <section className="workflow-recommendation-panel" aria-label="Workflow recommendations">
+        <section className="workflow-recommendation-panel" aria-label="Suggested analysis paths">
           <div className="summary-header">
             <div>
-              <p className="section-label">Workflow recommendations</p>
+              <p className="section-label">Analysis paths</p>
               <h2>Likely analysis paths</h2>
               <p>{workflowSummary}</p>
             </div>

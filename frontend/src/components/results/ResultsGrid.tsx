@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ActiveResultModel } from "../../features/results/activeResultModel";
 import type { SortDirection } from "../../features/results/resultTypes";
+import {
+  classifyStructuralRow,
+  createDisplayColumnProfiles,
+  getDisplayColumnName,
+} from "../../features/dataIntelligence/structuralPresentation";
 
 type ResultsGridProps = {
   title: string;
@@ -83,16 +88,34 @@ function ResultsGrid({
   const isLargePage = rowsPerPage >= 500;
   const largePageWarningId = "results-large-page-warning";
   const normalizedColumnSearch = columnSearch.trim().toLowerCase();
+  const displayColumnProfiles = useMemo(
+    () => createDisplayColumnProfiles(columns, rows),
+    [columns, rows],
+  );
   const matchingColumns = useMemo(
     () =>
       normalizedColumnSearch
         ? new Set(
-            visibleColumns.filter((column) => column.toLowerCase().includes(normalizedColumnSearch)),
+            visibleColumns.filter((column) => {
+              const displayName = getDisplayColumnName(displayColumnProfiles, column);
+              return (
+                column.toLowerCase().includes(normalizedColumnSearch) ||
+                displayName.toLowerCase().includes(normalizedColumnSearch)
+              );
+            }),
           )
         : new Set<string>(),
-    [normalizedColumnSearch, visibleColumns],
+    [displayColumnProfiles, normalizedColumnSearch, visibleColumns],
   );
   const hiddenColumnCount = columns.length - visibleColumns.length;
+  const structuralRowCount = useMemo(
+    () =>
+      rows.reduce(
+        (count, row) => count + (classifyStructuralRow(row, visibleColumns).isStructural ? 1 : 0),
+        0,
+      ),
+    [rows, visibleColumns],
+  );
 
   useEffect(() => {
     if (!copiedMessage) return undefined;
@@ -202,16 +225,23 @@ function ResultsGrid({
                   </button>
                 </div>
                 <div className="columns-menu-list">
-                  {columns.map((column) => (
+                  {columns.map((column) => {
+                    const displayName = getDisplayColumnName(displayColumnProfiles, column);
+
+                    return (
                     <label key={column} title={column}>
                       <input
                         type="checkbox"
                         checked={!hiddenColumns.includes(column)}
                         onChange={() => toggleColumnVisibility(column)}
                       />
-                      <span>{column}</span>
+                      <span>
+                        {displayName}
+                        {displayName !== column && <small>{column}</small>}
+                      </span>
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -220,7 +250,7 @@ function ResultsGrid({
         </div>
       </div>
 
-      {(normalizedColumnSearch || copiedMessage) && (
+      {(normalizedColumnSearch || copiedMessage || structuralRowCount > 0) && (
         <div className="results-grid-feedback" aria-live="polite">
           {normalizedColumnSearch && (
             <span>
@@ -229,6 +259,9 @@ function ResultsGrid({
             </span>
           )}
           {copiedMessage && <strong>{copiedMessage}</strong>}
+          {structuralRowCount > 0 && (
+            <span>{structuralRowCount.toLocaleString()} report rows softened</span>
+          )}
         </div>
       )}
 
@@ -260,7 +293,10 @@ function ResultsGrid({
                 >
                   Row
                 </th>
-                {visibleColumns.map((column, columnIndex) => (
+                {visibleColumns.map((column, columnIndex) => {
+                  const displayName = getDisplayColumnName(displayColumnProfiles, column);
+
+                  return (
                   <th
                     key={column}
                     className={matchingColumns.has(column) ? "is-column-match" : ""}
@@ -273,34 +309,39 @@ function ResultsGrid({
                       >
                         {getColumnLetter(columnIndex)}
                       </span>
-                      <span className="column-name" title={column}>
-                        {column}
+                      <span className="column-name" title={displayName !== column ? `${displayName} (${column})` : column}>
+                        {displayName}
                         {activeSortColumn === column && <span> {activeSortDirection}</span>}
                       </span>
+                      {displayName !== column && <span className="source-column-name">{column}</span>}
                     </button>
                   </th>
-                ))}
+                  );
+                })}
               </tr>
             </thead>
 
             <tbody>
               {rows.map((row, rowIndex) => {
                 const rowNumber = firstVisibleRowNumber + rowIndex;
+                const structuralRow = classifyStructuralRow(row, visibleColumns);
 
                 return (
                   <tr
                     key={rowIndex}
+                    className={structuralRow.isStructural ? `is-structural-row is-${structuralRow.type}` : ""}
                     tabIndex={0}
                     onKeyDown={(event) => focusSiblingRow(event, row, rowNumber)}
-                    aria-label={`Row ${rowNumber}. Press Enter to copy visible row values.`}
+                    aria-label={`Row ${rowNumber}. ${structuralRow.label}. Press Enter to copy visible row values.`}
                   >
                     <th
                       className={`row-number-cell ${copiedCellKey === `row-${rowNumber}` ? "is-copied" : ""}`}
                       scope="row"
-                      title="Click to copy visible row values"
+                      title={`${structuralRow.label}. Click to copy visible row values`}
                       onClick={() => copyVisibleRow(row, rowNumber)}
                     >
                       {rowNumber}
+                      {structuralRow.isStructural && <span className="row-structure-label">Report</span>}
                     </th>
                     {visibleColumns.map((column) => (
                       <td
@@ -311,7 +352,7 @@ function ResultsGrid({
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        title={`${column}: ${String(row[column] ?? "")}. Click to copy.`}
+                        title={`${getDisplayColumnName(displayColumnProfiles, column)} (${column}): ${String(row[column] ?? "")}. Click to copy.`}
                         onClick={() => copyCellValue(column, rowIndex, row[column])}
                       >
                         {String(row[column] ?? "")}
