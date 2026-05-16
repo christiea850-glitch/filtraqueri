@@ -18,6 +18,11 @@ import {
   listWorkbookWorksheets,
   type WorksheetMetadata,
 } from "../../features/workbook";
+import {
+  buildWorkbookRelationshipIntelligence,
+  type WorkbookEntityRole,
+  type WorkbookRelationshipIntelligence,
+} from "../../features/workbookIntelligence";
 import { TaskLauncherPanel } from "../../features/tasksLauncher";
 import CompactStatGrid from "../layout/CompactStatGrid";
 import DrillInDetailPanel from "../layout/DrillInDetailPanel";
@@ -177,6 +182,75 @@ function WorksheetSelector({
   );
 }
 
+const workbookRoleLabels: Record<WorkbookEntityRole, string> = {
+  customers: "Customers",
+  orders: "Orders",
+  invoices: "Invoices",
+  products: "Products",
+  employees: "Employees",
+  managers: "Managers",
+  transactions: "Transactions",
+  inventory: "Inventory",
+  payments: "Payments",
+  regions: "Regions",
+  unknown: "Worksheet",
+};
+
+function WorkbookRelationshipSummaryPanel({
+  intelligence,
+}: {
+  intelligence: WorkbookRelationshipIntelligence;
+}) {
+  const visibleRoles = intelligence.entityRoles.slice(0, 5);
+  const visibleConnections = intelligence.joinSuggestions.slice(0, 3);
+  const detectedEntityCount = intelligence.entityRoles.filter((role) => role.role !== "unknown").length;
+
+  return (
+    <section className="workbook-intelligence-panel" aria-label="Workbook relationship guidance">
+      <div className="workbook-intelligence-heading">
+        <div>
+          <p className="section-label">Workbook connections</p>
+          <h3>Connected business sheets</h3>
+          <p>{intelligence.humanSummary}</p>
+        </div>
+        <span>{intelligence.complexity}</span>
+      </div>
+      <div className="workbook-intelligence-strip" aria-label="Workbook connection summary">
+        <span>
+          Related sheets
+          <strong>{intelligence.joinSuggestions.length.toLocaleString()}</strong>
+        </span>
+        <span>
+          Business entities
+          <strong>{detectedEntityCount.toLocaleString()}</strong>
+        </span>
+        <span>
+          Start with
+          <strong>{intelligence.recommendedStartingWorksheetName || "Current sheet"}</strong>
+        </span>
+      </div>
+      {visibleConnections.length > 0 && (
+        <div className="workbook-connection-list" aria-label="Likely worksheet connections">
+          {visibleConnections.map((connection) => (
+            <article key={connection.id}>
+              <strong>{connection.guidance}</strong>
+              <span>{connection.confidence} confidence</span>
+            </article>
+          ))}
+        </div>
+      )}
+      <div className="workbook-entity-list" aria-label="Detected workbook entities">
+        {visibleRoles.map((role) => (
+          <span key={role.worksheetId} title={role.reasons.join(" ")}>
+            {workbookRoleLabels[role.role]}
+            <strong>{role.worksheetName}</strong>
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function DatasetSummaryPanel({
   dataset,
   onViewPreview,
@@ -198,6 +272,7 @@ function DatasetSummaryPanel({
     }, {});
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
+  const workbookRelationshipIntelligence = buildWorkbookRelationshipIntelligence(dataset?.workbook_metadata);
   const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
   const {
     recommendations,
@@ -359,6 +434,9 @@ function DatasetSummaryPanel({
                   </small>
                 ))}
               </div>
+            )}
+            {workbookRelationshipIntelligence && (
+              <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
             )}
             {activeDrillInView === "overview" && (
               <div className="drill-in-summary-grid" aria-label="Data detail summaries">
