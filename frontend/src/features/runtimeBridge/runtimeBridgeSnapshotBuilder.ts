@@ -11,6 +11,7 @@ import {
 import { createBridgeEdgeId, createBridgeNodeId, createRuntimeBridgeId } from "./runtimeBridgeIds";
 import { createRuntimeBridgeArtifacts } from "./runtimeBridgeArtifacts";
 import { createRuntimeBridgeEvents } from "./runtimeBridgeEvents";
+import { normalizeRuntimeBridgeSnapshot } from "./runtimeBridgeNormalize";
 import type { RuntimeBridgeSnapshot } from "./runtimeBridgeTypes";
 
 export const buildRuntimeBridgeSnapshot = ({
@@ -105,7 +106,7 @@ export const buildRuntimeBridgeSnapshot = ({
     artifactIds: artifacts.map((artifact) => artifact.artifactId),
   });
 
-  return {
+  return normalizeRuntimeBridgeSnapshot({
     bridgeId:
       bridgeId ||
       createRuntimeBridgeId(
@@ -129,5 +130,5 @@ export const buildRuntimeBridgeSnapshot = ({
     confidence,
     events,
     metadataOnly: true,
-  };
+  });
 };
