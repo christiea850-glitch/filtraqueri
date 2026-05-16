@@ -49,6 +49,11 @@ export const executableImportTargets = [
   "src/services/api",
 ];
 
+export const advisoryHardFailImportTargets = [
+  "src/features/execution/executeWorkspaceQuery",
+  "src/services/api",
+];
+
 export const runtimeMetadataForbiddenImports = {
   persistence: [
     "src/features/workspace/workspacePersistence",
@@ -100,5 +105,15 @@ export const allowedBoundaryWarnings = [
   //   file: "src/features/example/example.ts",
   //   importTarget: "src/features/example/types",
   //   reason: "Type-only domain contract import.",
+  // },
+];
+
+export const allowedBoundaryErrors = [
+  // Keep hard-fail exceptions even narrower than warnings. Example:
+  // {
+  //   rule: "advisory-import-backend-execution",
+  //   file: "src/features/example/example.ts",
+  //   importTarget: "src/services/api",
+  //   reason: "Temporary migration exception with owner approval.",
   // },
 ];

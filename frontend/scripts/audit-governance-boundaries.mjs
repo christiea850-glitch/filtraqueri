@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   advisoryFeatureFolders,
+  advisoryHardFailImportTargets,
+  allowedBoundaryErrors,
   allowedBoundaryWarnings,
   continuationCallbackFieldNames,
   continuationMetadataFolders,
@@ -115,20 +117,34 @@ const isAllowedWarning = ({ rule, file, importTarget, fieldName }) =>
     return true;
   });
 
-const createImportWarning = ({ rule, file, importTarget, specifier, detail }) => {
-  if (isAllowedWarning({ rule, file, importTarget })) return null;
+const isAllowedError = ({ rule, file, importTarget, fieldName }) =>
+  allowedBoundaryErrors.some((allowedError) => {
+    if (allowedError.rule !== rule) return false;
+    if (allowedError.file && allowedError.file !== file) return false;
+    if (allowedError.importTarget && allowedError.importTarget !== importTarget) return false;
+    if (allowedError.fieldName && allowedError.fieldName !== fieldName) return false;
+    return true;
+  });
+
+const createFinding = ({ severity, rule, file, importTarget, specifier, detail, fieldName }) => {
+  const allowlistInput = { rule, file, importTarget, fieldName };
+  if (severity === "error" && isAllowedError(allowlistInput)) return null;
+  if (severity === "warn" && isAllowedWarning(allowlistInput)) return null;
 
   return {
+    severity,
     rule,
     file,
-    message: `${rule}: ${file} imports ${specifier} (${detail})`,
+    message: specifier
+      ? `${rule}: ${file} imports ${specifier} (${detail})`
+      : `${rule}: ${file} ${detail}`,
   };
 };
 
 const auditAdvisoryImports = async () => {
   const files = await collectFilesFromProjectPaths(advisoryFeatureFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
-  const warnings = [];
+  const findings = [];
 
   for (const file of sourceFiles) {
     const imports = parseImports(file.source);
@@ -143,24 +159,30 @@ const auditAdvisoryImports = async () => {
 
       if (!matchedTarget) continue;
 
-      const warning = createImportWarning({
-        rule: "advisory-import-executable",
+      const isHardFailTarget = advisoryHardFailImportTargets.some((target) =>
+        matchesTarget(resolvedTarget, target),
+      );
+      const finding = createFinding({
+        severity: isHardFailTarget ? "error" : "warn",
+        rule: isHardFailTarget
+          ? "advisory-import-backend-execution"
+          : "advisory-import-executable",
         file: file.projectPath,
         importTarget: matchedTarget,
         specifier: importEntry.specifier,
         detail: `matches ${matchedTarget}`,
       });
-      if (warning) warnings.push(warning);
+      if (finding) findings.push(finding);
     }
   }
 
-  return warnings;
+  return findings;
 };
 
 const auditRuntimeIntelligenceImports = async () => {
   const files = await collectFilesFromProjectPaths([runtimeIntelligenceFolder]);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
-  const warnings = [];
+  const findings = [];
 
   for (const file of sourceFiles) {
     const imports = parseImports(file.source);
@@ -169,14 +191,15 @@ const auditRuntimeIntelligenceImports = async () => {
       if (importEntry.isTypeOnly) continue;
 
       if (importEntry.specifier === "react") {
-        const warning = createImportWarning({
+        const finding = createFinding({
+          severity: "warn",
           rule: "metadata-only-import-react-hook",
           file: file.projectPath,
           importTarget: "react",
           specifier: importEntry.specifier,
           detail: "runtimeIntelligence should stay metadata-only",
         });
-        if (warning) warnings.push(warning);
+        if (finding) findings.push(finding);
         continue;
       }
 
@@ -189,30 +212,32 @@ const auditRuntimeIntelligenceImports = async () => {
       );
 
       if (persistenceTarget) {
-        const warning = createImportWarning({
+        const finding = createFinding({
+          severity: "error",
           rule: "metadata-only-import-persistence",
           file: file.projectPath,
           importTarget: persistenceTarget,
           specifier: importEntry.specifier,
           detail: `matches ${persistenceTarget}`,
         });
-        if (warning) warnings.push(warning);
+        if (finding) findings.push(finding);
       }
 
       if (executionTarget) {
-        const warning = createImportWarning({
+        const finding = createFinding({
+          severity: "error",
           rule: "metadata-only-import-execution",
           file: file.projectPath,
           importTarget: executionTarget,
           specifier: importEntry.specifier,
           detail: `matches ${executionTarget}`,
         });
-        if (warning) warnings.push(warning);
+        if (finding) findings.push(finding);
       }
     }
   }
 
-  return warnings;
+  return findings;
 };
 
 const createFieldPattern = (fieldName) =>
@@ -221,13 +246,13 @@ const createFieldPattern = (fieldName) =>
 const auditContinuationCallbackFields = async () => {
   const files = await collectFilesFromProjectPaths(continuationMetadataFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
-  const warnings = [];
+  const findings = [];
 
   for (const file of sourceFiles) {
     for (const fieldName of continuationCallbackFieldNames) {
       if (!createFieldPattern(fieldName).test(file.source)) continue;
       if (
-        isAllowedWarning({
+        isAllowedError({
           rule: "continuation-callback-field",
           file: file.projectPath,
           fieldName,
@@ -236,7 +261,8 @@ const auditContinuationCallbackFields = async () => {
         continue;
       }
 
-      warnings.push({
+      findings.push({
+        severity: "error",
         rule: "continuation-callback-field",
         file: file.projectPath,
         message: `continuation-callback-field: ${file.projectPath} contains field "${fieldName}"`,
@@ -244,13 +270,13 @@ const auditContinuationCallbackFields = async () => {
     }
   }
 
-  return warnings;
+  return findings;
 };
 
 const auditPresentationalImports = async () => {
   const files = await collectFilesFromProjectPaths([...presentationalFolders, ...presentationalFiles]);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
-  const warnings = [];
+  const findings = [];
 
   for (const file of sourceFiles) {
     const imports = parseImports(file.source);
@@ -265,32 +291,35 @@ const auditPresentationalImports = async () => {
 
       if (!matchedTarget) continue;
 
-      const warning = createImportWarning({
+      const finding = createFinding({
+        severity: "warn",
         rule: "presentational-import-backend-or-executable",
         file: file.projectPath,
         importTarget: matchedTarget,
         specifier: importEntry.specifier,
         detail: `matches ${matchedTarget}`,
       });
-      if (warning) warnings.push(warning);
+      if (finding) findings.push(finding);
     }
   }
 
-  return warnings;
+  return findings;
 };
 
 const runAudit = async () => {
-  const warningGroups = await Promise.all([
+  const findingGroups = await Promise.all([
     auditAdvisoryImports(),
     auditRuntimeIntelligenceImports(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);
-  const warnings = warningGroups.flat();
+  const findings = findingGroups.flat();
+  const warnings = findings.filter((finding) => finding.severity === "warn");
+  const errors = findings.filter((finding) => finding.severity === "error");
 
   console.log("Governance boundary audit");
   console.log("");
-  console.log("Warnings:");
+  console.log("WARN:");
 
   if (warnings.length === 0) {
     console.log("- none");
@@ -301,14 +330,29 @@ const runAudit = async () => {
   }
 
   console.log("");
-  console.log("Summary:");
-  console.log(`${warnings.length} warnings, 0 errors`);
+  console.log("ERROR:");
+
+  if (errors.length === 0) {
+    console.log("- none");
+  } else {
+    for (const error of errors) {
+      console.log(`- ${error.message}`);
+    }
+  }
+
+  console.log("");
+  console.log("SUMMARY:");
+  console.log(`${warnings.length} warnings, ${errors.length} errors`);
+
+  if (errors.length > 0) {
+    process.exitCode = 1;
+  }
 };
 
 runAudit().catch((error) => {
   console.error("Governance boundary audit could not complete.");
   console.error(error instanceof Error ? error.message : String(error));
   console.log("");
-  console.log("Summary:");
+  console.log("SUMMARY:");
   console.log("0 warnings, 0 errors");
 });
