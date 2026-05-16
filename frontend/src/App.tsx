@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import DatasetSummaryPanel, {
   DatasetSessionPanel,
   type HumanIntent,
@@ -29,18 +29,14 @@ import useQueryHistory from "./features/history/useQueryHistory";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import {
-  createQueryBuilderSnapshot,
   coordinateExecutionResult,
 } from "./features/workspace/workspaceOrchestration";
 import useWorkspaceIntelligenceReports from "./features/workspace/useWorkspaceIntelligenceReports";
-import useWorkspaceOrchestrationSnapshot from "./features/workspace/useWorkspaceOrchestrationSnapshot";
 import {
-  buildWorkspaceRuntimeContext,
   createRuntimeNavigationSelection,
   getContextualObjectIdForView,
-  loadRuntimePersistenceState,
-  saveRuntimePersistenceState,
 } from "./features/workspaceRuntime";
+import useWorkspaceRuntimeCoordinator from "./features/workspaceRuntime/useWorkspaceRuntimeCoordinator";
 import type { WorkspaceExecutionResult } from "./features/execution/workspaceExecutionTypes";
 import useActiveResultModel, {
   getCurrentPageMetadata,
@@ -129,7 +125,6 @@ function App() {
     tab: ResultTabKey;
   } | null>(null);
   const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(true);
-  const [runtimePersistence, setRuntimePersistence] = useState(loadRuntimePersistenceState);
   const {
     registry: executionRegistry,
     recordExecutionResult,
@@ -276,46 +271,23 @@ function App() {
     queryHistory,
     workspaceMode,
   });
-  const queryBuilderRuntimeSnapshot = useMemo(
-    () =>
-      createQueryBuilderSnapshot({
-        selectedColumns: querySelectedColumns,
-        groupBy: queryGroupBy,
-        aggregations: queryAggregations,
-        sortColumn: querySortColumn,
-        sortDirection: querySortDirection,
-        limit: queryLimit,
-        hasRunQuery,
-        latestRequest: activeResult.source?.queryBuilder || null,
-      }),
-    [
-      activeResult.source?.queryBuilder,
-      hasRunQuery,
-      queryAggregations,
-      queryGroupBy,
-      queryLimit,
-      querySelectedColumns,
-      querySortColumn,
-      querySortDirection,
-    ],
-  );
-  useWorkspaceOrchestrationSnapshot({
+  const {
+    runtimePersistence,
+    setRuntimePersistence,
+    workspaceRuntimeContext,
+    onRuntimePanelToggle,
+    onRuntimeTrailSelect,
+  } = useWorkspaceRuntimeCoordinator({
     dataset,
     recentDatasets,
+    activeView,
     activeResultTab,
     activeResult,
     activeResultModel,
     executionRegistry,
     datasetRegistry,
-    mode: workspaceMode,
+    workspaceMode,
     activeFilters,
-    sorting: activeResult.sortColumn
-      ? {
-          column: activeResult.sortColumn,
-          direction: activeResult.sortDirection,
-        }
-      : null,
-    grouping: activeResultModel?.grouping.columns || queryGroupBy,
     querySelectedColumns,
     queryGroupBy,
     queryAggregations,
@@ -323,39 +295,11 @@ function App() {
     querySortDirection,
     queryLimit,
     hasRunQuery,
-    latestQueryRequest: activeResult.source?.queryBuilder || null,
+    sqlWorkspaceMetadata,
+    humanIntentLabel: humanIntent ? humanIntentGuidance[humanIntent].label : null,
+    setWorkspaceMode,
+    updateDatasetSessionView,
   });
-  const workspaceRuntimeContext = useMemo(
-    () =>
-      buildWorkspaceRuntimeContext({
-        dataset,
-        mode: workspaceMode,
-        activeView,
-        activeResultTab,
-        activeResultModel,
-        queryBuilder: queryBuilderRuntimeSnapshot,
-        sqlWorkspaceMetadata,
-        executionRegistry,
-        humanIntentLabel: humanIntent ? humanIntentGuidance[humanIntent].label : null,
-        selectedTrailItemId: runtimePersistence.selectedTrailItemId,
-        selectedContextualObjectId: runtimePersistence.selectedContextualObjectId,
-        returnContinuationId: runtimePersistence.returnContinuationId,
-      }),
-    [
-      activeResultModel,
-      activeResultTab,
-      activeView,
-      dataset,
-      executionRegistry,
-      humanIntent,
-      queryBuilderRuntimeSnapshot,
-      runtimePersistence.selectedTrailItemId,
-      runtimePersistence.selectedContextualObjectId,
-      runtimePersistence.returnContinuationId,
-      sqlWorkspaceMetadata,
-      workspaceMode,
-    ],
-  );
 
   const schemaTypeSummary = dataset
     ? dataset.schema.reduce<Record<string, number>>((summary, column) => {
@@ -936,10 +880,6 @@ function App() {
     }
   }, [activeView, setShouldOpenFilePicker, shouldOpenFilePicker]);
 
-  useEffect(() => {
-    saveRuntimePersistenceState(runtimePersistence);
-  }, [runtimePersistence]);
-
   const renderNoDatasetView = () => (
     <section className="empty-state">
       <p className="section-label">No dataset</p>
@@ -1241,27 +1181,8 @@ function App() {
         updateDatasetSessionView(mode === "human" ? (dataset ? "results" : "welcome") : "sqlWorkspace");
       }}
       onRecentDatasetClick={activateRecentDataset}
-      onRuntimePanelToggle={() =>
-        setRuntimePersistence((currentState) => ({
-          ...currentState,
-          isRuntimePanelCollapsed: !currentState.isRuntimePanelCollapsed,
-        }))
-      }
-      onRuntimeTrailSelect={(trailItemId, targetView, targetMode) => {
-        setRuntimePersistence((currentState) =>
-          createRuntimeNavigationSelection({
-            runtimeContext: workspaceRuntimeContext,
-            currentPersistence: currentState,
-            request: {
-              id: trailItemId,
-              targetView,
-              targetMode,
-            },
-          }).persistence,
-        );
-        if (targetMode !== workspaceMode) setWorkspaceMode(targetMode);
-        updateDatasetSessionView(targetView);
-      }}
+      onRuntimePanelToggle={onRuntimePanelToggle}
+      onRuntimeTrailSelect={onRuntimeTrailSelect}
     >
       {renderWorkspaceView()}
     </WorkspaceShell>
