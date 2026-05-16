@@ -3,6 +3,7 @@ import { buildWorkspaceSessionAudit } from "./workspaceSessionAudit";
 import { buildWorkspaceSessionRecommendations } from "./workspaceSessionRecommendations";
 import { createWorkspaceStorageReferences } from "./workspaceSessionStorage";
 import { buildInvestigationTimeline } from "./workspaceSessionTimeline";
+import { createNarrativeRuntimeNode } from "../runtimeIntelligence";
 import type {
   InvestigationSessionReadiness,
   InvestigationSessionStatus,
@@ -44,6 +45,14 @@ export const buildInvestigationWorkspacePlan = (
   const packageManifest = input.analysisPackagePlan?.packageManifest || null;
   const activeResult = input.activeResultModel;
   const workbook = input.dataset?.workbook_metadata;
+  const narrativeRuntimeNode = input.narrativeReport
+    ? createNarrativeRuntimeNode({
+        narrativeReport: input.narrativeReport,
+        activeResultModel: input.activeResultModel,
+        parentInvestigationReference: sessionId,
+        createdAt: now,
+      })
+    : null;
   const session: InvestigationWorkspaceSession = {
     sessionId,
     sessionTitle: `${input.dataset?.original_filename || "Untitled"} workspace session`,
@@ -89,6 +98,19 @@ export const buildInvestigationWorkspacePlan = (
         label: insight.title,
         relatedColumns: insight.relatedColumns,
       })) || [],
+    runtimeNodeReferences: narrativeRuntimeNode
+      ? [
+          {
+            nodeId: narrativeRuntimeNode.id,
+            family: narrativeRuntimeNode.family,
+            label: narrativeRuntimeNode.label,
+            metadataOnly: true,
+          },
+        ]
+      : [],
+    runtimeContinuationReferences: narrativeRuntimeNode?.continuationReferences || [],
+    runtimeLineageReferences: narrativeRuntimeNode?.lineageReferences || [],
+    advisoryRuntimeCheckpoints: narrativeRuntimeNode?.advisoryEventReferences || [],
     analysisPackageReferences: packageManifest
       ? [
           {

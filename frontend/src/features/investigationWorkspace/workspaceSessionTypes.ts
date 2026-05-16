@@ -5,6 +5,12 @@ import type { HistoryItem } from "../history/historyTypes";
 import type { InvestigationReport, InvestigationStage } from "../investigationIntelligence";
 import type { NarrativeReport } from "../narrativeIntelligence";
 import type { ActiveResultModel } from "../results/activeResultModel";
+import type {
+  RuntimeContinuationReference,
+  RuntimeEventReference,
+  RuntimeLineageReference,
+  RuntimeNode,
+} from "../runtimeIntelligence";
 
 export type InvestigationSessionStatus = "new" | "in_progress" | "review_ready" | "packaging_ready";
 
@@ -120,6 +126,15 @@ export type InvestigationWorkspaceSession = {
     label: string;
     relatedColumns: string[];
   }>;
+  runtimeNodeReferences: Array<{
+    nodeId: string;
+    family: RuntimeNode["family"];
+    label: string;
+    metadataOnly: true;
+  }>;
+  runtimeContinuationReferences: RuntimeContinuationReference[];
+  runtimeLineageReferences: RuntimeLineageReference[];
+  advisoryRuntimeCheckpoints: RuntimeEventReference[];
   analysisPackageReferences: Array<{
     packageId: string;
     title: string;
