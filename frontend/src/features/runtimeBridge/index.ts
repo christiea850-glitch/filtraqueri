@@ -1,6 +1,7 @@
 export * from "./runtimeBridgeAdapters";
 export * from "./runtimeBridgeArtifacts";
 export * from "./runtimeBridgeBuilderTypes";
+export * from "./runtimeBridgeComposition";
 export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeGovernance";
 export * from "./runtimeAnalysisPackageAdapters";
