@@ -27,6 +27,7 @@ import useExportController from "./features/export/useExportController";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
 import { buildInvestigationReport } from "./features/investigationIntelligence";
+import { buildInvestigationWorkspacePlan } from "./features/investigationWorkspace";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import {
@@ -279,6 +280,18 @@ function App() {
         sourceMode: workspaceMode,
       }),
     [activeResultModel, dataset, investigationReport, queryHistory, workspaceMode],
+  );
+  const investigationWorkspacePlan = useMemo(
+    () =>
+      buildInvestigationWorkspacePlan({
+        dataset,
+        activeResultModel,
+        investigationReport,
+        analysisPackagePlan,
+        queryHistory,
+        sourceMode: workspaceMode,
+      }),
+    [activeResultModel, analysisPackagePlan, dataset, investigationReport, queryHistory, workspaceMode],
   );
   const queryBuilderRuntimeSnapshot = useMemo(
     () =>
@@ -1005,6 +1018,8 @@ function App() {
     const packageArtifacts = analysisPackagePlan.packageManifest.artifactManifest;
     const readyPackageArtifacts = packageArtifacts.filter((artifact) => artifact.readiness === "ready_now");
     const packageRecommendations = analysisPackagePlan.recommendations.slice(0, 4);
+    const latestTimelineEvent = investigationWorkspacePlan.session.timeline.at(-1);
+    const workspaceRecommendations = investigationWorkspacePlan.recommendations.slice(0, 3);
 
     return (
       <section
@@ -1068,6 +1083,41 @@ function App() {
             {resultFollowUps.map((suggestion) => (
               <small key={suggestion.id}>{suggestion.question}</small>
             ))}
+          </div>
+        )}
+
+        {!isAnalystMode && (
+          <div className="workspace-hub-panel results-workspace-hub" aria-label="Workspace hub summary">
+            <div>
+              <span>Workspace hub</span>
+              <strong>{investigationWorkspacePlan.readinessSummary.label}</strong>
+              <small>
+                {latestTimelineEvent
+                  ? latestTimelineEvent.label
+                  : "No checkpoint recorded yet."}
+              </small>
+            </div>
+            <div className="workspace-hub-metrics" aria-label="Workspace hub metrics">
+              <span>
+                Packages
+                <strong>{investigationWorkspacePlan.readinessSummary.packageCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Stages
+                <strong>{investigationWorkspacePlan.readinessSummary.stageCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Deliverables
+                <strong>{investigationWorkspacePlan.readinessSummary.deliverableCount.toLocaleString()}</strong>
+              </span>
+            </div>
+            {workspaceRecommendations.length > 0 && (
+              <div className="workspace-hub-prompts" aria-label="Workspace continuation guidance">
+                {workspaceRecommendations.map((recommendation) => (
+                  <small key={recommendation.recommendationId}>{recommendation.label}</small>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1205,6 +1255,7 @@ function App() {
             workspaceMode={workspaceMode}
             investigationReport={investigationReport}
             analysisPackagePlan={analysisPackagePlan}
+            investigationWorkspacePlan={investigationWorkspacePlan}
             selectedColumns={querySelectedColumns}
             groupBy={queryGroupBy}
             aggregations={queryAggregations}

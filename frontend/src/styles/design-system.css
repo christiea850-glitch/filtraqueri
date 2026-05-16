@@ -2408,6 +2408,94 @@ body,
   border-top-color: var(--fq-border);
 }
 
+/* UX-F26: investigation workspace sessions and deliverable hub */
+.workspace-hub-panel {
+  display: grid;
+  gap: var(--fq-space-3);
+  min-width: 0;
+  padding: var(--fq-space-3);
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-sm);
+  background: var(--fq-surface);
+}
+
+.workspace-hub-panel.compact {
+  padding: var(--fq-space-2) var(--fq-space-3);
+}
+
+.workspace-hub-panel h3,
+.workspace-hub-panel strong {
+  overflow: hidden;
+  margin: 0;
+  color: var(--fq-text);
+  font-weight: var(--fq-font-heading);
+  text-overflow: ellipsis;
+}
+
+.workspace-hub-panel h3 {
+  font-size: 16px;
+}
+
+.workspace-hub-panel p,
+.workspace-hub-panel small {
+  margin: 4px 0 0;
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.workspace-hub-panel > div:first-child > span {
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-label);
+}
+
+.workspace-hub-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--fq-space-2);
+  min-width: 0;
+}
+
+.workspace-hub-metrics > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  background: var(--fq-surface-muted);
+  color: var(--fq-text-muted);
+  font-size: 12px;
+}
+
+.workspace-hub-metrics strong {
+  color: var(--fq-text);
+  font-size: 13px;
+}
+
+.workspace-hub-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fq-space-2);
+  min-width: 0;
+}
+
+.workspace-hub-prompts small {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-pill);
+  background: var(--fq-surface-muted);
+}
+
+.results-workspace-hub {
+  padding-top: var(--fq-space-2);
+  border-top-color: var(--fq-border);
+}
+
 .view-results .data-grid-table th button {
   gap: 4px;
 }

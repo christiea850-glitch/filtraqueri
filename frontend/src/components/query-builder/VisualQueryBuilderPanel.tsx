@@ -8,6 +8,7 @@ import {
 } from "../../features/dataIntelligence/structuralPresentation";
 import type { AnalysisPackagePlan } from "../../features/analysisPackages";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
+import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
 
 type VisualQueryBuilderPanelProps = {
   schema: SchemaColumn[];
@@ -17,6 +18,7 @@ type VisualQueryBuilderPanelProps = {
   workspaceMode: WorkspaceMode;
   investigationReport?: InvestigationReport | null;
   analysisPackagePlan?: AnalysisPackagePlan | null;
+  investigationWorkspacePlan?: InvestigationWorkspacePlan | null;
   selectedColumns: string[];
   groupBy: string[];
   aggregations: AggregationState[];
@@ -59,6 +61,7 @@ function VisualQueryBuilderPanel({
   workspaceMode,
   investigationReport,
   analysisPackagePlan,
+  investigationWorkspacePlan,
   selectedColumns,
   groupBy,
   aggregations,
@@ -86,6 +89,7 @@ function VisualQueryBuilderPanel({
   const investigationSuggestions = investigationReport?.suggestions.slice(0, 4) || [];
   const primaryInvestigation = investigationSuggestions[0] || null;
   const packageRecommendations = analysisPackagePlan?.recommendations.slice(0, 3) || [];
+  const workspaceRecommendations = investigationWorkspacePlan?.recommendations.slice(0, 2) || [];
   const visibleSchema = useMemo(
     () =>
       normalizedSearch
@@ -260,6 +264,37 @@ function VisualQueryBuilderPanel({
               </span>
             ))}
           </div>
+        </section>
+      )}
+
+      {!isAnalystMode && investigationWorkspacePlan && (
+        <section className="workspace-hub-panel compact" aria-label="Investigation workspace summary">
+          <div>
+            <p className="section-label">Investigation workspace</p>
+            <h3>{investigationWorkspacePlan.readinessSummary.label}</h3>
+            <p>{investigationWorkspacePlan.humanSummary}</p>
+          </div>
+          <div className="workspace-hub-metrics" aria-label="Workspace session readiness">
+            <span>
+              Packages
+              <strong>{investigationWorkspacePlan.readinessSummary.packageCount.toLocaleString()}</strong>
+            </span>
+            <span>
+              Stages
+              <strong>{investigationWorkspacePlan.readinessSummary.stageCount.toLocaleString()}</strong>
+            </span>
+            <span>
+              Deliverables
+              <strong>{investigationWorkspacePlan.readinessSummary.deliverableCount.toLocaleString()}</strong>
+            </span>
+          </div>
+          {workspaceRecommendations.length > 0 && (
+            <div className="workspace-hub-prompts" aria-label="Workspace recommendations">
+              {workspaceRecommendations.map((recommendation) => (
+                <small key={recommendation.recommendationId}>{recommendation.label}</small>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
