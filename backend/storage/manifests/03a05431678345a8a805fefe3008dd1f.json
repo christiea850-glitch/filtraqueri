@@ -54,7 +54,7 @@
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-16T00:27:15.628Z"
+    "updatedAt": "2026-05-16T18:45:40.447Z"
   },
   "datasets": [
     {
@@ -71,12 +71,12 @@
           "null_count": 0,
           "unique_count": 6,
           "sample_values": [
-            "MGT005",
-            "MGT006",
-            "MGT003",
             "MGT001",
             "MGT002",
-            "MGT004"
+            "MGT004",
+            "MGT003",
+            "MGT005",
+            "MGT006"
           ]
         },
         {
@@ -86,12 +86,12 @@
           "null_count": 0,
           "unique_count": 6,
           "sample_values": [
-            "Sophia",
-            "Emma",
-            "Ethan",
             "Liam",
             "Noah",
-            "Ava"
+            "Ava",
+            "Ethan",
+            "Sophia",
+            "Emma"
           ]
         },
         {
@@ -101,12 +101,12 @@
           "null_count": 0,
           "unique_count": 6,
           "sample_values": [
+            "Johnson",
+            "Ross",
             "Nguyen",
             "Patel",
             "Silva",
-            "Kim",
-            "Johnson",
-            "Ross"
+            "Kim"
           ]
         },
         {
@@ -116,12 +116,12 @@
           "null_count": 0,
           "unique_count": 6,
           "sample_values": [
+            "617-555-0102",
             "617-555-0103",
             "617-555-0106",
-            "617-555-0105",
-            "617-555-0104",
             "617-555-0101",
-            "617-555-0102"
+            "617-555-0104",
+            "617-555-0105"
           ]
         },
         {
@@ -132,11 +132,11 @@
           "unique_count": 6,
           "sample_values": [
             "noah.johnson@pmco.com",
-            "emma.silva@pmco.com",
             "ava.kim@pmco.com",
             "sophia.nguyen@pmco.com",
             "ethan.ross@pmco.com",
-            "liam.patel@pmco.com"
+            "liam.patel@pmco.com",
+            "emma.silva@pmco.com"
           ]
         },
         {
@@ -146,10 +146,10 @@
           "null_count": 0,
           "unique_count": 6,
           "sample_values": [
-            "43850",
             "43013",
             "44298",
             "42581",
+            "43850",
             "43631",
             "43160"
           ]
@@ -161,10 +161,10 @@
           "null_count": 0,
           "unique_count": 4,
           "sample_values": [
-            "Assistant Manager",
-            "Regional Manager",
             "Property Manager",
-            "General Manager"
+            "Regional Manager",
+            "General Manager",
+            "Assistant Manager"
           ]
         }
       ],
@@ -4407,13 +4407,13 @@
           "warnings": []
         },
         "created_at": "2026-05-16T00:19:40.835640+00:00",
-        "updated_at": "2026-05-16T01:05:25.093837+00:00"
+        "updated_at": "2026-05-16T18:53:03.444700+00:00"
       }
     }
   ],
   "created_at": "2026-05-16T00:19:40.835640+00:00",
-  "last_opened_at": "2026-05-16T01:05:25.305768+00:00",
-  "updated_at": "2026-05-16T01:05:25.329588+00:00",
+  "last_opened_at": "2026-05-16T18:53:04.229593+00:00",
+  "updated_at": "2026-05-16T18:53:04.254262+00:00",
   "workbook_metadata": {
     "workbook_id": "03a05431678345a8a805fefe3008dd1f",
     "workspace_id": "03a05431678345a8a805fefe3008dd1f",
@@ -8650,6 +8650,6 @@
       "warnings": []
     },
     "created_at": "2026-05-16T00:19:40.835640+00:00",
-    "updated_at": "2026-05-16T01:05:25.093837+00:00"
+    "updated_at": "2026-05-16T18:53:03.444700+00:00"
   }
 }

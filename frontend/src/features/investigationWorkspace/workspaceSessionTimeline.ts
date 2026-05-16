@@ -7,6 +7,7 @@ export const buildInvestigationTimeline = ({
   dataset,
   activeResultModel,
   investigationReport,
+  narrativeReport,
   queryHistory,
   sourceMode,
 }: InvestigationWorkspaceBuildInput): InvestigationTimelineEvent[] => {
@@ -65,6 +66,19 @@ export const buildInvestigationTimeline = ({
       });
     }
   }
+
+  narrativeReport?.timelineCheckpoints.slice(0, 4).forEach((checkpoint) => {
+    events.push({
+      eventId: `timeline:${checkpoint.checkpointId}`,
+      type: "narrative_checkpoint",
+      label: checkpoint.label,
+      description: checkpoint.description,
+      stage: checkpoint.type === "grouping_opportunity_identified" ? "compare" : "review_result",
+      createdAt,
+      relatedDatasetId: datasetId,
+      relatedResultSource: activeResultModel?.sourceTab || null,
+    });
+  });
 
   if (dataset?.workbook_metadata) {
     events.push({

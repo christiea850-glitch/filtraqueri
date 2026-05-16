@@ -81,6 +81,14 @@ export const buildInvestigationWorkspacePlan = (
           filters: activeResult.filters.activeLabels,
         }
       : null,
+    narrativeReferences:
+      input.narrativeReport?.visibleInsights.map((insight) => ({
+        insightId: insight.id,
+        category: insight.category,
+        severity: insight.severity,
+        label: insight.title,
+        relatedColumns: insight.relatedColumns,
+      })) || [],
     analysisPackageReferences: packageManifest
       ? [
           {

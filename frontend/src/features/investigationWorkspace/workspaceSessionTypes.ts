@@ -3,6 +3,7 @@ import type { DatasetMetadata } from "../dataset/datasetTypes";
 import type { WorkspaceMode } from "../dataset/datasetTypes";
 import type { HistoryItem } from "../history/historyTypes";
 import type { InvestigationReport, InvestigationStage } from "../investigationIntelligence";
+import type { NarrativeReport } from "../narrativeIntelligence";
 import type { ActiveResultModel } from "../results/activeResultModel";
 
 export type InvestigationSessionStatus = "new" | "in_progress" | "review_ready" | "packaging_ready";
@@ -49,6 +50,7 @@ export type InvestigationTimelineEventType =
   | "filter_milestone"
   | "grouping_milestone"
   | "result_checkpoint"
+  | "narrative_checkpoint"
   | "workbook_transition"
   | "mode_transition";
 
@@ -111,6 +113,13 @@ export type InvestigationWorkspaceSession = {
     grouping: string[];
     filters: string[];
   } | null;
+  narrativeReferences: Array<{
+    insightId: string;
+    category: string;
+    severity: string;
+    label: string;
+    relatedColumns: string[];
+  }>;
   analysisPackageReferences: Array<{
     packageId: string;
     title: string;
@@ -132,6 +141,7 @@ export type InvestigationWorkspaceBuildInput = {
   activeResultModel: ActiveResultModel | null;
   investigationReport: InvestigationReport | null;
   analysisPackagePlan: AnalysisPackagePlan | null;
+  narrativeReport?: NarrativeReport | null;
   queryHistory: HistoryItem[];
   sourceMode: WorkspaceMode;
 };

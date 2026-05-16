@@ -17,6 +17,8 @@ import {
 } from "./features/analyst/analystWorkspaceHelpers";
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
 import { buildAnalysisPackagePlan } from "./features/analysisPackages";
+import { useBusinessSemantics } from "./features/businessSemantics";
+import { useDataIntelligence } from "./features/dataIntelligence";
 import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
@@ -28,6 +30,7 @@ import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
 import { buildInvestigationReport } from "./features/investigationIntelligence";
 import { buildInvestigationWorkspacePlan } from "./features/investigationWorkspace";
+import { scanNarrativeIntelligence } from "./features/narrativeIntelligence";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import {
@@ -48,6 +51,7 @@ import useActiveResultModel, {
   getCurrentRowCount,
 } from "./features/results/activeResultModel";
 import useResults, { createEmptyResultState } from "./features/results/useResults";
+import { useWorkflowRecommendations } from "./features/workflowRecommendations";
 import "./App.css";
 
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
@@ -266,9 +270,29 @@ function App() {
     activeResultModel,
     addHistory,
   });
+  const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
+  const { workflowRecommendationReport } = useWorkflowRecommendations({
+    dataProfile,
+    dialectRecommendation,
+  });
+  const { businessSemanticReport } = useBusinessSemantics({
+    dataset,
+    dataProfile,
+    workflowRecommendationReport,
+  });
   const investigationReport = useMemo(
     () => buildInvestigationReport({ dataset, activeResultModel }),
     [activeResultModel, dataset],
+  );
+  const narrativeReport = useMemo(
+    () =>
+      scanNarrativeIntelligence({
+        dataset,
+        activeResultModel,
+        businessSemanticReport,
+        investigationReport,
+      }),
+    [activeResultModel, businessSemanticReport, dataset, investigationReport],
   );
   const analysisPackagePlan = useMemo(
     () =>
@@ -288,10 +312,19 @@ function App() {
         activeResultModel,
         investigationReport,
         analysisPackagePlan,
+        narrativeReport,
         queryHistory,
         sourceMode: workspaceMode,
       }),
-    [activeResultModel, analysisPackagePlan, dataset, investigationReport, queryHistory, workspaceMode],
+    [
+      activeResultModel,
+      analysisPackagePlan,
+      dataset,
+      investigationReport,
+      narrativeReport,
+      queryHistory,
+      workspaceMode,
+    ],
   );
   const queryBuilderRuntimeSnapshot = useMemo(
     () =>
@@ -951,7 +984,7 @@ function App() {
       sidebarFileInputRef.current?.click();
       setShouldOpenFilePicker(false);
     }
-  }, [activeView, shouldOpenFilePicker]);
+  }, [activeView, setShouldOpenFilePicker, shouldOpenFilePicker]);
 
   useEffect(() => {
     saveRuntimePersistenceState(runtimePersistence);
@@ -1020,6 +1053,8 @@ function App() {
     const packageRecommendations = analysisPackagePlan.recommendations.slice(0, 4);
     const latestTimelineEvent = investigationWorkspacePlan.session.timeline.at(-1);
     const workspaceRecommendations = investigationWorkspacePlan.recommendations.slice(0, 3);
+    const executiveInsights = narrativeReport.visibleInsights.slice(0, 4);
+    const narrativeReadiness = narrativeReport.readiness;
 
     return (
       <section
@@ -1033,9 +1068,40 @@ function App() {
       >
         <div className="results-business-takeaway">
           <span>{isAnalystMode ? "Result inspection" : "Business takeaway"}</span>
-          <strong>{takeaway}</strong>
-          <small>{chartSupportLabel}</small>
+          <strong>{narrativeReport.summary || takeaway}</strong>
+          <small>{narrativeReadiness.label} | {chartSupportLabel}</small>
         </div>
+
+        {!isAnalystMode && (
+          <div className="executive-insights-panel" aria-label="Executive insights">
+            <div className="executive-insights-header">
+              <span>Executive insights</span>
+              <strong>{narrativeReadiness.label}</strong>
+              <small>
+                {narrativeReadiness.insightCount.toLocaleString()} deterministic insight
+                {narrativeReadiness.insightCount === 1 ? "" : "s"}
+              </small>
+            </div>
+            {executiveInsights.length > 0 ? (
+              <div className="executive-insight-list">
+                {executiveInsights.map((insight) => (
+                  <article key={insight.id} className={`is-${insight.severity}`}>
+                    <div>
+                      <span>{insight.category}</span>
+                      <strong>{insight.title}</strong>
+                    </div>
+                    <p>{insight.narrative}</p>
+                    <small>
+                      {insight.evidence[0]?.label}: {insight.evidence[0]?.value}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p>{narrativeReadiness.detail}</p>
+            )}
+          </div>
+        )}
 
         <div className="results-insight-row" aria-label="Lightweight result insights">
           <span>
