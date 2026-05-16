@@ -47,3 +47,13 @@ S2-A must not modify:
 ## Future Use
 
 Future phases may import these types to annotate advisory, executable, metadata-only, presentational, persistence, composition, or hybrid contracts. S2-A does not enforce those rules yet. Linting, runtime assertions, and protected import checks belong to later S2 phases.
+
+## Warning-Only Audit
+
+S2-C adds a warning-only governance audit command:
+
+```sh
+npm run governance:audit
+```
+
+This command reports advisory/executable boundary warnings without failing builds or changing runtime behavior. Review guidance lives in `docs/governance-review-checklist.md`.
