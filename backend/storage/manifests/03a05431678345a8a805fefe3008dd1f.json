@@ -10,10 +10,10 @@
   "filter_metadata": {},
   "query_builder_metadata": {
     "selected_columns": [
-      "manager_id",
-      "first_name",
-      "last_name",
-      "manager_phone"
+      "property_id",
+      "property_name",
+      "property_type",
+      "address"
     ],
     "group_by": [],
     "aggregations": [
@@ -65,111 +65,432 @@
       "duckdb_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\sessions\\03a05431678345a8a805fefe3008dd1f.duckdb",
       "schema": [
         {
-          "name": "manager_id",
+          "name": "property_id",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 8,
           "sample_values": [
-            "MGT001",
-            "MGT002",
-            "MGT004",
-            "MGT003",
-            "MGT005",
-            "MGT006"
+            "P005",
+            "P001",
+            "P007",
+            "P004",
+            "P006",
+            "P002",
+            "P003",
+            "P008"
           ]
         },
         {
-          "name": "first_name",
+          "name": "property_name",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 8,
           "sample_values": [
-            "Liam",
-            "Noah",
-            "Ava",
-            "Ethan",
-            "Sophia",
-            "Emma"
+            "Seaside Villas",
+            "Elmwood Gardens",
+            "Harbor Heights",
+            "RiverView Lofts",
+            "Maple Court",
+            "Beacon Row",
+            "Cedar Park",
+            "Hillside Flats"
           ]
         },
         {
-          "name": "last_name",
+          "name": "property_type",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 1,
+          "sample_values": [
+            "Multifamily"
+          ]
+        },
+        {
+          "name": "address",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 8,
           "sample_values": [
-            "Johnson",
-            "Ross",
-            "Nguyen",
-            "Patel",
-            "Silva",
-            "Kim"
+            "5 Ocean Blvd",
+            "455 Riverside Dr",
+            "900 Elm St",
+            "15 Beacon Row",
+            "120 Maple St",
+            "77 Pier Ave",
+            "210 Cedar Rd",
+            "380 Hillside Ave"
           ]
         },
         {
-          "name": "manager_phone",
+          "name": "city",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 7,
           "sample_values": [
-            "617-555-0102",
-            "617-555-0103",
-            "617-555-0106",
-            "617-555-0101",
-            "617-555-0104",
-            "617-555-0105"
+            "Cambridge",
+            "Revere",
+            "Boston",
+            "Medford",
+            "Salem",
+            "Somerville",
+            "Quincy"
           ]
         },
         {
-          "name": "email",
+          "name": "state",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 1,
+          "sample_values": [
+            "MA"
+          ]
+        },
+        {
+          "name": "zip",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 7,
           "sample_values": [
-            "noah.johnson@pmco.com",
-            "ava.kim@pmco.com",
-            "sophia.nguyen@pmco.com",
-            "ethan.ross@pmco.com",
-            "liam.patel@pmco.com",
-            "emma.silva@pmco.com"
+            "2169",
+            "2155",
+            "1970",
+            "2108",
+            "2139",
+            "2144",
+            "2151"
           ]
         },
         {
-          "name": "hire_date",
+          "name": "year_built",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 8,
           "sample_values": [
-            "43013",
-            "44298",
-            "42581",
-            "43850",
-            "43631",
-            "43160"
+            "2016",
+            "2012",
+            "1989",
+            "1998",
+            "1995",
+            "2008",
+            "2001",
+            "2005"
           ]
         },
         {
-          "name": "manager_type",
+          "name": "units_total",
           "type": "VARCHAR",
           "inferred_type": "categorical",
           "null_count": 0,
           "unique_count": 4,
           "sample_values": [
-            "Property Manager",
-            "Regional Manager",
-            "General Manager",
-            "Assistant Manager"
+            "8",
+            "10",
+            "12",
+            "6"
           ]
+        },
+        {
+          "name": "manager_id",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 6,
+          "sample_values": [
+            "MGT001",
+            "MGT002",
+            "MGT005",
+            "MGT006",
+            "MGT003",
+            "MGT004"
+          ]
+        },
+        {
+          "name": "realtor_id",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "RLTR0001",
+            "RLTR0003",
+            "RLTR0002"
+          ]
+        },
+        {
+          "name": "column_12",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_13",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_14",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_15",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_16",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_17",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_18",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_19",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_20",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_21",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_22",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_23",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_24",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_25",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_26",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_27",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_28",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_29",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_30",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_31",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_32",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_33",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_34",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_35",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_36",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_37",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_38",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_39",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_40",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_41",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_42",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_43",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
+        },
+        {
+          "name": "column_44",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 8,
+          "unique_count": 0,
+          "sample_values": []
         }
       ],
-      "row_count": 6,
-      "column_count": 7,
+      "row_count": 8,
+      "column_count": 44,
       "created_at": "2026-05-16T00:19:40.835640+00:00",
       "workbook_metadata": {
         "workbook_id": "03a05431678345a8a805fefe3008dd1f",
@@ -203,7 +524,7 @@
           "03a05431678345a8a805fefe3008dd1f:worksheet:17",
           "03a05431678345a8a805fefe3008dd1f:worksheet:18"
         ],
-        "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:1",
+        "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:3",
         "worksheets": [
           {
             "worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:1",
@@ -4407,13 +4728,13 @@
           "warnings": []
         },
         "created_at": "2026-05-16T00:19:40.835640+00:00",
-        "updated_at": "2026-05-16T18:53:03.444700+00:00"
+        "updated_at": "2026-05-16T23:02:37.648399+00:00"
       }
     }
   ],
   "created_at": "2026-05-16T00:19:40.835640+00:00",
-  "last_opened_at": "2026-05-16T22:33:43.489651+00:00",
-  "updated_at": "2026-05-16T22:33:43.508639+00:00",
+  "last_opened_at": "2026-05-16T23:02:38.135729+00:00",
+  "updated_at": "2026-05-16T23:02:38.148995+00:00",
   "workbook_metadata": {
     "workbook_id": "03a05431678345a8a805fefe3008dd1f",
     "workspace_id": "03a05431678345a8a805fefe3008dd1f",
@@ -4446,7 +4767,7 @@
       "03a05431678345a8a805fefe3008dd1f:worksheet:17",
       "03a05431678345a8a805fefe3008dd1f:worksheet:18"
     ],
-    "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:1",
+    "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:3",
     "worksheets": [
       {
         "worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:1",
@@ -8650,6 +8971,6 @@
       "warnings": []
     },
     "created_at": "2026-05-16T00:19:40.835640+00:00",
-    "updated_at": "2026-05-16T18:53:03.444700+00:00"
+    "updated_at": "2026-05-16T23:02:37.648399+00:00"
   }
 }
