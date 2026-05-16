@@ -2335,6 +2335,79 @@ body,
   border-top: 1px solid var(--fq-border);
 }
 
+/* UX-F25: analysis package foundation */
+.analysis-package-panel {
+  display: grid;
+  gap: var(--fq-space-3);
+  min-width: 0;
+  padding: var(--fq-space-3);
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-sm);
+  background: var(--fq-surface);
+}
+
+.analysis-package-panel.compact {
+  padding: var(--fq-space-2) var(--fq-space-3);
+}
+
+.analysis-package-panel h3,
+.analysis-package-panel strong {
+  overflow: hidden;
+  margin: 0;
+  color: var(--fq-text);
+  font-weight: var(--fq-font-heading);
+  text-overflow: ellipsis;
+}
+
+.analysis-package-panel h3 {
+  font-size: 16px;
+}
+
+.analysis-package-panel p,
+.analysis-package-panel small {
+  margin: 4px 0 0;
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.analysis-package-panel > div:first-child > span {
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-label);
+}
+
+.analysis-package-artifacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--fq-space-2);
+  min-width: 0;
+}
+
+.analysis-package-artifacts > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  background: var(--fq-surface-muted);
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-body);
+}
+
+.analysis-package-artifacts strong {
+  color: var(--fq-text);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.results-package-panel {
+  padding-top: var(--fq-space-2);
+  border-top-color: var(--fq-border);
+}
+
 .view-results .data-grid-table th button {
   gap: 4px;
 }

@@ -16,6 +16,7 @@ import {
   createAnalystWorkspaceRenderers,
 } from "./features/analyst/analystWorkspaceHelpers";
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
+import { buildAnalysisPackagePlan } from "./features/analysisPackages";
 import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
@@ -267,6 +268,17 @@ function App() {
   const investigationReport = useMemo(
     () => buildInvestigationReport({ dataset, activeResultModel }),
     [activeResultModel, dataset],
+  );
+  const analysisPackagePlan = useMemo(
+    () =>
+      buildAnalysisPackagePlan({
+        dataset,
+        activeResultModel,
+        investigationReport,
+        queryHistory,
+        sourceMode: workspaceMode,
+      }),
+    [activeResultModel, dataset, investigationReport, queryHistory, workspaceMode],
   );
   const queryBuilderRuntimeSnapshot = useMemo(
     () =>
@@ -990,6 +1002,9 @@ function App() {
         ? "Chart support available"
         : "Table review recommended";
     const resultFollowUps = investigationReport.nextSteps.slice(0, 3);
+    const packageArtifacts = analysisPackagePlan.packageManifest.artifactManifest;
+    const readyPackageArtifacts = packageArtifacts.filter((artifact) => artifact.readiness === "ready_now");
+    const packageRecommendations = analysisPackagePlan.recommendations.slice(0, 4);
 
     return (
       <section
@@ -1053,6 +1068,28 @@ function App() {
             {resultFollowUps.map((suggestion) => (
               <small key={suggestion.id}>{suggestion.question}</small>
             ))}
+          </div>
+        )}
+
+        {!isAnalystMode && (
+          <div className="analysis-package-panel results-package-panel" aria-label="Analysis package planner">
+            <div>
+              <span>Analysis package</span>
+              <strong>{analysisPackagePlan.readinessSummary.label}</strong>
+              <small>{analysisPackagePlan.humanSummary}</small>
+            </div>
+            <div className="analysis-package-artifacts" aria-label="Suggested package contents">
+              <span>
+                Ready artifacts
+                <strong>{readyPackageArtifacts.length.toLocaleString()}</strong>
+              </span>
+              {packageRecommendations.slice(0, 3).map((recommendation) => (
+                <span key={recommendation.recommendationId}>
+                  {recommendation.label}
+                  <strong>{recommendation.readiness.replace(/_/g, " ")}</strong>
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1167,6 +1204,7 @@ function App() {
             activeFilterCount={activeFilterLabels.length}
             workspaceMode={workspaceMode}
             investigationReport={investigationReport}
+            analysisPackagePlan={analysisPackagePlan}
             selectedColumns={querySelectedColumns}
             groupBy={queryGroupBy}
             aggregations={queryAggregations}

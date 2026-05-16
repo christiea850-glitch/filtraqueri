@@ -6,6 +6,7 @@ import {
   createSchemaDisplayProfiles,
   getDisplayColumnName,
 } from "../../features/dataIntelligence/structuralPresentation";
+import type { AnalysisPackagePlan } from "../../features/analysisPackages";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
 
 type VisualQueryBuilderPanelProps = {
@@ -15,6 +16,7 @@ type VisualQueryBuilderPanelProps = {
   activeFilterCount: number;
   workspaceMode: WorkspaceMode;
   investigationReport?: InvestigationReport | null;
+  analysisPackagePlan?: AnalysisPackagePlan | null;
   selectedColumns: string[];
   groupBy: string[];
   aggregations: AggregationState[];
@@ -56,6 +58,7 @@ function VisualQueryBuilderPanel({
   activeFilterCount,
   workspaceMode,
   investigationReport,
+  analysisPackagePlan,
   selectedColumns,
   groupBy,
   aggregations,
@@ -82,6 +85,7 @@ function VisualQueryBuilderPanel({
   const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
   const investigationSuggestions = investigationReport?.suggestions.slice(0, 4) || [];
   const primaryInvestigation = investigationSuggestions[0] || null;
+  const packageRecommendations = analysisPackagePlan?.recommendations.slice(0, 3) || [];
   const visibleSchema = useMemo(
     () =>
       normalizedSearch
@@ -236,6 +240,24 @@ function VisualQueryBuilderPanel({
             <span>Next steps</span>
             {primaryInvestigation.nextSteps.slice(0, 3).map((item) => (
               <small key={item}>{item}</small>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!isAnalystMode && analysisPackagePlan && (
+        <section className="analysis-package-panel compact" aria-label="Analysis package planning">
+          <div>
+            <p className="section-label">Analysis package</p>
+            <h3>{analysisPackagePlan.readinessSummary.label}</h3>
+            <p>{analysisPackagePlan.humanSummary}</p>
+          </div>
+          <div className="analysis-package-artifacts" aria-label="Recommended package contents">
+            {packageRecommendations.map((recommendation) => (
+              <span key={recommendation.recommendationId}>
+                {recommendation.label}
+                <strong>{recommendation.readiness.replace(/_/g, " ")}</strong>
+              </span>
             ))}
           </div>
         </section>
