@@ -1,3 +1,4 @@
+export * from "./investigationGovernance";
 export * from "./investigationContext";
 export * from "./investigationExplanation";
 export * from "./investigationFlow";

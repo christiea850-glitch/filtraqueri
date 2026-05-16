@@ -1,3 +1,4 @@
+export * from "./narrativeGovernance";
 export * from "./narrativeBuilder";
 export * from "./narrativeBusinessContext";
 export * from "./narrativeDetectors";

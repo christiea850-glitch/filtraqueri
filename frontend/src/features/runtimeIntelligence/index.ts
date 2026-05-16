@@ -1,3 +1,4 @@
+export * from "./runtimeIntelligenceGovernance";
 export * from "./artifacts/runtimeArtifacts";
 export * from "./confidence/runtimeConfidence";
 export * from "./continuations/runtimeContinuations";

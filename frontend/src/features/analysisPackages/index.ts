@@ -1,3 +1,4 @@
+export * from "./analysisPackageGovernance";
 export * from "./analysisPackageArtifacts";
 export * from "./analysisPackageAudit";
 export * from "./analysisPackageBuilder";

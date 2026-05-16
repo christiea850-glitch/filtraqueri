@@ -1,3 +1,4 @@
+export * from "./workflowRecommendationGovernance";
 export * from "./workflowRecommendationTypes";
 export * from "./workflowRecommendationBuilder";
 export * from "./workflowRecommendationValidation";
