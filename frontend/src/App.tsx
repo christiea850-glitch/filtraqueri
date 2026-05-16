@@ -16,9 +16,6 @@ import {
   createAnalystWorkspaceRenderers,
 } from "./features/analyst/analystWorkspaceHelpers";
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
-import { buildAnalysisPackagePlan } from "./features/analysisPackages";
-import { useBusinessSemantics } from "./features/businessSemantics";
-import { useDataIntelligence } from "./features/dataIntelligence";
 import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
@@ -28,15 +25,13 @@ import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatase
 import useExportController from "./features/export/useExportController";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
-import { buildInvestigationReport } from "./features/investigationIntelligence";
-import { buildInvestigationWorkspacePlan } from "./features/investigationWorkspace";
-import { scanNarrativeIntelligence } from "./features/narrativeIntelligence";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import {
   createQueryBuilderSnapshot,
   coordinateExecutionResult,
 } from "./features/workspace/workspaceOrchestration";
+import useWorkspaceIntelligenceReports from "./features/workspace/useWorkspaceIntelligenceReports";
 import useWorkspaceOrchestrationSnapshot from "./features/workspace/useWorkspaceOrchestrationSnapshot";
 import {
   buildWorkspaceRuntimeContext,
@@ -51,7 +46,6 @@ import useActiveResultModel, {
   getCurrentRowCount,
 } from "./features/results/activeResultModel";
 import useResults, { createEmptyResultState } from "./features/results/useResults";
-import { useWorkflowRecommendations } from "./features/workflowRecommendations";
 import "./App.css";
 
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
@@ -270,62 +264,17 @@ function App() {
     activeResultModel,
     addHistory,
   });
-  const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
-  const { workflowRecommendationReport } = useWorkflowRecommendations({
-    dataProfile,
-    dialectRecommendation,
-  });
-  const { businessSemanticReport } = useBusinessSemantics({
+  const {
+    investigationReport,
+    narrativeReport,
+    analysisPackagePlan,
+    investigationWorkspacePlan,
+  } = useWorkspaceIntelligenceReports({
     dataset,
-    dataProfile,
-    workflowRecommendationReport,
+    activeResultModel,
+    queryHistory,
+    workspaceMode,
   });
-  const investigationReport = useMemo(
-    () => buildInvestigationReport({ dataset, activeResultModel }),
-    [activeResultModel, dataset],
-  );
-  const narrativeReport = useMemo(
-    () =>
-      scanNarrativeIntelligence({
-        dataset,
-        activeResultModel,
-        businessSemanticReport,
-        investigationReport,
-      }),
-    [activeResultModel, businessSemanticReport, dataset, investigationReport],
-  );
-  const analysisPackagePlan = useMemo(
-    () =>
-      buildAnalysisPackagePlan({
-        dataset,
-        activeResultModel,
-        investigationReport,
-        queryHistory,
-        sourceMode: workspaceMode,
-      }),
-    [activeResultModel, dataset, investigationReport, queryHistory, workspaceMode],
-  );
-  const investigationWorkspacePlan = useMemo(
-    () =>
-      buildInvestigationWorkspacePlan({
-        dataset,
-        activeResultModel,
-        investigationReport,
-        analysisPackagePlan,
-        narrativeReport,
-        queryHistory,
-        sourceMode: workspaceMode,
-      }),
-    [
-      activeResultModel,
-      analysisPackagePlan,
-      dataset,
-      investigationReport,
-      narrativeReport,
-      queryHistory,
-      workspaceMode,
-    ],
-  );
   const queryBuilderRuntimeSnapshot = useMemo(
     () =>
       createQueryBuilderSnapshot({
