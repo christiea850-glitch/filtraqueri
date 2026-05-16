@@ -8,7 +8,9 @@ import {
   runtimeBridgeBuilderSourceModules,
   type RuntimeBridgeSnapshotBuildInput,
 } from "./runtimeBridgeBuilderTypes";
-import { createRuntimeBridgeId } from "./runtimeBridgeIds";
+import { createBridgeEdgeId, createBridgeNodeId, createRuntimeBridgeId } from "./runtimeBridgeIds";
+import { createRuntimeBridgeArtifacts } from "./runtimeBridgeArtifacts";
+import { createRuntimeBridgeEvents } from "./runtimeBridgeEvents";
 import type { RuntimeBridgeSnapshot } from "./runtimeBridgeTypes";
 
 export const buildRuntimeBridgeSnapshot = ({
@@ -45,6 +47,63 @@ export const buildRuntimeBridgeSnapshot = ({
     sourceModule: modules.investigationIntelligence,
     resultReference,
   });
+  const nodes = [
+    ...(resultNode ? [resultNode] : []),
+    ...narrativeMetadata.nodes,
+    ...investigationMetadata.nodes,
+  ];
+  const continuations = [
+    ...narrativeMetadata.continuations,
+    ...investigationMetadata.continuations,
+  ];
+  const advisories = [
+    ...narrativeMetadata.advisories,
+    ...investigationMetadata.advisories,
+  ];
+  const explanations = [
+    ...narrativeMetadata.explanations,
+    ...investigationMetadata.explanations,
+  ];
+  const confidence = [
+    ...narrativeMetadata.confidence,
+    ...investigationMetadata.confidence,
+  ];
+  const artifacts = createRuntimeBridgeArtifacts({
+    createdAt,
+    sourceModule: modules.runtimeBridge,
+    resultReference,
+    narrativeReport,
+    investigationReport,
+    relatedNodeIds: nodes.map((node) => node.bridgeNodeId),
+  });
+  const artifactEdges = artifacts.flatMap((artifact) =>
+    artifact.relatedNodeIds.map((nodeId) => ({
+      bridgeEdgeId: createBridgeEdgeId("references", artifact.artifactId, nodeId),
+      edgeType: "references" as const,
+      fromBridgeNodeId: createBridgeNodeId("artifact", artifact.artifactId),
+      toBridgeNodeId: nodeId,
+      createdAt,
+      lineageReferences: [
+        {
+          referenceId: artifact.artifactId,
+          referenceKind: "artifact" as const,
+          relationship: "related_to" as const,
+          label: artifact.label,
+        },
+      ],
+      confidenceReferenceId: null,
+      metadataOnly: true as const,
+    })),
+  );
+  const events = createRuntimeBridgeEvents({
+    createdAt,
+    sourceModule: modules.runtimeBridge,
+    relatedNodeIds: nodes.map((node) => node.bridgeNodeId),
+    confidence,
+    explanations,
+    continuations,
+    artifactIds: artifacts.map((artifact) => artifact.artifactId),
+  });
 
   return {
     bridgeId:
@@ -59,32 +118,16 @@ export const buildRuntimeBridgeSnapshot = ({
       ),
     createdAt,
     sourceModule: modules.runtimeBridge,
-    nodes: [
-      ...(resultNode ? [resultNode] : []),
-      ...narrativeMetadata.nodes,
-      ...investigationMetadata.nodes,
-    ],
-    edges: [...narrativeMetadata.edges, ...investigationMetadata.edges],
-    artifacts: [],
-    continuations: [
-      ...narrativeMetadata.continuations,
-      ...investigationMetadata.continuations,
-    ],
-    advisories: [
-      ...narrativeMetadata.advisories,
-      ...investigationMetadata.advisories,
-    ],
+    nodes,
+    edges: [...narrativeMetadata.edges, ...investigationMetadata.edges, ...artifactEdges],
+    artifacts,
+    continuations,
+    advisories,
     investigations: investigationMetadata.investigations,
-    explanations: [
-      ...narrativeMetadata.explanations,
-      ...investigationMetadata.explanations,
-    ],
+    explanations,
     results: resultReference ? [resultReference] : [],
-    confidence: [
-      ...narrativeMetadata.confidence,
-      ...investigationMetadata.confidence,
-    ],
-    events: [],
+    confidence,
+    events,
     metadataOnly: true,
   };
 };
