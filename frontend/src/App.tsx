@@ -25,6 +25,7 @@ import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatase
 import useExportController from "./features/export/useExportController";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
+import { buildInvestigationReport } from "./features/investigationIntelligence";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultState, ResultTabKey } from "./features/results/resultTypes";
 import {
@@ -263,6 +264,10 @@ function App() {
     activeResultModel,
     addHistory,
   });
+  const investigationReport = useMemo(
+    () => buildInvestigationReport({ dataset, activeResultModel }),
+    [activeResultModel, dataset],
+  );
   const queryBuilderRuntimeSnapshot = useMemo(
     () =>
       createQueryBuilderSnapshot({
@@ -984,6 +989,7 @@ function App() {
       activeResultModel.chartReady.numericColumns.length > 0
         ? "Chart support available"
         : "Table review recommended";
+    const resultFollowUps = investigationReport.nextSteps.slice(0, 3);
 
     return (
       <section
@@ -1040,6 +1046,15 @@ function App() {
             <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows yet"}</strong>
           </span>
         </div>
+
+        {!isAnalystMode && resultFollowUps.length > 0 && (
+          <div className="investigation-prompt-row results-follow-up-row" aria-label="Follow-up investigations">
+            <span>Follow up</span>
+            {resultFollowUps.map((suggestion) => (
+              <small key={suggestion.id}>{suggestion.question}</small>
+            ))}
+          </div>
+        )}
 
         <details className="results-technical-disclosure">
           <summary>
@@ -1128,6 +1143,7 @@ function App() {
             filterValues={filterValues}
             applying={isFiltering}
             workspaceMode={workspaceMode}
+            investigationReport={investigationReport}
             errorMessage={errorMessage}
             onFilterChange={updateFilter}
             onApplyFilters={applyFilters}
@@ -1150,6 +1166,7 @@ function App() {
             }
             activeFilterCount={activeFilterLabels.length}
             workspaceMode={workspaceMode}
+            investigationReport={investigationReport}
             selectedColumns={querySelectedColumns}
             groupBy={queryGroupBy}
             aggregations={queryAggregations}

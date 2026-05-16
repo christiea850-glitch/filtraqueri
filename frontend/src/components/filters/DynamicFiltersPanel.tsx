@@ -5,12 +5,14 @@ import {
   createSchemaDisplayProfiles,
   getBusinessRoleLabel,
 } from "../../features/dataIntelligence/structuralPresentation";
+import type { InvestigationReport } from "../../features/investigationIntelligence";
 
 type DynamicFiltersPanelProps = {
   schema: SchemaColumn[];
   filterValues: Record<string, FilterState>;
   applying: boolean;
   workspaceMode: WorkspaceMode;
+  investigationReport?: InvestigationReport | null;
   errorMessage?: string;
   onFilterChange: (columnName: string, value: FilterState) => void;
   onApplyFilters: () => void;
@@ -22,6 +24,7 @@ function DynamicFiltersPanel({
   filterValues,
   applying,
   workspaceMode,
+  investigationReport,
   errorMessage,
   onFilterChange,
   onApplyFilters,
@@ -32,6 +35,8 @@ function DynamicFiltersPanel({
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const isAnalystMode = workspaceMode === "analyst";
   const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
+  const investigationSuggestions = investigationReport?.suggestions.slice(0, 4) || [];
+  const investigationNextSteps = investigationReport?.nextSteps.slice(0, 3) || [];
 
   const formatDateValue = (value: unknown) => {
     if (!value) return "";
@@ -93,13 +98,19 @@ function DynamicFiltersPanel({
         </div>
         <div className="explore-question-list" aria-label="Suggested questions">
           <span>Suggested questions</span>
-          {suggestedQuestions.map((question) => (
+          {(isAnalystMode || investigationSuggestions.length === 0
+            ? suggestedQuestions.map((question) => ({ id: question, question }))
+            : investigationSuggestions.map((suggestion) => ({
+                id: suggestion.id,
+                question: suggestion.question,
+              }))
+          ).map((question) => (
             <button
               type="button"
-              key={question}
-              onClick={() => setCustomQuestion(question)}
+              key={question.id}
+              onClick={() => setCustomQuestion(question.question)}
             >
-              {question}
+              {question.question}
             </button>
           ))}
         </div>
@@ -113,6 +124,33 @@ function DynamicFiltersPanel({
           />
         </label>
       </section>
+
+      {!isAnalystMode && investigationSuggestions.length > 0 && (
+        <section className="investigation-guidance-panel" aria-label="Investigation guidance">
+          <div>
+            <p className="section-label">Investigation ideas</p>
+            <h3>Good starting questions</h3>
+            <p>{investigationReport?.humanSummary}</p>
+          </div>
+          <div className="investigation-card-row">
+            {investigationSuggestions.slice(0, 3).map((suggestion) => (
+              <article key={suggestion.id}>
+                <span>{suggestion.title}</span>
+                <strong>{suggestion.question}</strong>
+                <small>{suggestion.confidence} confidence</small>
+              </article>
+            ))}
+          </div>
+          {investigationNextSteps.length > 0 && (
+            <div className="investigation-prompt-row" aria-label="Possible next steps">
+              <span>Possible next steps</span>
+              {investigationNextSteps.map((suggestion) => (
+                <small key={suggestion.id}>{suggestion.nextSteps[0]}</small>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="filters-header">
         <div>

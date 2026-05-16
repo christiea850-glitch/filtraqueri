@@ -2246,6 +2246,95 @@ body,
   }
 }
 
+/* UX-F24: Human investigation flow intelligence */
+.investigation-guidance-panel {
+  display: grid;
+  gap: var(--fq-space-3);
+  min-width: 0;
+  padding: var(--fq-space-3);
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-sm);
+  background: var(--fq-surface);
+}
+
+.investigation-guidance-panel.compact {
+  padding: var(--fq-space-2) var(--fq-space-3);
+}
+
+.investigation-guidance-panel h3 {
+  margin: 0;
+  color: var(--fq-text);
+  font-size: 16px;
+  font-weight: var(--fq-font-heading);
+}
+
+.investigation-guidance-panel p:not(.section-label) {
+  margin: 4px 0 0;
+  color: var(--fq-text-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.investigation-card-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--fq-space-2);
+  min-width: 0;
+}
+
+.investigation-card-row article {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-xs);
+  background: var(--fq-surface-muted);
+}
+
+.investigation-card-row span,
+.investigation-prompt-row span {
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-label);
+}
+
+.investigation-card-row strong {
+  overflow: hidden;
+  color: var(--fq-text);
+  font-size: 13px;
+  font-weight: var(--fq-font-heading);
+  line-height: 1.35;
+}
+
+.investigation-card-row small,
+.investigation-prompt-row small {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--fq-border);
+  border-radius: var(--fq-radius-pill);
+  background: var(--fq-surface-muted);
+  color: var(--fq-text-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-body);
+  line-height: 1.25;
+}
+
+.investigation-prompt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fq-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.results-follow-up-row {
+  padding-top: var(--fq-space-2);
+  border-top: 1px solid var(--fq-border);
+}
+
 .view-results .data-grid-table th button {
   gap: 4px;
 }

@@ -6,6 +6,7 @@ import {
   createSchemaDisplayProfiles,
   getDisplayColumnName,
 } from "../../features/dataIntelligence/structuralPresentation";
+import type { InvestigationReport } from "../../features/investigationIntelligence";
 
 type VisualQueryBuilderPanelProps = {
   schema: SchemaColumn[];
@@ -13,6 +14,7 @@ type VisualQueryBuilderPanelProps = {
   worksheetName: string;
   activeFilterCount: number;
   workspaceMode: WorkspaceMode;
+  investigationReport?: InvestigationReport | null;
   selectedColumns: string[];
   groupBy: string[];
   aggregations: AggregationState[];
@@ -53,6 +55,7 @@ function VisualQueryBuilderPanel({
   schema,
   activeFilterCount,
   workspaceMode,
+  investigationReport,
   selectedColumns,
   groupBy,
   aggregations,
@@ -77,6 +80,8 @@ function VisualQueryBuilderPanel({
   const [columnSearch, setColumnSearch] = useState("");
   const normalizedSearch = columnSearch.trim().toLowerCase();
   const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
+  const investigationSuggestions = investigationReport?.suggestions.slice(0, 4) || [];
+  const primaryInvestigation = investigationSuggestions[0] || null;
   const visibleSchema = useMemo(
     () =>
       normalizedSearch
@@ -213,6 +218,28 @@ function VisualQueryBuilderPanel({
           <h2>{builderSteps.find((step) => step.id === activeStep)?.label || "Build query"}</h2>
         </div>
       </div>
+
+      {!isAnalystMode && primaryInvestigation && (
+        <section className="investigation-guidance-panel compact" aria-label="Build investigation guidance">
+          <div>
+            <p className="section-label">Investigation goal</p>
+            <h3>{primaryInvestigation.title}</h3>
+            <p>{primaryInvestigation.question}</p>
+          </div>
+          <div className="investigation-prompt-row" aria-label="Recommended comparisons">
+            <span>Compare by</span>
+            {primaryInvestigation.compareBy.slice(0, 3).map((item) => (
+              <small key={item}>{item}</small>
+            ))}
+          </div>
+          <div className="investigation-prompt-row" aria-label="Possible next steps">
+            <span>Next steps</span>
+            {primaryInvestigation.nextSteps.slice(0, 3).map((item) => (
+              <small key={item}>{item}</small>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="query-approval-strip" aria-label="Review before running query">
         <div>
@@ -360,6 +387,14 @@ function VisualQueryBuilderPanel({
           </div>
 
           <div className="query-guidance-grid">
+            {!isAnalystMode &&
+              investigationSuggestions.slice(0, 2).map((suggestion) => (
+                <article key={suggestion.id}>
+                  <span>Good question</span>
+                  <strong>{suggestion.title}</strong>
+                  <p>{suggestion.question}</p>
+                </article>
+              ))}
             <article>
               <span>{isAnalystMode ? "Projection" : "Business question"}</span>
               <strong>{selectedColumns.length > 0 ? "Fields selected" : "Choose fields"}</strong>
