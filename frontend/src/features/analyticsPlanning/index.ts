@@ -1,3 +1,4 @@
+export * from "./analyticsPlanningGovernance";
 export * from "./analyticsPlanningTypes";
 export * from "./analyticsPlanningBuilder";
 export * from "./analyticsPlanningValidation";

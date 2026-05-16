@@ -1,3 +1,4 @@
+export { explanationGovernance } from "./explanationGovernance";
 export { buildBusinessExplanation } from "./explanationBuilder";
 export {
   getBusinessMeaning,

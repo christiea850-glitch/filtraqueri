@@ -67,7 +67,16 @@ export type AdvisoryBoundaryContract = BaseBoundaryContract & {
   readonly canMutateResults: false;
   readonly canCallBackend: false;
   readonly canPersistRuntimeState: false;
-  readonly allowedOutputs: ReadonlyArray<"summary" | "recommendation" | "diagnostic" | "readiness" | "continuation" | "lineage_reference">;
+  readonly allowedOutputs: ReadonlyArray<
+    | "summary"
+    | "recommendation"
+    | "diagnostic"
+    | "readiness"
+    | "continuation"
+    | "lineage_reference"
+    | "plan"
+    | "explanation"
+  >;
 };
 
 export type ExecutableBoundaryContract = BaseBoundaryContract & {

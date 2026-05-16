@@ -1,3 +1,4 @@
+export { analysisPlanGovernance } from "./analysisPlanGovernance";
 export { buildAnalysisPlan } from "./analysisPlanBuilder";
 export {
   getAnalysisPlanReadinessLabel,

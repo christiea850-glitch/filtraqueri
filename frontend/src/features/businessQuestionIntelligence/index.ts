@@ -1,3 +1,4 @@
+export * from "./businessQuestionGovernance";
 export * from "./businessQuestionTypes";
 export * from "./businessQuestionClassifier";
 export * from "./businessQuestionValidation";

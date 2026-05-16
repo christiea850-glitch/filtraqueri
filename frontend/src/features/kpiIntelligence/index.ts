@@ -1,3 +1,4 @@
+export * from "./kpiGovernance";
 export * from "./kpiIntelligenceTypes";
 export * from "./kpiIntelligenceBuilder";
 export * from "./kpiIntelligenceValidation";

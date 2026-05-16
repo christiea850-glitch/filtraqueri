@@ -1,3 +1,4 @@
+export * from "./analyticsIntentGraphGovernance";
 export * from "./analyticsIntentGraphTypes";
 export * from "./analyticsIntentGraphBuilder";
 export * from "./analyticsIntentGraphValidation";
