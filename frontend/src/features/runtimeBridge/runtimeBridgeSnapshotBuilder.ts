@@ -13,6 +13,7 @@ import { createRuntimeBridgeArtifacts } from "./runtimeBridgeArtifacts";
 import { createRuntimeBridgeEvents } from "./runtimeBridgeEvents";
 import { normalizeRuntimeBridgeSnapshot } from "./runtimeBridgeNormalize";
 import type { RuntimeBridgeSnapshot } from "./runtimeBridgeTypes";
+import { createRuntimeBridgeIntegrityReport } from "./runtimeBridgeIntegrity";
 
 export const buildRuntimeBridgeSnapshot = ({
   bridgeId,
@@ -131,4 +132,19 @@ export const buildRuntimeBridgeSnapshot = ({
     events,
     metadataOnly: true,
   });
+};
+
+export const buildRuntimeBridgeIntegrityReadySnapshot = (
+  input: RuntimeBridgeSnapshotBuildInput,
+) => {
+  const snapshot = buildRuntimeBridgeSnapshot(input);
+
+  return {
+    snapshot,
+    integrityReport: createRuntimeBridgeIntegrityReport({
+      snapshot,
+      checkedAt: input.createdAt,
+    }),
+    metadataOnly: true as const,
+  };
 };
