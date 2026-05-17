@@ -10,10 +10,10 @@
   "filter_metadata": {},
   "query_builder_metadata": {
     "selected_columns": [
-      "property_id",
-      "property_name",
-      "property_type",
-      "address"
+      "realtor_id",
+      "realtor_agent",
+      "company",
+      "phone"
     ],
     "group_by": [],
     "aggregations": [
@@ -65,157 +65,9 @@
       "duckdb_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\sessions\\03a05431678345a8a805fefe3008dd1f.duckdb",
       "schema": [
         {
-          "name": "property_id",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 8,
-          "sample_values": [
-            "P005",
-            "P001",
-            "P007",
-            "P004",
-            "P006",
-            "P002",
-            "P003",
-            "P008"
-          ]
-        },
-        {
-          "name": "property_name",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 8,
-          "sample_values": [
-            "Seaside Villas",
-            "Elmwood Gardens",
-            "Harbor Heights",
-            "RiverView Lofts",
-            "Maple Court",
-            "Beacon Row",
-            "Cedar Park",
-            "Hillside Flats"
-          ]
-        },
-        {
-          "name": "property_type",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 1,
-          "sample_values": [
-            "Multifamily"
-          ]
-        },
-        {
-          "name": "address",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 8,
-          "sample_values": [
-            "5 Ocean Blvd",
-            "455 Riverside Dr",
-            "900 Elm St",
-            "15 Beacon Row",
-            "120 Maple St",
-            "77 Pier Ave",
-            "210 Cedar Rd",
-            "380 Hillside Ave"
-          ]
-        },
-        {
-          "name": "city",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 7,
-          "sample_values": [
-            "Cambridge",
-            "Revere",
-            "Boston",
-            "Medford",
-            "Salem",
-            "Somerville",
-            "Quincy"
-          ]
-        },
-        {
-          "name": "state",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 1,
-          "sample_values": [
-            "MA"
-          ]
-        },
-        {
-          "name": "zip",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 7,
-          "sample_values": [
-            "2169",
-            "2155",
-            "1970",
-            "2108",
-            "2139",
-            "2144",
-            "2151"
-          ]
-        },
-        {
-          "name": "year_built",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 8,
-          "sample_values": [
-            "2016",
-            "2012",
-            "1989",
-            "1998",
-            "1995",
-            "2008",
-            "2001",
-            "2005"
-          ]
-        },
-        {
-          "name": "units_total",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 4,
-          "sample_values": [
-            "8",
-            "10",
-            "12",
-            "6"
-          ]
-        },
-        {
-          "name": "manager_id",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 6,
-          "sample_values": [
-            "MGT001",
-            "MGT002",
-            "MGT005",
-            "MGT006",
-            "MGT003",
-            "MGT004"
-          ]
-        },
-        {
           "name": "realtor_id",
           "type": "VARCHAR",
-          "inferred_type": "categorical",
+          "inferred_type": "text",
           "null_count": 0,
           "unique_count": 3,
           "sample_values": [
@@ -225,272 +77,44 @@
           ]
         },
         {
-          "name": "column_12",
+          "name": "realtor_agent",
           "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
+          "inferred_type": "text",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "Shawn Taylor",
+            "Divya Kataria",
+            "Jacek Mikolajczyk"
+          ]
         },
         {
-          "name": "column_13",
+          "name": "company",
           "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
+          "inferred_type": "text",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "Valley Fine Homes, LLC",
+            "OctFest LLC",
+            "LevelUp Realty"
+          ]
         },
         {
-          "name": "column_14",
+          "name": "phone",
           "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_15",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_16",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_17",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_18",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_19",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_20",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_21",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_22",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_23",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_24",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_25",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_26",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_27",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_28",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_29",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_30",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_31",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_32",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_33",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_34",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_35",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_36",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_37",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_38",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_39",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_40",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_41",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_42",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_43",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
-        },
-        {
-          "name": "column_44",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 8,
-          "unique_count": 0,
-          "sample_values": []
+          "inferred_type": "text",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "860-713-5506",
+            "860-713-5501",
+            "860-713-5502"
+          ]
         }
       ],
-      "row_count": 8,
-      "column_count": 44,
+      "row_count": 3,
+      "column_count": 4,
       "created_at": "2026-05-16T00:19:40.835640+00:00",
       "workbook_metadata": {
         "workbook_id": "03a05431678345a8a805fefe3008dd1f",
@@ -524,7 +148,7 @@
           "03a05431678345a8a805fefe3008dd1f:worksheet:17",
           "03a05431678345a8a805fefe3008dd1f:worksheet:18"
         ],
-        "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:3",
+        "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:2",
         "worksheets": [
           {
             "worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:1",
@@ -4728,13 +4352,13 @@
           "warnings": []
         },
         "created_at": "2026-05-16T00:19:40.835640+00:00",
-        "updated_at": "2026-05-16T23:02:37.648399+00:00"
+        "updated_at": "2026-05-17T20:09:11.092855+00:00"
       }
     }
   ],
   "created_at": "2026-05-16T00:19:40.835640+00:00",
-  "last_opened_at": "2026-05-17T18:52:55.459439+00:00",
-  "updated_at": "2026-05-17T18:52:55.491028+00:00",
+  "last_opened_at": "2026-05-17T20:09:11.877748+00:00",
+  "updated_at": "2026-05-17T20:09:11.899950+00:00",
   "workbook_metadata": {
     "workbook_id": "03a05431678345a8a805fefe3008dd1f",
     "workspace_id": "03a05431678345a8a805fefe3008dd1f",
@@ -4767,7 +4391,7 @@
       "03a05431678345a8a805fefe3008dd1f:worksheet:17",
       "03a05431678345a8a805fefe3008dd1f:worksheet:18"
     ],
-    "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:3",
+    "active_worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:2",
     "worksheets": [
       {
         "worksheet_id": "03a05431678345a8a805fefe3008dd1f:worksheet:1",
@@ -8971,6 +8595,6 @@
       "warnings": []
     },
     "created_at": "2026-05-16T00:19:40.835640+00:00",
-    "updated_at": "2026-05-16T23:02:37.648399+00:00"
+    "updated_at": "2026-05-17T20:09:11.092855+00:00"
   }
 }
