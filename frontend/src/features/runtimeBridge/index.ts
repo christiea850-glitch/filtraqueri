@@ -11,6 +11,7 @@ export * from "./runtimeInvestigationWorkspaceAdapters";
 export * from "./runtimeBridgeIds";
 export * from "./runtimeBridgeIntegrity";
 export * from "./runtimeBridgeLineage";
+export * from "./runtimeBridgeNarrativeIntelligence";
 export * from "./runtimeBridgeNormalize";
 export * from "./runtimeBridgeSnapshotBuilder";
 export * from "./runtimeBridgeTypes";
