@@ -2,6 +2,7 @@ export * from "./runtimeBridgeAdapters";
 export * from "./runtimeBridgeArtifacts";
 export * from "./runtimeBridgeBuilderTypes";
 export * from "./runtimeBridgeComposition";
+export * from "./runtimeBridgeDashboardNarrativeIntelligence";
 export * from "./runtimeBridgeDecisionSupport";
 export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeExplainability";
