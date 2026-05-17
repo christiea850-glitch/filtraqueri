@@ -46,3 +46,4 @@ export * from "./runtimeBridgeNormalize";
 export * from "./runtimeBridgeSnapshotBuilder";
 export * from "./runtimeBridgeStrategicNarrativePackaging";
 export * from "./runtimeBridgeTypes";
+export * from "./runtimeBridgeVisualizationPlanning";
