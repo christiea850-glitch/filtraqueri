@@ -8,6 +8,30 @@ export * from "./runtimeBridgeExplainability";
 export * from "./runtimeBridgeExecutiveDeliveryIntelligence";
 export * from "./runtimeBridgeExecutiveRecommendations";
 export * from "./runtimeBridgeGovernance";
+export {
+  buildRuntimeBridgeGovernanceIntelligenceManifest,
+  buildRuntimeBridgeGovernanceNarrativeBundle,
+  buildRuntimeBridgeGovernanceReviewMap,
+  collectRuntimeBridgeGovernanceSignals,
+  consolidateRuntimeBridgeGovernanceMetadata,
+  runtimeBridgeGovernanceIntelligenceConsolidationGovernance,
+  runtimeBridgeGovernanceIntelligenceConsolidationSourceModule,
+  summarizeRuntimeBridgeAuditReadiness,
+  summarizeRuntimeBridgeCompliancePosture as summarizeRuntimeBridgeGovernanceIntelligenceCompliancePosture,
+  summarizeRuntimeBridgeEscalationPosture,
+  summarizeRuntimeBridgeGovernanceAlignment,
+  summarizeRuntimeBridgeGovernancePriorities,
+  type RuntimeBridgeAuditReadinessSummary,
+  type RuntimeBridgeCompliancePostureSummary,
+  type RuntimeBridgeEscalationPostureSummary,
+  type RuntimeBridgeGovernanceAlignmentSummary,
+  type RuntimeBridgeGovernanceConsolidation,
+  type RuntimeBridgeGovernanceIntelligenceManifest,
+  type RuntimeBridgeGovernanceNarrativeBundle,
+  type RuntimeBridgeGovernancePriority,
+  type RuntimeBridgeGovernanceReviewMap,
+  type RuntimeBridgeGovernanceSignal,
+} from "./runtimeBridgeGovernanceIntelligenceConsolidation";
 export * from "./runtimeAnalysisPackageAdapters";
 export * from "./runtimeGraphAdapters";
 export * from "./runtimeInvestigationWorkspaceAdapters";
