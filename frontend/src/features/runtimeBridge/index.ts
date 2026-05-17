@@ -6,6 +6,7 @@ export * from "./runtimeBridgeDashboardNarrativeIntelligence";
 export * from "./runtimeBridgeDecisionSupport";
 export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeExplainability";
+export * from "./runtimeBridgeExecutiveDashboardComposition";
 export * from "./runtimeBridgeExecutiveDeliveryIntelligence";
 export * from "./runtimeBridgeExecutiveRecommendations";
 export * from "./runtimeBridgeExecutiveVisualizationStorytelling";
