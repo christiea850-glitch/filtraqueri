@@ -8,6 +8,7 @@ export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeExplainability";
 export * from "./runtimeBridgeExecutiveDeliveryIntelligence";
 export * from "./runtimeBridgeExecutiveRecommendations";
+export * from "./runtimeBridgeExecutiveVisualizationStorytelling";
 export * from "./runtimeBridgeGovernance";
 export {
   buildRuntimeBridgeGovernanceIntelligenceManifest,
