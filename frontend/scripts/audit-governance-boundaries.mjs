@@ -208,7 +208,8 @@ const isRuntimeBridgeFile = (projectPath) =>
 
 const isRuntimeBridgeIndexFile = (projectPath) =>
   projectPath === "src/features/runtimeBridge/index.ts" ||
-  projectPath === "src/features/runtimeBridge/_kernel/index.ts";
+  projectPath === "src/features/runtimeBridge/_kernel/index.ts" ||
+  projectPath === "src/features/runtimeBridge/_registry/index.ts";
 
 const isRuntimeBridgeModuleTarget = (projectPath) =>
   projectPath === "src/features/runtimeBridge" ||
@@ -310,6 +311,96 @@ const findRuntimeBridgeCycle = (graph) => {
   }
 
   return null;
+};
+
+const runtimeBridgeRegistryForbiddenCapabilityValues = [
+  "runtime_execution",
+  "workflow_dispatch",
+  "backend_api",
+  "storage_write",
+  "memory_persistence",
+  "session_restore",
+  "react_rendering",
+  "chart_rendering",
+  "network_call",
+  "timer_loop",
+  "random_id",
+];
+
+const matchAllStrings = (source, pattern) => [...source.matchAll(pattern)].map((match) => match[1]);
+
+const auditRuntimeBridgeRegistry = async () => {
+  const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge/_registry"]);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const approvedLayers = new Set(Object.keys(runtimeBridgeArchitectureLayerOrder));
+  const findings = [];
+
+  for (const file of sourceFiles) {
+    const moduleIds = matchAllStrings(file.source, /\bmoduleId:\s*"([^"]+)"/g);
+    for (const moduleId of moduleIds) {
+      if (/^[a-z0-9:-]+$/.test(moduleId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-registry-nondeterministic-id",
+        file: file.projectPath,
+        message: `runtime-bridge-registry-nondeterministic-id: ${file.projectPath} moduleId "${moduleId}" is not a deterministic slug`,
+      });
+    }
+
+    const layerValues = matchAllStrings(file.source, /\blayer:\s*"([^"]+)"/g);
+    const dependencyLayerBlocks = [...file.source.matchAll(/\ballowedDependencyLayers:\s*\[([\s\S]*?)\]/g)]
+      .map((match) => match[1]);
+    const dependencyLayerValues = dependencyLayerBlocks.flatMap((block) =>
+      matchAllStrings(block, /"([^"]+)"/g),
+    );
+
+    for (const layer of [...layerValues, ...dependencyLayerValues]) {
+      if (approvedLayers.has(layer)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-registry-unapproved-layer",
+        file: file.projectPath,
+        message: `runtime-bridge-registry-unapproved-layer: ${file.projectPath} declares layer "${layer}"`,
+      });
+    }
+
+    if (/\bgovernanceClassification:\s*"(?!metadata_only")/.test(file.source)) {
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-registry-not-metadata-only",
+        file: file.projectPath,
+        message: `runtime-bridge-registry-not-metadata-only: ${file.projectPath} declares non metadata-only governance classification`,
+      });
+    }
+
+    if (/\bmetadataOnly:\s*false\b/.test(file.source)) {
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-registry-not-metadata-only",
+        file: file.projectPath,
+        message: `runtime-bridge-registry-not-metadata-only: ${file.projectPath} declares metadataOnly false`,
+      });
+    }
+
+    const deterministicCapabilityBlocks = [...file.source.matchAll(/\bdeterministicCapabilities:\s*\[([\s\S]*?)\]/g)]
+      .map((match) => match[1]);
+    for (const block of deterministicCapabilityBlocks) {
+      for (const capability of runtimeBridgeRegistryForbiddenCapabilityValues) {
+        if (!block.includes(`"${capability}"`)) continue;
+
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-registry-forbidden-capability",
+          file: file.projectPath,
+          message: `runtime-bridge-registry-forbidden-capability: ${file.projectPath} declares "${capability}" as deterministic capability`,
+        });
+      }
+    }
+  }
+
+  return findings;
 };
 
 const auditAdvisoryImports = async () => {
@@ -660,6 +751,7 @@ const runAudit = async () => {
     auditAdvisoryImports(),
     auditRuntimeMetadataImports(),
     auditRuntimeBridgeArchitecture(),
+    auditRuntimeBridgeRegistry(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

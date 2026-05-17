@@ -29,6 +29,7 @@ export const runtimeIntelligenceFolder = "src/features/runtimeIntelligence";
 
 export const runtimeBridgeArchitectureLayers = {
   "src/features/runtimeBridge/_kernel": "kernel",
+  "src/features/runtimeBridge/_registry": "foundation",
   "src/features/runtimeBridge/runtimeAnalysisPackageAdapters": "foundation",
   "src/features/runtimeBridge/runtimeBridgeAdapters": "foundation",
   "src/features/runtimeBridge/runtimeBridgeArtifacts": "foundation",
