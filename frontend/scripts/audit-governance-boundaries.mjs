@@ -12,7 +12,7 @@ import {
   presentationalFiles,
   presentationalFolders,
   presentationalForbiddenImports,
-  runtimeIntelligenceFolder,
+  runtimeMetadataFolders,
   runtimeMetadataForbiddenImports,
 } from "./governance-boundary-rules.mjs";
 
@@ -141,6 +141,85 @@ const createFinding = ({ severity, rule, file, importTarget, specifier, detail, 
   };
 };
 
+const runtimeBridgeUsagePatterns = [
+  {
+    rule: "runtime-bridge-storage-api",
+    importTarget: "browser-storage-api",
+    patterns: [
+      /\blocalStorage\s*\./,
+      /\bsessionStorage\s*\./,
+      /\bindexedDB\s*\./,
+      /\bindexedDB\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-network-api",
+    importTarget: "network-api",
+    patterns: [
+      /\bfetch\s*\(/,
+      /\baxios\s*\./,
+      /\baxios\s*\(/,
+      /\bnew\s+WebSocket\s*\(/,
+      /\bWebSocket\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-timer-api",
+    importTarget: "timer-api",
+    patterns: [
+      /\bsetInterval\s*\(/,
+      /\bsetTimeout\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-nondeterministic-id",
+    importTarget: "nondeterministic-id-api",
+    patterns: [
+      /\bDate\.now\s*\(/,
+      /\bMath\.random\s*\(/,
+      /\bcrypto\.randomUUID\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-import-react",
+    importTarget: "react-hook",
+    patterns: [
+      /\buse[A-Z][A-Za-z0-9_]*\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-import-chart-rendering",
+    importTarget: "svg-canvas-rendering-api",
+    patterns: [
+      /\bcreateElementNS\s*\(\s*["']http:\/\/www\.w3\.org\/2000\/svg["']/,
+      /\bgetContext\s*\(\s*["']2d["']/,
+      /\bnew\s+Path2D\s*\(/,
+      /\bCanvasRenderingContext2D\b/,
+      /\bSVGElement\b/,
+    ],
+  },
+];
+
+const isRuntimeBridgeFile = (projectPath) =>
+  projectPath === "src/features/runtimeBridge" ||
+  projectPath.startsWith("src/features/runtimeBridge/");
+
+const createRuntimeBridgeImportFinding = ({
+  file,
+  importEntry,
+  resolvedTarget,
+  target,
+  rule,
+}) =>
+  createFinding({
+    severity: "error",
+    rule,
+    file: file.projectPath,
+    importTarget: target,
+    specifier: importEntry.specifier,
+    detail: `matches ${resolvedTarget}`,
+  });
+
 const auditAdvisoryImports = async () => {
   const files = await collectFilesFromProjectPaths(advisoryFeatureFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
@@ -179,31 +258,108 @@ const auditAdvisoryImports = async () => {
   return findings;
 };
 
-const auditRuntimeIntelligenceImports = async () => {
-  const files = await collectFilesFromProjectPaths([runtimeIntelligenceFolder]);
+const auditRuntimeMetadataImports = async () => {
+  const files = await collectFilesFromProjectPaths(runtimeMetadataFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
   const findings = [];
 
   for (const file of sourceFiles) {
     const imports = parseImports(file.source);
+    const isBridgeFile = isRuntimeBridgeFile(file.projectPath);
 
     for (const importEntry of imports) {
       if (importEntry.isTypeOnly) continue;
 
-      if (importEntry.specifier === "react") {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+
+      if (isBridgeFile) {
+        const reactTarget = runtimeMetadataForbiddenImports.react.find((target) =>
+          matchesTarget(resolvedTarget, target),
+        );
+        const chartRenderingTarget = runtimeMetadataForbiddenImports.chartRendering.find((target) =>
+          matchesTarget(resolvedTarget, target),
+        );
+        const backendTarget = runtimeMetadataForbiddenImports.backend.find((target) =>
+          matchesTarget(resolvedTarget, target),
+        );
+        const persistenceTarget = runtimeMetadataForbiddenImports.persistence.find((target) =>
+          matchesTarget(resolvedTarget, target),
+        );
+        const executionTarget = runtimeMetadataForbiddenImports.execution.find((target) =>
+          matchesTarget(resolvedTarget, target),
+        );
+
+        if (reactTarget) {
+          const finding = createRuntimeBridgeImportFinding({
+            file,
+            importEntry,
+            resolvedTarget,
+            target: reactTarget,
+            rule: "runtime-bridge-import-react",
+          });
+          if (finding) findings.push(finding);
+        }
+
+        if (chartRenderingTarget) {
+          const finding = createRuntimeBridgeImportFinding({
+            file,
+            importEntry,
+            resolvedTarget,
+            target: chartRenderingTarget,
+            rule: "runtime-bridge-import-chart-rendering",
+          });
+          if (finding) findings.push(finding);
+        }
+
+        if (backendTarget) {
+          const finding = createRuntimeBridgeImportFinding({
+            file,
+            importEntry,
+            resolvedTarget,
+            target: backendTarget,
+            rule: "runtime-bridge-import-backend",
+          });
+          if (finding) findings.push(finding);
+        }
+
+        if (persistenceTarget) {
+          const finding = createRuntimeBridgeImportFinding({
+            file,
+            importEntry,
+            resolvedTarget,
+            target: persistenceTarget,
+            rule: "runtime-bridge-import-persistence",
+          });
+          if (finding) findings.push(finding);
+        }
+
+        if (executionTarget) {
+          const finding = createRuntimeBridgeImportFinding({
+            file,
+            importEntry,
+            resolvedTarget,
+            target: executionTarget,
+            rule: "runtime-bridge-import-execution",
+          });
+          if (finding) findings.push(finding);
+        }
+
+        continue;
+      }
+
+      if (runtimeMetadataForbiddenImports.react.some((target) => matchesTarget(resolvedTarget, target))) {
         const finding = createFinding({
-          severity: "warn",
+          severity: "error",
           rule: "metadata-only-import-react-hook",
           file: file.projectPath,
           importTarget: "react",
           specifier: importEntry.specifier,
-          detail: "runtimeIntelligence should stay metadata-only",
+          detail: "runtime metadata should stay metadata-only",
         });
         if (finding) findings.push(finding);
         continue;
       }
 
-      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
       const persistenceTarget = runtimeMetadataForbiddenImports.persistence.find((target) =>
         matchesTarget(resolvedTarget, target),
       );
@@ -234,6 +390,21 @@ const auditRuntimeIntelligenceImports = async () => {
         });
         if (finding) findings.push(finding);
       }
+    }
+
+    if (!isBridgeFile) continue;
+
+    for (const usagePattern of runtimeBridgeUsagePatterns) {
+      if (!usagePattern.patterns.some((pattern) => pattern.test(file.source))) continue;
+
+      const finding = createFinding({
+        severity: "error",
+        rule: usagePattern.rule,
+        file: file.projectPath,
+        importTarget: usagePattern.importTarget,
+        detail: `uses ${usagePattern.importTarget}`,
+      });
+      if (finding) findings.push(finding);
     }
   }
 
@@ -309,7 +480,7 @@ const auditPresentationalImports = async () => {
 const runAudit = async () => {
   const findingGroups = await Promise.all([
     auditAdvisoryImports(),
-    auditRuntimeIntelligenceImports(),
+    auditRuntimeMetadataImports(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

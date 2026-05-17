@@ -20,6 +20,11 @@ export const advisoryFeatureFolders = [
   "src/features/workbookRelationships",
 ];
 
+export const runtimeMetadataFolders = [
+  "src/features/runtimeBridge",
+  "src/features/runtimeIntelligence",
+];
+
 export const runtimeIntelligenceFolder = "src/features/runtimeIntelligence";
 
 export const continuationMetadataFolders = [
@@ -55,6 +60,21 @@ export const advisoryHardFailImportTargets = [
 ];
 
 export const runtimeMetadataForbiddenImports = {
+  backend: [
+    "src/services/api",
+  ],
+  react: [
+    "react",
+    "react-dom",
+    "react-dom/client",
+  ],
+  chartRendering: [
+    "d3",
+    "recharts",
+    "chart.js",
+    "chartjs",
+    "react-chartjs-2",
+  ],
   persistence: [
     "src/features/workspace/workspacePersistence",
     "src/features/workspaceRuntime/runtimePersistence",
