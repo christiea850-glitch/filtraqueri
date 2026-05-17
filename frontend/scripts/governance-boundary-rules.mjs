@@ -27,6 +27,58 @@ export const runtimeMetadataFolders = [
 
 export const runtimeIntelligenceFolder = "src/features/runtimeIntelligence";
 
+export const runtimeBridgeArchitectureLayers = {
+  "src/features/runtimeBridge/_kernel": "kernel",
+  "src/features/runtimeBridge/runtimeAnalysisPackageAdapters": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeAdapters": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeArtifacts": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeBuilderTypes": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeComposition": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeEvents": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeGovernance": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeIds": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeIntegrity": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeLineage": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeNormalize": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeSnapshotBuilder": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeTypes": "foundation",
+  "src/features/runtimeBridge/runtimeGraphAdapters": "foundation",
+  "src/features/runtimeBridge/runtimeInvestigationWorkspaceAdapters": "foundation",
+  "src/features/runtimeBridge/runtimeBridgeDecisionSupport": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeExecutiveDeliveryIntelligence": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeExecutiveRecommendations": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeExplainability": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeInsightInterpretation": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeNarrativeIntelligence": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeStrategicNarrativePackaging": "intelligence",
+  "src/features/runtimeBridge/runtimeBridgeGovernanceIntelligenceConsolidation": "governance",
+  "src/features/runtimeBridge/runtimeBridgeIntelligenceReviewGovernance": "governance",
+  "src/features/runtimeBridge/runtimeBridgeDashboardNarrativeIntelligence": "visualization",
+  "src/features/runtimeBridge/runtimeBridgeExecutiveDashboardComposition": "visualization",
+  "src/features/runtimeBridge/runtimeBridgeExecutiveVisualizationStorytelling": "visualization",
+  "src/features/runtimeBridge/runtimeBridgeVisualizationPlanning": "visualization",
+  "src/features/runtimeBridge/runtimeBridgeExecutivePresentationOrchestration": "orchestration",
+  "src/features/runtimeBridge/runtimeBridgeIntelligenceOrchestrationPlanning": "orchestration",
+  "src/features/runtimeBridge/runtimeBridgeExecutiveDeliveryEcosystem": "federation",
+  "src/features/runtimeBridge/runtimeBridgeEnterpriseIntelligenceFederation": "federation",
+  "src/features/runtimeBridge/runtimeBridgeEnterpriseLifecycleContinuity": "lifecycle",
+  "src/features/runtimeBridge/runtimeBridgeEnterpriseResilienceGovernance": "resilience",
+  "src/features/runtimeBridge/runtimeBridgeEnterpriseObservabilityTraceability": "observability",
+};
+
+export const runtimeBridgeArchitectureLayerOrder = {
+  kernel: 0,
+  foundation: 1,
+  intelligence: 2,
+  visualization: 3,
+  orchestration: 4,
+  governance: 5,
+  federation: 6,
+  lifecycle: 7,
+  resilience: 8,
+  observability: 9,
+};
+
 export const continuationMetadataFolders = [
   "src/features/runtimeIntelligence/continuations",
   "src/features/narrativeIntelligence",

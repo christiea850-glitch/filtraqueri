@@ -12,6 +12,8 @@ import {
   presentationalFiles,
   presentationalFolders,
   presentationalForbiddenImports,
+  runtimeBridgeArchitectureLayerOrder,
+  runtimeBridgeArchitectureLayers,
   runtimeMetadataFolders,
   runtimeMetadataForbiddenImports,
 } from "./governance-boundary-rules.mjs";
@@ -204,6 +206,61 @@ const isRuntimeBridgeFile = (projectPath) =>
   projectPath === "src/features/runtimeBridge" ||
   projectPath.startsWith("src/features/runtimeBridge/");
 
+const isRuntimeBridgeIndexFile = (projectPath) =>
+  projectPath === "src/features/runtimeBridge/index.ts" ||
+  projectPath === "src/features/runtimeBridge/_kernel/index.ts";
+
+const isRuntimeBridgeModuleTarget = (projectPath) =>
+  projectPath === "src/features/runtimeBridge" ||
+  projectPath.startsWith("src/features/runtimeBridge/");
+
+const getRuntimeBridgeLayer = (projectPath) => {
+  const strippedProjectPath = stripExtension(projectPath);
+  const exactLayer = runtimeBridgeArchitectureLayers[strippedProjectPath];
+  if (exactLayer) return exactLayer;
+
+  const prefix = Object.keys(runtimeBridgeArchitectureLayers)
+    .filter((configuredPath) => strippedProjectPath.startsWith(`${configuredPath}/`))
+    .sort((left, right) => right.length - left.length)[0];
+
+  return prefix ? runtimeBridgeArchitectureLayers[prefix] : null;
+};
+
+const getRuntimeBridgeLayerRank = (layer) => runtimeBridgeArchitectureLayerOrder[layer] ?? Number.POSITIVE_INFINITY;
+
+const runtimeBridgeRuleForLayerViolation = (sourceLayer, targetLayer, resolvedTarget) => {
+  if (sourceLayer === "kernel" && targetLayer !== "kernel" && targetLayer !== "foundation") {
+    return "runtime-bridge-kernel-reverse-dependency";
+  }
+
+  if (
+    (sourceLayer === "visualization" &&
+      ["lifecycle", "resilience", "observability"].includes(targetLayer)) ||
+    (sourceLayer === "governance" &&
+      resolvedTarget === "src/features/runtimeBridge/runtimeBridgeExecutivePresentationOrchestration")
+  ) {
+    return "runtime-bridge-cross-layer-violation";
+  }
+
+  return "runtime-bridge-forbidden-layer-direction";
+};
+
+const createRuntimeBridgeArchitectureFinding = ({
+  rule,
+  file,
+  importTarget,
+  specifier,
+  detail,
+}) =>
+  createFinding({
+    severity: "error",
+    rule,
+    file,
+    importTarget,
+    specifier,
+    detail,
+  });
+
 const createRuntimeBridgeImportFinding = ({
   file,
   importEntry,
@@ -219,6 +276,41 @@ const createRuntimeBridgeImportFinding = ({
     specifier: importEntry.specifier,
     detail: `matches ${resolvedTarget}`,
   });
+
+const findRuntimeBridgeCycle = (graph) => {
+  const sortedNodes = [...graph.keys()].sort();
+  const visiting = new Set();
+  const visited = new Set();
+  const stack = [];
+
+  const visit = (node) => {
+    if (visiting.has(node)) {
+      const cycleStart = stack.indexOf(node);
+      return [...stack.slice(cycleStart), node];
+    }
+    if (visited.has(node)) return null;
+
+    visiting.add(node);
+    stack.push(node);
+
+    for (const nextNode of [...(graph.get(node) || [])].sort()) {
+      const cycle = visit(nextNode);
+      if (cycle) return cycle;
+    }
+
+    stack.pop();
+    visiting.delete(node);
+    visited.add(node);
+    return null;
+  };
+
+  for (const node of sortedNodes) {
+    const cycle = visit(node);
+    if (cycle) return cycle;
+  }
+
+  return null;
+};
 
 const auditAdvisoryImports = async () => {
   const files = await collectFilesFromProjectPaths(advisoryFeatureFolders);
@@ -411,6 +503,92 @@ const auditRuntimeMetadataImports = async () => {
   return findings;
 };
 
+const auditRuntimeBridgeArchitecture = async () => {
+  const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge"]);
+  const sourceFiles = (await Promise.all(files.map(readSourceFile)))
+    .filter((file) => !isRuntimeBridgeIndexFile(file.projectPath))
+    .sort((left, right) => left.projectPath.localeCompare(right.projectPath));
+  const runtimeBridgeFileSet = new Set(sourceFiles.map((file) => stripExtension(file.projectPath)));
+  const findings = [];
+  const graph = new Map(sourceFiles.map((file) => [stripExtension(file.projectPath), []]));
+
+  for (const file of sourceFiles) {
+    const sourceModule = stripExtension(file.projectPath);
+    const sourceLayer = getRuntimeBridgeLayer(file.projectPath);
+
+    if (!sourceLayer) {
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-unclassified-module",
+        file: file.projectPath,
+        message: `runtime-bridge-unclassified-module: ${file.projectPath} is not classified`,
+      });
+      continue;
+    }
+
+    const imports = parseImports(file.source);
+
+    for (const importEntry of imports) {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+      if (!isRuntimeBridgeModuleTarget(resolvedTarget)) continue;
+
+      const targetLayer = getRuntimeBridgeLayer(resolvedTarget);
+      if (!targetLayer) {
+        const finding = createRuntimeBridgeArchitectureFinding({
+          rule: "runtime-bridge-unclassified-import-target",
+          file: file.projectPath,
+          importTarget: resolvedTarget,
+          specifier: importEntry.specifier,
+          detail: "target is not classified",
+        });
+        if (finding) findings.push(finding);
+        continue;
+      }
+
+      if (runtimeBridgeFileSet.has(resolvedTarget)) {
+        graph.get(sourceModule).push(resolvedTarget);
+      }
+
+      const sourceRank = getRuntimeBridgeLayerRank(sourceLayer);
+      const targetRank = getRuntimeBridgeLayerRank(targetLayer);
+      const isSameModule = sourceModule === resolvedTarget;
+      const isAllowedKernelImport = sourceLayer !== "kernel" && targetLayer === "kernel";
+      const isKernelAllowedFoundationImport =
+        sourceLayer === "kernel" && (targetLayer === "kernel" || targetLayer === "foundation");
+
+      if (
+        !isSameModule &&
+        !isAllowedKernelImport &&
+        !isKernelAllowedFoundationImport &&
+        sourceRank < targetRank
+      ) {
+        const rule = runtimeBridgeRuleForLayerViolation(sourceLayer, targetLayer, resolvedTarget);
+        const finding = createRuntimeBridgeArchitectureFinding({
+          rule,
+          file: file.projectPath,
+          importTarget: resolvedTarget,
+          specifier: importEntry.specifier,
+          detail: `${sourceLayer} cannot import ${targetLayer}`,
+        });
+        if (finding) findings.push(finding);
+      }
+    }
+  }
+
+  const cycle = findRuntimeBridgeCycle(graph);
+  if (cycle) {
+    const cyclePath = cycle.map((node) => `${node}.ts`).join(" -> ");
+    findings.push({
+      severity: "error",
+      rule: "runtime-bridge-circular-import",
+      file: `${cycle[0]}.ts`,
+      message: `runtime-bridge-circular-import: ${cyclePath}`,
+    });
+  }
+
+  return findings;
+};
+
 const createFieldPattern = (fieldName) =>
   new RegExp(`(?:\\b${fieldName}\\b|["']${fieldName}["'])\\s*(?:\\?|:)`, "i");
 
@@ -481,6 +659,7 @@ const runAudit = async () => {
   const findingGroups = await Promise.all([
     auditAdvisoryImports(),
     auditRuntimeMetadataImports(),
+    auditRuntimeBridgeArchitecture(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

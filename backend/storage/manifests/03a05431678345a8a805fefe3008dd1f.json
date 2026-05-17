@@ -12,8 +12,7 @@
     "selected_columns": [
       "realtor_id",
       "realtor_agent",
-      "company",
-      "phone"
+      "company"
     ],
     "group_by": [],
     "aggregations": [
@@ -4357,8 +4356,8 @@
     }
   ],
   "created_at": "2026-05-16T00:19:40.835640+00:00",
-  "last_opened_at": "2026-05-17T20:09:11.877748+00:00",
-  "updated_at": "2026-05-17T20:09:11.899950+00:00",
+  "last_opened_at": "2026-05-17T22:18:18.149064+00:00",
+  "updated_at": "2026-05-17T22:18:18.171488+00:00",
   "workbook_metadata": {
     "workbook_id": "03a05431678345a8a805fefe3008dd1f",
     "workspace_id": "03a05431678345a8a805fefe3008dd1f",
