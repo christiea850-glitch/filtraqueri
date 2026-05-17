@@ -14,6 +14,7 @@ export * from "./runtimeBridgeExecutiveRecommendations";
 export * from "./runtimeBridgeExecutiveVisualizationStorytelling";
 export * from "./runtimeBridgeEnterpriseLifecycleContinuity";
 export * from "./runtimeBridgeEnterpriseIntelligenceFederation";
+export * from "./runtimeBridgeEnterpriseResilienceGovernance";
 export * from "./runtimeBridgeGovernance";
 export {
   buildRuntimeBridgeGovernanceIntelligenceManifest,
