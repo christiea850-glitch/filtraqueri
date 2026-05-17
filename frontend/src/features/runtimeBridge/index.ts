@@ -8,6 +8,7 @@ export * from "./runtimeBridgeEvents";
 export * from "./runtimeBridgeExplainability";
 export * from "./runtimeBridgeExecutiveDashboardComposition";
 export * from "./runtimeBridgeExecutiveDeliveryIntelligence";
+export * from "./runtimeBridgeExecutiveDeliveryEcosystem";
 export * from "./runtimeBridgeExecutivePresentationOrchestration";
 export * from "./runtimeBridgeExecutiveRecommendations";
 export * from "./runtimeBridgeExecutiveVisualizationStorytelling";
