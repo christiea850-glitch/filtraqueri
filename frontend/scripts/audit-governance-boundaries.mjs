@@ -208,6 +208,7 @@ const isRuntimeBridgeFile = (projectPath) =>
 
 const isRuntimeBridgeIndexFile = (projectPath) =>
   projectPath === "src/features/runtimeBridge/index.ts" ||
+  projectPath === "src/features/runtimeBridge/_contracts/index.ts" ||
   projectPath === "src/features/runtimeBridge/_kernel/index.ts" ||
   projectPath === "src/features/runtimeBridge/_registry/index.ts";
 
@@ -395,6 +396,170 @@ const auditRuntimeBridgeRegistry = async () => {
           rule: "runtime-bridge-registry-forbidden-capability",
           file: file.projectPath,
           message: `runtime-bridge-registry-forbidden-capability: ${file.projectPath} declares "${capability}" as deterministic capability`,
+        });
+      }
+    }
+  }
+
+  return findings;
+};
+
+const runtimeBridgeApprovedReadinessIds = new Set([
+  "metadata_only",
+  "advisory_ready",
+  "runtime_candidate",
+  "execution_prohibited",
+  "governance_review_required",
+  "future_runtime_possible",
+]);
+
+const runtimeBridgeApprovedBoundaryIds = new Set([
+  "metadata_boundary",
+  "runtime_boundary",
+  "orchestration_boundary",
+  "persistence_boundary",
+  "rendering_boundary",
+  "backend_boundary",
+  "agent_boundary",
+  "export_boundary",
+]);
+
+const runtimeBridgeForbiddenEligibilityFields = [
+  "executable",
+  "runtimeEligible",
+  "uiEligible",
+  "persistenceEligible",
+  "orchestrationEligible",
+  "exportEligible",
+  "backendEligible",
+  "agentEligible",
+  "workflowEligible",
+];
+
+const splitObjectLiteralBlocks = (source) => {
+  const blocks = [];
+  let depth = 0;
+  let start = -1;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "{") {
+      if (depth === 0) start = index;
+      depth += 1;
+    }
+    if (character !== "}") continue;
+
+    depth -= 1;
+    if (depth === 0 && start >= 0) {
+      blocks.push(source.slice(start, index + 1));
+      start = -1;
+    }
+  }
+
+  return blocks;
+};
+
+const auditRuntimeBridgeCapabilityContracts = async () => {
+  const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge/_contracts"]);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const approvedLayers = new Set(Object.keys(runtimeBridgeArchitectureLayerOrder));
+  const findings = [];
+
+  for (const file of sourceFiles) {
+    const capabilityIds = matchAllStrings(file.source, /\bcapabilityId:\s*"([^"]+)"/g);
+    for (const capabilityId of capabilityIds) {
+      if (/^[a-z0-9:-]+$/.test(capabilityId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-contract-nondeterministic-id",
+        file: file.projectPath,
+        message: `runtime-bridge-contract-nondeterministic-id: ${file.projectPath} capabilityId "${capabilityId}" is not a deterministic slug`,
+      });
+    }
+
+    for (const layer of matchAllStrings(file.source, /\blayer:\s*"([^"]+)"/g)) {
+      if (approvedLayers.has(layer)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-contract-unapproved-layer",
+        file: file.projectPath,
+        message: `runtime-bridge-contract-unapproved-layer: ${file.projectPath} declares layer "${layer}"`,
+      });
+    }
+
+    for (const readinessId of matchAllStrings(file.source, /\breadiness:\s*"([^"]+)"/g)) {
+      if (runtimeBridgeApprovedReadinessIds.has(readinessId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-contract-unapproved-readiness",
+        file: file.projectPath,
+        message: `runtime-bridge-contract-unapproved-readiness: ${file.projectPath} declares readiness "${readinessId}"`,
+      });
+    }
+
+    for (const boundaryId of matchAllStrings(file.source, /\bexecutionBoundary:\s*"([^"]+)"/g)) {
+      if (runtimeBridgeApprovedBoundaryIds.has(boundaryId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-contract-unapproved-boundary",
+        file: file.projectPath,
+        message: `runtime-bridge-contract-unapproved-boundary: ${file.projectPath} declares boundary "${boundaryId}"`,
+      });
+    }
+
+    const blocks = splitObjectLiteralBlocks(file.source);
+    for (const block of blocks) {
+      const capabilityId = (block.match(/\bcapabilityId:\s*"([^"]+)"/) || [])[1];
+      if (!capabilityId) continue;
+
+      for (const fieldName of runtimeBridgeForbiddenEligibilityFields) {
+        if (!new RegExp(`\\b${fieldName}:\\s*true\\b`).test(block)) continue;
+
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-contract-executable-capability",
+          file: file.projectPath,
+          message: `runtime-bridge-contract-executable-capability: ${file.projectPath} contract "${capabilityId}" declares ${fieldName}: true`,
+        });
+      }
+
+      if (/\badvisoryOnly:\s*true\b/.test(block) && /\bruntimeEligible:\s*true\b/.test(block)) {
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-contract-advisory-runtime-eligible",
+          file: file.projectPath,
+          message: `runtime-bridge-contract-advisory-runtime-eligible: ${file.projectPath} contract "${capabilityId}" is advisory-only and runtime eligible`,
+        });
+      }
+
+      if (/\blayer:\s*"kernel"/.test(block) && /\bruntimeEligible:\s*true\b/.test(block)) {
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-contract-kernel-runtime-eligible",
+          file: file.projectPath,
+          message: `runtime-bridge-contract-kernel-runtime-eligible: ${file.projectPath} contract "${capabilityId}" makes kernel runtime eligible`,
+        });
+      }
+
+      if (/\bexecutionBoundary:\s*"(?!metadata_boundary")/.test(block)) {
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-contract-boundary-conflict",
+          file: file.projectPath,
+          message: `runtime-bridge-contract-boundary-conflict: ${file.projectPath} contract "${capabilityId}" does not use metadata_boundary`,
+        });
+      }
+
+      if (/\bmetadataOnly:\s*false\b/.test(block) || /\bdeterministicOnly:\s*false\b/.test(block)) {
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-contract-not-metadata-only",
+          file: file.projectPath,
+          message: `runtime-bridge-contract-not-metadata-only: ${file.projectPath} contract "${capabilityId}" is not deterministic metadata only`,
         });
       }
     }
@@ -752,6 +917,7 @@ const runAudit = async () => {
     auditRuntimeMetadataImports(),
     auditRuntimeBridgeArchitecture(),
     auditRuntimeBridgeRegistry(),
+    auditRuntimeBridgeCapabilityContracts(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);
