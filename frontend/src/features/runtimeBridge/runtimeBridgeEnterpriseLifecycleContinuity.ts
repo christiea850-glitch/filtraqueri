@@ -1,11 +1,17 @@
-import type { MetadataOnlyBoundaryContract } from "../governance/boundaryTypes";
+import {
+  buildRuntimeBridgeMetadataOnlyGovernanceDescriptor,
+  buildRuntimeBridgeSourceModuleDescriptor,
+  selectStrongestRuntimeBridgePriority,
+  sortRuntimeBridgeBundles,
+  sortRuntimeBridgePriorities,
+  uniqueStable,
+} from "./_kernel";
 import type {
   RuntimeBridgeEnterpriseIntelligenceFederation,
   RuntimeBridgeFederationPriority,
   RuntimeBridgeFederationTheme,
 } from "./runtimeBridgeEnterpriseIntelligenceFederation";
 import { createRuntimeBridgeId } from "./runtimeBridgeIds";
-import type { RuntimeBridgeSourceModuleReference } from "./runtimeBridgeTypes";
 
 export type RuntimeBridgeLifecyclePriority = RuntimeBridgeFederationPriority;
 
@@ -131,16 +137,11 @@ export type RuntimeBridgeEnterpriseLifecycleContinuity = {
   readonly metadataOnly: true;
 };
 
-export const runtimeBridgeEnterpriseLifecycleContinuityGovernance = {
-  mode: "metadata_only",
+export const runtimeBridgeEnterpriseLifecycleContinuityGovernance = buildRuntimeBridgeMetadataOnlyGovernanceDescriptor({
   contractId: "runtime-bridge-enterprise-lifecycle-continuity",
   label: "Runtime bridge enterprise lifecycle continuity",
   description:
     "Metadata-only enterprise intelligence lifecycle tracking, cross-session federation lineage metadata, strategic intelligence archival posture, organizational intelligence evolution descriptors, enterprise insight ecosystem resilience metadata, and deterministic lifecycle continuity planning.",
-  confidence: "high",
-  canExecute: false,
-  canMutateWorkspace: false,
-  canCallBackend: false,
   lineageRefs: [
     "runtime-bridge-enterprise-lifecycle-continuity",
     "runtime-bridge-lifecycle-stage-map",
@@ -151,47 +152,17 @@ export const runtimeBridgeEnterpriseLifecycleContinuityGovernance = {
     "runtime-bridge-lifecycle-narrative-flow",
     "runtime-bridge-lifecycle-continuity-bundle",
   ],
-} satisfies MetadataOnlyBoundaryContract;
+});
 
-export const runtimeBridgeEnterpriseLifecycleContinuitySourceModule: RuntimeBridgeSourceModuleReference = {
+export const runtimeBridgeEnterpriseLifecycleContinuitySourceModule = buildRuntimeBridgeSourceModuleDescriptor({
   moduleId: "runtime-bridge-enterprise-lifecycle-continuity",
   modulePath: "frontend/src/features/runtimeBridge/runtimeBridgeEnterpriseLifecycleContinuity.ts",
-  capabilityMode: "metadata_only",
   label: "Runtime bridge enterprise lifecycle continuity",
-};
-
-const uniqueStable = <T extends string>(items: ReadonlyArray<T>): T[] => {
-  const seen = new Set<string>();
-  const values: T[] = [];
-
-  for (const item of items) {
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    values.push(item);
-  }
-
-  return values;
-};
-
-const priorityScore = (priority: RuntimeBridgeLifecyclePriority) => {
-  if (priority === "critical") return 4;
-  if (priority === "high") return 3;
-  if (priority === "medium") return 2;
-  return 1;
-};
-
-const sortPriorities = (
-  priorities: ReadonlyArray<RuntimeBridgeLifecyclePriority>,
-): RuntimeBridgeLifecyclePriority[] =>
-  uniqueStable(priorities).sort((left, right) => {
-    const priorityDelta = priorityScore(right) - priorityScore(left);
-    if (priorityDelta !== 0) return priorityDelta;
-    return left.localeCompare(right);
-  });
+});
 
 const strongestPriority = (
   priorities: ReadonlyArray<RuntimeBridgeLifecyclePriority>,
-): RuntimeBridgeLifecyclePriority => sortPriorities(priorities)[0] || "low";
+): RuntimeBridgeLifecyclePriority => selectStrongestRuntimeBridgePriority(priorities, "low");
 
 const lifecycleTheme = (theme: RuntimeBridgeFederationTheme): RuntimeBridgeLifecycleTheme => theme;
 
@@ -212,7 +183,7 @@ export const collectRuntimeBridgeLifecycleThemes = (
 export const summarizeRuntimeBridgeLifecyclePriorities = (
   federation: RuntimeBridgeEnterpriseIntelligenceFederation,
 ): ReadonlyArray<RuntimeBridgeLifecyclePriority> =>
-  sortPriorities([
+  sortRuntimeBridgePriorities([
     ...federation.federationPriorities,
     federation.federationTopology.priority,
     federation.boardroomContinuityMap.priority,
@@ -435,7 +406,7 @@ export const buildRuntimeBridgeLifecycleContinuityBundles = ({
   readonly organizationalEvolution: RuntimeBridgeOrganizationalIntelligenceEvolution;
   readonly ecosystemResilience: RuntimeBridgeInsightEcosystemResilience;
 }): ReadonlyArray<RuntimeBridgeLifecycleContinuityBundle> =>
-  collectRuntimeBridgeLifecycleThemes(federation).map((theme) => {
+  sortRuntimeBridgeBundles(collectRuntimeBridgeLifecycleThemes(federation).map((theme) => {
     const sourceBundles = federation.federationBundles.filter(
       (bundle) => lifecycleTheme(bundle.theme) === theme,
     );
@@ -462,11 +433,7 @@ export const buildRuntimeBridgeLifecycleContinuityBundles = ({
       summary: `${theme} lifecycle continuity bundle references ${sourceBundles.length} federation bundles.`,
       metadataOnly: true as const,
     };
-  }).sort((left, right) => {
-    const priorityDelta = priorityScore(right.priority) - priorityScore(left.priority);
-    if (priorityDelta !== 0) return priorityDelta;
-    return left.bundleId.localeCompare(right.bundleId);
-  });
+  }));
 
 export const buildRuntimeBridgeEnterpriseLifecycleContinuity = (
   federation: RuntimeBridgeEnterpriseIntelligenceFederation,

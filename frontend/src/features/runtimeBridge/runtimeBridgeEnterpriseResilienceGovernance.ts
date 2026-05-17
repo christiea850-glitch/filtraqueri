@@ -1,11 +1,17 @@
-import type { MetadataOnlyBoundaryContract } from "../governance/boundaryTypes";
+import {
+  buildRuntimeBridgeMetadataOnlyGovernanceDescriptor,
+  buildRuntimeBridgeSourceModuleDescriptor,
+  selectStrongestRuntimeBridgePriority,
+  sortRuntimeBridgeBundles,
+  sortRuntimeBridgePriorities,
+  uniqueStable,
+} from "./_kernel";
 import type {
   RuntimeBridgeEnterpriseLifecycleContinuity,
   RuntimeBridgeLifecyclePriority,
   RuntimeBridgeLifecycleTheme,
 } from "./runtimeBridgeEnterpriseLifecycleContinuity";
 import { createRuntimeBridgeId } from "./runtimeBridgeIds";
-import type { RuntimeBridgeSourceModuleReference } from "./runtimeBridgeTypes";
 
 export type RuntimeBridgeResiliencePriority = RuntimeBridgeLifecyclePriority;
 
@@ -134,16 +140,11 @@ export type RuntimeBridgeEnterpriseResilienceGovernance = {
   readonly metadataOnly: true;
 };
 
-export const runtimeBridgeEnterpriseResilienceGovernanceGovernance = {
-  mode: "metadata_only",
+export const runtimeBridgeEnterpriseResilienceGovernanceGovernance = buildRuntimeBridgeMetadataOnlyGovernanceDescriptor({
   contractId: "runtime-bridge-enterprise-resilience-governance",
   label: "Runtime bridge enterprise resilience governance",
   description:
     "Metadata-only resilience governance descriptors, enterprise continuity posture metadata, intelligence survivability summaries, continuity audit-readiness descriptors, federation resilience mapping, executive continuity governance narratives, and deterministic resilience continuity planning.",
-  confidence: "high",
-  canExecute: false,
-  canMutateWorkspace: false,
-  canCallBackend: false,
   lineageRefs: [
     "runtime-bridge-enterprise-resilience-governance",
     "runtime-bridge-continuity-governance-map",
@@ -154,47 +155,17 @@ export const runtimeBridgeEnterpriseResilienceGovernanceGovernance = {
     "runtime-bridge-resilience-continuity-flow",
     "runtime-bridge-resilience-governance-bundle",
   ],
-} satisfies MetadataOnlyBoundaryContract;
+});
 
-export const runtimeBridgeEnterpriseResilienceGovernanceSourceModule: RuntimeBridgeSourceModuleReference = {
+export const runtimeBridgeEnterpriseResilienceGovernanceSourceModule = buildRuntimeBridgeSourceModuleDescriptor({
   moduleId: "runtime-bridge-enterprise-resilience-governance",
   modulePath: "frontend/src/features/runtimeBridge/runtimeBridgeEnterpriseResilienceGovernance.ts",
-  capabilityMode: "metadata_only",
   label: "Runtime bridge enterprise resilience governance",
-};
-
-const uniqueStable = <T extends string>(items: ReadonlyArray<T>): T[] => {
-  const seen = new Set<string>();
-  const values: T[] = [];
-
-  for (const item of items) {
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    values.push(item);
-  }
-
-  return values;
-};
-
-const priorityScore = (priority: RuntimeBridgeResiliencePriority) => {
-  if (priority === "critical") return 4;
-  if (priority === "high") return 3;
-  if (priority === "medium") return 2;
-  return 1;
-};
-
-const sortPriorities = (
-  priorities: ReadonlyArray<RuntimeBridgeResiliencePriority>,
-): RuntimeBridgeResiliencePriority[] =>
-  uniqueStable(priorities).sort((left, right) => {
-    const priorityDelta = priorityScore(right) - priorityScore(left);
-    if (priorityDelta !== 0) return priorityDelta;
-    return left.localeCompare(right);
-  });
+});
 
 const strongestPriority = (
   priorities: ReadonlyArray<RuntimeBridgeResiliencePriority>,
-): RuntimeBridgeResiliencePriority => sortPriorities(priorities)[0] || "low";
+): RuntimeBridgeResiliencePriority => selectStrongestRuntimeBridgePriority(priorities, "low");
 
 const resilienceTheme = (theme: RuntimeBridgeLifecycleTheme): RuntimeBridgeResilienceTheme => theme;
 
@@ -215,7 +186,7 @@ export const collectRuntimeBridgeResilienceThemes = (
 export const summarizeRuntimeBridgeResiliencePriorities = (
   continuity: RuntimeBridgeEnterpriseLifecycleContinuity,
 ): ReadonlyArray<RuntimeBridgeResiliencePriority> =>
-  sortPriorities([
+  sortRuntimeBridgePriorities([
     ...continuity.lifecyclePriorities,
     continuity.lifecycleStageMap.priority,
     continuity.crossSessionFederationLineage.priority,
@@ -451,7 +422,7 @@ export const buildRuntimeBridgeResilienceGovernanceBundles = ({
   readonly topology: RuntimeBridgeFederationResilienceTopology;
   readonly narrative: RuntimeBridgeExecutiveContinuityNarrative;
 }): ReadonlyArray<RuntimeBridgeResilienceGovernanceBundle> =>
-  collectRuntimeBridgeResilienceThemes(continuity).map((theme) => {
+  sortRuntimeBridgeBundles(collectRuntimeBridgeResilienceThemes(continuity).map((theme) => {
     const sourceBundles = continuity.lifecycleContinuityBundles.filter(
       (bundle) => resilienceTheme(bundle.theme) === theme,
     );
@@ -478,11 +449,7 @@ export const buildRuntimeBridgeResilienceGovernanceBundles = ({
       summary: `${theme} resilience governance bundle references ${sourceBundles.length} lifecycle continuity bundles.`,
       metadataOnly: true as const,
     };
-  }).sort((left, right) => {
-    const priorityDelta = priorityScore(right.priority) - priorityScore(left.priority);
-    if (priorityDelta !== 0) return priorityDelta;
-    return left.bundleId.localeCompare(right.bundleId);
-  });
+  }));
 
 export const buildRuntimeBridgeEnterpriseResilienceGovernance = (
   continuity: RuntimeBridgeEnterpriseLifecycleContinuity,

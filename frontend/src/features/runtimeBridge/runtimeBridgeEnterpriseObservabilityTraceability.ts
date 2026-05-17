@@ -1,11 +1,17 @@
-import type { MetadataOnlyBoundaryContract } from "../governance/boundaryTypes";
+import {
+  buildRuntimeBridgeMetadataOnlyGovernanceDescriptor,
+  buildRuntimeBridgeSourceModuleDescriptor,
+  selectStrongestRuntimeBridgePriority,
+  sortRuntimeBridgeBundles,
+  sortRuntimeBridgePriorities,
+  uniqueStable,
+} from "./_kernel";
 import type {
   RuntimeBridgeEnterpriseResilienceGovernance,
   RuntimeBridgeResiliencePriority,
   RuntimeBridgeResilienceTheme,
 } from "./runtimeBridgeEnterpriseResilienceGovernance";
 import { createRuntimeBridgeId } from "./runtimeBridgeIds";
-import type { RuntimeBridgeSourceModuleReference } from "./runtimeBridgeTypes";
 
 export type RuntimeBridgeObservabilityPriority = RuntimeBridgeResiliencePriority;
 
@@ -133,16 +139,11 @@ export type RuntimeBridgeEnterpriseObservabilityTraceability = {
   readonly metadataOnly: true;
 };
 
-export const runtimeBridgeEnterpriseObservabilityTraceabilityGovernance = {
-  mode: "metadata_only",
+export const runtimeBridgeEnterpriseObservabilityTraceabilityGovernance = buildRuntimeBridgeMetadataOnlyGovernanceDescriptor({
   contractId: "runtime-bridge-enterprise-observability-traceability",
   label: "Runtime bridge enterprise observability traceability",
   description:
     "Metadata-only enterprise observability descriptors, strategic traceability lineage metadata, executive audit intelligence federation, explainability continuity topology, organizational insight trust governance metadata, and deterministic observability continuity planning.",
-  confidence: "high",
-  canExecute: false,
-  canMutateWorkspace: false,
-  canCallBackend: false,
   lineageRefs: [
     "runtime-bridge-enterprise-observability-traceability",
     "runtime-bridge-observability-topology",
@@ -153,47 +154,17 @@ export const runtimeBridgeEnterpriseObservabilityTraceabilityGovernance = {
     "runtime-bridge-observability-narrative-flow",
     "runtime-bridge-observability-bundle",
   ],
-} satisfies MetadataOnlyBoundaryContract;
+});
 
-export const runtimeBridgeEnterpriseObservabilityTraceabilitySourceModule: RuntimeBridgeSourceModuleReference = {
+export const runtimeBridgeEnterpriseObservabilityTraceabilitySourceModule = buildRuntimeBridgeSourceModuleDescriptor({
   moduleId: "runtime-bridge-enterprise-observability-traceability",
   modulePath: "frontend/src/features/runtimeBridge/runtimeBridgeEnterpriseObservabilityTraceability.ts",
-  capabilityMode: "metadata_only",
   label: "Runtime bridge enterprise observability traceability",
-};
-
-const uniqueStable = <T extends string>(items: ReadonlyArray<T>): T[] => {
-  const seen = new Set<string>();
-  const values: T[] = [];
-
-  for (const item of items) {
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    values.push(item);
-  }
-
-  return values;
-};
-
-const priorityScore = (priority: RuntimeBridgeObservabilityPriority) => {
-  if (priority === "critical") return 4;
-  if (priority === "high") return 3;
-  if (priority === "medium") return 2;
-  return 1;
-};
-
-const sortPriorities = (
-  priorities: ReadonlyArray<RuntimeBridgeObservabilityPriority>,
-): RuntimeBridgeObservabilityPriority[] =>
-  uniqueStable(priorities).sort((left, right) => {
-    const priorityDelta = priorityScore(right) - priorityScore(left);
-    if (priorityDelta !== 0) return priorityDelta;
-    return left.localeCompare(right);
-  });
+});
 
 const strongestPriority = (
   priorities: ReadonlyArray<RuntimeBridgeObservabilityPriority>,
-): RuntimeBridgeObservabilityPriority => sortPriorities(priorities)[0] || "low";
+): RuntimeBridgeObservabilityPriority => selectStrongestRuntimeBridgePriority(priorities, "low");
 
 const observabilityTheme = (theme: RuntimeBridgeResilienceTheme): RuntimeBridgeObservabilityTheme => theme;
 
@@ -214,7 +185,7 @@ export const collectRuntimeBridgeObservabilityThemes = (
 export const summarizeRuntimeBridgeObservabilityPriorities = (
   governance: RuntimeBridgeEnterpriseResilienceGovernance,
 ): ReadonlyArray<RuntimeBridgeObservabilityPriority> =>
-  sortPriorities([
+  sortRuntimeBridgePriorities([
     ...governance.resiliencePriorities,
     governance.continuityGovernanceMap.priority,
     governance.intelligenceSurvivability.priority,
@@ -446,7 +417,7 @@ export const buildRuntimeBridgeObservabilityBundles = ({
   readonly explainabilityMap: RuntimeBridgeExplainabilityContinuityMap;
   readonly trustGovernance: RuntimeBridgeInsightTrustGovernance;
 }): ReadonlyArray<RuntimeBridgeObservabilityBundle> =>
-  collectRuntimeBridgeObservabilityThemes(governance).map((theme) => {
+  sortRuntimeBridgeBundles(collectRuntimeBridgeObservabilityThemes(governance).map((theme) => {
     const sourceBundles = governance.resilienceGovernanceBundles.filter(
       (bundle) => observabilityTheme(bundle.theme) === theme,
     );
@@ -473,11 +444,7 @@ export const buildRuntimeBridgeObservabilityBundles = ({
       summary: `${theme} observability bundle references ${sourceBundles.length} resilience governance bundles.`,
       metadataOnly: true as const,
     };
-  }).sort((left, right) => {
-    const priorityDelta = priorityScore(right.priority) - priorityScore(left.priority);
-    if (priorityDelta !== 0) return priorityDelta;
-    return left.bundleId.localeCompare(right.bundleId);
-  });
+  }));
 
 export const buildRuntimeBridgeEnterpriseObservabilityTraceability = (
   governance: RuntimeBridgeEnterpriseResilienceGovernance,
