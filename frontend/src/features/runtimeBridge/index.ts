@@ -12,6 +12,7 @@ export * from "./runtimeBridgeExecutiveDeliveryEcosystem";
 export * from "./runtimeBridgeExecutivePresentationOrchestration";
 export * from "./runtimeBridgeExecutiveRecommendations";
 export * from "./runtimeBridgeExecutiveVisualizationStorytelling";
+export * from "./runtimeBridgeEnterpriseLifecycleContinuity";
 export * from "./runtimeBridgeEnterpriseIntelligenceFederation";
 export * from "./runtimeBridgeGovernance";
 export {
