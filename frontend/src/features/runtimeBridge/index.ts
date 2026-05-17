@@ -18,4 +18,5 @@ export * from "./runtimeBridgeLineage";
 export * from "./runtimeBridgeNarrativeIntelligence";
 export * from "./runtimeBridgeNormalize";
 export * from "./runtimeBridgeSnapshotBuilder";
+export * from "./runtimeBridgeStrategicNarrativePackaging";
 export * from "./runtimeBridgeTypes";
