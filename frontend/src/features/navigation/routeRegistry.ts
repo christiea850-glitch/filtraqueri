@@ -84,6 +84,17 @@ export const navigationRouteRegistry = [
     metadataOnly: true,
   },
   {
+    routeId: "detail:pattern-preview",
+    routeKind: "detail",
+    depth: 3,
+    owningSurface: "future_consumer",
+    modeAccess: anyMode,
+    contextRequirements: datasetContext,
+    protectedSurface: false,
+    label: "S5 Detail Pattern Preview",
+    metadataOnly: true,
+  },
+  {
     routeId: "page:history",
     routeKind: "page",
     depth: 2,
@@ -129,7 +140,7 @@ export const navigationRouteRegistry = [
   },
 ] as const satisfies ReadonlyArray<NavigationRouteRegistryEntry>;
 
-export const navigationRouteRegistryVersion = "s5-p2-navigation-skeleton-v1";
+export const navigationRouteRegistryVersion = "s5-2a-detail-pattern-preview-v1";
 
 export const navigationRouteKindDepthLimits = {
   workspace: 1,
@@ -137,4 +148,3 @@ export const navigationRouteKindDepthLimits = {
   detail: 3,
   subDetail: 4,
 } as const;
-
