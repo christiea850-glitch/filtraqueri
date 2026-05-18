@@ -11,6 +11,9 @@ export * as NavigationPreservationTypes from "./navigationPreservationTypes";
 export * as NavigationRoutedDetailActivationRegistry from "./routedDetailActivation";
 export * as NavigationRouteRegistry from "./routeRegistry";
 export * as NavigationTypes from "./navigationTypes";
+export * as RouteActivationChecks from "./routeActivationChecks";
+export * as RouteActivationIntegrity from "./routeActivationIntegrity";
+export * as RouteActivationIntegrityRegistry from "./routeActivationIntegrityRegistry";
 export {
   defaultNavigationBackBehaviorPolicy,
   type NavigationBackBehaviorPolicy,
@@ -66,6 +69,21 @@ export {
   navigationRoutedDetailActivationVersion,
   type NavigationRoutedDetailActivation,
 } from "./routedDetailActivation";
+export {
+  checkRouteActivationIntegrity,
+  type RouteActivationIntegrityCheckInput,
+  type RouteActivationIntegrityIssue,
+} from "./routeActivationChecks";
+export {
+  summarizeRouteActivationIntegrity,
+  type RouteActivationIntegrityStatus,
+  type RouteActivationIntegritySummary,
+} from "./routeActivationIntegrity";
+export {
+  routeActivationIntegrityRegistry,
+  routeActivationIntegrityRegistryVersion,
+  type RouteActivationIntegrityRegistryEntry,
+} from "./routeActivationIntegrityRegistry";
 export {
   type NavigationBackStateDescriptor,
   type NavigationExpandedPanelStateReference,

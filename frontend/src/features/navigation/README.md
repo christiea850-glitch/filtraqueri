@@ -62,3 +62,16 @@ These assertions describe expectations only. They do not control routing, do not
 S5-3A activates only the Results insight detail flow through a controlled hash route. This is not a global routing migration. `App.tsx` still owns the current view composition, workspace routing is not active, and the activation metadata remains tied to the existing preservation and integrity descriptors.
 
 Future routed systems should remain staged and should not infer that all detail pages or workspaces are route-backed yet.
+
+## Route Activation Integrity
+
+S5-3B adds metadata-level checks that compare controlled routed detail activations against:
+
+- route registry entries
+- preservation registry entries
+- integrity assertion references
+- allowed route scope
+- preservation scope compatibility
+- activation ownership metadata
+
+These checks do not activate or deactivate routes, do not own routing execution, and do not introduce persistence or orchestration. They exist so future routed systems can verify governance linkage before more detail flows are activated.
