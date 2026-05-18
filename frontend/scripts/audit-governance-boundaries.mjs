@@ -9,6 +9,8 @@ import {
   continuationCallbackFieldNames,
   continuationMetadataFolders,
   executableImportTargets,
+  navigationFolders,
+  navigationForbiddenImports,
   presentationalFiles,
   presentationalFolders,
   presentationalForbiddenImports,
@@ -1064,6 +1066,83 @@ const auditRuntimeBridgeConsumers = async () => {
   return findings;
 };
 
+const auditNavigationSkeleton = async () => {
+  const files = await collectFilesFromProjectPaths(navigationFolders);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const findings = [];
+
+  for (const file of sourceFiles) {
+    if (file.projectPath.endsWith(".tsx") || file.projectPath.endsWith(".jsx")) {
+      findings.push({
+        severity: "error",
+        rule: "navigation-jsx-file",
+        file: file.projectPath,
+        message: `navigation-jsx-file: ${file.projectPath} must remain a non-rendering TypeScript skeleton`,
+      });
+    }
+
+    const imports = parseImports(file.source);
+
+    for (const importEntry of imports) {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+
+      for (const [category, targets] of Object.entries(navigationForbiddenImports)) {
+        const matchedTarget = targets.find((target) => matchesTarget(resolvedTarget, target));
+        if (!matchedTarget) continue;
+
+        const finding = createFinding({
+          severity: "error",
+          rule: `navigation-import-${category}`,
+          file: file.projectPath,
+          importTarget: matchedTarget,
+          specifier: importEntry.specifier,
+          detail: `matches ${matchedTarget}`,
+        });
+        if (finding) findings.push(finding);
+      }
+    }
+
+    for (const usagePattern of runtimeBridgeConsumerUsagePatterns) {
+      if (!usagePattern.patterns.some((pattern) => pattern.test(file.source))) continue;
+
+      const finding = createFinding({
+        severity: "error",
+        rule: usagePattern.rule.replace("runtime-bridge-consumer", "navigation"),
+        file: file.projectPath,
+        importTarget: usagePattern.importTarget,
+        detail: `uses ${usagePattern.importTarget}`,
+      });
+      if (finding) findings.push(finding);
+    }
+
+    const routeIds = matchAllStrings(file.source, /\brouteId:\s*"([^"]+)"/g);
+    for (const routeId of routeIds) {
+      if (/^[a-z0-9:-]+$/.test(routeId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "navigation-nondeterministic-route-id",
+        file: file.projectPath,
+        message: `navigation-nondeterministic-route-id: ${file.projectPath} routeId "${routeId}" is not a deterministic slug`,
+      });
+    }
+
+    for (const depth of matchAllStrings(file.source, /\bdepth:\s*(\d+)/g)) {
+      const parsedDepth = Number(depth);
+      if (parsedDepth >= 1 && parsedDepth <= 4) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "navigation-route-depth-exceeded",
+        file: file.projectPath,
+        message: `navigation-route-depth-exceeded: ${file.projectPath} declares route depth ${depth}`,
+      });
+    }
+  }
+
+  return findings;
+};
+
 const auditRuntimeBridgeArchitecture = async () => {
   const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge"]);
   const sourceFiles = (await Promise.all(files.map(readSourceFile)))
@@ -1091,6 +1170,18 @@ const auditRuntimeBridgeArchitecture = async () => {
 
     for (const importEntry of imports) {
       const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+      if (matchesTarget(resolvedTarget, "src/features/navigation")) {
+        const finding = createRuntimeBridgeArchitectureFinding({
+          rule: "runtime-bridge-import-navigation",
+          file: file.projectPath,
+          importTarget: resolvedTarget,
+          specifier: importEntry.specifier,
+          detail: "Runtime Bridge must stay independent from navigation",
+        });
+        if (finding) findings.push(finding);
+        continue;
+      }
+
       if (!isRuntimeBridgeModuleTarget(resolvedTarget)) continue;
 
       const targetLayer = getRuntimeBridgeLayer(resolvedTarget);
@@ -1225,6 +1316,7 @@ const runAudit = async () => {
     auditRuntimeBridgeCapabilityContracts(),
     auditRuntimeBridgeGovernanceSnapshots(),
     auditRuntimeBridgeConsumers(),
+    auditNavigationSkeleton(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);
