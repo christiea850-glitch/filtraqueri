@@ -28,7 +28,19 @@ export const navigationPreservationRegistry = [
     preservesDatasetSessionWorkbook: true,
     metadataOnly: true,
   },
+  {
+    preservationId: "preserve:dataset-intelligence-detail",
+    scope: "inline-preview-to-detail",
+    originSurfaceId: "dataset-summary-panel",
+    sourceRouteId: "page:dataset",
+    targetRouteId: "detail:dataset-intelligence",
+    preservesFilters: true,
+    preservesPagination: true,
+    preservesExpandedPanels: true,
+    preservesSelectedItem: true,
+    preservesDatasetSessionWorkbook: true,
+    metadataOnly: true,
+  },
 ] as const satisfies ReadonlyArray<NavigationPreservationRegistryEntry>;
 
-export const navigationPreservationRegistryVersion = "s5-2c-preservation-registry-v1";
-
+export const navigationPreservationRegistryVersion = "s5-2d-preservation-registry-v1";

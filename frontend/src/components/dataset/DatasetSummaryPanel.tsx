@@ -10,6 +10,12 @@ import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
+import { DatasetIntelligenceDetailPage } from "../../features/detailPages";
+import {
+  createNavigationBackStateDescriptor,
+  createNavigationOriginDescriptor,
+  emptyNavigationContextPreservation,
+} from "../../features/navigation";
 import {
   createSchemaDisplayProfiles,
   getBusinessRoleLabel,
@@ -265,6 +271,7 @@ function DatasetSummaryPanel({
   onSelectedTaskIdChange,
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
+  const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -393,6 +400,76 @@ function DatasetSummaryPanel({
     whyItMattersPreview: "Column labels and workbook structure are cleaned up for review.",
     readinessLabel: dataProfile ? dataProfile.shape.shapeLabel.replace(/_/g, " ") : "Profile",
   });
+  const navigationContext = emptyNavigationContextPreservation("human");
+  const workbookContextLabel = dataset?.workbook_metadata
+    ? activeWorksheet?.displayName || activeWorksheet?.sheetName || dataset.workbook_metadata.name
+    : "Dataset table";
+  const datasetIntelligenceOrigin = createNavigationOriginDescriptor({
+    preservationId: "preserve:dataset-intelligence-detail",
+    scope: "inline-preview-to-detail",
+    originSurfaceId: "dataset-summary-panel",
+    sourceRoute: {
+      routeId: "page:dataset",
+      routeKind: "page",
+      depth: 2,
+    },
+    targetRoute: {
+      routeId: "detail:dataset-intelligence",
+      routeKind: "detail",
+      depth: 3,
+    },
+    mode: "human",
+    context: {
+      ...navigationContext,
+      dataset: {
+        datasetId: dataset?.dataset_id || null,
+        datasetName: dataset?.original_filename || null,
+      },
+      workbook: {
+        workbookId: dataset?.workbook_metadata?.workbookId || null,
+        workbookName: dataset?.workbook_metadata?.name || null,
+        worksheetId: activeWorksheet?.worksheetId || null,
+        worksheetName: activeWorksheet?.displayName || activeWorksheet?.sheetName || null,
+      },
+    },
+  });
+  const datasetIntelligenceBackState = createNavigationBackStateDescriptor({
+    preservationId: "preserve:dataset-intelligence-detail",
+    origin: datasetIntelligenceOrigin,
+    filterState: {
+      activeFilterLabels: [],
+      filterCount: 0,
+    },
+    paginationState: {
+      page: null,
+      totalPages: null,
+      rowsPerPage: null,
+    },
+    expandedPanelState: {
+      expandedPanelIds: isDatasetIntelligenceDetailOpen
+        ? ["dataset-intelligence-detail"]
+        : [`dataset-drill-in:${activeDrillInView}`],
+      collapsedPanelIds: [],
+    },
+    selectedItem: {
+      selectedItemId: dataset?.dataset_id || null,
+      selectedItemLabel: dataset?.original_filename || null,
+      selectedItemType: "dataset",
+    },
+  });
+
+  if (dataset && isDatasetIntelligenceDetailOpen) {
+    return (
+      <DatasetIntelligenceDetailPage
+        datasetIntelligencePreview={datasetIntelligencePreview}
+        sourceContext={`${dataset.original_filename} / ${workbookContextLabel}`}
+        workbookContextLabel={workbookContextLabel}
+        fieldTypeLabel={`${Object.keys(schemaTypeSummary).length.toLocaleString()} field types`}
+        preservedContextLabel={datasetIntelligenceBackState.preservationId}
+        onBack={() => setIsDatasetIntelligenceDetailOpen(false)}
+      />
+    );
+  }
 
   return (
     <div className="human-dataset-workspace">
@@ -426,6 +503,13 @@ function DatasetSummaryPanel({
                 <p>{datasetIntelligencePreview.whyItMattersPreview}</p>
               </div>
               <div className="dataset-card-actions">
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setIsDatasetIntelligenceDetailOpen(true)}
+                >
+                  View details
+                </button>
                 <button type="button" className="secondary-button" onClick={onViewPreview}>
                   View results
                 </button>

@@ -1,4 +1,8 @@
 export {
+  default as DatasetIntelligenceDetailPage,
+  type DatasetIntelligenceDetailPageProps,
+} from "./DatasetIntelligenceDetailPage";
+export {
   default as ResultsInsightDetailPage,
   type ResultsInsightDetailPageProps,
 } from "./ResultsInsightDetailPage";
