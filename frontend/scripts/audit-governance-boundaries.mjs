@@ -436,6 +436,38 @@ const runtimeBridgeForbiddenEligibilityFields = [
   "workflowEligible",
 ];
 
+const runtimeBridgeApprovedSnapshotPostures = new Set([
+  "governance_hardened",
+  "metadata_only_enforced",
+  "runtime_execution_prohibited",
+  "deterministic_compliance_verified",
+  "advisory_runtime_separation_verified",
+  "future_runtime_review_required",
+]);
+
+const runtimeBridgeApprovedSnapshotIntegrityValues = new Set([
+  "verified",
+  "review_required",
+]);
+
+const runtimeBridgeApprovedSnapshotSupportIds = new Set([
+  "runtime-bridge-capability-posture",
+  "runtime-bridge-compliance-posture-summary",
+  "runtime-bridge-deterministic-posture-summary",
+  "runtime-bridge-execution-boundary-posture",
+  "runtime-bridge-execution-boundary-snapshot-summary",
+  "runtime-bridge-governance-enforcement-posture",
+  "runtime-bridge-governance-registry-posture",
+  "runtime-bridge-governance-snapshot",
+  "runtime-bridge-governance-snapshot-summary",
+  "runtime-bridge-integrity-posture-summary",
+  "runtime-bridge-metadata-only-compliance-posture",
+  "runtime-bridge-readiness-posture-summary",
+  "runtime-bridge-registry-layer-validation",
+  "runtime-bridge-runtime-eligibility-posture",
+  "runtime-bridge-runtime-readiness-posture",
+]);
+
 const splitObjectLiteralBlocks = (source) => {
   const blocks = [];
   let depth = 0;
@@ -562,6 +594,128 @@ const auditRuntimeBridgeCapabilityContracts = async () => {
           message: `runtime-bridge-contract-not-metadata-only: ${file.projectPath} contract "${capabilityId}" is not deterministic metadata only`,
         });
       }
+    }
+  }
+
+  return findings;
+};
+
+const auditRuntimeBridgeGovernanceSnapshots = async () => {
+  const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge/_snapshots"]);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const findings = [];
+
+  for (const file of sourceFiles) {
+    const snapshotIds = [
+      ...matchAllStrings(file.source, /\bsnapshotId:\s*"([^"]+)"/g),
+      ...matchAllStrings(file.source, /\bsummaryId:\s*"([^"]+)"/g),
+      ...matchAllStrings(file.source, /\bpostureId:\s*"([^"]+)"/g),
+    ];
+
+    for (const snapshotId of snapshotIds) {
+      if (/^[a-z0-9:_-]+$/.test(snapshotId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-nondeterministic-id",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-nondeterministic-id: ${file.projectPath} id "${snapshotId}" is not a deterministic slug`,
+      });
+    }
+
+    for (const postureId of matchAllStrings(file.source, /\bpostureId:\s*"([^"]+)"/g)) {
+      if (runtimeBridgeApprovedSnapshotPostures.has(postureId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-invalid-posture",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-invalid-posture: ${file.projectPath} declares posture "${postureId}"`,
+      });
+    }
+
+    for (const posture of matchAllStrings(file.source, /\barchitecturePostures:\s*\[([\s\S]*?)\]/g)
+      .flatMap((block) => matchAllStrings(block, /"([^"]+)"/g))) {
+      if (runtimeBridgeApprovedSnapshotPostures.has(posture)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-invalid-posture",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-invalid-posture: ${file.projectPath} declares architecture posture "${posture}"`,
+      });
+    }
+
+    for (const integrity of matchAllStrings(file.source, /\bintegrity:\s*"([^"]+)"/g)) {
+      if (runtimeBridgeApprovedSnapshotIntegrityValues.has(integrity)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-invalid-integrity",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-invalid-integrity: ${file.projectPath} declares integrity "${integrity}"`,
+      });
+    }
+
+    for (const posture of matchAllStrings(file.source, /\bposture:\s*"([^"]+)"/g)) {
+      if (runtimeBridgeApprovedSnapshotIntegrityValues.has(posture)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-invalid-posture",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-invalid-posture: ${file.projectPath} declares compliance posture "${posture}"`,
+      });
+    }
+
+    const supportBlocks = [
+      ...matchAllStrings(file.source, /\bsupportedBy:\s*\[([\s\S]*?)\]/g),
+      ...matchAllStrings(file.source, /\bsupportingIds:\s*\[([\s\S]*?)\]/g),
+    ];
+    for (const supportId of supportBlocks.flatMap((block) => matchAllStrings(block, /"([^"]+)"/g))) {
+      if (runtimeBridgeApprovedSnapshotSupportIds.has(supportId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-unsupported-claim",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-unsupported-claim: ${file.projectPath} references unsupported snapshot support id "${supportId}"`,
+      });
+    }
+
+    const blocks = splitObjectLiteralBlocks(file.source);
+    for (const block of blocks) {
+      const snapshotId = (block.match(/\b(?:snapshotId|summaryId|postureId):\s*"([^"]+)"/) || [])[1];
+      if (!snapshotId) continue;
+
+      for (const fieldName of runtimeBridgeForbiddenEligibilityFields) {
+        if (!new RegExp(`\\b${fieldName}:\\s*true\\b`).test(block)) continue;
+
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-snapshot-executable-declaration",
+          file: file.projectPath,
+          message: `runtime-bridge-snapshot-executable-declaration: ${file.projectPath} snapshot "${snapshotId}" declares ${fieldName}: true`,
+        });
+      }
+
+      if (/\bmetadataOnly:\s*false\b/.test(block)) {
+        findings.push({
+          severity: "error",
+          rule: "runtime-bridge-snapshot-not-metadata-only",
+          file: file.projectPath,
+          message: `runtime-bridge-snapshot-not-metadata-only: ${file.projectPath} snapshot "${snapshotId}" declares metadataOnly false`,
+        });
+      }
+    }
+
+    if (/\bexecutionBoundaryPosture:\s*"verified"/.test(file.source) && /\bnonMetadataBoundaryCount\s*!==?\s*0\b/.test(file.source)) {
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-snapshot-runtime-contradiction",
+        file: file.projectPath,
+        message: `runtime-bridge-snapshot-runtime-contradiction: ${file.projectPath} verifies execution boundary posture while checking for non-metadata boundaries`,
+      });
     }
   }
 
@@ -918,6 +1072,7 @@ const runAudit = async () => {
     auditRuntimeBridgeArchitecture(),
     auditRuntimeBridgeRegistry(),
     auditRuntimeBridgeCapabilityContracts(),
+    auditRuntimeBridgeGovernanceSnapshots(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

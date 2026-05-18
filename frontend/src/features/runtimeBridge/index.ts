@@ -53,6 +53,29 @@ export * from "./runtimeBridgeLineage";
 export * from "./runtimeBridgeNarrativeIntelligence";
 export * from "./runtimeBridgeNormalize";
 export * from "./runtimeBridgeSnapshotBuilder";
+export {
+  runtimeBridgeApprovedArchitecturePostures,
+  runtimeBridgeApprovedIntegrityValues,
+  runtimeBridgeArchitecturePostureDescriptors,
+  runtimeBridgeComplianceSnapshotSummaries,
+  runtimeBridgeGovernanceSnapshot,
+  runtimeBridgeIntegritySummaries,
+  summarizeRuntimeBridgeCompliancePosture as summarizeRuntimeBridgeSnapshotCompliancePosture,
+  summarizeRuntimeBridgeDeterministicPosture,
+  summarizeRuntimeBridgeExecutionBoundarySnapshotPosture,
+  summarizeRuntimeBridgeGovernanceSnapshot,
+  summarizeRuntimeBridgeIntegrityPosture,
+  summarizeRuntimeBridgeIntegritySnapshotPosture,
+  summarizeRuntimeBridgeReadinessPosture as summarizeRuntimeBridgeSnapshotReadinessPosture,
+  type RuntimeBridgeArchitecturePosture,
+  type RuntimeBridgeArchitecturePostureDescriptor,
+  type RuntimeBridgeComplianceSnapshotSummary,
+  type RuntimeBridgeGovernanceSnapshot,
+  type RuntimeBridgeIntegrityDimension,
+  type RuntimeBridgeIntegritySummary,
+  type RuntimeBridgeIntegrityValue,
+  type RuntimeBridgeSnapshotPosture,
+} from "./_snapshots";
 export * from "./runtimeBridgeStrategicNarrativePackaging";
 export * from "./runtimeBridgeTypes";
 export * from "./runtimeBridgeVisualizationPlanning";
