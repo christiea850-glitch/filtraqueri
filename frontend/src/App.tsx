@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { humanIntentGuidance } from "./app/appCompositionConfig";
 import DatasetSummaryPanel, {
   DatasetSessionPanel,
   type HumanIntent,
@@ -45,59 +46,9 @@ import "./App.css";
 
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
 
-const humanIntentGuidance: Record<
-  HumanIntent,
-  {
-    label: string;
-    route: ActiveView;
-    nextStep: string;
-    detail: string;
-  }
-> = {
-  summary: {
-    label: "Summarize",
-    route: "results",
-    nextStep: "Review rows, columns, and preview.",
-    detail: "Start with rows, columns, and preview.",
-  },
-  missing_values: {
-    label: "Missing values",
-    route: "queryBuilder",
-    nextStep: "Choose columns.",
-    detail: "Check columns with empty values.",
-  },
-  top_categories: {
-    label: "Top categories",
-    route: "queryBuilder",
-    nextStep: "Group a category.",
-    detail: "Count the biggest groups.",
-  },
-  compare_columns: {
-    label: "Compare fields",
-    route: "queryBuilder",
-    nextStep: "Choose two columns.",
-    detail: "View fields side by side.",
-  },
-  trends: {
-    label: "Trend analysis",
-    route: "queryBuilder",
-    nextStep: "Choose time and value.",
-    detail: "Summarize change over time.",
-  },
-  unusual_values: {
-    label: "Unusual values",
-    route: "results",
-    nextStep: "Sort rows.",
-    detail: "Look for highs, lows, and surprises.",
-  },
-  simple_chart: {
-    label: "Visualize data",
-    route: "queryBuilder",
-    nextStep: "Build a small summary.",
-    detail: "Prepare grouped chart data.",
-  },
-};
-
+// S5-P3: App.tsx remains the current composition root. The S5 navigation
+// skeleton is intentionally inactive here; routing, mode switching, dataset
+// restore, SQL, results, export, and runtime wiring stay behaviorally unchanged.
 function App() {
   const sidebarFileInputRef = useRef<HTMLInputElement | null>(null);
   const {
