@@ -15,6 +15,7 @@ import {
   getTopContributorLabel,
 } from "../../features/results/resultInvestigationSurfaceSelectors";
 import type { WorkspaceMode } from "../../features/dataset/datasetTypes";
+import { createExplainabilityPreviewViewModel } from "../../features/runtimeBridgeConsumers";
 
 type ResultsInvestigationSurfaceProps = {
   activeResultModel: ActiveResultModel;
@@ -53,6 +54,19 @@ function ResultsInvestigationSurface({
   const workspaceRecommendations = investigationWorkspacePlan.recommendations.slice(0, 3);
   const executiveInsights = narrativeReport.visibleInsights.slice(0, 4);
   const narrativeReadiness = narrativeReport.readiness;
+  const primaryExecutiveInsight = executiveInsights[0] || null;
+  const explainabilityPreview = createExplainabilityPreviewViewModel({
+    sourceDescriptorVersion: "results-investigation-surface-v1",
+    generatedAt: "deterministic-results-preview",
+    takeawaySentence: narrativeReport.summary || takeaway,
+    confidenceLabel: narrativeReadiness.label,
+    topEvidenceFact: primaryExecutiveInsight?.evidence[0] || {
+      label: "Top contributor",
+      value: topContributorLabel,
+    },
+    whyItMattersPreview: chartSupportLabel,
+    recommendationPreview: continuationSuggestion,
+  });
 
   return (
     <section
@@ -66,8 +80,8 @@ function ResultsInvestigationSurface({
     >
       <div className="results-business-takeaway">
         <span>{isAnalystMode ? "Result inspection" : "Business takeaway"}</span>
-        <strong>{narrativeReport.summary || takeaway}</strong>
-        <small>{narrativeReadiness.label} | {chartSupportLabel}</small>
+        <strong>{explainabilityPreview.takeawaySentence}</strong>
+        <small>{explainabilityPreview.confidenceLabel} | {explainabilityPreview.whyItMattersPreview}</small>
       </div>
 
       {!isAnalystMode && (
