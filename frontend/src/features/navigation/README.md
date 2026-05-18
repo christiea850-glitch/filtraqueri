@@ -59,7 +59,9 @@ These assertions describe expectations only. They do not control routing, do not
 
 ## Controlled Routed Detail Activation
 
-S5-3A activates only the Results insight detail flow through a controlled hash route. This is not a global routing migration. `App.tsx` still owns the current view composition, workspace routing is not active, and the activation metadata remains tied to the existing preservation and integrity descriptors.
+S5-3A activates the Results insight detail flow through a controlled hash route. S5-3C activates the Dataset intelligence detail flow through the same staged pattern. These are the only active routed detail flows.
+
+This is not a global routing migration. `App.tsx` still owns the current view composition, workspace routing is not active, and the activation metadata remains tied to the existing preservation and integrity descriptors.
 
 Future routed systems should remain staged and should not infer that all detail pages or workspaces are route-backed yet.
 

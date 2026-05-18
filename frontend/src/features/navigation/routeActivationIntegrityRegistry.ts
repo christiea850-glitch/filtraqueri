@@ -37,5 +37,4 @@ export const routeActivationIntegrityRegistry = navigationRoutedDetailActivation
   };
 }) satisfies ReadonlyArray<RouteActivationIntegrityRegistryEntry>;
 
-export const routeActivationIntegrityRegistryVersion = "s5-3b-route-activation-integrity-v1";
-
+export const routeActivationIntegrityRegistryVersion = "s5-3c-route-activation-integrity-v1";

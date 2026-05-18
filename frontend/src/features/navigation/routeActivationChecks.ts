@@ -45,6 +45,10 @@ export const checkRouteActivationIntegrity = ({
     issues.push(createIssue(activation.activationId, "missing-route", "Activated detail route is not registered."));
   } else if (route.routeKind !== "detail") {
     issues.push(createIssue(activation.activationId, "invalid-route-kind", "Activated route must be a detail route."));
+  } else if (route.owningSurface !== activation.owningSurface) {
+    issues.push(
+      createIssue(activation.activationId, "owner-mismatch", "Activation owning surface must match the registered route owner."),
+    );
   }
 
   if (!sourceRoute) {
@@ -95,4 +99,3 @@ export const checkRouteActivationIntegrity = ({
 
   return issues.sort((left, right) => left.ruleId.localeCompare(right.ruleId));
 };
-

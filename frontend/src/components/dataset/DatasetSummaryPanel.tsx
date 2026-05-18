@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useAnalyticsIntentGraph } from "../../features/analyticsIntentGraph";
 import { useAnalyticsPlanning } from "../../features/analyticsPlanning";
@@ -67,6 +67,24 @@ type DatasetSummaryPanelProps = {
 };
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
+
+const datasetIntelligenceDetailRouteId = "detail:dataset-intelligence";
+const datasetIntelligenceDetailHash = `#${datasetIntelligenceDetailRouteId}`;
+
+const getCurrentHashRoute = () => globalThis.location?.hash.replace(/^#/, "") || "";
+
+const isDatasetIntelligenceDetailRouteActive = () =>
+  getCurrentHashRoute() === datasetIntelligenceDetailRouteId;
+
+const clearDatasetIntelligenceDetailRoute = () => {
+  if (globalThis.location?.hash !== datasetIntelligenceDetailHash) return;
+
+  globalThis.history.replaceState(
+    globalThis.history.state,
+    "",
+    `${globalThis.location.pathname}${globalThis.location.search}`,
+  );
+};
 
 const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
@@ -457,6 +475,34 @@ function DatasetSummaryPanel({
       selectedItemType: "dataset",
     },
   });
+  const openDatasetIntelligenceDetail = () => {
+    if (globalThis.location?.hash !== datasetIntelligenceDetailHash) {
+      globalThis.history.pushState(
+        { detailRouteId: datasetIntelligenceDetailRouteId },
+        "",
+        datasetIntelligenceDetailHash,
+      );
+    }
+    setIsDatasetIntelligenceDetailOpen(true);
+  };
+  const closeDatasetIntelligenceDetail = () => {
+    clearDatasetIntelligenceDetailRoute();
+    setIsDatasetIntelligenceDetailOpen(false);
+  };
+
+  useEffect(() => {
+    const syncRouteState = () =>
+      setIsDatasetIntelligenceDetailOpen(isDatasetIntelligenceDetailRouteActive());
+
+    syncRouteState();
+    globalThis.addEventListener("hashchange", syncRouteState);
+    globalThis.addEventListener("popstate", syncRouteState);
+
+    return () => {
+      globalThis.removeEventListener("hashchange", syncRouteState);
+      globalThis.removeEventListener("popstate", syncRouteState);
+    };
+  }, []);
 
   if (dataset && isDatasetIntelligenceDetailOpen) {
     return (
@@ -466,7 +512,7 @@ function DatasetSummaryPanel({
         workbookContextLabel={workbookContextLabel}
         fieldTypeLabel={`${Object.keys(schemaTypeSummary).length.toLocaleString()} field types`}
         preservedContextLabel={datasetIntelligenceBackState.preservationId}
-        onBack={() => setIsDatasetIntelligenceDetailOpen(false)}
+        onBack={closeDatasetIntelligenceDetail}
       />
     );
   }
@@ -506,7 +552,7 @@ function DatasetSummaryPanel({
                 <button
                   type="button"
                   className="text-button"
-                  onClick={() => setIsDatasetIntelligenceDetailOpen(true)}
+                  onClick={openDatasetIntelligenceDetail}
                 >
                   View details
                 </button>
