@@ -56,3 +56,9 @@ S5-2E adds metadata-level integrity assertions for:
 - selected-result preservation
 
 These assertions describe expectations only. They do not control routing, do not create a persistence engine, do not introduce global state, and do not execute navigation behavior. Future navigation systems may consume the assertions when routed detail pages and deep-link restoration are activated.
+
+## Controlled Routed Detail Activation
+
+S5-3A activates only the Results insight detail flow through a controlled hash route. This is not a global routing migration. `App.tsx` still owns the current view composition, workspace routing is not active, and the activation metadata remains tied to the existing preservation and integrity descriptors.
+
+Future routed systems should remain staged and should not infer that all detail pages or workspaces are route-backed yet.

@@ -8,6 +8,7 @@ export * as NavigationOrigin from "./navigationOrigin";
 export * as NavigationPreservationAssertions from "./preservationAssertions";
 export * as NavigationPreservationRegistry from "./preservationRegistry";
 export * as NavigationPreservationTypes from "./navigationPreservationTypes";
+export * as NavigationRoutedDetailActivationRegistry from "./routedDetailActivation";
 export * as NavigationRouteRegistry from "./routeRegistry";
 export * as NavigationTypes from "./navigationTypes";
 export {
@@ -60,6 +61,11 @@ export {
   navigationPreservationRegistryVersion,
   type NavigationPreservationRegistryEntry,
 } from "./preservationRegistry";
+export {
+  navigationRoutedDetailActivations,
+  navigationRoutedDetailActivationVersion,
+  type NavigationRoutedDetailActivation,
+} from "./routedDetailActivation";
 export {
   type NavigationBackStateDescriptor,
   type NavigationExpandedPanelStateReference,

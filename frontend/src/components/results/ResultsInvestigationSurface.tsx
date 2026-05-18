@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AnalysisPackagePlan } from "../../features/analysisPackages";
 import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
@@ -32,6 +32,23 @@ type ResultsInvestigationSurfaceProps = {
   analysisPackagePlan: AnalysisPackagePlan;
   investigationWorkspacePlan: InvestigationWorkspacePlan;
   narrativeReport: NarrativeReport;
+};
+
+const resultsInsightDetailRouteId = "detail:results-insight";
+const resultsInsightDetailHash = `#${resultsInsightDetailRouteId}`;
+
+const getCurrentHashRoute = () => globalThis.location?.hash.replace(/^#/, "") || "";
+
+const isResultsInsightDetailRouteActive = () => getCurrentHashRoute() === resultsInsightDetailRouteId;
+
+const clearResultsInsightDetailRoute = () => {
+  if (globalThis.location?.hash !== resultsInsightDetailHash) return;
+
+  globalThis.history.replaceState(
+    globalThis.history.state,
+    "",
+    `${globalThis.location.pathname}${globalThis.location.search}`,
+  );
 };
 
 function ResultsInvestigationSurface({
@@ -125,6 +142,33 @@ function ResultsInvestigationSurface({
       selectedItemType: "result",
     },
   });
+  const openResultsInsightDetail = () => {
+    if (globalThis.location?.hash !== resultsInsightDetailHash) {
+      globalThis.history.pushState(
+        { detailRouteId: resultsInsightDetailRouteId },
+        "",
+        resultsInsightDetailHash,
+      );
+    }
+    setIsInsightDetailOpen(true);
+  };
+  const closeResultsInsightDetail = () => {
+    clearResultsInsightDetailRoute();
+    setIsInsightDetailOpen(false);
+  };
+
+  useEffect(() => {
+    const syncRouteState = () => setIsInsightDetailOpen(isResultsInsightDetailRouteActive());
+
+    syncRouteState();
+    globalThis.addEventListener("hashchange", syncRouteState);
+    globalThis.addEventListener("popstate", syncRouteState);
+
+    return () => {
+      globalThis.removeEventListener("hashchange", syncRouteState);
+      globalThis.removeEventListener("popstate", syncRouteState);
+    };
+  }, []);
 
   if (isInsightDetailOpen) {
     return (
@@ -134,7 +178,7 @@ function ResultsInvestigationSurface({
         resultFactLabel={resultRowsLabel}
         filterSortLabel={filterSortLabel}
         preservedContextLabel={resultsInsightBackState.preservationId}
-        onBack={() => setIsInsightDetailOpen(false)}
+        onBack={closeResultsInsightDetail}
       />
     );
   }
@@ -153,7 +197,7 @@ function ResultsInvestigationSurface({
         <span>{isAnalystMode ? "Result inspection" : "Business takeaway"}</span>
         <strong>{explainabilityPreview.takeawaySentence}</strong>
         <small>{explainabilityPreview.confidenceLabel} | {explainabilityPreview.whyItMattersPreview}</small>
-        <button type="button" className="text-button" onClick={() => setIsInsightDetailOpen(true)}>
+        <button type="button" className="text-button" onClick={openResultsInsightDetail}>
           View details
         </button>
       </div>
