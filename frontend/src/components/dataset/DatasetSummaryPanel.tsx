@@ -9,6 +9,7 @@ import { useExecutionContracts } from "../../features/executionContracts";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
+import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import {
   createSchemaDisplayProfiles,
   getBusinessRoleLabel,
@@ -378,6 +379,20 @@ function DatasetSummaryPanel({
     { label: "Date", value: dateColumnCount.toLocaleString() },
     { label: "Types", value: Object.keys(schemaTypeSummary).length.toLocaleString() },
   ];
+  const datasetIntelligencePreview = createDatasetIntelligencePreviewViewModel({
+    sourceDescriptorVersion: "dataset-summary-panel-v1",
+    generatedAt: "deterministic-dataset-preview",
+    datasetLabel: dataset?.original_filename || "Dataset",
+    rowCount: dataset?.row_count || 0,
+    columnCount: dataset?.column_count || 0,
+    detectedDataShapeSummary: `${Object.keys(schemaTypeSummary).length.toLocaleString()} field types`,
+    opportunityPreview:
+      kpiOpportunities[0]?.label ||
+      semanticHints[0]?.displayName ||
+      "Review the detected data profile.",
+    whyItMattersPreview: "Column labels and workbook structure are cleaned up for review.",
+    readinessLabel: dataProfile ? dataProfile.shape.shapeLabel.replace(/_/g, " ") : "Profile",
+  });
 
   return (
     <div className="human-dataset-workspace">
@@ -407,8 +422,8 @@ function DatasetSummaryPanel({
             <div className="data-profile-overview">
               <div>
                 <span>Business table</span>
-                <strong>{Object.keys(schemaTypeSummary).length.toLocaleString()} field types</strong>
-                <p>Column labels and workbook structure are cleaned up for review.</p>
+                <strong>{datasetIntelligencePreview.detectedDataShapeSummary}</strong>
+                <p>{datasetIntelligencePreview.whyItMattersPreview}</p>
               </div>
               <div className="dataset-card-actions">
                 <button type="button" className="secondary-button" onClick={onViewPreview}>

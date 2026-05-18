@@ -1,6 +1,13 @@
 export * as RuntimeBridgeConsumerHash from "./runtimeBridgeConsumerHash";
 export * as RuntimeBridgeConsumerTypes from "./runtimeBridgeConsumerTypes";
+export * as RuntimeBridgeDatasetIntelligenceConsumer from "./datasetIntelligence";
 export * as RuntimeBridgeExplainabilityConsumer from "./explainability";
+export {
+  createDatasetIntelligencePreviewViewModel,
+  datasetIntelligencePreviewViewModelSchemaVersion,
+  type DatasetIntelligencePreviewViewModel,
+  type DatasetIntelligencePreviewViewModelInput,
+} from "./datasetIntelligence";
 export {
   createExplainabilityPreviewViewModel,
   explainabilityPreviewViewModelSchemaVersion,
