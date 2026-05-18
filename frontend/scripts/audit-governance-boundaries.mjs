@@ -12,6 +12,8 @@ import {
   presentationalFiles,
   presentationalFolders,
   presentationalForbiddenImports,
+  runtimeBridgeConsumerFolders,
+  runtimeBridgeConsumerForbiddenImports,
   runtimeBridgeArchitectureLayerOrder,
   runtimeBridgeArchitectureLayers,
   runtimeMetadataFolders,
@@ -198,6 +200,78 @@ const runtimeBridgeUsagePatterns = [
       /\bnew\s+Path2D\s*\(/,
       /\bCanvasRenderingContext2D\b/,
       /\bSVGElement\b/,
+    ],
+  },
+];
+
+const runtimeBridgeConsumerUsagePatterns = [
+  {
+    rule: "runtime-bridge-consumer-storage-api",
+    importTarget: "browser-storage-api",
+    patterns: [
+      /\blocalStorage\s*\./,
+      /\bsessionStorage\s*\./,
+      /\bindexedDB\s*\./,
+      /\bindexedDB\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-consumer-network-api",
+    importTarget: "network-api",
+    patterns: [
+      /\bfetch\s*\(/,
+      /\baxios\s*\./,
+      /\baxios\s*\(/,
+      /\bnew\s+WebSocket\s*\(/,
+      /\bWebSocket\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-consumer-timer-api",
+    importTarget: "timer-api",
+    patterns: [
+      /\bsetInterval\s*\(/,
+      /\bsetTimeout\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-consumer-nondeterministic-api",
+    importTarget: "nondeterministic-api",
+    patterns: [
+      /\bDate\.now\s*\(/,
+      /\bnew\s+Date\s*\(/,
+      /\bMath\.random\s*\(/,
+      /\bcrypto\.randomUUID\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-consumer-react-hook",
+    importTarget: "react-hook",
+    patterns: [
+      /\buse[A-Z][A-Za-z0-9_]*\s*\(/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-consumer-dom-rendering-api",
+    importTarget: "dom-svg-canvas-api",
+    patterns: [
+      /\bdocument\./,
+      /\bwindow\./,
+      /\bcreateElementNS\s*\(/,
+      /\bgetContext\s*\(\s*["']2d["']/,
+      /\bnew\s+Path2D\s*\(/,
+      /\bCanvasRenderingContext2D\b/,
+      /\bSVGElement\b/,
+      /\bHTMLElement\b/,
+    ],
+  },
+  {
+    rule: "runtime-bridge-consumer-async-io",
+    importTarget: "async-io",
+    patterns: [
+      /\basync\s+/,
+      /\bawait\s+/,
+      /\bnew\s+Promise\s*\(/,
     ],
   },
 ];
@@ -913,6 +987,83 @@ const auditRuntimeMetadataImports = async () => {
   return findings;
 };
 
+const auditRuntimeBridgeConsumers = async () => {
+  const files = await collectFilesFromProjectPaths(runtimeBridgeConsumerFolders);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const findings = [];
+
+  for (const file of sourceFiles) {
+    if (file.projectPath.endsWith(".tsx") || file.projectPath.endsWith(".jsx")) {
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-consumer-jsx-file",
+        file: file.projectPath,
+        message: `runtime-bridge-consumer-jsx-file: ${file.projectPath} must be pure TypeScript, not JSX/TSX`,
+      });
+    }
+
+    const imports = parseImports(file.source);
+
+    for (const importEntry of imports) {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+
+      if (matchesTarget(resolvedTarget, "src/features/runtimeBridge") && !importEntry.isTypeOnly) {
+        const finding = createFinding({
+          severity: "error",
+          rule: "runtime-bridge-consumer-runtime-bridge-value-import",
+          file: file.projectPath,
+          importTarget: "src/features/runtimeBridge",
+          specifier: importEntry.specifier,
+          detail: "Runtime Bridge imports must be type-only inside consumers",
+        });
+        if (finding) findings.push(finding);
+        continue;
+      }
+
+      if (importEntry.isTypeOnly) continue;
+
+      for (const [category, targets] of Object.entries(runtimeBridgeConsumerForbiddenImports)) {
+        const matchedTarget = targets.find((target) => matchesTarget(resolvedTarget, target));
+        if (!matchedTarget) continue;
+
+        const finding = createFinding({
+          severity: "error",
+          rule: `runtime-bridge-consumer-import-${category}`,
+          file: file.projectPath,
+          importTarget: matchedTarget,
+          specifier: importEntry.specifier,
+          detail: `matches ${matchedTarget}`,
+        });
+        if (finding) findings.push(finding);
+      }
+    }
+
+    for (const usagePattern of runtimeBridgeConsumerUsagePatterns) {
+      if (!usagePattern.patterns.some((pattern) => pattern.test(file.source))) continue;
+
+      const finding = createFinding({
+        severity: "error",
+        rule: usagePattern.rule,
+        file: file.projectPath,
+        importTarget: usagePattern.importTarget,
+        detail: `uses ${usagePattern.importTarget}`,
+      });
+      if (finding) findings.push(finding);
+    }
+
+    if (/\bkind:\s*"(?!consumer-readonly")/.test(file.source)) {
+      findings.push({
+        severity: "error",
+        rule: "runtime-bridge-consumer-invalid-kind",
+        file: file.projectPath,
+        message: `runtime-bridge-consumer-invalid-kind: ${file.projectPath} declares a non consumer-readonly kind`,
+      });
+    }
+  }
+
+  return findings;
+};
+
 const auditRuntimeBridgeArchitecture = async () => {
   const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge"]);
   const sourceFiles = (await Promise.all(files.map(readSourceFile)))
@@ -1073,6 +1224,7 @@ const runAudit = async () => {
     auditRuntimeBridgeRegistry(),
     auditRuntimeBridgeCapabilityContracts(),
     auditRuntimeBridgeGovernanceSnapshots(),
+    auditRuntimeBridgeConsumers(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);
