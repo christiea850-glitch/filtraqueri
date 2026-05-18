@@ -77,3 +77,17 @@ S5-3B adds metadata-level checks that compare controlled routed detail activatio
 - activation ownership metadata
 
 These checks do not activate or deactivate routes, do not own routing execution, and do not introduce persistence or orchestration. They exist so future routed systems can verify governance linkage before more detail flows are activated.
+
+## Route Governance Reporting
+
+S5-3D adds metadata-only reporting for routed detail activation coverage. The reporting layer summarizes:
+
+- active routed detail flows
+- inactive routed detail route candidates
+- preservation linkage coverage
+- integrity assertion coverage
+- route ownership coverage
+- unsupported or partially linked activation states
+- future activation readiness
+
+The reporting layer is governance observability only. It does not render UI, does not control routing execution, does not mutate activation metadata, does not persist telemetry, and does not infer that workspace routing is active. Future workspace systems may consume these summaries later, but workspace routing remains inactive.

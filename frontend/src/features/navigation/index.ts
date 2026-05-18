@@ -14,6 +14,9 @@ export * as NavigationTypes from "./navigationTypes";
 export * as RouteActivationChecks from "./routeActivationChecks";
 export * as RouteActivationIntegrity from "./routeActivationIntegrity";
 export * as RouteActivationIntegrityRegistry from "./routeActivationIntegrityRegistry";
+export * as RouteActivationSummaryModule from "./routeActivationSummary";
+export * as RouteGovernanceReportModule from "./routeGovernanceReport";
+export * as RouteGovernanceSnapshotModule from "./routeGovernanceSnapshot";
 export {
   defaultNavigationBackBehaviorPolicy,
   type NavigationBackBehaviorPolicy,
@@ -84,6 +87,24 @@ export {
   routeActivationIntegrityRegistryVersion,
   type RouteActivationIntegrityRegistryEntry,
 } from "./routeActivationIntegrityRegistry";
+export {
+  createRouteActivationSummaries,
+  type RouteActivationReadinessState,
+  type RouteActivationSummary,
+  type RouteActivationSummaryInput,
+} from "./routeActivationSummary";
+export {
+  createRouteGovernanceReport,
+  routeActivationGovernanceSummaries,
+  routeGovernanceReport,
+  routeGovernanceReportVersion,
+  type RouteGovernanceReport,
+} from "./routeGovernanceReport";
+export {
+  routeGovernanceSnapshot,
+  type RouteGovernanceSnapshot,
+  type RouteGovernanceSnapshotReadiness,
+} from "./routeGovernanceSnapshot";
 export {
   type NavigationBackStateDescriptor,
   type NavigationExpandedPanelStateReference,
