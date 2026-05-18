@@ -95,6 +95,17 @@ export const navigationRouteRegistry = [
     metadataOnly: true,
   },
   {
+    routeId: "detail:results-insight",
+    routeKind: "detail",
+    depth: 3,
+    owningSurface: "results",
+    modeAccess: anyMode,
+    contextRequirements: datasetContext,
+    protectedSurface: false,
+    label: "Results Insight Detail",
+    metadataOnly: true,
+  },
+  {
     routeId: "page:history",
     routeKind: "page",
     depth: 2,
@@ -140,7 +151,7 @@ export const navigationRouteRegistry = [
   },
 ] as const satisfies ReadonlyArray<NavigationRouteRegistryEntry>;
 
-export const navigationRouteRegistryVersion = "s5-2a-detail-pattern-preview-v1";
+export const navigationRouteRegistryVersion = "s5-2b-results-insight-detail-v1";
 
 export const navigationRouteKindDepthLimits = {
   workspace: 1,

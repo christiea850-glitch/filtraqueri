@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { AnalysisPackagePlan } from "../../features/analysisPackages";
 import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
@@ -16,6 +17,7 @@ import {
 } from "../../features/results/resultInvestigationSurfaceSelectors";
 import type { WorkspaceMode } from "../../features/dataset/datasetTypes";
 import { createExplainabilityPreviewViewModel } from "../../features/runtimeBridgeConsumers";
+import { ResultsInsightDetailPage } from "../../features/detailPages";
 
 type ResultsInvestigationSurfaceProps = {
   activeResultModel: ActiveResultModel;
@@ -36,6 +38,7 @@ function ResultsInvestigationSurface({
   investigationWorkspacePlan,
   narrativeReport,
 }: ResultsInvestigationSurfaceProps) {
+  const [isInsightDetailOpen, setIsInsightDetailOpen] = useState(false);
   const isAnalystMode = workspaceMode === "analyst";
   const sourceLabel = getResultSourceLabel(activeResultModel);
   const takeaway = getResultTakeaway(activeResultModel);
@@ -67,6 +70,20 @@ function ResultsInvestigationSurface({
     whyItMattersPreview: chartSupportLabel,
     recommendationPreview: continuationSuggestion,
   });
+  const resultRowsLabel = activeResultModel.totalCount.toLocaleString();
+  const filterSortLabel = `${activeFilterCount.toLocaleString()} filters / ${activeSortLabel}`;
+
+  if (isInsightDetailOpen) {
+    return (
+      <ResultsInsightDetailPage
+        explainabilityPreview={explainabilityPreview}
+        sourceContext={`${sourceLabel} / ${activeResultTab} / ${activeResultModel.sourceType}`}
+        resultFactLabel={resultRowsLabel}
+        filterSortLabel={filterSortLabel}
+        onBack={() => setIsInsightDetailOpen(false)}
+      />
+    );
+  }
 
   return (
     <section
@@ -82,6 +99,9 @@ function ResultsInvestigationSurface({
         <span>{isAnalystMode ? "Result inspection" : "Business takeaway"}</span>
         <strong>{explainabilityPreview.takeawaySentence}</strong>
         <small>{explainabilityPreview.confidenceLabel} | {explainabilityPreview.whyItMattersPreview}</small>
+        <button type="button" className="text-button" onClick={() => setIsInsightDetailOpen(true)}>
+          View details
+        </button>
       </div>
 
       {!isAnalystMode && (
@@ -146,7 +166,7 @@ function ResultsInvestigationSurface({
         <span>
           <small>Filters / sort</small>
           <strong>
-            {activeFilterCount.toLocaleString()} filters / {activeSortLabel}
+            {filterSortLabel}
           </strong>
         </span>
         <span>
