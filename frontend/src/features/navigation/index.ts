@@ -1,7 +1,11 @@
 export * as NavigationBackBehavior from "./backBehavior";
 export * as NavigationContext from "./navigationContext";
 export * as NavigationBackState from "./navigationBackState";
+export * as NavigationIntegrity from "./navigationIntegrity";
+export * as NavigationIntegrityRegistry from "./navigationIntegrityRegistry";
+export * as NavigationIntegrityTypes from "./integrityTypes";
 export * as NavigationOrigin from "./navigationOrigin";
+export * as NavigationPreservationAssertions from "./preservationAssertions";
 export * as NavigationPreservationRegistry from "./preservationRegistry";
 export * as NavigationPreservationTypes from "./navigationPreservationTypes";
 export * as NavigationRouteRegistry from "./routeRegistry";
@@ -26,9 +30,31 @@ export {
   type CreateNavigationBackStateInput,
 } from "./navigationBackState";
 export {
+  summarizeNavigationIntegrity,
+  validateNavigationIntegrityAssertions,
+} from "./navigationIntegrity";
+export {
+  navigationIntegrityAssertions,
+  navigationIntegrityIssues,
+  navigationIntegrityRegistryVersion,
+  navigationIntegritySummaries,
+} from "./navigationIntegrityRegistry";
+export {
+  type NavigationIntegrityAssertion,
+  type NavigationIntegrityExpectation,
+  type NavigationIntegrityLevel,
+  type NavigationIntegrityScope,
+  type NavigationIntegritySummary,
+} from "./integrityTypes";
+export {
   createNavigationOriginDescriptor,
   type CreateNavigationOriginInput,
 } from "./navigationOrigin";
+export {
+  createNavigationPreservationAssertion,
+  navigationPreservationExpectations,
+  type CreateNavigationPreservationAssertionInput,
+} from "./preservationAssertions";
 export {
   navigationPreservationRegistry,
   navigationPreservationRegistryVersion,

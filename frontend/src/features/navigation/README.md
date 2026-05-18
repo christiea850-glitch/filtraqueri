@@ -42,3 +42,17 @@ S5-2C adds typed preservation metadata for:
 The preservation registry is metadata/contracts only. It does not create a global state manager, does not persist anything, does not use storage APIs, and does not activate browser deep-link restoration. Future routing systems may consume these contracts later.
 
 Consumers and renderers should not mutate preservation state directly. Runtime Bridge must remain separate from navigation and preservation ownership.
+
+## Integrity Assertions
+
+S5-2E adds metadata-level integrity assertions for:
+
+- origin restoration
+- dataset, session, workbook, and worksheet continuity
+- mode continuity
+- pagination preservation
+- filter preservation
+- expanded-panel preservation
+- selected-result preservation
+
+These assertions describe expectations only. They do not control routing, do not create a persistence engine, do not introduce global state, and do not execute navigation behavior. Future navigation systems may consume the assertions when routed detail pages and deep-link restoration are activated.
