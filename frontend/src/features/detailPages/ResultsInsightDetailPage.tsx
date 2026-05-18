@@ -5,6 +5,7 @@ export type ResultsInsightDetailPageProps = {
   readonly sourceContext: string;
   readonly resultFactLabel: string;
   readonly filterSortLabel: string;
+  readonly preservedContextLabel?: string;
   readonly backTargetLabel?: string;
   readonly onBack: () => void;
 };
@@ -14,6 +15,7 @@ function ResultsInsightDetailPage({
   sourceContext,
   resultFactLabel,
   filterSortLabel,
+  preservedContextLabel = "preserve:results-insight-detail",
   backTargetLabel = "Results",
   onBack,
 }: ResultsInsightDetailPageProps) {
@@ -62,7 +64,7 @@ function ResultsInsightDetailPage({
       </div>
 
       <p className="status-message">
-        Back behavior preserves the current dataset, session, mode, filters, pagination,
+        {preservedContextLabel}: Back behavior preserves the current dataset, session, mode, filters, pagination,
         export state, result context, and expanded panels.
       </p>
     </section>
@@ -70,4 +72,3 @@ function ResultsInsightDetailPage({
 }
 
 export default ResultsInsightDetailPage;
-

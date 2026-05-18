@@ -12,6 +12,7 @@ This folder may define:
 - route registry metadata
 - back-behavior contracts
 - navigation context preservation contracts
+- navigation origin and back-state preservation contracts
 - pure TypeScript helpers for future navigation planning
 
 ## Governance Rules
@@ -26,3 +27,18 @@ This folder may define:
 
 The current application routing remains in place. This folder is infrastructure only and has no visible UI behavior.
 
+## Preservation Infrastructure
+
+S5-2C adds typed preservation metadata for:
+
+- origin surface id
+- source and target route references
+- dataset, session, workbook, worksheet, mode, and active result context
+- filter state references
+- pagination state references
+- expanded or collapsed panel references
+- selected result or item references
+
+The preservation registry is metadata/contracts only. It does not create a global state manager, does not persist anything, does not use storage APIs, and does not activate browser deep-link restoration. Future routing systems may consume these contracts later.
+
+Consumers and renderers should not mutate preservation state directly. Runtime Bridge must remain separate from navigation and preservation ownership.

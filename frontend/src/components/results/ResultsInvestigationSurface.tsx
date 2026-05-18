@@ -18,6 +18,11 @@ import {
 import type { WorkspaceMode } from "../../features/dataset/datasetTypes";
 import { createExplainabilityPreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { ResultsInsightDetailPage } from "../../features/detailPages";
+import {
+  createNavigationBackStateDescriptor,
+  createNavigationOriginDescriptor,
+  emptyNavigationContextPreservation,
+} from "../../features/navigation";
 
 type ResultsInvestigationSurfaceProps = {
   activeResultModel: ActiveResultModel;
@@ -72,6 +77,54 @@ function ResultsInvestigationSurface({
   });
   const resultRowsLabel = activeResultModel.totalCount.toLocaleString();
   const filterSortLabel = `${activeFilterCount.toLocaleString()} filters / ${activeSortLabel}`;
+  const navigationContext = emptyNavigationContextPreservation(workspaceMode);
+  const resultsInsightOrigin = createNavigationOriginDescriptor({
+    preservationId: "preserve:results-insight-detail",
+    scope: "inline-preview-to-detail",
+    originSurfaceId: "results-investigation-surface",
+    sourceRoute: {
+      routeId: "page:results",
+      routeKind: "page",
+      depth: 2,
+    },
+    targetRoute: {
+      routeId: "detail:results-insight",
+      routeKind: "detail",
+      depth: 3,
+    },
+    mode: workspaceMode,
+    context: {
+      ...navigationContext,
+      activeResult: {
+        datasetId: activeResultModel.datasetId,
+        resultTab: activeResultTab,
+        sourceType: activeResultModel.sourceType,
+        rowCount: activeResultModel.totalCount,
+      },
+    },
+  });
+  const resultsInsightBackState = createNavigationBackStateDescriptor({
+    preservationId: "preserve:results-insight-detail",
+    origin: resultsInsightOrigin,
+    filterState: {
+      activeFilterLabels: activeResultModel.filters.activeLabels,
+      filterCount: activeFilterCount,
+    },
+    paginationState: {
+      page: activeResultModel.page,
+      totalPages: activeResultModel.totalPages,
+      rowsPerPage: activeResultModel.rowsPerPage,
+    },
+    expandedPanelState: {
+      expandedPanelIds: isInsightDetailOpen ? ["results-insight-detail"] : ["results-inline-preview"],
+      collapsedPanelIds: [],
+    },
+    selectedItem: {
+      selectedItemId: activeResultModel.sourceTab,
+      selectedItemLabel: sourceLabel,
+      selectedItemType: "result",
+    },
+  });
 
   if (isInsightDetailOpen) {
     return (
@@ -80,6 +133,7 @@ function ResultsInvestigationSurface({
         sourceContext={`${sourceLabel} / ${activeResultTab} / ${activeResultModel.sourceType}`}
         resultFactLabel={resultRowsLabel}
         filterSortLabel={filterSortLabel}
+        preservedContextLabel={resultsInsightBackState.preservationId}
         onBack={() => setIsInsightDetailOpen(false)}
       />
     );
