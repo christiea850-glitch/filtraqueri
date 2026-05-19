@@ -1,6 +1,6 @@
 # Investigation Workspace Boundary
 
-S7-A/S7-B keeps this proof local-state-only, non-routed, and presentation-only.
+S7-A/B/C/D establish the current stable baseline for this proof. It is local-state-only, non-routed, and presentation-only.
 
 - Local React state may only support tabs, panels, expanded sections, and presentation mode.
 - Props and callbacks come from the existing Results owner; this feature does not own Results state.
@@ -16,3 +16,9 @@ Results ownership remains external. `ResultsInvestigationSurface` owns the activ
 The Investigation Workspace is a consumer/presentation surface only. It does not own result execution, filtering, sorting, pagination, exports, upload/session/workbook restore, SQL/Monaco state, or ActiveResultModel behavior.
 
 There is no result lifecycle ownership in `features/investigationWorkspace/`; local state is limited to tab, panel, expanded-section, and presentation-mode display state.
+
+## S7-D Stability Checkpoint
+
+future changes must preserve local-state-only, non-routed, presentation-only behavior unless a new explicit phase approves otherwise.
+
+The proof mounts only from `ResultsInvestigationSurface`. It must not add route activation, workspace routes, controlled hash helper usage, persistence, orchestration, backend/API calls, SQL/Monaco ownership, export/download ownership, upload/session/workbook restore ownership, ActiveResultModel ownership, or Runtime Bridge behavior imports.

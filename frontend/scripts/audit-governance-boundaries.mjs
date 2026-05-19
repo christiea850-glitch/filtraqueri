@@ -1508,6 +1508,9 @@ const auditInvestigationWorkspaceBoundary = async () => {
   const allWorkspaceFiles = await Promise.all(
     (await collectFilesFromProjectPaths(["src/features/investigationWorkspace"])).map(readSourceFile),
   );
+  const allSourceFiles = await Promise.all(
+    (await collectFilesFromProjectPaths(["src"])).map(readSourceFile),
+  );
   const resultsInvestigationSurface = await readProjectSourceFile(
     "src/components/results/ResultsInvestigationSurface.tsx",
   );
@@ -1528,6 +1531,8 @@ const auditInvestigationWorkspaceBoundary = async () => {
     "Results ownership remains external",
     "consumer/presentation surface only",
     "no result lifecycle ownership",
+    "S7-A/B/C/D establish the current stable baseline",
+    "future changes must preserve local-state-only, non-routed, presentation-only behavior",
   ];
 
   for (const phrase of requiredReadmePhrases) {
@@ -1631,6 +1636,31 @@ const auditInvestigationWorkspaceBoundary = async () => {
       rule: "investigation-workspace-results-owner-integration-drift",
       file: resultsInvestigationSurface.projectPath,
       message: `investigation-workspace-results-owner-integration-drift: ${detail}`,
+    });
+  }
+
+  const allowedSurfaceReferenceFiles = new Set([
+    "src/components/results/ResultsInvestigationSurface.tsx",
+    "src/features/investigationWorkspace/InvestigationWorkspaceSurface.tsx",
+    "src/features/investigationWorkspace/index.ts",
+  ]);
+
+  for (const file of allSourceFiles) {
+    const referencesSurface =
+      parseImports(file.source).some((importEntry) => {
+        const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+        return matchesTarget(resolvedTarget, "src/features/investigationWorkspace");
+      }) && /\bInvestigationWorkspaceSurface\b/.test(file.source);
+    const mountsSurface = /<InvestigationWorkspaceSurface[\s>]/.test(file.source);
+
+    if (!referencesSurface && !mountsSurface) continue;
+    if (allowedSurfaceReferenceFiles.has(file.projectPath)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "investigation-workspace-unapproved-mount-surface",
+      file: file.projectPath,
+      message: `investigation-workspace-unapproved-mount-surface: ${file.projectPath} must not import or mount InvestigationWorkspaceSurface outside ResultsInvestigationSurface`,
     });
   }
 
