@@ -1,6 +1,7 @@
 export * as NavigationBackBehavior from "./backBehavior";
 export * as NavigationContext from "./navigationContext";
 export * as NavigationBackState from "./navigationBackState";
+export * as ControlledHashDetailHelper from "./controlledHashDetailHelper";
 export * as NavigationIntegrity from "./navigationIntegrity";
 export * as NavigationIntegrityRegistry from "./navigationIntegrityRegistry";
 export * as NavigationIntegrityTypes from "./integrityTypes";
@@ -17,6 +18,17 @@ export * as RouteActivationIntegrityRegistry from "./routeActivationIntegrityReg
 export * as RouteActivationSummaryModule from "./routeActivationSummary";
 export * as RouteGovernanceReportModule from "./routeGovernanceReport";
 export * as RouteGovernanceSnapshotModule from "./routeGovernanceSnapshot";
+export {
+  closeControlledHashDetailRoute,
+  getCurrentControlledHashDetailRoute,
+  isControlledHashDetailRouteActive,
+  openControlledHashDetailRoute,
+  subscribeControlledHashDetailRoute,
+  type ControlledHashDetailEvent,
+  type ControlledHashDetailResult,
+  type ControlledHashDetailRouteId,
+  type ControlledHashDetailUnsubscribe,
+} from "./controlledHashDetailHelper";
 export {
   defaultNavigationBackBehaviorPolicy,
   type NavigationBackBehaviorPolicy,

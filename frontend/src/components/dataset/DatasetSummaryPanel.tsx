@@ -12,9 +12,13 @@ import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { DatasetIntelligenceDetailPage } from "../../features/detailPages";
 import {
+  closeControlledHashDetailRoute,
   createNavigationBackStateDescriptor,
   createNavigationOriginDescriptor,
   emptyNavigationContextPreservation,
+  openControlledHashDetailRoute,
+  subscribeControlledHashDetailRoute,
+  type ControlledHashDetailRouteId,
 } from "../../features/navigation";
 import {
   createSchemaDisplayProfiles,
@@ -68,23 +72,7 @@ type DatasetSummaryPanelProps = {
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
 
-const datasetIntelligenceDetailRouteId = "detail:dataset-intelligence";
-const datasetIntelligenceDetailHash = `#${datasetIntelligenceDetailRouteId}`;
-
-const getCurrentHashRoute = () => globalThis.location?.hash.replace(/^#/, "") || "";
-
-const isDatasetIntelligenceDetailRouteActive = () =>
-  getCurrentHashRoute() === datasetIntelligenceDetailRouteId;
-
-const clearDatasetIntelligenceDetailRoute = () => {
-  if (globalThis.location?.hash !== datasetIntelligenceDetailHash) return;
-
-  globalThis.history.replaceState(
-    globalThis.history.state,
-    "",
-    `${globalThis.location.pathname}${globalThis.location.search}`,
-  );
-};
+const datasetIntelligenceDetailRouteId: ControlledHashDetailRouteId = "detail:dataset-intelligence";
 
 const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
@@ -476,32 +464,18 @@ function DatasetSummaryPanel({
     },
   });
   const openDatasetIntelligenceDetail = () => {
-    if (globalThis.location?.hash !== datasetIntelligenceDetailHash) {
-      globalThis.history.pushState(
-        { detailRouteId: datasetIntelligenceDetailRouteId },
-        "",
-        datasetIntelligenceDetailHash,
-      );
-    }
+    openControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
     setIsDatasetIntelligenceDetailOpen(true);
   };
   const closeDatasetIntelligenceDetail = () => {
-    clearDatasetIntelligenceDetailRoute();
+    closeControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
     setIsDatasetIntelligenceDetailOpen(false);
   };
 
   useEffect(() => {
-    const syncRouteState = () =>
-      setIsDatasetIntelligenceDetailOpen(isDatasetIntelligenceDetailRouteActive());
-
-    syncRouteState();
-    globalThis.addEventListener("hashchange", syncRouteState);
-    globalThis.addEventListener("popstate", syncRouteState);
-
-    return () => {
-      globalThis.removeEventListener("hashchange", syncRouteState);
-      globalThis.removeEventListener("popstate", syncRouteState);
-    };
+    return subscribeControlledHashDetailRoute(datasetIntelligenceDetailRouteId, (event) => {
+      setIsDatasetIntelligenceDetailOpen(event.active);
+    });
   }, []);
 
   if (dataset && isDatasetIntelligenceDetailOpen) {

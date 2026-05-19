@@ -19,9 +19,13 @@ import type { WorkspaceMode } from "../../features/dataset/datasetTypes";
 import { createExplainabilityPreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { ResultsInsightDetailPage } from "../../features/detailPages";
 import {
+  closeControlledHashDetailRoute,
   createNavigationBackStateDescriptor,
   createNavigationOriginDescriptor,
   emptyNavigationContextPreservation,
+  openControlledHashDetailRoute,
+  subscribeControlledHashDetailRoute,
+  type ControlledHashDetailRouteId,
 } from "../../features/navigation";
 
 type ResultsInvestigationSurfaceProps = {
@@ -34,22 +38,7 @@ type ResultsInvestigationSurfaceProps = {
   narrativeReport: NarrativeReport;
 };
 
-const resultsInsightDetailRouteId = "detail:results-insight";
-const resultsInsightDetailHash = `#${resultsInsightDetailRouteId}`;
-
-const getCurrentHashRoute = () => globalThis.location?.hash.replace(/^#/, "") || "";
-
-const isResultsInsightDetailRouteActive = () => getCurrentHashRoute() === resultsInsightDetailRouteId;
-
-const clearResultsInsightDetailRoute = () => {
-  if (globalThis.location?.hash !== resultsInsightDetailHash) return;
-
-  globalThis.history.replaceState(
-    globalThis.history.state,
-    "",
-    `${globalThis.location.pathname}${globalThis.location.search}`,
-  );
-};
+const resultsInsightDetailRouteId: ControlledHashDetailRouteId = "detail:results-insight";
 
 function ResultsInvestigationSurface({
   activeResultModel,
@@ -143,31 +132,18 @@ function ResultsInvestigationSurface({
     },
   });
   const openResultsInsightDetail = () => {
-    if (globalThis.location?.hash !== resultsInsightDetailHash) {
-      globalThis.history.pushState(
-        { detailRouteId: resultsInsightDetailRouteId },
-        "",
-        resultsInsightDetailHash,
-      );
-    }
+    openControlledHashDetailRoute(resultsInsightDetailRouteId);
     setIsInsightDetailOpen(true);
   };
   const closeResultsInsightDetail = () => {
-    clearResultsInsightDetailRoute();
+    closeControlledHashDetailRoute(resultsInsightDetailRouteId);
     setIsInsightDetailOpen(false);
   };
 
   useEffect(() => {
-    const syncRouteState = () => setIsInsightDetailOpen(isResultsInsightDetailRouteActive());
-
-    syncRouteState();
-    globalThis.addEventListener("hashchange", syncRouteState);
-    globalThis.addEventListener("popstate", syncRouteState);
-
-    return () => {
-      globalThis.removeEventListener("hashchange", syncRouteState);
-      globalThis.removeEventListener("popstate", syncRouteState);
-    };
+    return subscribeControlledHashDetailRoute(resultsInsightDetailRouteId, (event) => {
+      setIsInsightDetailOpen(event.active);
+    });
   }, []);
 
   if (isInsightDetailOpen) {

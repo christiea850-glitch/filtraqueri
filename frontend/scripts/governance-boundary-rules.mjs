@@ -38,8 +38,7 @@ export const workspaceGovernanceFolders = [
 ];
 
 export const controlledHashNavigationAllowedFiles = [
-  "src/components/results/ResultsInvestigationSurface.tsx",
-  "src/components/dataset/DatasetSummaryPanel.tsx",
+  "src/features/navigation/controlledHashDetailHelper.ts",
 ];
 
 export const runtimeIntelligenceFolder = "src/features/runtimeIntelligence";

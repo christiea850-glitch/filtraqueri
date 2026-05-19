@@ -78,6 +78,18 @@ S5-3B adds metadata-level checks that compare controlled routed detail activatio
 
 These checks do not activate or deactivate routes, do not own routing execution, and do not introduce persistence or orchestration. They exist so future routed systems can verify governance linkage before more detail flows are activated.
 
+## Controlled Hash Detail Helper
+
+S6-B centralizes controlled detail hash behavior in `controlledHashDetailHelper.ts`. This helper owns the narrow operations required by the two active routed detail flows:
+
+- read the current controlled detail hash
+- open a controlled detail hash
+- close a controlled detail hash
+- subscribe to `hashchange` and `popstate` for controlled detail synchronization
+- verify the route is backed by existing routed detail activation metadata
+
+The helper is not a global router, route controller, deep-link restoration engine, persistence engine, workspace routing system, or `App.tsx` ownership migration. New hash/history listeners should not be added outside this helper.
+
 ## Route Governance Reporting
 
 S5-3D adds metadata-only reporting for routed detail activation coverage. The reporting layer summarizes:
