@@ -33,6 +33,10 @@ export const navigationFolders = [
   "src/features/navigation",
 ];
 
+export const workspaceGovernanceFolders = [
+  "src/features/workspaces",
+];
+
 export const runtimeIntelligenceFolder = "src/features/runtimeIntelligence";
 
 export const runtimeBridgeArchitectureLayers = {
@@ -252,6 +256,50 @@ export const navigationForbiddenImports = {
     "src/features/investigationWorkspace/workspaceSessionStorage",
   ],
 };
+
+export const workspaceGovernanceForbiddenImports = {
+  runtimeBridge: [
+    "src/features/runtimeBridge",
+  ],
+  react: [
+    "react",
+    "react-dom",
+    "react-dom/client",
+  ],
+  chartRendering: [
+    "d3",
+    "recharts",
+    "chart.js",
+    "chartjs",
+    "react-chartjs-2",
+  ],
+  backend: [
+    "src/services/api",
+  ],
+  execution: [
+    "src/features/execution",
+    "src/features/results/useResultExecutionCoordinator",
+    "src/features/export",
+    "src/features/dataset/useWorkspaceDatasetController",
+    "src/features/analyst/sql/useSqlWorkspace",
+    "src/services/api",
+  ],
+  persistence: [
+    "src/features/workspace/workspacePersistence",
+    "src/features/workspaceRuntime/runtimePersistence",
+    "src/features/sqlWorkspacePersistence",
+    "src/features/dataset/useDatasetSessions",
+    "src/features/investigationWorkspace/workspaceSessionStorage",
+  ],
+  navigationMutation: [
+    "src/App",
+    "src/features/navigation",
+    "src/features/workspaceRuntime/runtimeNavigationAdapter",
+    "src/features/workspaceRuntime/useWorkspaceRuntimeCoordinator",
+    "src/components/layout/WorkspaceShell",
+  ],
+};
+
 
 export const continuationCallbackFieldNames = [
   "callback",

@@ -20,6 +20,8 @@ import {
   runtimeBridgeArchitectureLayers,
   runtimeMetadataFolders,
   runtimeMetadataForbiddenImports,
+  workspaceGovernanceFolders,
+  workspaceGovernanceForbiddenImports,
 } from "./governance-boundary-rules.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -1143,6 +1145,80 @@ const auditNavigationSkeleton = async () => {
   return findings;
 };
 
+const auditWorkspaceGovernance = async () => {
+  const files = await collectFilesFromProjectPaths(workspaceGovernanceFolders);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const findings = [];
+
+  for (const file of sourceFiles) {
+    if (file.projectPath.endsWith(".tsx") || file.projectPath.endsWith(".jsx")) {
+      findings.push({
+        severity: "error",
+        rule: "workspace-governance-jsx-file",
+        file: file.projectPath,
+        message: `workspace-governance-jsx-file: ${file.projectPath} must remain metadata-only TypeScript, not JSX/TSX`,
+      });
+    }
+
+    const imports = parseImports(file.source);
+
+    for (const importEntry of imports) {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+
+      for (const [category, targets] of Object.entries(workspaceGovernanceForbiddenImports)) {
+        const matchedTarget = targets.find((target) => matchesTarget(resolvedTarget, target));
+        if (!matchedTarget) continue;
+
+        const finding = createFinding({
+          severity: "error",
+          rule: `workspace-governance-import-${category}`,
+          file: file.projectPath,
+          importTarget: matchedTarget,
+          specifier: importEntry.specifier,
+          detail: `matches ${matchedTarget}`,
+        });
+        if (finding) findings.push(finding);
+      }
+    }
+
+    for (const usagePattern of runtimeBridgeConsumerUsagePatterns) {
+      if (!usagePattern.patterns.some((pattern) => pattern.test(file.source))) continue;
+
+      const finding = createFinding({
+        severity: "error",
+        rule: usagePattern.rule.replace("runtime-bridge-consumer", "workspace-governance"),
+        file: file.projectPath,
+        importTarget: usagePattern.importTarget,
+        detail: `uses ${usagePattern.importTarget}`,
+      });
+      if (finding) findings.push(finding);
+    }
+
+    const workspaceIds = matchAllStrings(file.source, /\bworkspaceId:\s*"([^"]+)"/g);
+    for (const workspaceId of workspaceIds) {
+      if (/^[a-z0-9:-]+$/.test(workspaceId)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "workspace-governance-nondeterministic-workspace-id",
+        file: file.projectPath,
+        message: `workspace-governance-nondeterministic-workspace-id: ${file.projectPath} workspaceId "${workspaceId}" is not a deterministic slug`,
+      });
+    }
+
+    if (/\bactive:\s*true\b/.test(file.source)) {
+      findings.push({
+        severity: "error",
+        rule: "workspace-governance-active-workspace",
+        file: file.projectPath,
+        message: `workspace-governance-active-workspace: ${file.projectPath} must not activate workspace behavior`,
+      });
+    }
+  }
+
+  return findings;
+};
+
 const auditRuntimeBridgeArchitecture = async () => {
   const files = await collectFilesFromProjectPaths(["src/features/runtimeBridge"]);
   const sourceFiles = (await Promise.all(files.map(readSourceFile)))
@@ -1317,6 +1393,7 @@ const runAudit = async () => {
     auditRuntimeBridgeGovernanceSnapshots(),
     auditRuntimeBridgeConsumers(),
     auditNavigationSkeleton(),
+    auditWorkspaceGovernance(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);
