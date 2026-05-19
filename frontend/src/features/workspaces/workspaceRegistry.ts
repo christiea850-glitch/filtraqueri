@@ -51,47 +51,11 @@ const workspaceShells = [
     metadataOnly: true,
   },
   {
-    workspaceId: "workspace:executive",
-    category: "executive_workspace",
-    owner: "executive",
-    label: "Executive Workspace",
-    lifecycleState: "future_candidate",
-    routeReady: false,
-    preservationReady: false,
-    integrityReady: false,
-    active: false,
-    metadataOnly: true,
-  },
-  {
-    workspaceId: "workspace:analyst-governed",
-    category: "analyst_workspace",
-    owner: "analyst",
-    label: "Analyst Workspace Governance",
-    lifecycleState: "partially_defined",
-    routeReady: false,
-    preservationReady: false,
-    integrityReady: false,
-    active: false,
-    metadataOnly: true,
-  },
-  {
     workspaceId: "workspace:orchestration-planning",
     category: "orchestration_workspace",
     owner: "orchestration",
-    label: "Orchestration Planning Workspace",
-    lifecycleState: "inactive",
-    routeReady: false,
-    preservationReady: false,
-    integrityReady: false,
-    active: false,
-    metadataOnly: true,
-  },
-  {
-    workspaceId: "workspace:future-consumer",
-    category: "future_workspace",
-    owner: "future_consumer",
-    label: "Future Consumer Workspace",
-    lifecycleState: "future_candidate",
+    label: "Orchestration Planning Placeholder",
+    lifecycleState: "permanently_inert",
     routeReady: false,
     preservationReady: false,
     integrityReady: false,
@@ -109,5 +73,4 @@ export const workspaceRegistry = workspaceShells.map((shell) => ({
   metadataOnly: true,
 })) satisfies ReadonlyArray<WorkspaceRegistryEntry>;
 
-export const workspaceRegistryVersion = "s5-4a-workspace-registry-v1";
-
+export const workspaceRegistryVersion = "s6-x-workspace-registry-consolidated-v1";

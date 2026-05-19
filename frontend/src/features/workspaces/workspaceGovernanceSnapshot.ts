@@ -30,6 +30,7 @@ export type WorkspaceGovernanceSnapshot = {
   readonly inactiveCount: number;
   readonly partiallyDefinedCount: number;
   readonly futureCandidateCount: number;
+  readonly permanentlyInertCount: number;
   readonly preservationReadyCount: number;
   readonly integrityReadyCount: number;
   readonly ownershipLinkedCount: number;
@@ -62,6 +63,7 @@ export const workspaceGovernanceSnapshot: WorkspaceGovernanceSnapshot = {
   inactiveCount: workspaceGovernanceReport.inactiveCount,
   partiallyDefinedCount: workspaceGovernanceReport.partiallyDefinedCount,
   futureCandidateCount: workspaceGovernanceReport.futureCandidateCount,
+  permanentlyInertCount: workspaceGovernanceReport.permanentlyInertCount,
   preservationReadyCount: workspaceGovernanceReport.preservationReadyCount,
   integrityReadyCount: workspaceGovernanceReport.integrityReadyCount,
   ownershipLinkedCount: workspaceGovernanceReport.ownershipLinkedCount,

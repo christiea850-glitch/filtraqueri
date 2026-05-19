@@ -48,6 +48,12 @@ S2-A must not modify:
 
 Future phases may import these types to annotate advisory, executable, metadata-only, presentational, persistence, composition, or hybrid contracts. S2-A does not enforce those rules yet. Linting, runtime assertions, and protected import checks belong to later S2 phases.
 
+## S6 Consolidated Read Surface
+
+S6-X adds `s6GovernanceReadSurface` as a composition over the existing route and workspace governance snapshots. It does not create a new registry, posture report, readiness registry, route controller, workspace controller, persistence engine, or orchestration layer.
+
+The read surface exists so the next Investigation workspace planning phase can inspect route and workspace governance together without expanding governance sprawl.
+
 ## Warning-Only Audit
 
 S2-C adds a warning-only governance audit command:

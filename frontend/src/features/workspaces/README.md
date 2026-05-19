@@ -11,6 +11,7 @@ This folder is metadata-only. Workspaces are not active yet.
 - Workspace persistence is not active.
 - No workspace UI shell is rendered from this folder.
 - `App.tsx` routing and composition ownership remain unchanged.
+- S6-X prunes speculative workspace shells from the active governance inventory. The current registry keeps only near-term Investigation and Explainability shells plus a permanently inert orchestration placeholder.
 
 ## Scope
 
@@ -35,6 +36,8 @@ This folder may define:
 ## Future Use
 
 Future S5 phases may use this registry to evaluate whether an investigation, explainability, executive, analyst, orchestration, or future consumer workspace is ready for routed activation. That future activation must remain staged and governed by navigation, preservation, and integrity layers.
+
+S6-X narrows the immediate planning target to one future Investigation workspace activation. Executive, Analyst, and generic future-consumer workspace shells should not be reintroduced until paired with a real activation phase and matching governance evidence.
 
 ## Governance Reporting
 

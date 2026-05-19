@@ -11,6 +11,7 @@ export type WorkspaceGovernanceReport = {
   readonly inactiveCount: number;
   readonly partiallyDefinedCount: number;
   readonly futureCandidateCount: number;
+  readonly permanentlyInertCount: number;
   readonly preservationReadyCount: number;
   readonly integrityReadyCount: number;
   readonly ownershipLinkedCount: number;
@@ -35,6 +36,7 @@ export const createWorkspaceGovernanceReport = (
     inactiveCount: summaries.filter((summary) => summary.inactive).length,
     partiallyDefinedCount: summaries.filter((summary) => summary.partiallyDefined).length,
     futureCandidateCount: summaries.filter((summary) => summary.futureCandidate).length,
+    permanentlyInertCount: summaries.filter((summary) => summary.permanentlyInert).length,
     preservationReadyCount: summaries.filter((summary) => summary.preservationReady).length,
     integrityReadyCount: summaries.filter((summary) => summary.integrityReady).length,
     ownershipLinkedCount: summaries.filter((summary) => summary.ownershipLinked).length,

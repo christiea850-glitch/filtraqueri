@@ -16,6 +16,7 @@ export type WorkspaceReadinessSummary = {
   readonly inactive: boolean;
   readonly partiallyDefined: boolean;
   readonly futureCandidate: boolean;
+  readonly permanentlyInert: boolean;
   readonly routeReady: boolean;
   readonly preservationReady: boolean;
   readonly integrityReady: boolean;
@@ -59,6 +60,7 @@ export const summarizeWorkspaceReadinessEntry = (
   inactive: entry.shell.lifecycleState === "inactive",
   partiallyDefined: entry.shell.lifecycleState === "partially_defined",
   futureCandidate: entry.shell.lifecycleState === "future_candidate",
+  permanentlyInert: entry.shell.lifecycleState === "permanently_inert",
   routeReady: entry.shell.routeReady,
   preservationReady: entry.shell.preservationReady,
   integrityReady: entry.shell.integrityReady,

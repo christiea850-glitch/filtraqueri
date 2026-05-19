@@ -13,7 +13,8 @@ export type WorkspaceShellLifecycleState =
   | "preservation_ready"
   | "integrity_ready"
   | "partially_defined"
-  | "future_candidate";
+  | "future_candidate"
+  | "permanently_inert";
 
 export type WorkspaceShellOwner =
   | "results"
@@ -49,4 +50,3 @@ export type WorkspaceGovernanceBoundary = {
   readonly persistsState: false;
   readonly metadataOnly: true;
 };
-
