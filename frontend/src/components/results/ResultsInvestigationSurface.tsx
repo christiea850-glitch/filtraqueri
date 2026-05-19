@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import type { AnalysisPackagePlan } from "../../features/analysisPackages";
-import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
+import {
+  InvestigationWorkspaceSurface,
+  type InvestigationWorkspacePlan,
+} from "../../features/investigationWorkspace";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
 import type { NarrativeReport } from "../../features/narrativeIntelligence";
 import type { ActiveResultModel } from "../../features/results/activeResultModel";
@@ -291,6 +294,22 @@ function ResultsInvestigationSurface({
             </div>
           )}
         </div>
+      )}
+
+      {!isAnalystMode && (
+        <InvestigationWorkspaceSurface
+          investigationWorkspacePlan={investigationWorkspacePlan}
+          investigationReport={investigationReport}
+          narrativeReport={narrativeReport}
+          explainabilityPreview={explainabilityPreview}
+          resultsContext={{
+            sourceLabel,
+            activeResultTab,
+            sourceType: activeResultModel.sourceType,
+            rowCountLabel: resultRowsLabel,
+            filterSortLabel,
+          }}
+        />
       )}
 
       {!isAnalystMode && (
