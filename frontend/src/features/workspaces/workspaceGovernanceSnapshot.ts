@@ -33,7 +33,7 @@ export type WorkspaceGovernanceSnapshot = {
   readonly preservationReadyCount: number;
   readonly integrityReadyCount: number;
   readonly ownershipLinkedCount: number;
-  readonly preservationLinkedCount: number;
+  readonly preservationDescriptorLinkedCount: number;
   readonly unsupportedStateCount: number;
   readonly workspaceRoutingActive: false;
   readonly workspaceOrchestrationActive: false;
@@ -65,7 +65,7 @@ export const workspaceGovernanceSnapshot: WorkspaceGovernanceSnapshot = {
   preservationReadyCount: workspaceGovernanceReport.preservationReadyCount,
   integrityReadyCount: workspaceGovernanceReport.integrityReadyCount,
   ownershipLinkedCount: workspaceGovernanceReport.ownershipLinkedCount,
-  preservationLinkedCount: workspaceGovernanceReport.preservationLinkedCount,
+  preservationDescriptorLinkedCount: workspaceGovernanceReport.preservationDescriptorLinkedCount,
   unsupportedStateCount,
   workspaceRoutingActive: false,
   workspaceOrchestrationActive: false,
@@ -77,4 +77,3 @@ export const workspaceGovernanceSnapshot: WorkspaceGovernanceSnapshot = {
       : "workspace_governance_review_required",
   metadataOnly: true,
 };
-

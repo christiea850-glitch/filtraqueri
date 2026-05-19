@@ -33,6 +33,7 @@ export type NavigationRouteRegistryEntry = {
   readonly routeKind: NavigationRouteKind;
   readonly depth: NavigationRouteDepth;
   readonly owningSurface: NavigationOwningSurface;
+  readonly routeTemplate?: "pattern_template";
   readonly modeAccess: NavigationModeAccessRule;
   readonly contextRequirements: NavigationContextRequirements;
   readonly protectedSurface: boolean;
@@ -47,4 +48,3 @@ export type NavigationRouteReference = {
 };
 
 export const navigationMaxRouteDepth: NavigationRouteDepth = 4;
-

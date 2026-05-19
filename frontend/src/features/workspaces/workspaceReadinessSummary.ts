@@ -20,7 +20,7 @@ export type WorkspaceReadinessSummary = {
   readonly preservationReady: boolean;
   readonly integrityReady: boolean;
   readonly ownershipLinked: boolean;
-  readonly preservationLinked: boolean;
+  readonly preservationDescriptorLinked: boolean;
   readonly unsupportedStates: ReadonlyArray<WorkspaceUnsupportedState>;
   readonly activationCandidate: false;
   readonly metadataOnly: true;
@@ -63,7 +63,7 @@ export const summarizeWorkspaceReadinessEntry = (
   preservationReady: entry.shell.preservationReady,
   integrityReady: entry.shell.integrityReady,
   ownershipLinked: entry.ownership.workspaceId === entry.shell.workspaceId,
-  preservationLinked: entry.preservation.workspaceId === entry.shell.workspaceId,
+  preservationDescriptorLinked: entry.preservation.workspaceId === entry.shell.workspaceId,
   unsupportedStates: detectUnsupportedStates(entry),
   activationCandidate: false,
   metadataOnly: true,
@@ -77,4 +77,3 @@ export const summarizeWorkspaceReadinessRegistry = (
     .sort((left, right) => left.summaryId.localeCompare(right.summaryId));
 
 export const workspaceReadinessSummaryVersion = "s5-4b-workspace-readiness-summary-v1";
-

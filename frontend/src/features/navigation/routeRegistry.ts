@@ -88,6 +88,7 @@ export const navigationRouteRegistry = [
     routeKind: "detail",
     depth: 3,
     owningSurface: "future_consumer",
+    routeTemplate: "pattern_template",
     modeAccess: anyMode,
     contextRequirements: datasetContext,
     protectedSurface: false,
@@ -162,7 +163,7 @@ export const navigationRouteRegistry = [
   },
 ] as const satisfies ReadonlyArray<NavigationRouteRegistryEntry>;
 
-export const navigationRouteRegistryVersion = "s5-2d-dataset-intelligence-detail-v1";
+export const navigationRouteRegistryVersion = "s5-3d-routed-governance-traceability-v1";
 
 export const navigationRouteKindDepthLimits = {
   workspace: 1,

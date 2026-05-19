@@ -14,7 +14,7 @@ export type WorkspaceGovernanceReport = {
   readonly preservationReadyCount: number;
   readonly integrityReadyCount: number;
   readonly ownershipLinkedCount: number;
-  readonly preservationLinkedCount: number;
+  readonly preservationDescriptorLinkedCount: number;
   readonly unsupportedOwnershipStateCount: number;
   readonly unsupportedReadinessCombinationCount: number;
   readonly unsupportedActivationCandidateCount: number;
@@ -38,7 +38,7 @@ export const createWorkspaceGovernanceReport = (
     preservationReadyCount: summaries.filter((summary) => summary.preservationReady).length,
     integrityReadyCount: summaries.filter((summary) => summary.integrityReady).length,
     ownershipLinkedCount: summaries.filter((summary) => summary.ownershipLinked).length,
-    preservationLinkedCount: summaries.filter((summary) => summary.preservationLinked).length,
+    preservationDescriptorLinkedCount: summaries.filter((summary) => summary.preservationDescriptorLinked).length,
     unsupportedOwnershipStateCount: summaries.filter((summary) =>
       summary.unsupportedStates.includes("missing_ownership_metadata"),
     ).length,
@@ -59,4 +59,3 @@ export const workspaceGovernanceSummaries = summarizeWorkspaceReadinessRegistry(
 export const workspaceGovernanceReport = createWorkspaceGovernanceReport(workspaceGovernanceSummaries);
 
 export const workspaceGovernanceReportVersion = "s5-4b-workspace-governance-report-v1";
-

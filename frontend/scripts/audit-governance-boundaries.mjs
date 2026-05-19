@@ -7,6 +7,7 @@ import {
   allowedBoundaryErrors,
   allowedBoundaryWarnings,
   continuationCallbackFieldNames,
+  controlledHashNavigationAllowedFiles,
   continuationMetadataFolders,
   executableImportTargets,
   navigationFolders,
@@ -72,6 +73,9 @@ const readSourceFile = async (filePath) => ({
   projectPath: toProjectPath(filePath),
   source: await readFile(filePath, "utf8"),
 });
+
+const readProjectSourceFile = async (projectPath) =>
+  readSourceFile(path.join(frontendRoot, projectPath));
 
 const collectFilesFromProjectPaths = async (projectPaths) => {
   const files = await Promise.all(
@@ -1145,6 +1149,206 @@ const auditNavigationSkeleton = async () => {
   return findings;
 };
 
+const auditRouteGovernanceStabilization = async () => {
+  const [
+    routeRegistry,
+    preservationRegistry,
+    integrityRegistry,
+    routedActivations,
+    routeGovernanceSnapshot,
+  ] = await Promise.all([
+    readProjectSourceFile("src/features/navigation/routeRegistry.ts"),
+    readProjectSourceFile("src/features/navigation/preservationRegistry.ts"),
+    readProjectSourceFile("src/features/navigation/navigationIntegrityRegistry.ts"),
+    readProjectSourceFile("src/features/navigation/routedDetailActivation.ts"),
+    readProjectSourceFile("src/features/navigation/routeGovernanceSnapshot.ts"),
+  ]);
+  const findings = [];
+
+  if (!/navigationRouteRegistryVersion\s*=\s*"s5-3[cd]-/.test(routeRegistry.source)) {
+    findings.push({
+      severity: "error",
+      rule: "route-governance-stale-route-registry-version",
+      file: routeRegistry.projectPath,
+      message: `route-governance-stale-route-registry-version: ${routeRegistry.projectPath} must reflect the active S5-3 routed governance state`,
+    });
+  }
+
+  const patternPreviewBlock = splitObjectLiteralBlocks(routeRegistry.source).find((block) =>
+    block.includes('routeId: "detail:pattern-preview"'),
+  );
+  if (!patternPreviewBlock?.includes('routeTemplate: "pattern_template"')) {
+    findings.push({
+      severity: "error",
+      rule: "route-governance-pattern-route-untagged",
+      file: routeRegistry.projectPath,
+      message: `route-governance-pattern-route-untagged: ${routeRegistry.projectPath} must tag detail:pattern-preview as a pattern template`,
+    });
+  }
+
+  if (/\bunsupportedActivationCount:\s*[1-9]\d*\b/.test(routeGovernanceSnapshot.source)) {
+    findings.push({
+      severity: "error",
+      rule: "route-governance-unsupported-active-state",
+      file: routeGovernanceSnapshot.projectPath,
+      message: `route-governance-unsupported-active-state: ${routeGovernanceSnapshot.projectPath} must not declare unsupported active route states`,
+    });
+  }
+
+  if (/\bworkspaceRoutingActive:\s*true\b|\bglobalRoutingMigrationActive:\s*true\b/.test(routeGovernanceSnapshot.source)) {
+    findings.push({
+      severity: "error",
+      rule: "route-governance-global-routing-active",
+      file: routeGovernanceSnapshot.projectPath,
+      message: `route-governance-global-routing-active: ${routeGovernanceSnapshot.projectPath} must keep workspace/global routing inactive`,
+    });
+  }
+
+  if (/\bdeepLinkReady\b/.test(routedActivations.source)) {
+    findings.push({
+      severity: "error",
+      rule: "route-governance-misleading-deeplink-readiness",
+      file: routedActivations.projectPath,
+      message: `route-governance-misleading-deeplink-readiness: ${routedActivations.projectPath} must not imply full deep-link restoration readiness`,
+    });
+  }
+
+  const activationBlocks = splitObjectLiteralBlocks(routedActivations.source).filter((block) =>
+    /\bactivationId:\s*"[^"]+"/.test(block),
+  );
+  const routeSource = routeRegistry.source;
+  const preservationSource = preservationRegistry.source;
+  const integritySource = integrityRegistry.source;
+
+  for (const block of activationBlocks) {
+    const activationId = (block.match(/\bactivationId:\s*"([^"]+)"/) || [])[1];
+    const routeId = (block.match(/\brouteId:\s*"([^"]+)"/) || [])[1];
+    const sourceRouteId = (block.match(/\bsourceRouteId:\s*"([^"]+)"/) || [])[1];
+    const preservationId = (block.match(/\bpreservationId:\s*"([^"]+)"/) || [])[1];
+    const assertionIds = matchAllStrings(block, /"((?:assert:)[^"]+)"/g);
+
+    if (!activationId || !routeId || !sourceRouteId || !preservationId || assertionIds.length === 0) {
+      findings.push({
+        severity: "error",
+        rule: "route-governance-activation-incomplete-linkage",
+        file: routedActivations.projectPath,
+        message: `route-governance-activation-incomplete-linkage: ${routedActivations.projectPath} activation "${activationId || "unknown"}" is missing route, source, preservation, or integrity linkage`,
+      });
+      continue;
+    }
+
+    if (!routeSource.includes(`routeId: "${routeId}"`) || !routeSource.includes(`routeId: "${sourceRouteId}"`)) {
+      findings.push({
+        severity: "error",
+        rule: "route-governance-activation-missing-route-linkage",
+        file: routedActivations.projectPath,
+        message: `route-governance-activation-missing-route-linkage: ${activationId} references an unregistered route`,
+      });
+    }
+
+    if (
+      !preservationSource.includes(`preservationId: "${preservationId}"`) ||
+      !preservationSource.includes(`sourceRouteId: "${sourceRouteId}"`) ||
+      !preservationSource.includes(`targetRouteId: "${routeId}"`)
+    ) {
+      findings.push({
+        severity: "error",
+        rule: "route-governance-activation-missing-preservation-linkage",
+        file: routedActivations.projectPath,
+        message: `route-governance-activation-missing-preservation-linkage: ${activationId} is not linked to matching preservation metadata`,
+      });
+    }
+
+    for (const assertionId of assertionIds) {
+      const assertionParts = assertionId.split(":");
+      const assertionPrefix = assertionParts.slice(0, 2).join(":");
+      const assertionSuffix = assertionParts.slice(2).join(":");
+      if (integritySource.includes(assertionPrefix) && integritySource.includes(`:${assertionSuffix}`)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: "route-governance-activation-missing-integrity-linkage",
+        file: routedActivations.projectPath,
+        message: `route-governance-activation-missing-integrity-linkage: ${activationId} references missing assertion "${assertionId}"`,
+      });
+    }
+
+    if (!block.includes("hashRouteAddressable: true") || !block.includes('restorationCapability: "hash_addressable_only"')) {
+      findings.push({
+        severity: "error",
+        rule: "route-governance-activation-restoration-overstated",
+        file: routedActivations.projectPath,
+        message: `route-governance-activation-restoration-overstated: ${activationId} must declare hash-addressable-only restoration semantics`,
+      });
+    }
+  }
+
+  return findings;
+};
+
+const auditWorkspaceGovernanceStabilization = async () => {
+  const [snapshot, report] = await Promise.all([
+    readProjectSourceFile("src/features/workspaces/workspaceGovernanceSnapshot.ts"),
+    readProjectSourceFile("src/features/workspaces/workspaceGovernanceReport.ts"),
+  ]);
+  const findings = [];
+
+  if (
+    /\bworkspaceRoutingActive:\s*true\b|\bworkspaceOrchestrationActive:\s*true\b|\bworkspacePersistenceActive:\s*true\b|\bworkspaceUiActive:\s*true\b/.test(
+      snapshot.source,
+    )
+  ) {
+    findings.push({
+      severity: "error",
+      rule: "workspace-governance-unexpected-active-state",
+      file: snapshot.projectPath,
+      message: `workspace-governance-unexpected-active-state: ${snapshot.projectPath} must keep routing, orchestration, persistence, and UI inactive`,
+    });
+  }
+
+  if (!/\bunsupportedStateCount\s*=\s*workspaceGovernanceReport\.unsupportedSummaries\.length\b/.test(snapshot.source)) {
+    findings.push({
+      severity: "error",
+      rule: "workspace-governance-snapshot-unsupported-state-untracked",
+      file: snapshot.projectPath,
+      message: `workspace-governance-snapshot-unsupported-state-untracked: ${snapshot.projectPath} must derive unsupported state count from the governance report`,
+    });
+  }
+
+  if (!/\bunsupportedActivationCandidateCount\b/.test(report.source)) {
+    findings.push({
+      severity: "error",
+      rule: "workspace-governance-report-missing-activation-drift-check",
+      file: report.projectPath,
+      message: `workspace-governance-report-missing-activation-drift-check: ${report.projectPath} must report unsupported activation candidates`,
+    });
+  }
+
+  return findings;
+};
+
+const auditControlledHashNavigationPreparation = async () => {
+  const files = await collectFilesFromProjectPaths(["src"]);
+  const sourceFiles = await Promise.all(files.map(readSourceFile));
+  const allowedFiles = new Set(controlledHashNavigationAllowedFiles);
+  const findings = [];
+  const hashMutationPattern = /\bglobalThis\.history\.|\baddEventListener\s*\(\s*"hashchange"|\baddEventListener\s*\(\s*"popstate"/;
+
+  for (const file of sourceFiles) {
+    if (!hashMutationPattern.test(file.source)) continue;
+    if (allowedFiles.has(file.projectPath)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-navigation-unapproved-surface",
+      file: file.projectPath,
+      message: `controlled-hash-navigation-unapproved-surface: ${file.projectPath} uses controlled hash navigation outside the S6-A allowlist`,
+    });
+  }
+
+  return findings;
+};
+
 const auditWorkspaceGovernance = async () => {
   const files = await collectFilesFromProjectPaths(workspaceGovernanceFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
@@ -1393,7 +1597,10 @@ const runAudit = async () => {
     auditRuntimeBridgeGovernanceSnapshots(),
     auditRuntimeBridgeConsumers(),
     auditNavigationSkeleton(),
+    auditRouteGovernanceStabilization(),
     auditWorkspaceGovernance(),
+    auditWorkspaceGovernanceStabilization(),
+    auditControlledHashNavigationPreparation(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

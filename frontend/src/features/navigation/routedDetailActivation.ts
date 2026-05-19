@@ -8,7 +8,8 @@ export type NavigationRoutedDetailActivation = {
   readonly owningSurface: NavigationOwningSurface;
   readonly integrityAssertionIds: ReadonlyArray<string>;
   readonly activationMode: "controlled-hash-route";
-  readonly deepLinkReady: boolean;
+  readonly hashRouteAddressable: boolean;
+  readonly restorationCapability: "hash_addressable_only";
   readonly globalRoutingMigration: false;
   readonly metadataOnly: true;
 };
@@ -30,7 +31,8 @@ export const navigationRoutedDetailActivations = [
       "assert:results-insight-detail:selected-result-preservation",
     ],
     activationMode: "controlled-hash-route",
-    deepLinkReady: true,
+    hashRouteAddressable: true,
+    restorationCapability: "hash_addressable_only",
     globalRoutingMigration: false,
     metadataOnly: true,
   },
@@ -50,7 +52,8 @@ export const navigationRoutedDetailActivations = [
       "assert:dataset-intelligence-detail:selected-result-preservation",
     ],
     activationMode: "controlled-hash-route",
-    deepLinkReady: true,
+    hashRouteAddressable: true,
+    restorationCapability: "hash_addressable_only",
     globalRoutingMigration: false,
     metadataOnly: true,
   },

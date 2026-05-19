@@ -22,8 +22,9 @@ export type RouteGovernanceSnapshot = {
   };
   readonly activeRoutedDetailFlowCount: number;
   readonly inactiveRoutedFlowCount: number;
+  readonly patternTemplateRouteCount: number;
   readonly unsupportedActivationCount: number;
-  readonly preservationCoverage: "linked" | "review_required";
+  readonly preservationDescriptorCoverage: "linked" | "review_required";
   readonly integrityCoverage: "linked" | "review_required";
   readonly ownershipCoverage: "linked" | "review_required";
   readonly futureActivationReadiness: RouteGovernanceSnapshotReadiness;
@@ -45,9 +46,10 @@ export const routeGovernanceSnapshot: RouteGovernanceSnapshot = {
   },
   activeRoutedDetailFlowCount: routeGovernanceReport.activeRoutedDetailFlowCount,
   inactiveRoutedFlowCount: routeGovernanceReport.inactiveRoutedFlowCount,
+  patternTemplateRouteCount: routeGovernanceReport.patternTemplateRouteCount,
   unsupportedActivationCount: routeGovernanceReport.unsupportedActivationCount,
-  preservationCoverage:
-    routeGovernanceReport.preservationLinkedCount >= routeGovernanceReport.activeRoutedDetailFlowCount
+  preservationDescriptorCoverage:
+    routeGovernanceReport.preservationDescriptorLinkedCount >= routeGovernanceReport.activeRoutedDetailFlowCount
       ? "linked"
       : "review_required",
   integrityCoverage:
@@ -66,4 +68,3 @@ export const routeGovernanceSnapshot: RouteGovernanceSnapshot = {
   globalRoutingMigrationActive: false,
   metadataOnly: true,
 };
-

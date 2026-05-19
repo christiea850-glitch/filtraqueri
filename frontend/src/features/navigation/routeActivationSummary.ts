@@ -8,6 +8,7 @@ export type RouteActivationReadinessState =
   | "governance_ready"
   | "partially_linked"
   | "inactive"
+  | "pattern_template"
   | "future_workspace_candidate";
 
 export type RouteActivationSummary = {
@@ -20,7 +21,7 @@ export type RouteActivationSummary = {
   readonly activationScope: "controlled-hash-route" | "not-activated" | "future-workspace";
   readonly owningSurface: string;
   readonly readiness: RouteActivationReadinessState;
-  readonly preservationLinked: boolean;
+  readonly preservationDescriptorLinked: boolean;
   readonly integrityLinked: boolean;
   readonly ownershipLinked: boolean;
   readonly unsupportedState: boolean;
@@ -46,8 +47,12 @@ const summarizeInactiveRoute = (route: NavigationRouteRegistryEntry): RouteActiv
   integrityAssertionIds: [],
   activationScope: isFutureWorkspaceCandidate(route) ? "future-workspace" : "not-activated",
   owningSurface: route.owningSurface,
-  readiness: isFutureWorkspaceCandidate(route) ? "future_workspace_candidate" : "inactive",
-  preservationLinked: false,
+  readiness: route.routeTemplate === "pattern_template"
+    ? "pattern_template"
+    : isFutureWorkspaceCandidate(route)
+      ? "future_workspace_candidate"
+      : "inactive",
+  preservationDescriptorLinked: false,
   integrityLinked: false,
   ownershipLinked: true,
   unsupportedState: false,
@@ -67,7 +72,7 @@ export const createRouteActivationSummaries = ({
   );
   const activeSummaries = activationIntegrityEntries.map<RouteActivationSummary>((entry) => {
     const route = routes.find((candidate) => candidate.routeId === entry.activation.routeId) || null;
-    const preservationLinked = preservationIds.has(entry.activation.preservationId);
+    const preservationDescriptorLinked = preservationIds.has(entry.activation.preservationId);
     const integrityLinked = entry.activation.integrityAssertionIds.every((assertionId) =>
       assertionIds.has(assertionId),
     );
@@ -75,7 +80,7 @@ export const createRouteActivationSummaries = ({
     const unsupportedState = entry.issues.length > 0;
     const readiness: RouteActivationReadinessState = unsupportedState
       ? "partially_linked"
-      : entry.activation.deepLinkReady
+      : entry.activation.hashRouteAddressable
         ? "active"
         : "governance_ready";
 
@@ -89,7 +94,7 @@ export const createRouteActivationSummaries = ({
       activationScope: entry.activation.activationMode,
       owningSurface: entry.activation.owningSurface,
       readiness,
-      preservationLinked,
+      preservationDescriptorLinked,
       integrityLinked,
       ownershipLinked,
       unsupportedState,
@@ -104,4 +109,3 @@ export const createRouteActivationSummaries = ({
     left.summaryId.localeCompare(right.summaryId),
   );
 };
-

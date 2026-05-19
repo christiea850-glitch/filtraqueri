@@ -8,7 +8,8 @@ export type RouteGovernanceReport = {
   readonly reportId: string;
   readonly activeRoutedDetailFlowCount: number;
   readonly inactiveRoutedFlowCount: number;
-  readonly preservationLinkedCount: number;
+  readonly patternTemplateRouteCount: number;
+  readonly preservationDescriptorLinkedCount: number;
   readonly integrityLinkedCount: number;
   readonly ownershipLinkedCount: number;
   readonly governanceReadyCount: number;
@@ -26,13 +27,15 @@ export const createRouteGovernanceReport = (
 ): RouteGovernanceReport => {
   const activeRoutedDetailFlows = summaries.filter((summary) => summary.readiness === "active");
   const inactiveRoutedFlows = summaries.filter((summary) => summary.readiness === "inactive");
+  const patternTemplateRoutes = summaries.filter((summary) => summary.readiness === "pattern_template");
   const unsupportedActivationStates = summaries.filter((summary) => summary.unsupportedState);
 
   return {
     reportId: "route-governance-report:s5-3d",
     activeRoutedDetailFlowCount: activeRoutedDetailFlows.length,
     inactiveRoutedFlowCount: inactiveRoutedFlows.length,
-    preservationLinkedCount: summaries.filter((summary) => summary.preservationLinked).length,
+    patternTemplateRouteCount: patternTemplateRoutes.length,
+    preservationDescriptorLinkedCount: summaries.filter((summary) => summary.preservationDescriptorLinked).length,
     integrityLinkedCount: summaries.filter((summary) => summary.integrityLinked).length,
     ownershipLinkedCount: summaries.filter((summary) => summary.ownershipLinked).length,
     governanceReadyCount: summaries.filter((summary) => summary.readiness === "governance_ready").length,
@@ -58,4 +61,3 @@ export const routeActivationGovernanceSummaries = createRouteActivationSummaries
 export const routeGovernanceReport = createRouteGovernanceReport(routeActivationGovernanceSummaries);
 
 export const routeGovernanceReportVersion = "s5-3d-route-governance-report-v1";
-

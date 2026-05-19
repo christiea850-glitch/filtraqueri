@@ -37,6 +37,11 @@ export const workspaceGovernanceFolders = [
   "src/features/workspaces",
 ];
 
+export const controlledHashNavigationAllowedFiles = [
+  "src/components/results/ResultsInvestigationSurface.tsx",
+  "src/components/dataset/DatasetSummaryPanel.tsx",
+];
+
 export const runtimeIntelligenceFolder = "src/features/runtimeIntelligence";
 
 export const runtimeBridgeArchitectureLayers = {
