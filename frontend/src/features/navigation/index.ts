@@ -20,11 +20,13 @@ export * as RouteGovernanceReportModule from "./routeGovernanceReport";
 export * as RouteGovernanceSnapshotModule from "./routeGovernanceSnapshot";
 export {
   closeControlledHashDetailRoute,
+  controlledHashDetailHelperIntegritySummary,
   getCurrentControlledHashDetailRoute,
   isControlledHashDetailRouteActive,
   openControlledHashDetailRoute,
   subscribeControlledHashDetailRoute,
   type ControlledHashDetailEvent,
+  type ControlledHashDetailHelperIntegritySummary,
   type ControlledHashDetailResult,
   type ControlledHashDetailRouteId,
   type ControlledHashDetailUnsubscribe,

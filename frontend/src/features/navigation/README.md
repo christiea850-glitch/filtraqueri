@@ -90,6 +90,8 @@ S6-B centralizes controlled detail hash behavior in `controlledHashDetailHelper.
 
 The helper is not a global router, route controller, deep-link restoration engine, persistence engine, workspace routing system, or `App.tsx` ownership migration. New hash/history listeners should not be added outside this helper.
 
+S6-C verifies the helper boundary through governance audit checks. The helper may only accept controlled routes that are present in routed detail activation metadata, linked through route activation integrity checks, and currently approved as Results insight detail or Dataset intelligence detail. Unknown or unlinked controlled detail routes are rejected by helper behavior and governance audit.
+
 ## Route Governance Reporting
 
 S5-3D adds metadata-only reporting for routed detail activation coverage. The reporting layer summarizes:

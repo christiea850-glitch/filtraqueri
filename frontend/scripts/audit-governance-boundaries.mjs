@@ -1349,6 +1349,117 @@ const auditControlledHashNavigationPreparation = async () => {
   return findings;
 };
 
+const auditControlledHashDetailHelperIntegrity = async () => {
+  const [helper, routedActivations, activationIntegrityRegistry, routeGovernanceReport] = await Promise.all([
+    readProjectSourceFile("src/features/navigation/controlledHashDetailHelper.ts"),
+    readProjectSourceFile("src/features/navigation/routedDetailActivation.ts"),
+    readProjectSourceFile("src/features/navigation/routeActivationIntegrityRegistry.ts"),
+    readProjectSourceFile("src/features/navigation/routeGovernanceReport.ts"),
+  ]);
+  const findings = [];
+  const approvedRouteIds = [
+    "detail:results-insight",
+    "detail:dataset-intelligence",
+  ];
+  const approvedActivationIds = [
+    "activate:results-insight-detail",
+    "activate:dataset-intelligence-detail",
+  ];
+
+  for (const routeId of approvedRouteIds) {
+    if (routedActivations.source.includes(`routeId: "${routeId}"`)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-approved-route-missing",
+      file: routedActivations.projectPath,
+      message: `controlled-hash-helper-approved-route-missing: ${routedActivations.projectPath} must include approved route "${routeId}"`,
+    });
+  }
+
+  for (const activationId of approvedActivationIds) {
+    if (routedActivations.source.includes(`activationId: "${activationId}"`)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-approved-activation-missing",
+      file: routedActivations.projectPath,
+      message: `controlled-hash-helper-approved-activation-missing: ${routedActivations.projectPath} must include approved activation "${activationId}"`,
+    });
+  }
+
+  const activationBlocks = splitObjectLiteralBlocks(routedActivations.source).filter((block) =>
+    /\bactivationId:\s*"[^"]+"/.test(block),
+  );
+  if (activationBlocks.length !== approvedActivationIds.length) {
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-unapproved-activation-count",
+      file: routedActivations.projectPath,
+      message: `controlled-hash-helper-unapproved-activation-count: ${routedActivations.projectPath} must only contain the two currently approved controlled detail activations`,
+    });
+  }
+
+  for (const block of activationBlocks) {
+    const routeId = (block.match(/\brouteId:\s*"([^"]+)"/) || [])[1];
+    const activationId = (block.match(/\bactivationId:\s*"([^"]+)"/) || [])[1];
+    if (approvedRouteIds.includes(routeId) && approvedActivationIds.includes(activationId)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-unapproved-route",
+      file: routedActivations.projectPath,
+      message: `controlled-hash-helper-unapproved-route: ${activationId || "unknown"} / ${routeId || "unknown"} is not approved for controlled hash detail navigation`,
+    });
+  }
+
+  const requiredHelperGuards = [
+    "routeActivationIntegrityRegistry",
+    "entry.issues.length === 0",
+    'entry.activation.activationMode === "controlled-hash-route"',
+    "entry.activation.hashRouteAddressable",
+    'entry.activation.restorationCapability === "hash_addressable_only"',
+    "controlledRouteIds.has(currentRoute)",
+    'reason: "unsupported-route"',
+    "controlledHashDetailHelperIntegritySummary",
+    "rejectsUnknownRoutes: true",
+    "requiresRouteActivationIntegrity: true",
+    "globalRoutingController: false",
+    "workspaceRoutingActive: false",
+  ];
+
+  for (const guard of requiredHelperGuards) {
+    if (helper.source.includes(guard)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-missing-integrity-guard",
+      file: helper.projectPath,
+      message: `controlled-hash-helper-missing-integrity-guard: ${helper.projectPath} must include guard "${guard}"`,
+    });
+  }
+
+  if (!activationIntegrityRegistry.source.includes("checkRouteActivationIntegrity")) {
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-missing-activation-integrity-registry",
+      file: activationIntegrityRegistry.projectPath,
+      message: `controlled-hash-helper-missing-activation-integrity-registry: ${activationIntegrityRegistry.projectPath} must derive entries from route activation checks`,
+    });
+  }
+
+  if (!routeGovernanceReport.source.includes("unsupportedActivationCount")) {
+    findings.push({
+      severity: "error",
+      rule: "controlled-hash-helper-missing-unsupported-route-reporting",
+      file: routeGovernanceReport.projectPath,
+      message: `controlled-hash-helper-missing-unsupported-route-reporting: ${routeGovernanceReport.projectPath} must report unsupported active route states`,
+    });
+  }
+
+  return findings;
+};
+
 const auditWorkspaceGovernance = async () => {
   const files = await collectFilesFromProjectPaths(workspaceGovernanceFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
@@ -1601,6 +1712,7 @@ const runAudit = async () => {
     auditWorkspaceGovernance(),
     auditWorkspaceGovernanceStabilization(),
     auditControlledHashNavigationPreparation(),
+    auditControlledHashDetailHelperIntegrity(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

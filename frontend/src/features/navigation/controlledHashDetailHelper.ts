@@ -22,6 +22,18 @@ export type ControlledHashDetailResult = {
 
 export type ControlledHashDetailUnsubscribe = () => void;
 
+export type ControlledHashDetailHelperIntegritySummary = {
+  readonly summaryId: "controlled-hash-detail-helper-integrity:s6-c";
+  readonly approvedRouteIds: ReadonlyArray<ControlledHashDetailRouteId>;
+  readonly approvedActivationIds: ReadonlyArray<string>;
+  readonly rejectsUnknownRoutes: true;
+  readonly requiresRouteActivationIntegrity: true;
+  readonly restorationCapability: "hash_addressable_only";
+  readonly globalRoutingController: false;
+  readonly workspaceRoutingActive: false;
+  readonly metadataOnly: false;
+};
+
 const controlledActivationEntries = routeActivationIntegrityRegistry.filter(
   (entry) =>
     entry.activation.activationMode === "controlled-hash-route" &&
@@ -38,6 +50,18 @@ const getControlledActivation = (routeId: ControlledHashDetailRouteId) =>
   controlledActivationEntries.find((entry) => entry.activation.routeId === routeId)?.activation || null;
 
 const getHashForRoute = (routeId: ControlledHashDetailRouteId) => `#${routeId}`;
+
+export const controlledHashDetailHelperIntegritySummary: ControlledHashDetailHelperIntegritySummary = {
+  summaryId: "controlled-hash-detail-helper-integrity:s6-c",
+  approvedRouteIds: controlledActivationEntries.map((entry) => entry.activation.routeId),
+  approvedActivationIds: controlledActivationEntries.map((entry) => entry.activation.activationId),
+  rejectsUnknownRoutes: true,
+  requiresRouteActivationIntegrity: true,
+  restorationCapability: "hash_addressable_only",
+  globalRoutingController: false,
+  workspaceRoutingActive: false,
+  metadataOnly: false,
+};
 
 export const getCurrentControlledHashDetailRoute = (): ControlledHashDetailRouteId | null => {
   const currentRoute = globalThis.location?.hash.replace(/^#/, "") || "";

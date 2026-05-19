@@ -19,3 +19,4 @@ The former local proof surfaces now call the helper instead of owning hash/histo
 - New routed detail flows must wait for the helper extraction.
 - Workspace routing must not bypass the helper.
 - The helper must remain controlled and narrow; it must not become a global router, deep-link restoration engine, persistence engine, or App ownership migration.
+- S6-C audit hardening verifies that the helper only accepts the currently approved Results insight and Dataset intelligence controlled detail routes, and that those routes remain linked through activation, preservation, and integrity governance.
