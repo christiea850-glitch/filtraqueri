@@ -10,6 +10,8 @@ import {
   controlledHashNavigationAllowedFiles,
   continuationMetadataFolders,
   executableImportTargets,
+  investigationWorkspaceRenderingFiles,
+  investigationWorkspaceRenderingForbiddenImports,
   navigationFolders,
   navigationForbiddenImports,
   presentationalFiles,
@@ -280,6 +282,42 @@ const runtimeBridgeConsumerUsagePatterns = [
       /\basync\s+/,
       /\bawait\s+/,
       /\bnew\s+Promise\s*\(/,
+    ],
+  },
+];
+
+const investigationWorkspaceRenderingUsagePatterns = [
+  {
+    rule: "investigation-workspace-rendering-browser-history-api",
+    importTarget: "browser-history-api",
+    patterns: [
+      /\bglobalThis\.history\./,
+      /\bhistory\.pushState\s*\(/,
+      /\bhistory\.replaceState\s*\(/,
+      /\baddEventListener\s*\(\s*["']hashchange["']/,
+      /\baddEventListener\s*\(\s*["']popstate["']/,
+      /\bonhashchange\b/,
+      /\bonpopstate\b/,
+    ],
+  },
+  {
+    rule: "investigation-workspace-rendering-storage-api",
+    importTarget: "browser-storage-api",
+    patterns: [
+      /\blocalStorage\b/,
+      /\bsessionStorage\b/,
+      /\bindexedDB\b/,
+    ],
+  },
+  {
+    rule: "investigation-workspace-rendering-network-api",
+    importTarget: "network-api",
+    patterns: [
+      /\bfetch\s*\(/,
+      /\baxios\s*\./,
+      /\baxios\s*\(/,
+      /\bnew\s+WebSocket\s*\(/,
+      /\bWebSocket\s*\(/,
     ],
   },
 ];
@@ -1460,6 +1498,109 @@ const auditControlledHashDetailHelperIntegrity = async () => {
   return findings;
 };
 
+const auditInvestigationWorkspaceBoundary = async () => {
+  const renderingFiles = await collectFilesFromProjectPaths(investigationWorkspaceRenderingFiles);
+  const sourceFiles = await Promise.all(renderingFiles.map(readSourceFile));
+  const allWorkspaceFiles = await Promise.all(
+    (await collectFilesFromProjectPaths(["src/features/investigationWorkspace"])).map(readSourceFile),
+  );
+  const readme = await readFile(
+    path.join(frontendRoot, "src/features/investigationWorkspace/README.md"),
+    "utf8",
+  ).catch(() => "");
+  const findings = [];
+
+  const requiredReadmePhrases = [
+    "local-state-only",
+    "non-routed",
+    "presentation-only",
+    "no persistence",
+    "no execution",
+    "no orchestration",
+    "no App.tsx ownership migration",
+  ];
+
+  for (const phrase of requiredReadmePhrases) {
+    if (readme.includes(phrase)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "investigation-workspace-boundary-readme-incomplete",
+      file: "src/features/investigationWorkspace/README.md",
+      message: `investigation-workspace-boundary-readme-incomplete: README must document "${phrase}"`,
+    });
+  }
+
+  for (const file of sourceFiles) {
+    const imports = parseImports(file.source);
+
+    for (const importEntry of imports) {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+
+      for (const [category, targets] of Object.entries(investigationWorkspaceRenderingForbiddenImports)) {
+        const matchedTarget = targets.find((target) => matchesTarget(resolvedTarget, target));
+        if (!matchedTarget) continue;
+
+        const finding = createFinding({
+          severity: "error",
+          rule: `investigation-workspace-rendering-import-${category}`,
+          file: file.projectPath,
+          importTarget: matchedTarget,
+          specifier: importEntry.specifier,
+          detail: `matches ${matchedTarget}`,
+        });
+        if (finding) findings.push(finding);
+      }
+    }
+
+    for (const usagePattern of investigationWorkspaceRenderingUsagePatterns) {
+      if (!usagePattern.patterns.some((pattern) => pattern.test(file.source))) continue;
+
+      const finding = createFinding({
+        severity: "error",
+        rule: usagePattern.rule,
+        file: file.projectPath,
+        importTarget: usagePattern.importTarget,
+        detail: `uses ${usagePattern.importTarget}`,
+      });
+      if (finding) findings.push(finding);
+    }
+  }
+
+  const protectedWorkspacePatterns = [
+    {
+      rule: "investigation-workspace-controlled-hash-helper-usage",
+      detail: "uses controlledHashDetailHelper",
+      pattern: /\bcontrolledHashDetailHelper\b/,
+    },
+    {
+      rule: "investigation-workspace-route-activation-usage",
+      detail: "uses route activation governance",
+      pattern: /\brouteActivation|routedDetailActivation|openControlledHashDetailRoute|subscribeControlledHashDetailRoute\b/,
+    },
+    {
+      rule: "investigation-workspace-app-ownership-migration",
+      detail: "references App ownership",
+      pattern: /\bsrc\/App\b|\.\.\/\.\.\/App\b|\bfrom\s+["'][^"']*App["']/,
+    },
+  ];
+
+  for (const file of allWorkspaceFiles) {
+    for (const protectedPattern of protectedWorkspacePatterns) {
+      if (!protectedPattern.pattern.test(file.source)) continue;
+
+      findings.push({
+        severity: "error",
+        rule: protectedPattern.rule,
+        file: file.projectPath,
+        message: `${protectedPattern.rule}: ${file.projectPath} ${protectedPattern.detail}`,
+      });
+    }
+  }
+
+  return findings;
+};
+
 const auditWorkspaceGovernance = async () => {
   const files = await collectFilesFromProjectPaths(workspaceGovernanceFolders);
   const sourceFiles = await Promise.all(files.map(readSourceFile));
@@ -1713,6 +1854,7 @@ const runAudit = async () => {
     auditWorkspaceGovernanceStabilization(),
     auditControlledHashNavigationPreparation(),
     auditControlledHashDetailHelperIntegrity(),
+    auditInvestigationWorkspaceBoundary(),
     auditContinuationCallbackFields(),
     auditPresentationalImports(),
   ]);

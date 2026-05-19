@@ -37,6 +37,11 @@ export const workspaceGovernanceFolders = [
   "src/features/workspaces",
 ];
 
+export const investigationWorkspaceRenderingFiles = [
+  "src/features/investigationWorkspace/InvestigationWorkspaceSurface.tsx",
+  "src/features/investigationWorkspace/InvestigationWorkspaceView.tsx",
+];
+
 export const controlledHashNavigationAllowedFiles = [
   "src/features/navigation/controlledHashDetailHelper.ts",
 ];
@@ -301,6 +306,62 @@ export const workspaceGovernanceForbiddenImports = {
     "src/features/workspaceRuntime/runtimeNavigationAdapter",
     "src/features/workspaceRuntime/useWorkspaceRuntimeCoordinator",
     "src/components/layout/WorkspaceShell",
+  ],
+};
+
+export const investigationWorkspaceRenderingForbiddenImports = {
+  navigation: [
+    "src/features/navigation",
+    "src/features/workspaceRuntime/runtimeNavigationAdapter",
+    "src/features/workspaceRuntime/useWorkspaceRuntimeCoordinator",
+    "src/components/layout/WorkspaceShell",
+  ],
+  backend: [
+    "src/services/api",
+  ],
+  execution: [
+    "src/features/execution",
+    "src/features/results/useResultExecutionCoordinator",
+    "src/features/dataset/useWorkspaceDatasetController",
+    "src/features/dataset/useDatasetSessions",
+    "src/features/workspaceRuntime/useWorkspaceRuntimeCoordinator",
+    "src/features/workspace",
+  ],
+  exportDownload: [
+    "src/features/export",
+  ],
+  persistence: [
+    "src/features/workspace/workspacePersistence",
+    "src/features/workspaceRuntime/runtimePersistence",
+    "src/features/sqlWorkspacePersistence",
+    "src/features/dataset/useDatasetSessions",
+    "src/features/investigationWorkspace/workspaceSessionStorage",
+  ],
+  runtimeBridgeBehavior: [
+    "src/features/runtimeBridge",
+    "src/features/workspaceRuntime",
+    "src/features/runtimeIntelligence",
+  ],
+  sqlMonaco: [
+    "@monaco-editor/react",
+    "monaco-editor",
+    "src/features/analyst/sql",
+    "src/features/sqlIntelligence",
+    "src/features/sqlWorkspacePersistence",
+  ],
+  queryBuilder: [
+    "src/features/query-builder",
+    "src/components/query-builder",
+  ],
+  activeResultModel: [
+    "src/features/results/activeResultModel",
+    "src/features/results/useResults",
+    "src/features/results/useResultExecutionCoordinator",
+  ],
+  uploadSessionRestore: [
+    "src/components/upload",
+    "src/features/dataset/useDatasetSessions",
+    "src/features/dataset/useWorkspaceDatasetController",
   ],
 };
 
