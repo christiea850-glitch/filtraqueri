@@ -52,3 +52,53 @@ S5-4B adds metadata-only readiness summaries, a governance report, and a determi
 - unsupported ownership, readiness, and activation-candidate states
 
 The reporting layer does not activate workspaces, does not activate orchestration, does not activate routing, does not render UI, and does not mutate governance state. It exists only for governance observability before any future workspace shell is activated.
+
+## Investigation Pre-Activation Contract
+
+Phase 0 documents the Investigation workspace activation contract before any local proof begins.
+
+The Investigation workspace may read:
+
+- `InvestigationWorkspacePlan`
+- `InvestigationReport`
+- `NarrativeReport`
+- explainability consumer view models
+- current Results context through supplied props and callbacks
+
+The Investigation workspace may own only:
+
+- local panel or tab state
+- local expand or collapse state
+- local view selection state
+
+The Investigation workspace must never own:
+
+- query execution
+- result mutation
+- pagination, sorting, or filtering
+- export or download behavior
+- upload, session, or workbook restore
+- SQL or Monaco behavior
+- Runtime Bridge behavior
+- orchestration
+- persistence
+- global routing
+- workspace routing
+- `controlledHashDetailHelper` behavior
+- `App.tsx` ownership
+
+## Investigation Workspace Hygiene Findings
+
+Phase 0 inspected `frontend/src/features/investigationWorkspace/*` for storage, session, persistence, browser storage, write APIs, backend calls, mutation, and execution behavior.
+
+Findings:
+
+- `workspaceSessionStorage.ts` creates metadata-only `WorkspaceStorageReference` placeholders. It does not call filesystem APIs, browser storage APIs, backend APIs, or persistence engines.
+- `workspaceSessionTypes.ts` defines storage and session reference types only.
+- `workspaceSessionBuilder.ts`, `workspaceSessionTimeline.ts`, and `workspaceSessionAudit.ts` create session metadata and timeline/audit metadata. They currently use `new Date().toISOString()`, which is nondeterministic metadata and should be reviewed before any deterministic workspace proof.
+- `workspaceSessionArtifacts.ts` builds deliverable metadata only. It does not export files or write state.
+- `workspaceSessionRecommendations.ts` returns advisory recommendation metadata only.
+
+No `localStorage`, `sessionStorage`, `indexedDB`, backend calls, filesystem writes, export/download execution, query execution, or result mutation behavior was found in `features/investigationWorkspace`.
+
+Before a local Investigation workspace proof, the nondeterministic timestamp generation should either remain outside deterministic governance claims or be replaced with caller-supplied deterministic timestamps.
