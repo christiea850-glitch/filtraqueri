@@ -42,6 +42,13 @@ export const investigationWorkspaceRenderingFiles = [
   "src/features/investigationWorkspace/InvestigationWorkspaceView.tsx",
 ];
 
+export const investigationWorkspaceOwnershipFiles = [
+  "src/features/investigationWorkspace/InvestigationWorkspaceSurface.tsx",
+  "src/features/investigationWorkspace/InvestigationWorkspaceView.tsx",
+  "src/features/investigationWorkspace/investigationWorkspaceTypes.ts",
+  "src/features/investigationWorkspace/index.ts",
+];
+
 export const controlledHashNavigationAllowedFiles = [
   "src/features/navigation/controlledHashDetailHelper.ts",
 ];
@@ -321,7 +328,9 @@ export const investigationWorkspaceRenderingForbiddenImports = {
   ],
   execution: [
     "src/features/execution",
+    "src/features/filters/useFilterController",
     "src/features/results/useResultExecutionCoordinator",
+    "src/features/query-builder/useQueryBuilderController",
     "src/features/dataset/useWorkspaceDatasetController",
     "src/features/dataset/useDatasetSessions",
     "src/features/workspaceRuntime/useWorkspaceRuntimeCoordinator",
@@ -354,6 +363,7 @@ export const investigationWorkspaceRenderingForbiddenImports = {
     "src/components/query-builder",
   ],
   activeResultModel: [
+    "src/features/results",
     "src/features/results/activeResultModel",
     "src/features/results/useResults",
     "src/features/results/useResultExecutionCoordinator",
@@ -363,6 +373,16 @@ export const investigationWorkspaceRenderingForbiddenImports = {
     "src/features/dataset/useDatasetSessions",
     "src/features/dataset/useWorkspaceDatasetController",
   ],
+};
+
+export const investigationWorkspaceOwnershipForbiddenImports = {
+  backend: investigationWorkspaceRenderingForbiddenImports.backend,
+  execution: investigationWorkspaceRenderingForbiddenImports.execution,
+  exportDownload: investigationWorkspaceRenderingForbiddenImports.exportDownload,
+  sqlMonaco: investigationWorkspaceRenderingForbiddenImports.sqlMonaco,
+  queryBuilder: investigationWorkspaceRenderingForbiddenImports.queryBuilder,
+  activeResultModel: investigationWorkspaceRenderingForbiddenImports.activeResultModel,
+  uploadSessionRestore: investigationWorkspaceRenderingForbiddenImports.uploadSessionRestore,
 };
 
 

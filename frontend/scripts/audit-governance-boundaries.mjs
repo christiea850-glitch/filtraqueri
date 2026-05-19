@@ -10,6 +10,8 @@ import {
   controlledHashNavigationAllowedFiles,
   continuationMetadataFolders,
   executableImportTargets,
+  investigationWorkspaceOwnershipFiles,
+  investigationWorkspaceOwnershipForbiddenImports,
   investigationWorkspaceRenderingFiles,
   investigationWorkspaceRenderingForbiddenImports,
   navigationFolders,
@@ -1501,8 +1503,13 @@ const auditControlledHashDetailHelperIntegrity = async () => {
 const auditInvestigationWorkspaceBoundary = async () => {
   const renderingFiles = await collectFilesFromProjectPaths(investigationWorkspaceRenderingFiles);
   const sourceFiles = await Promise.all(renderingFiles.map(readSourceFile));
+  const ownershipFiles = await collectFilesFromProjectPaths(investigationWorkspaceOwnershipFiles);
+  const ownershipSourceFiles = await Promise.all(ownershipFiles.map(readSourceFile));
   const allWorkspaceFiles = await Promise.all(
     (await collectFilesFromProjectPaths(["src/features/investigationWorkspace"])).map(readSourceFile),
+  );
+  const resultsInvestigationSurface = await readProjectSourceFile(
+    "src/components/results/ResultsInvestigationSurface.tsx",
   );
   const readme = await readFile(
     path.join(frontendRoot, "src/features/investigationWorkspace/README.md"),
@@ -1518,6 +1525,9 @@ const auditInvestigationWorkspaceBoundary = async () => {
     "no execution",
     "no orchestration",
     "no App.tsx ownership migration",
+    "Results ownership remains external",
+    "consumer/presentation surface only",
+    "no result lifecycle ownership",
   ];
 
   for (const phrase of requiredReadmePhrases) {
@@ -1565,6 +1575,63 @@ const auditInvestigationWorkspaceBoundary = async () => {
       });
       if (finding) findings.push(finding);
     }
+  }
+
+  for (const file of ownershipSourceFiles) {
+    const imports = parseImports(file.source);
+
+    for (const importEntry of imports) {
+      const resolvedTarget = resolveImportTarget(importEntry.specifier, file.absolutePath);
+
+      for (const [category, targets] of Object.entries(investigationWorkspaceOwnershipForbiddenImports)) {
+        const matchedTarget = targets.find((target) => matchesTarget(resolvedTarget, target));
+        if (!matchedTarget) continue;
+
+        const finding = createFinding({
+          severity: "error",
+          rule: `investigation-workspace-ownership-import-${category}`,
+          file: file.projectPath,
+          importTarget: matchedTarget,
+          specifier: importEntry.specifier,
+          detail: `matches ${matchedTarget}`,
+        });
+        if (finding) findings.push(finding);
+      }
+    }
+  }
+
+  const resultsOwnerIntegrationGuards = [
+    {
+      guard: "activeResultModel: ActiveResultModel",
+      detail: "Results integration must receive and own the ActiveResultModel",
+    },
+    {
+      guard: "<InvestigationWorkspaceSurface",
+      detail: "Results integration must remain the Investigation Workspace mounting owner",
+    },
+    {
+      guard: "resultsContext={{",
+      detail: "Results integration must pass a read-only result context",
+    },
+    {
+      guard: "rowCountLabel: resultRowsLabel",
+      detail: "Results integration must supply row count presentation metadata",
+    },
+    {
+      guard: "filterSortLabel",
+      detail: "Results integration must supply filter/sort presentation metadata",
+    },
+  ];
+
+  for (const { guard, detail } of resultsOwnerIntegrationGuards) {
+    if (resultsInvestigationSurface.source.includes(guard)) continue;
+
+    findings.push({
+      severity: "error",
+      rule: "investigation-workspace-results-owner-integration-drift",
+      file: resultsInvestigationSurface.projectPath,
+      message: `investigation-workspace-results-owner-integration-drift: ${detail}`,
+    });
   }
 
   const protectedWorkspacePatterns = [
