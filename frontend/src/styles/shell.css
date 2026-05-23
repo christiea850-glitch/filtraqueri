@@ -189,7 +189,7 @@ body {
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr) 4px var(--rail-width, 300px);
+  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr) 260px;
   min-height: 0;
   transition: grid-template-columns 180ms ease;
 }
@@ -202,7 +202,7 @@ body {
 }
 
 .app.is-sidebar-collapsed .workspace-shell {
-  grid-template-columns: 64px 0 minmax(0, 1fr) 4px var(--rail-width, 300px);
+  grid-template-columns: 64px 0 minmax(0, 1fr) 260px;
 }
 
 .app.is-sidebar-collapsed .workspace-brand strong,
@@ -266,42 +266,6 @@ body {
 }
 
 body.is-resizing-sidebar {
-  cursor: col-resize;
-  user-select: none;
-}
-
-.rail-resize-handle {
-  width: 4px;
-  min-width: 4px;
-  border: 0;
-  border-left: 1px solid #dbe5ef;
-  border-right: 1px solid transparent;
-  background: rgba(248, 251, 255, 0.58);
-  cursor: col-resize;
-  transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease;
-}
-
-.rail-resize-handle:hover,
-.rail-resize-handle:focus-visible {
-  background: #dbeafe;
-  border-right-color: #93c5fd;
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.14);
-  outline: none;
-}
-
-.workspace-shell:has(.runtime-context-panel.is-collapsed) .rail-resize-handle {
-  width: 0;
-  min-width: 0;
-  border: 0;
-  padding: 0;
-  cursor: default;
-  pointer-events: none;
-}
-
-body.is-resizing-rail {
   cursor: col-resize;
   user-select: none;
 }
@@ -769,11 +733,11 @@ body.is-resizing-rail {
 }
 
 .workspace-shell:has(.runtime-context-panel.is-collapsed) {
-  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr) 0 44px;
+  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr) 44px;
 }
 
 .app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
-  grid-template-columns: 64px 0 minmax(0, 1fr) 0 44px;
+  grid-template-columns: 64px 0 minmax(0, 1fr) 44px;
 }
 
 .runtime-panel-toggle {
