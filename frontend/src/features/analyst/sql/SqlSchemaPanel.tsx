@@ -1,5 +1,4 @@
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
-import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
 import type { SqlSuggestion, SqlTemplate } from "./sqlTypes";
 
 type SqlSchemaPanelProps = {
@@ -33,13 +32,6 @@ function SqlSchemaPanel({
       </button>
 
       <div className="sql-context-body">
-        <div>
-          <p className="section-label">SQL context</p>
-          <h2>SQL context</h2>
-        </div>
-
-        <WorkbookContextPanel dataset={dataset} variant="analyst" />
-
         <div className="sql-helper-section">
           <div className="builder-block-header">
             <span>Columns</span>

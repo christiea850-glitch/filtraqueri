@@ -640,3 +640,178 @@
   box-shadow: none;
 }
 
+/* ============================================================
+   Phase 1 — Analyst SQL workspace layout (v2).
+   Editor is the hero; schema reference sits on the right; SQL
+   context and query output live in collapsible docks. These use
+   new class names so the layout never collides with the legacy
+   .sql-workspace / .sql-main-panel / .sql-side-panel rules.
+   ============================================================ */
+.sql-workspace-v2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 14px;
+  align-items: start;
+}
+
+.sql-workspace-v2.is-rail-collapsed {
+  grid-template-columns: minmax(0, 1fr) 52px;
+}
+
+.sqlw-main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: min(760px, calc(100vh - 150px));
+}
+
+.sqlw-main > .sql-editor-panel {
+  flex: 1;
+  min-height: 300px;
+}
+
+.sqlw-dockbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sqlw-dockbar-bottom {
+  margin-top: 2px;
+}
+
+.sqlw-dockbar-label {
+  margin-right: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sqlw-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.sqlw-pill:hover {
+  border-color: var(--fq-accent, #4338ca);
+  color: var(--fq-accent-ink, #312a8f);
+}
+
+.sqlw-pill.is-on {
+  border-color: var(--fq-accent, #4338ca);
+  background: var(--fq-accent-soft, #ebeafb);
+  color: var(--fq-accent-ink, #312a8f);
+}
+
+.sqlw-pill:focus-visible {
+  outline: 2px solid rgba(67, 56, 202, 0.42);
+  outline-offset: 2px;
+}
+
+.sqlw-dock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.sqlw-dock-top {
+  max-height: 340px;
+}
+
+.sqlw-dock-bot {
+  max-height: 320px;
+}
+
+.sqlw-dock-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.sqlw-dock-head span {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sqlw-dock-x {
+  padding: 3px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sqlw-dock-x:hover {
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.sqlw-dock-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+
+.sql-workspace-v2 .sql-context-panel {
+  position: sticky;
+  top: 0;
+}
+
+.sql-workspace-v2.is-rail-collapsed .sql-context-body {
+  display: none;
+}
+
+.sql-workspace-v2.is-rail-collapsed .sql-context-panel {
+  padding: 10px;
+  overflow: hidden;
+}
+
+.sql-workspace-v2.is-rail-collapsed .sql-context-panel .panel-collapse-button {
+  width: 36px;
+  min-height: 120px;
+  padding: 10px 0;
+  writing-mode: vertical-rl;
+}
+
+@media (max-width: 1080px) {
+  .sql-workspace-v2,
+  .sql-workspace-v2.is-rail-collapsed {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
-import WorkspaceTabs from "../../../components/layout/WorkspaceTabs";
+import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
 import SqlEditorPanel, { SqlDraftPanel, SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
@@ -15,10 +15,20 @@ type SqlWorkspaceProps = {
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
 };
 
+type BottomTab = "result" | "guidance" | "drafts";
+
+const bottomTabLabels: Record<BottomTab, string> = {
+  result: "Result preview",
+  guidance: "SQL guidance",
+  drafts: "Drafts",
+};
+
+const bottomTabOrder: BottomTab[] = ["result", "guidance", "drafts"];
+
 function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
-  const [isSchemaCollapsed, setIsSchemaCollapsed] = useState(true);
-  const [isSqlSideCollapsed, setIsSqlSideCollapsed] = useState(true);
-  const [activeAnalystView, setActiveAnalystView] = useState<"sql" | "schema" | "context" | "runtime">("sql");
+  const [isRailCollapsed, setIsRailCollapsed] = useState(false);
+  const [isContextOpen, setIsContextOpen] = useState(false);
+  const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
   const {
     savedDrafts,
     characterCount,
@@ -39,73 +49,85 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
   const readinessLabel = dataset ? "Dataset context ready" : "Open data to inspect queries";
   const warningCount = sqlAnalysis.validation.diagnostics.length;
   const planStepCount = sqlAnalysis.explanationCards.length + sqlAnalysis.diagnostics.length;
-  const analystTabs = [
-    { id: "sql", label: "SQL" },
-    { id: "schema", label: "Schema" },
-    { id: "context", label: "Context" },
-    { id: "runtime", label: "Runtime" },
-  ] satisfies Array<{ id: "sql" | "schema" | "context" | "runtime"; label: string }>;
 
-  const changeAnalystView = (view: "sql" | "schema" | "context" | "runtime") => {
-    setActiveAnalystView(view);
-    if (view === "schema") setIsSchemaCollapsed(false);
+  const toggleBottomTab = (tab: BottomTab) => {
+    setBottomTab((current) => (current === tab ? null : tab));
   };
 
   return (
     <section
-      className={[
-        "sql-workspace",
-        isSchemaCollapsed ? "is-schema-collapsed" : "",
-        isSqlSideCollapsed ? "is-sql-side-collapsed" : "",
-      ]
+      className={["sql-workspace-v2", isRailCollapsed ? "is-rail-collapsed" : ""]
         .filter(Boolean)
         .join(" ")}
       aria-label="SQL workspace"
     >
-      <details className="sql-inspection-pill">
-        <summary>Inspection details</summary>
-        <section className="sql-inspection-overview" aria-label="SQL inspection overview">
-          <div>
-            <p className="section-label">Analyst inspection</p>
-            <h2>SQL workspace</h2>
-            <span>Use the editor as the primary surface. Schema, context, and drafts stay available when you need them.</span>
-          </div>
-          <div className="sql-inspection-metrics">
-            <span>
-              Query generated
-              <strong>{characterCount > 0 ? "Draft present" : "No draft"}</strong>
-            </span>
-            <span>
-              Execution plan
-              <strong>{planStepCount.toLocaleString()} notes</strong>
-            </span>
-            <span>
-              SQL dialect
-              <strong>{selectedDialectProfile.displayName}</strong>
-            </span>
-            <span>
-              Readiness
-              <strong>{readinessLabel}</strong>
-            </span>
-            <span>
-              Warnings
-              <strong>{warningCount.toLocaleString()}</strong>
-            </span>
-          </div>
-        </section>
-      </details>
+      <div className="sqlw-main">
+        <details className="sql-inspection-pill">
+          <summary>Inspection details</summary>
+          <section className="sql-inspection-overview" aria-label="SQL inspection overview">
+            <div>
+              <p className="section-label">Analyst inspection</p>
+              <h2>SQL workspace</h2>
+              <span>
+                Use the editor as the primary surface. Schema, context, and drafts stay available
+                when you need them.
+              </span>
+            </div>
+            <div className="sql-inspection-metrics">
+              <span>
+                Query generated
+                <strong>{characterCount > 0 ? "Draft present" : "No draft"}</strong>
+              </span>
+              <span>
+                Execution plan
+                <strong>{planStepCount.toLocaleString()} notes</strong>
+              </span>
+              <span>
+                SQL dialect
+                <strong>{selectedDialectProfile.displayName}</strong>
+              </span>
+              <span>
+                Readiness
+                <strong>{readinessLabel}</strong>
+              </span>
+              <span>
+                Warnings
+                <strong>{warningCount.toLocaleString()}</strong>
+              </span>
+            </div>
+          </section>
+        </details>
 
-      <SqlSchemaPanel
-        dataset={dataset}
-        columnSuggestions={suggestions}
-        templates={templates}
-        keywordSuggestions={keywordSuggestions}
-        collapsed={isSchemaCollapsed}
-        onToggleCollapsed={() => setIsSchemaCollapsed((currentValue) => !currentValue)}
-        onInsertSql={insertSql}
-      />
+        <div className="sqlw-dockbar">
+          <button
+            type="button"
+            className={["sqlw-pill", isContextOpen ? "is-on" : ""].filter(Boolean).join(" ")}
+            aria-expanded={isContextOpen}
+            onClick={() => setIsContextOpen((current) => !current)}
+          >
+            SQL context
+          </button>
+        </div>
 
-      <div className="sql-main-panel">
+        {isContextOpen && (
+          <section className="sqlw-dock sqlw-dock-top" aria-label="SQL context">
+            <div className="sqlw-dock-head">
+              <span>SQL context</span>
+              <button
+                type="button"
+                className="sqlw-dock-x"
+                onClick={() => setIsContextOpen(false)}
+                aria-label="Close SQL context"
+              >
+                Close
+              </button>
+            </div>
+            <div className="sqlw-dock-body">
+              <WorkbookContextPanel dataset={dataset} variant="analyst" />
+            </div>
+          </section>
+        )}
+
         <SqlEditorPanel
           editor={editor}
           executionStatus={editorStatus}
@@ -118,35 +140,23 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
             onDialectChange: setSelectedDialect,
           }}
         />
-        <div className="sql-side-panel">
-          <WorkspaceTabs
-            items={analystTabs}
-            activeItem={activeAnalystView}
-            label="Analyst workspace views"
-            onChange={changeAnalystView}
-          />
-          <button
-            type="button"
-            className="panel-collapse-button sql-side-collapse-button"
-            onClick={() => setIsSqlSideCollapsed((currentValue) => !currentValue)}
-          >
-            {isSqlSideCollapsed ? "Show preview" : "Hide preview"}
-          </button>
-          {!isSqlSideCollapsed && (
-            <>
-              {activeAnalystView === "sql" && <SqlPreviewGrid previewResult={previewResult} />}
-              {activeAnalystView === "schema" && (
-                <section className="sql-draft-panel" aria-label="Schema view">
-                  <div className="sql-draft-list">
-                    <div className="builder-block-header">
-                      <span>Schema</span>
-                      <small>{isSchemaCollapsed ? "Collapsed" : "Open"}</small>
-                    </div>
-                    <p>Use the schema rail on the left to inspect columns, suggestions, keywords, and templates.</p>
-                  </div>
-                </section>
-              )}
-              {activeAnalystView === "context" && (
+
+        {bottomTab && (
+          <section className="sqlw-dock sqlw-dock-bot" aria-label="Query output">
+            <div className="sqlw-dock-head">
+              <span>{bottomTabLabels[bottomTab]}</span>
+              <button
+                type="button"
+                className="sqlw-dock-x"
+                onClick={() => setBottomTab(null)}
+                aria-label="Close query output"
+              >
+                Close
+              </button>
+            </div>
+            <div className="sqlw-dock-body">
+              {bottomTab === "result" && <SqlPreviewGrid previewResult={previewResult} />}
+              {bottomTab === "guidance" && (
                 <SqlGuidancePanel
                   diagnostics={sqlAnalysis.diagnostics}
                   guidanceCards={sqlAnalysis.explanationCards}
@@ -154,16 +164,38 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
                   validation={sqlAnalysis.validation}
                 />
               )}
-              {activeAnalystView === "runtime" && (
-                <SqlDraftPanel
-                  savedDrafts={savedDrafts}
-                  onLoadDraft={loadDraft}
-                />
+              {bottomTab === "drafts" && (
+                <SqlDraftPanel savedDrafts={savedDrafts} onLoadDraft={loadDraft} />
               )}
-            </>
-          )}
+            </div>
+          </section>
+        )}
+
+        <div className="sqlw-dockbar sqlw-dockbar-bottom">
+          <span className="sqlw-dockbar-label">Query output</span>
+          {bottomTabOrder.map((tab) => (
+            <button
+              type="button"
+              key={tab}
+              className={["sqlw-pill", bottomTab === tab ? "is-on" : ""].filter(Boolean).join(" ")}
+              aria-pressed={bottomTab === tab}
+              onClick={() => toggleBottomTab(tab)}
+            >
+              {bottomTabLabels[tab]}
+            </button>
+          ))}
         </div>
       </div>
+
+      <SqlSchemaPanel
+        dataset={dataset}
+        columnSuggestions={suggestions}
+        templates={templates}
+        keywordSuggestions={keywordSuggestions}
+        collapsed={isRailCollapsed}
+        onToggleCollapsed={() => setIsRailCollapsed((current) => !current)}
+        onInsertSql={insertSql}
+      />
     </section>
   );
 }
