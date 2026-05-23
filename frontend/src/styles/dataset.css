@@ -155,7 +155,7 @@
 .semantic-hint-strip > span {
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -185,7 +185,7 @@
   margin: 0;
   color: #111827;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .human-guidance-panel p:last-child {
@@ -223,7 +223,7 @@
   margin: 0;
   color: #111827;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .human-intent-panel p {
@@ -294,7 +294,7 @@
 .human-insight-metrics span {
   color: #64748b;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -400,7 +400,7 @@
 .human-suggestion-grid strong {
   color: #172033;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .human-suggestion-grid span {
@@ -495,7 +495,7 @@
 .task-launcher-card span {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -556,7 +556,7 @@
   overflow: hidden;
   color: #172033;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: ellipsis;
   text-transform: none;
 }
@@ -591,7 +591,7 @@
 .task-validation-state small {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .task-configuration-list {
@@ -620,7 +620,7 @@
 .task-configuration-list small {
   color: #475569;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .task-configuration-list input {
@@ -668,7 +668,7 @@
 .guided-input-list label > span {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -735,7 +735,7 @@
 .analysis-plan-preview small {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -787,7 +787,7 @@
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -890,7 +890,7 @@
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -929,7 +929,7 @@
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -947,7 +947,7 @@
   background: #f1f5f9;
   color: #475569;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .relationship-planning-path small {
@@ -1021,7 +1021,7 @@
   background: rgba(255, 255, 255, 0.78);
   color: #334155;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1075,7 +1075,7 @@
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1091,7 +1091,7 @@
   background: #eff6ff;
   color: #1d4ed8;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .business-explanation-panel {
@@ -1116,7 +1116,7 @@
   margin: 0;
   color: #334155;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.45;
 }
 
@@ -1137,7 +1137,7 @@
   background: #f1f5f9;
   color: #475569;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .task-safe-note {
@@ -1325,7 +1325,7 @@
   overflow: hidden;
   color: #64748b;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1499,7 +1499,7 @@
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1616,7 +1616,7 @@
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1699,7 +1699,7 @@
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1802,7 +1802,7 @@
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1910,7 +1910,7 @@
   margin: 0;
   color: #64748b;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1994,7 +1994,7 @@
   margin: 0;
   color: #64748b;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -2078,7 +2078,7 @@
   margin: 0;
   color: #64748b;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -2283,7 +2283,7 @@
   background: #f8fafc;
   color: #64748b;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -2347,7 +2347,7 @@
   overflow: hidden;
   color: #172033;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2399,7 +2399,7 @@
 .workbook-empty-note {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .workbook-relationship-card {
@@ -2426,7 +2426,7 @@
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -2545,7 +2545,7 @@
   background: #f1f5f9;
   color: #475569;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .workbook-relationship-path strong {
@@ -2654,7 +2654,7 @@
 .accepted-relationship-card small {
   color: #64748b;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -2751,7 +2751,7 @@
   margin: 0 0 6px;
   color: #2563eb;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2760,7 +2760,7 @@
   margin: 0;
   color: #111827;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -2771,7 +2771,7 @@
   margin: 0;
   color: #111827;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .dataset-id {
@@ -2825,7 +2825,7 @@
   margin-bottom: 6px;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
@@ -2869,7 +2869,7 @@
 .schema-pill small {
   color: #64748b;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .preview-heading {

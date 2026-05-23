@@ -56,9 +56,9 @@ type WorkspaceShellProps = {
   ) => void;
 };
 
-const SIDEBAR_MIN_WIDTH = 112;
-const SIDEBAR_MAX_WIDTH = 140;
-const SIDEBAR_DEFAULT_WIDTH = 128;
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 300;
+const SIDEBAR_DEFAULT_WIDTH = 240;
 
 const productDestinations: ProductDestination[] = [
   {

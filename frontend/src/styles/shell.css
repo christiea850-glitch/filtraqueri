@@ -127,7 +127,7 @@ body {
   overflow: hidden;
   color: #334155;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -189,7 +189,7 @@ body {
 
 .workspace-shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr) 286px;
+  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr) 300px;
   min-height: 0;
   transition: grid-template-columns 180ms ease;
 }
@@ -198,11 +198,11 @@ body {
 .destination-settings .workspace-shell,
 .destination-home.is-sidebar-collapsed .workspace-shell,
 .destination-settings.is-sidebar-collapsed .workspace-shell {
-  grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr);
 }
 
 .app.is-sidebar-collapsed .workspace-shell {
-  grid-template-columns: 64px 0 minmax(0, 1fr) 286px;
+  grid-template-columns: 64px 0 minmax(0, 1fr) 300px;
 }
 
 .app.is-sidebar-collapsed .workspace-brand strong,
@@ -368,7 +368,7 @@ body.is-resizing-sidebar {
   overflow: hidden;
   color: #172033;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -590,7 +590,7 @@ body.is-resizing-sidebar {
 .analyst-sidebar-section span {
   color: #94a3b8;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .analyst-sidebar-section .nav-icon {
@@ -628,7 +628,7 @@ body.is-resizing-sidebar {
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -733,7 +733,7 @@ body.is-resizing-sidebar {
 }
 
 .workspace-shell:has(.runtime-context-panel.is-collapsed) {
-  grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr) 44px;
+  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr) 44px;
 }
 
 .app.is-sidebar-collapsed .workspace-shell:has(.runtime-context-panel.is-collapsed) {
@@ -785,7 +785,7 @@ body.is-resizing-sidebar {
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -822,7 +822,7 @@ body.is-resizing-sidebar {
 .runtime-section-heading small {
   color: #94a3b8;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
 }
 
@@ -900,7 +900,7 @@ body.is-resizing-sidebar {
 .runtime-guidance-group > div:first-child small {
   color: #64748b;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -964,7 +964,7 @@ body.is-resizing-sidebar {
 .runtime-return-button span {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1015,7 +1015,7 @@ body.is-resizing-sidebar {
   color: #475569;
   font-size: 11px;
   font-style: normal;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -1061,7 +1061,7 @@ body.is-resizing-sidebar {
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1172,7 +1172,7 @@ body.is-resizing-sidebar {
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -1208,7 +1208,7 @@ body.is-resizing-sidebar {
 .runtime-narrative-body li small {
   color: #64748b;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
 }
 
@@ -1256,7 +1256,7 @@ body.is-resizing-sidebar {
 .runtime-disclosure-section > summary small {
   color: #94a3b8;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   text-align: right;
 }
@@ -1310,7 +1310,7 @@ body.is-resizing-sidebar {
   margin: 0;
   color: #475569;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -1388,14 +1388,14 @@ body.is-resizing-sidebar {
   margin: 22px 0 0;
   color: #2563eb;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .selected-file-name {
   margin: 10px 0 0;
   color: #64748b;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .home-continuation-surface {
@@ -1535,7 +1535,7 @@ body.is-resizing-sidebar {
   margin: 0;
   color: #111827;
   font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .export-panel p:last-child,
@@ -1714,7 +1714,7 @@ h1 {
   margin: 0;
   color: #0f172a;
   font-size: 44px;
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
 }
@@ -1774,7 +1774,7 @@ h1 span:last-child {
   background: #e0f2fe;
   color: #0369a1;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .upload-title {
@@ -1804,7 +1804,7 @@ h1 span:last-child {
   border-radius: 10px;
   background: #0f172a;
   color: white;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
   transition:
     background 160ms ease,

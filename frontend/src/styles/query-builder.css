@@ -85,7 +85,7 @@
 .query-technical-disclosure small {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -313,7 +313,7 @@
 .query-workflow-tabs small {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .query-summary-strip {
@@ -481,7 +481,7 @@
   flex: 0 0 auto;
   color: #64748b;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .query-stage-grid {
@@ -623,7 +623,7 @@
 .builder-block-header span {
   color: #172033;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .builder-block-header small {

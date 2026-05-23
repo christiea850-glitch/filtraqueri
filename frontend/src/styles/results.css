@@ -85,7 +85,7 @@
 .results-technical-disclosure small {
   color: #64748b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -450,7 +450,7 @@
   overflow: hidden;
   color: #111827;
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -470,7 +470,7 @@
   margin: 0;
   color: #64748b;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -715,7 +715,7 @@
   color: #64748b;
   font: inherit;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   transition:
     background 150ms ease,

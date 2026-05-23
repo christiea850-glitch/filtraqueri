@@ -78,7 +78,7 @@ h6,
 
 .workspace-page-heading h1,
 .welcome-copy h2 {
-  font-size: clamp(20px, 1.15vw, 24px);
+  font-size: clamp(20px, 1.15vw, 22px);
   line-height: 1.2;
 }
 
@@ -1274,7 +1274,7 @@ h1 span:last-child {
 .welcome-copy h2,
 .workspace-page-heading h1,
 h1 {
-  font-size: clamp(20px, 1.2vw, 24px);
+  font-size: clamp(20px, 1.2vw, 22px);
   line-height: 1.2;
 }
 
@@ -1923,7 +1923,7 @@ body,
 }
 
 .workspace-page-heading h1 {
-  font-size: clamp(20px, 1vw, 23px);
+  font-size: clamp(20px, 1vw, 22px);
   font-weight: var(--fq-font-heading);
 }
 
