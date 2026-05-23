@@ -60,6 +60,10 @@ const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 300;
 const SIDEBAR_DEFAULT_WIDTH = 240;
 
+const RAIL_MIN_WIDTH = 240;
+const RAIL_MAX_WIDTH = 460;
+const RAIL_DEFAULT_WIDTH = 300;
+
 const productDestinations: ProductDestination[] = [
   {
     id: "home",
@@ -198,6 +202,8 @@ function WorkspaceShell({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [railWidth, setRailWidth] = useState(RAIL_DEFAULT_WIDTH);
+  const [isResizingRail, setIsResizingRail] = useState(false);
   const activeDestinationId = destinationByActiveView[activeView];
   const activeDestination =
     productDestinations.find((destination) => destination.id === activeDestinationId) ||
@@ -284,6 +290,40 @@ function WorkspaceShell({
     setIsResizingSidebar(true);
   };
 
+  useEffect(() => {
+    if (!isResizingRail) return undefined;
+
+    const resizeRail = (event: globalThis.PointerEvent) => {
+      const nextWidth = Math.min(
+        RAIL_MAX_WIDTH,
+        Math.max(RAIL_MIN_WIDTH, window.innerWidth - event.clientX),
+      );
+      setRailWidth(nextWidth);
+    };
+    const stopResize = () => setIsResizingRail(false);
+
+    window.addEventListener("pointermove", resizeRail);
+    window.addEventListener("pointerup", stopResize);
+    window.addEventListener("pointercancel", stopResize);
+    document.body.classList.add("is-resizing-rail");
+
+    return () => {
+      window.removeEventListener("pointermove", resizeRail);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+      document.body.classList.remove("is-resizing-rail");
+    };
+  }, [isResizingRail]);
+
+  const startRailResize = (event: PointerEvent<HTMLButtonElement>) => {
+    if (isRuntimePanelCollapsed) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsResizingRail(true);
+  };
+
+  const resetRailWidth = () => setRailWidth(RAIL_DEFAULT_WIDTH);
+
   return (
     <div
       className={[
@@ -295,7 +335,7 @@ function WorkspaceShell({
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}
+      style={{ "--sidebar-width": `${sidebarWidth}px`, "--rail-width": `${railWidth}px` } as CSSProperties}
     >
       <header className="top-menu-bar">
         <div className="workspace-brand">
@@ -444,6 +484,20 @@ function WorkspaceShell({
             {children}
           </section>
         </main>
+
+        {hasDestinationRail && (
+          <button
+            type="button"
+            className="rail-resize-handle"
+            aria-label="Resize context rail"
+            aria-valuemin={RAIL_MIN_WIDTH}
+            aria-valuemax={RAIL_MAX_WIDTH}
+            aria-valuenow={railWidth}
+            onPointerDown={startRailResize}
+            onDoubleClick={resetRailWidth}
+            disabled={isRuntimePanelCollapsed}
+          />
+        )}
 
         {hasDestinationRail && (
           <aside
