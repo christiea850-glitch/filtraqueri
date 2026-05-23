@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DatasetMetadata, SchemaColumn } from "../../features/dataset/datasetTypes";
+import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 import {
   getWorkbookContractDiagnostics,
   type RelationshipContractDiagnostic,
@@ -33,28 +33,6 @@ const countByStatus = (worksheets: WorksheetMetadata[], status: WorksheetStatus)
 
 const formatProfileValue = (value: number | string) =>
   typeof value === "number" ? value.toLocaleString() : value;
-
-function SchemaColumnList({ columns }: { columns: SchemaColumn[] }) {
-  if (columns.length === 0) {
-    return <p className="workbook-empty-note">No schema available.</p>;
-  }
-
-  return (
-    <div className="workbook-schema-list" aria-label="Active worksheet schema">
-      {columns.map((column) => (
-        <div className="workbook-schema-row" key={column.name} title={column.name}>
-          <span className="workbook-column-name">{column.name}</span>
-          <span className={`workbook-type-badge ${column.inferred_type}`}>
-            {column.inferred_type}
-          </span>
-          <span className="workbook-null-note">
-            {column.null_count > 0 ? `${column.null_count.toLocaleString()} nulls` : "no nulls"}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function WorkbookProfileList({ profile }: { profile: WorkbookIngestionProfile }) {
   const profileItems = [
@@ -721,6 +699,8 @@ function WorkbookContextPanel({
         </div>
       </div>
 
+      {variant !== "analyst" && (
+        <>
       <div className="workbook-mapping-section">
         <div className="builder-block-header">
           <span>Workbook profile</span>
@@ -770,15 +750,7 @@ function WorkbookContextPanel({
           contracts={workbook.acceptedRelationshipContracts}
         />
       </div>
-
-      {variant === "analyst" && (
-        <div className="workbook-mapping-section">
-          <div className="builder-block-header">
-            <span>Active schema</span>
-            <small>{activeWorksheet?.schema.length || 0}</small>
-          </div>
-          <SchemaColumnList columns={activeWorksheet?.schema || dataset?.schema || []} />
-        </div>
+        </>
       )}
     </div>
   );

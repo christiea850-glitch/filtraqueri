@@ -1,9 +1,8 @@
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
-import type { SqlSuggestion, SqlTemplate } from "./sqlTypes";
+import type { SqlTemplate } from "./sqlTypes";
 
 type SqlSchemaPanelProps = {
   dataset: DatasetMetadata | null;
-  columnSuggestions: SqlSuggestion[];
   templates: SqlTemplate[];
   keywordSuggestions: string[];
   collapsed: boolean;
@@ -13,7 +12,6 @@ type SqlSchemaPanelProps = {
 
 function SqlSchemaPanel({
   dataset,
-  columnSuggestions,
   templates,
   keywordSuggestions,
   collapsed,
@@ -48,25 +46,6 @@ function SqlSchemaPanel({
                 >
                   {column.name}
                   <small>{column.inferred_type}</small>
-                </button>
-              ))
-            ) : (
-              <p className="sql-helper-empty">No dataset open.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="sql-helper-section">
-          <div className="builder-block-header">
-            <span>Suggestions</span>
-            <small>Chips</small>
-          </div>
-          <div className="sql-suggestion-grid">
-            {columnSuggestions.length > 0 ? (
-              columnSuggestions.map((suggestion) => (
-                <button type="button" key={suggestion.id} onClick={() => onInsertSql(suggestion.sql)}>
-                  <strong>{suggestion.label}</strong>
-                  <span>{suggestion.description}</span>
                 </button>
               ))
             ) : (

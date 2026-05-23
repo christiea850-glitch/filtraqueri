@@ -35,7 +35,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     editorStatus,
     previewResult,
     templates,
-    suggestions,
     keywordSuggestions,
     sqlAnalysis,
     selectedDialect,
@@ -46,10 +45,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     insertSql,
     loadDraft,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
-  const readinessLabel = dataset ? "Dataset context ready" : "Open data to inspect queries";
-  const warningCount = sqlAnalysis.validation.diagnostics.length;
-  const planStepCount = sqlAnalysis.explanationCards.length + sqlAnalysis.diagnostics.length;
-
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
@@ -62,42 +57,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
       aria-label="SQL workspace"
     >
       <div className="sqlw-main">
-        <details className="sql-inspection-pill">
-          <summary>Inspection details</summary>
-          <section className="sql-inspection-overview" aria-label="SQL inspection overview">
-            <div>
-              <p className="section-label">Analyst inspection</p>
-              <h2>SQL workspace</h2>
-              <span>
-                Use the editor as the primary surface. Schema, context, and drafts stay available
-                when you need them.
-              </span>
-            </div>
-            <div className="sql-inspection-metrics">
-              <span>
-                Query generated
-                <strong>{characterCount > 0 ? "Draft present" : "No draft"}</strong>
-              </span>
-              <span>
-                Execution plan
-                <strong>{planStepCount.toLocaleString()} notes</strong>
-              </span>
-              <span>
-                SQL dialect
-                <strong>{selectedDialectProfile.displayName}</strong>
-              </span>
-              <span>
-                Readiness
-                <strong>{readinessLabel}</strong>
-              </span>
-              <span>
-                Warnings
-                <strong>{warningCount.toLocaleString()}</strong>
-              </span>
-            </div>
-          </section>
-        </details>
-
         <div className="sqlw-dockbar">
           <button
             type="button"
@@ -189,7 +148,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
 
       <SqlSchemaPanel
         dataset={dataset}
-        columnSuggestions={suggestions}
         templates={templates}
         keywordSuggestions={keywordSuggestions}
         collapsed={isRailCollapsed}
