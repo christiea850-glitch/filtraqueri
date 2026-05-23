@@ -205,7 +205,14 @@ function WorkspaceShell({
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeDestination.label;
   const isSettingsView = activeDestination.id === "settings";
-  const hasDestinationRail = !isSettingsView && activeDestination.id !== "home";
+  // The Analyst page carries its own Schema / Context / Runtime inspection
+  // tabs inside the SQL workspace, so the destination guidance rail is
+  // redundant there — and crowding it in caused the rail to clip off-screen.
+  // Analyst therefore runs as a clean 3-column shell with no rail.
+  const hasDestinationRail =
+    !isSettingsView &&
+    activeDestination.id !== "home" &&
+    activeDestination.id !== "analyst";
   const hasWorkspaceContextStrip = !isSettingsView && activeDestination.id !== "home";
   const isLoadedHome = activeView === "welcome" && Boolean(dataset);
   const workflowLabel = isLoadedHome
