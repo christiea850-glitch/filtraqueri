@@ -268,6 +268,20 @@ function VisualQueryBuilderPanel({
         </section>
       )}
 
+      {!isAnalystMode && (
+        <section className="filtraqueri-will-panel" aria-label="What FiltraQueri will do">
+          <div>
+            <p className="section-label">FiltraQueri will</p>
+            <h3>Shape the question before running the result</h3>
+          </div>
+          <div>
+            <span>Understand the fields</span>
+            <span>Suggest a useful comparison</span>
+            <span>Keep the result reviewable</span>
+          </div>
+        </section>
+      )}
+
       {!isAnalystMode && analysisPackagePlan && (
         <section className="analysis-package-panel compact" aria-label="Suggested insight package">
           <div>

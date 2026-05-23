@@ -21,11 +21,9 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
       uploading,
       errorMessage,
       selectedFileName,
-      buttonLabel,
       context,
       dataset,
       recentDatasets = [],
-      continueLabel = "Continue",
       onFileChange,
       onContinue,
       onRecentDatasetClick,
@@ -45,45 +43,51 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
     return (
       <section className="welcome-screen">
         <div className="welcome-copy">
-          <p className="section-label">FiltraQueri</p>
-          {dataset ? (
-            <>
-              <h2>Welcome back.</h2>
-              <p>What would you like to do with your current investigation?</p>
-              <div className="home-continuation-surface">
-                <div>
-                  <span>Current workspace</span>
-                  <strong>Investigation in progress</strong>
-                </div>
-                <button type="button" className="primary-button" onClick={onContinue}>
-                  {continueLabel}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h2>Ask better questions of your data.</h2>
-              <p>Start with a CSV or Excel workbook. FiltraQueri will help you understand what is inside and where to go next.</p>
-            </>
-          )}
+          <p className="section-label">Home</p>
+          <h2>Good morning, Christie</h2>
+          <p>What would you like to do?</p>
 
           <div className="home-action-grid" aria-label="Primary actions">
-            <button type="button" className="home-action-card is-primary" onClick={dataset ? onContinue : openFilePicker}>
-              <span>{dataset ? "Continue" : "Start"}</span>
-              <strong>{dataset ? continueLabel : buttonLabel}</strong>
-              <small>{dataset ? "Return to your current work." : "Open a workbook or CSV."}</small>
+            <button type="button" className="home-action-card is-primary" onClick={openFilePicker}>
+              <span>Data</span>
+              <strong>Open data</strong>
+              <small>Upload a CSV or workbook.</small>
+            </button>
+            <button type="button" className="home-action-card" onClick={onContinue}>
+              <span>Investigation</span>
+              <strong>Continue investigation</strong>
+              <small>{dataset ? "Return to the active workspace." : "Open data to begin."}</small>
+            </button>
+            <button type="button" className="home-action-card" onClick={onContinue}>
+              <span>Analyze</span>
+              <strong>Ask a question</strong>
+              <small>Start with guided analysis.</small>
+            </button>
+            <button type="button" className="home-action-card" onClick={onContinue}>
+              <span>Insights</span>
+              <strong>View insights</strong>
+              <small>Review findings and next steps.</small>
             </button>
             <button type="button" className="home-action-card" onClick={openFilePicker}>
-              <span>Data</span>
-              <strong>Open another file</strong>
-              <small>Begin a new investigation without changing the system.</small>
+              <span>Library</span>
+              <strong>Browse datasets</strong>
+              <small>Choose from recent work.</small>
+            </button>
+            <button type="button" className="home-action-card">
+              <span>Support</span>
+              <strong>Guides & help</strong>
+              <small>Learn investigation workflows.</small>
             </button>
           </div>
 
-          {usefulRecentDatasets.length > 0 && (
-            <div className="home-recent-list" aria-label="Recent investigations">
-              <span>Recent investigations</span>
-              {usefulRecentDatasets.map((session) => (
+          <div className="home-recent-list" aria-label="Recent work">
+            <div className="home-section-heading">
+              <span>Recent work</span>
+              <small>Pick up where you left off</small>
+            </div>
+            <div className="home-recent-card-grid">
+              {usefulRecentDatasets.length > 0 ? (
+                usefulRecentDatasets.map((session) => (
                 <button
                   type="button"
                   key={session.dataset.dataset_id}
@@ -92,9 +96,12 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
                 >
                   {session.dataset.original_filename}
                 </button>
-              ))}
+                ))
+              ) : (
+                <span className="home-empty-recent">No recent investigations yet.</span>
+              )}
             </div>
-          )}
+          </div>
 
           <input
             ref={ref}

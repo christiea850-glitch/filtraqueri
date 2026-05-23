@@ -5,7 +5,7 @@
   "active_dataset_id": "dbe565ed596244a1b9f52a013d07e227",
   "active_result_id": "preview",
   "active_execution_id": null,
-  "current_mode": "human",
+  "current_mode": "analyst",
   "current_result_tab": "preview",
   "filter_metadata": {
     "manager_phone": {
@@ -4417,8 +4417,8 @@
     }
   ],
   "created_at": "2026-05-19T18:19:49.546170+00:00",
-  "last_opened_at": "2026-05-23T16:56:19.036291+00:00",
-  "updated_at": "2026-05-23T16:56:19.062033+00:00",
+  "last_opened_at": "2026-05-23T17:20:55.955081+00:00",
+  "updated_at": "2026-05-23T17:20:55.964519+00:00",
   "workbook_metadata": {
     "workbook_id": "dbe565ed596244a1b9f52a013d07e227",
     "workspace_id": "dbe565ed596244a1b9f52a013d07e227",

@@ -758,6 +758,14 @@ function App() {
               <strong>Exports</strong>
               <small>Download defaults and result delivery options.</small>
             </span>
+            <span>
+              <strong>Analyst workspace</strong>
+              <small>SQL inspection, schema display, and saved draft preferences.</small>
+            </span>
+            <span>
+              <strong>Help and governance</strong>
+              <small>Product guidance, review posture, and audit visibility.</small>
+            </span>
           </div>
         </div>
       </section>
