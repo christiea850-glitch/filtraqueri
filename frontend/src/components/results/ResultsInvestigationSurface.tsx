@@ -43,6 +43,12 @@ type ResultsInvestigationSurfaceProps = {
 
 const resultsInsightDetailRouteId: ControlledHashDetailRouteId = "detail:results-insight";
 
+const toBusinessStatusLabel = (value: string) =>
+  value
+    .replace(/ready_now/g, "ready")
+    .replace(/readiness/g, "fit")
+    .replace(/_/g, " ");
+
 function ResultsInvestigationSurface({
   activeResultModel,
   activeResultTab,
@@ -76,7 +82,7 @@ function ResultsInvestigationSurface({
     sourceDescriptorVersion: "results-investigation-surface-v1",
     generatedAt: "deterministic-results-preview",
     takeawaySentence: narrativeReport.summary || takeaway,
-    confidenceLabel: narrativeReadiness.label,
+    confidenceLabel: toBusinessStatusLabel(narrativeReadiness.label),
     topEvidenceFact: primaryExecutiveInsight?.evidence[0] || {
       label: "Top contributor",
       value: topContributorLabel,
@@ -185,7 +191,7 @@ function ResultsInvestigationSurface({
         <div className="executive-insights-panel" aria-label="Executive insights">
           <div className="executive-insights-header">
             <span>Executive insights</span>
-            <strong>{narrativeReadiness.label}</strong>
+            <strong>{toBusinessStatusLabel(narrativeReadiness.label)}</strong>
             <small>
               {narrativeReadiness.insightCount.toLocaleString()} deterministic insight
               {narrativeReadiness.insightCount === 1 ? "" : "s"}
@@ -264,8 +270,8 @@ function ResultsInvestigationSurface({
       {!isAnalystMode && (
         <div className="workspace-hub-panel results-workspace-hub" aria-label="Workspace hub summary">
           <div>
-            <span>Workspace hub</span>
-            <strong>{investigationWorkspacePlan.readinessSummary.label}</strong>
+            <span>Investigation thread</span>
+            <strong>{toBusinessStatusLabel(investigationWorkspacePlan.readinessSummary.label)}</strong>
             <small>
               {latestTimelineEvent
                 ? latestTimelineEvent.label
@@ -274,7 +280,7 @@ function ResultsInvestigationSurface({
           </div>
           <div className="workspace-hub-metrics" aria-label="Workspace hub metrics">
             <span>
-              Packages
+              Insight sets
               <strong>{investigationWorkspacePlan.readinessSummary.packageCount.toLocaleString()}</strong>
             </span>
             <span>
@@ -282,7 +288,7 @@ function ResultsInvestigationSurface({
               <strong>{investigationWorkspacePlan.readinessSummary.stageCount.toLocaleString()}</strong>
             </span>
             <span>
-              Deliverables
+              Outputs
               <strong>{investigationWorkspacePlan.readinessSummary.deliverableCount.toLocaleString()}</strong>
             </span>
           </div>
@@ -313,21 +319,21 @@ function ResultsInvestigationSurface({
       )}
 
       {!isAnalystMode && (
-        <div className="analysis-package-panel results-package-panel" aria-label="Analysis package planner">
+        <div className="analysis-package-panel results-package-panel" aria-label="Suggested insight package">
           <div>
-            <span>Analysis package</span>
-            <strong>{analysisPackagePlan.readinessSummary.label}</strong>
+            <span>Insight package</span>
+            <strong>{toBusinessStatusLabel(analysisPackagePlan.readinessSummary.label)}</strong>
             <small>{analysisPackagePlan.humanSummary}</small>
           </div>
-          <div className="analysis-package-artifacts" aria-label="Suggested package contents">
+          <div className="analysis-package-artifacts" aria-label="Suggested insight contents">
             <span>
-              Ready artifacts
+              Ready outputs
               <strong>{readyPackageArtifacts.length.toLocaleString()}</strong>
             </span>
             {packageRecommendations.slice(0, 3).map((recommendation) => (
               <span key={recommendation.recommendationId}>
                 {recommendation.label}
-                <strong>{recommendation.readiness.replace(/_/g, " ")}</strong>
+                <strong>{toBusinessStatusLabel(recommendation.readiness)}</strong>
               </span>
             ))}
           </div>

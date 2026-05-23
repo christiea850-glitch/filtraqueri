@@ -966,7 +966,7 @@ function DatasetSummaryPanel({
               <strong>{executionContract.engines.length}</strong>
             </span>
             <span>
-              Readiness
+              Fit
               <strong>{executionContract.readinessScore}</strong>
             </span>
           </div>

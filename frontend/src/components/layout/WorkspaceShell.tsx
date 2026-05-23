@@ -13,32 +13,21 @@ type AnalystNavItem = {
   previewBadge?: string;
 };
 
-type HubId = "home" | "data" | "explore" | "build" | "results" | "analyst" | "settings";
+type ProductDestinationId = "home" | "data" | "analyze" | "insights" | "analyst" | "settings";
 
-type HubItem = {
-  id: HubId;
+type ProductDestination = {
+  id: ProductDestinationId;
   label: string;
   icon: IconName;
   defaultView: ActiveView;
   mode: WorkspaceMode;
-  subItems: Array<{
-    view: ActiveView;
-    label: string;
-    description: string;
-  }>;
-};
-
-type HubSection = {
-  label: string;
-  hubIds: HubId[];
 };
 
 type IconName =
   | "home"
   | "data"
-  | "explore"
-  | "build"
-  | "results"
+  | "analyze"
+  | "insights"
   | "analyst"
   | "settings"
   | "upload"
@@ -71,21 +60,13 @@ const SIDEBAR_MIN_WIDTH = 112;
 const SIDEBAR_MAX_WIDTH = 140;
 const SIDEBAR_DEFAULT_WIDTH = 128;
 
-const hubSections: HubSection[] = [
-  { label: "Workspace", hubIds: ["home", "data"] },
-  { label: "Analytics", hubIds: ["explore", "build", "results"] },
-  { label: "Advanced", hubIds: ["analyst"] },
-  { label: "System", hubIds: ["settings"] },
-];
-
-const workspaceHubs: HubItem[] = [
+const productDestinations: ProductDestination[] = [
   {
     id: "home",
     label: "Home",
     icon: "home",
     defaultView: "welcome",
     mode: "human",
-    subItems: [{ view: "welcome", label: "Open data", description: "Choose CSV" }],
   },
   {
     id: "data",
@@ -93,35 +74,20 @@ const workspaceHubs: HubItem[] = [
     icon: "data",
     defaultView: "dataset",
     mode: "human",
-    subItems: [{ view: "dataset", label: "Data", description: "Current dataset" }],
   },
   {
-    id: "explore",
-    label: "Explore",
-    icon: "explore",
-    defaultView: "filters",
-    mode: "human",
-    subItems: [{ view: "filters", label: "Filters", description: "Refine rows" }],
-  },
-  {
-    id: "build",
-    label: "Build",
-    icon: "build",
+    id: "analyze",
+    label: "Analyze",
+    icon: "analyze",
     defaultView: "queryBuilder",
     mode: "human",
-    subItems: [{ view: "queryBuilder", label: "Build query", description: "Group and aggregate" }],
   },
   {
-    id: "results",
-    label: "Results",
-    icon: "results",
+    id: "insights",
+    label: "Insights",
+    icon: "insights",
     defaultView: "results",
     mode: "human",
-    subItems: [
-      { view: "results", label: "Results", description: "Preview and output" },
-      { view: "history", label: "Activity", description: "Session log" },
-      { view: "export", label: "Export", description: "Download CSV" },
-    ],
   },
   {
     id: "analyst",
@@ -129,7 +95,6 @@ const workspaceHubs: HubItem[] = [
     icon: "analyst",
     defaultView: "sqlWorkspace",
     mode: "analyst",
-    subItems: [],
   },
   {
     id: "settings",
@@ -137,9 +102,25 @@ const workspaceHubs: HubItem[] = [
     icon: "settings",
     defaultView: "settings",
     mode: "human",
-    subItems: [{ view: "settings", label: "Settings", description: "Preferences" }],
   },
 ];
+
+const destinationByActiveView: Record<ActiveView, ProductDestinationId> = {
+  welcome: "home",
+  dataset: "data",
+  filters: "analyze",
+  queryBuilder: "analyze",
+  results: "insights",
+  history: "insights",
+  export: "insights",
+  settings: "settings",
+  sqlWorkspace: "analyst",
+  savedQueries: "analyst",
+  queryExplain: "analyst",
+  dataCleaning: "analyst",
+  diagnostics: "analyst",
+  normalization: "analyst",
+};
 
 function WorkspaceIcon({ name }: { name: IconName }) {
   const commonProps = {
@@ -162,19 +143,13 @@ function WorkspaceIcon({ name }: { name: IconName }) {
           <path {...commonProps} d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
         </>
       )}
-      {name === "explore" && (
+      {name === "analyze" && (
         <>
           <circle {...commonProps} cx="11" cy="11" r="6" />
           <path {...commonProps} d="m16 16 4 4" />
         </>
       )}
-      {name === "build" && (
-        <>
-          <path {...commonProps} d="M4 7h16M7 4v6M12 4v6M17 4v6" />
-          <path {...commonProps} d="M6 14h5v5H6zM14 14h4v5h-4z" />
-        </>
-      )}
-      {name === "results" && (
+      {name === "insights" && (
         <>
           <path {...commonProps} d="M5 19V5M5 19h15" />
           <path {...commonProps} d="M8 16v-4M12 16V8M16 16v-6" />
@@ -223,38 +198,13 @@ function WorkspaceShell({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const hubs = workspaceHubs.map((hub) =>
-    hub.id === "analyst"
-      ? {
-          ...hub,
-          subItems: analystViews.map((item) => ({
-            view: item.view,
-            label: item.label,
-            description: item.previewBadge || "Analyst tool",
-          })),
-        }
-      : hub,
-  );
-  const activeHub =
-    hubs.find((hub) => hub.subItems.some((item) => item.view === activeView)) ||
-    hubs.find((hub) => hub.id === (workspaceMode === "analyst" ? "analyst" : "home")) ||
-    hubs[0];
-  const activeSubItem =
-    activeHub.subItems.find((item) => item.view === activeView) || activeHub.subItems[0];
-  const groupedHubs = hubSections
-    .map((section) => ({
-      ...section,
-      hubs: section.hubIds
-        .map((hubId) => hubs.find((hub) => hub.id === hubId))
-        .filter((hub): hub is HubItem => Boolean(hub)),
-    }))
-    .filter((section) => section.hubs.length > 0);
-  const activeSectionLabel =
-    groupedHubs.find((section) => section.hubs.some((hub) => hub.id === activeHub.id))?.label ||
-    "Workspace";
+  const activeDestinationId = destinationByActiveView[activeView];
+  const activeDestination =
+    productDestinations.find((destination) => destination.id === activeDestinationId) ||
+    productDestinations[0];
   const investigationFocusLabel =
-    runtimeContext.selectedContextualObject?.label || activeSubItem?.label || activeHub.label;
-  const investigationBreadcrumb = `${activeSectionLabel} / ${activeHub.label}`;
+    runtimeContext.selectedContextualObject?.label || activeDestination.label;
+  const isSettingsView = activeDestination.id === "settings";
   const isLoadedHome = activeView === "welcome" && Boolean(dataset);
   const workflowLabel = isLoadedHome
     ? "Continue"
@@ -266,7 +216,8 @@ function WorkspaceShell({
           ? "Review result"
           : activeView === "sqlWorkspace"
             ? "Inspect SQL"
-        : activeSubItem?.label || activeHub.label;
+        : activeDestination.label;
+  const analystToolCount = analystViews.length;
   const workflowDescription =
     isLoadedHome
       ? "Pick up the current investigation or open another file."
@@ -277,9 +228,11 @@ function WorkspaceShell({
           : activeView === "results"
             ? "Review what the result means, then choose the next investigation move."
             : activeView === "sqlWorkspace"
-              ? "Inspect SQL, runtime context, readiness, and warnings before execution."
+              ? "Inspect SQL, schema, context, and warnings before running anything."
+              : activeView === "settings"
+                ? "Manage preferences and system choices away from the investigation workspace."
       : workspaceMode === "analyst"
-      ? "SQL and runtime context stay inspectable without automatic execution."
+      ? `SQL and technical context stay inspectable across ${analystToolCount.toLocaleString()} tool surfaces.`
       : "Business flow, results, and next steps stay connected.";
   const activeWorksheetLabel =
     runtimeContext.snapshot.workbook.activeWorksheetName ||
@@ -292,9 +245,9 @@ function WorkspaceShell({
   const primaryRecommendationItem = runtimeContext.recommendationGroups[0]?.items[0] || null;
   const compactTrail = runtimeContext.trail.slice(-5);
 
-  const changeHub = (hub: HubItem) => {
-    if (hub.mode !== workspaceMode) onModeChange(hub.mode);
-    onViewChange(hub.defaultView);
+  const changeDestination = (destination: ProductDestination) => {
+    if (destination.mode !== workspaceMode) onModeChange(destination.mode);
+    onViewChange(destination.defaultView);
   };
 
   useEffect(() => {
@@ -336,6 +289,7 @@ function WorkspaceShell({
         isSidebarCollapsed ? "is-sidebar-collapsed" : "",
         `view-${activeView}`,
         `mode-${workspaceMode}`,
+        `destination-${activeDestination.id}`,
       ]
         .filter(Boolean)
         .join(" ")}
@@ -379,7 +333,15 @@ function WorkspaceShell({
             Analyst Mode
           </button>
         </div>
-        <button type="button" className="settings-button" onClick={() => onViewChange("settings")}>
+        <button
+          type="button"
+          className="settings-button"
+          onClick={() =>
+            changeDestination(
+              productDestinations.find((destination) => destination.id === "settings")!,
+            )
+          }
+        >
           Settings
         </button>
       </header>
@@ -401,27 +363,25 @@ function WorkspaceShell({
           </div>
 
           <nav className="hub-nav" aria-label="Workspace navigation">
-            {groupedHubs.map((section) => (
-              <section key={section.label} className="sidebar-nav-section">
-                {!isSidebarCollapsed && <p>{section.label}</p>}
-                <div>
-                  {section.hubs.map((hub) => (
-                    <button
-                      type="button"
-                      key={hub.id}
-                      className={activeHub.id === hub.id ? "is-active" : ""}
-                      onClick={() => changeHub(hub)}
-                      title={hub.label}
-                    >
-                      <span className="nav-icon" aria-hidden="true">
-                        <WorkspaceIcon name={hub.icon} />
-                      </span>
-                      <span className="nav-label">{hub.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
+            <section className="sidebar-nav-section">
+              {!isSidebarCollapsed && <p>Destinations</p>}
+              <div>
+                {productDestinations.map((destination) => (
+                  <button
+                    type="button"
+                    key={destination.id}
+                    className={activeDestination.id === destination.id ? "is-active" : ""}
+                    onClick={() => changeDestination(destination)}
+                    title={destination.label}
+                  >
+                    <span className="nav-icon" aria-hidden="true">
+                      <WorkspaceIcon name={destination.icon} />
+                    </span>
+                    <span className="nav-label">{destination.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
           </nav>
         </aside>
         <button
@@ -436,40 +396,44 @@ function WorkspaceShell({
         />
 
         <main className="workspace-canvas">
-          <section
-            className={[
-              "workspace-page-heading",
-              workspaceMode === "analyst" ? "is-analyst-workflow" : "is-human-workflow",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            aria-label="Workspace heading"
-          >
-            <div>
-              <p>{investigationBreadcrumb}</p>
-              <h1>{workflowLabel}</h1>
-            </div>
-            <span>{workflowDescription}</span>
-          </section>
+          {!isSettingsView && (
+            <>
+              <section
+                className={[
+                  "workspace-page-heading",
+                  workspaceMode === "analyst" ? "is-analyst-workflow" : "is-human-workflow",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-label="Workspace heading"
+              >
+                <div>
+                  <p>{activeDestination.label}</p>
+                  <h1>{workflowLabel}</h1>
+                </div>
+                <span>{workflowDescription}</span>
+              </section>
 
-          <section className="workspace-context-strip" aria-label="Workspace context">
-            <span>
-              <small>Dataset</small>
-              <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
-            </span>
-            <span>
-              <small>Worksheet</small>
-              <strong>{activeWorksheetLabel}</strong>
-            </span>
-            <span>
-              <small>Rows / columns</small>
-              <strong>{datasetShapeLabel}</strong>
-            </span>
-            <span>
-              <small>Focus</small>
-              <strong>{investigationFocusLabel}</strong>
-            </span>
-          </section>
+              <section className="workspace-context-strip" aria-label="Workspace context">
+                <span>
+                  <small>Dataset</small>
+                  <strong>{dataset ? dataset.original_filename : "No dataset open"}</strong>
+                </span>
+                <span>
+                  <small>Worksheet</small>
+                  <strong>{activeWorksheetLabel}</strong>
+                </span>
+                <span>
+                  <small>Rows / columns</small>
+                  <strong>{datasetShapeLabel}</strong>
+                </span>
+                <span>
+                  <small>Focus</small>
+                  <strong>{investigationFocusLabel}</strong>
+                </span>
+              </section>
+            </>
+          )}
 
           <section className="workspace-active-flow" aria-label="Active workflow">
             {errorMessage && activeView !== "welcome" && (
@@ -479,85 +443,117 @@ function WorkspaceShell({
           </section>
         </main>
 
-        <aside
-          className={[
-            "runtime-context-panel",
-            workspaceMode === "analyst" ? "is-analyst-mode" : "is-human-mode",
-            isRuntimePanelCollapsed ? "is-collapsed" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          aria-label="Workspace runtime context"
-        >
-          <button
-            type="button"
-            className="runtime-panel-toggle"
-            onClick={onRuntimePanelToggle}
-            aria-expanded={!isRuntimePanelCollapsed}
+        {!isSettingsView && (
+          <aside
+            className={[
+              "runtime-context-panel",
+              workspaceMode === "analyst" ? "is-analyst-mode" : "is-human-mode",
+              isRuntimePanelCollapsed ? "is-collapsed" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label={`${activeDestination.label} guidance`}
           >
-            {isRuntimePanelCollapsed ? "Investigation" : "Hide investigation"}
-          </button>
-          {!isRuntimePanelCollapsed && (
-            <div className="runtime-context-body">
-              <div className="runtime-context-header">
-                <p className="section-label">Investigation</p>
-                <h2>{workflowLabel}</h2>
-                <span>{investigationFocusLabel}</span>
-              </div>
+            <button
+              type="button"
+              className="runtime-panel-toggle"
+              onClick={onRuntimePanelToggle}
+              aria-expanded={!isRuntimePanelCollapsed}
+            >
+              {isRuntimePanelCollapsed ? "Guidance" : "Hide guidance"}
+            </button>
+            {!isRuntimePanelCollapsed && (
+              <div className="runtime-context-body">
+                <div className="runtime-context-header">
+                  <p className="section-label">
+                    {activeDestination.id === "analyst" ? "Inspection" : activeDestination.label}
+                  </p>
+                  <h2>
+                    {activeDestination.id === "data"
+                      ? "Data quality"
+                      : activeDestination.id === "analyze"
+                        ? "Question shaping"
+                        : activeDestination.id === "insights"
+                          ? "Investigation thread"
+                          : workflowLabel}
+                  </h2>
+                  <span>{investigationFocusLabel}</span>
+                </div>
 
-              <section className="runtime-investigation-surface" aria-label="Suggested next step">
-                {primaryRecommendationItem && (
-                  <div className="runtime-next-steps">
-                    <div className="runtime-section-heading">
-                      <span>Suggested next action</span>
-                      <small>Choose when you are ready</small>
+                <section className="runtime-investigation-surface" aria-label="Suggested next step">
+                  {primaryRecommendationItem && (
+                    <div className="runtime-next-steps">
+                      <div className="runtime-section-heading">
+                        <span>
+                          {activeDestination.id === "data"
+                            ? "Data guidance"
+                            : activeDestination.id === "insights"
+                              ? "Follow-up suggestion"
+                              : activeDestination.id === "analyst"
+                                ? "Execution context"
+                                : "Next step"}
+                        </span>
+                        <small>
+                          {activeDestination.id === "analyst"
+                            ? "Technical details stay here"
+                            : "Choose when it helps the investigation"}
+                        </small>
+                      </div>
+                      <div className="runtime-guidance-list">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onRuntimeTrailSelect(
+                              primaryRecommendationItem.continuationLink.continuationId,
+                              primaryRecommendationItem.continuationLink.targetView,
+                              primaryRecommendationItem.continuationLink.targetMode,
+                            )
+                          }
+                        >
+                          <strong>{primaryRecommendationItem.title}</strong>
+                          <span>{primaryRecommendationItem.summary}</span>
+                        </button>
+                      </div>
                     </div>
-                    <div className="runtime-guidance-list">
+                  )}
+                </section>
+
+                <section className="runtime-trail-section" aria-label="Investigation trail">
+                  <div className="runtime-section-heading">
+                    <span>
+                      {activeDestination.id === "analyst" ? "Runtime inspection" : "Investigation flow"}
+                    </span>
+                    <small>
+                      {activeDestination.id === "insights"
+                        ? "Review, save, share, or export from the result"
+                        : activeDestination.id === "data"
+                          ? "Understand the dataset before asking more"
+                          : "Move through the current work"}
+                    </small>
+                  </div>
+                  <div className="runtime-trail-list" aria-label="Workspace path">
+                    {compactTrail.map((item) => (
                       <button
                         type="button"
-                        onClick={() =>
-                          onRuntimeTrailSelect(
-                            primaryRecommendationItem.continuationLink.continuationId,
-                            primaryRecommendationItem.continuationLink.targetView,
-                            primaryRecommendationItem.continuationLink.targetMode,
-                          )
-                        }
+                        key={item.id}
+                        className={[
+                          item.status === "current" ? "is-current" : "",
+                          runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
                       >
-                        <strong>{primaryRecommendationItem.title}</strong>
-                        <span>{primaryRecommendationItem.summary}</span>
+                        <strong>{item.label}</strong>
+                        <span>{item.summary}</span>
                       </button>
-                    </div>
+                    ))}
                   </div>
-                )}
-              </section>
-
-              <section className="runtime-trail-section" aria-label="Investigation trail">
-                <div className="runtime-section-heading">
-                  <span>Trail</span>
-                  <small>Move through the current investigation</small>
-                </div>
-                <div className="runtime-trail-list" aria-label="Workspace path">
-                  {compactTrail.map((item) => (
-                    <button
-                      type="button"
-                      key={item.id}
-                      className={[
-                        item.status === "current" ? "is-current" : "",
-                        runtimeContext.selectedTrailItemId === item.id ? "is-selected" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => onRuntimeTrailSelect(item.id, item.view, item.mode)}
-                    >
-                      <strong>{item.label}</strong>
-                      <span>{item.summary}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            </div>
-          )}
-        </aside>
+                </section>
+              </div>
+            )}
+          </aside>
+        )}
       </div>
     </div>
   );

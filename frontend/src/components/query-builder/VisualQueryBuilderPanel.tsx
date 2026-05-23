@@ -55,6 +55,12 @@ const builderSteps: Array<{
   { id: "execute", label: "Review & run", helper: "Approve" },
 ];
 
+const toBusinessStatusLabel = (value: string) =>
+  value
+    .replace(/ready_now/g, "ready")
+    .replace(/readiness/g, "fit")
+    .replace(/_/g, " ");
+
 function VisualQueryBuilderPanel({
   schema,
   activeFilterCount,
@@ -250,17 +256,17 @@ function VisualQueryBuilderPanel({
       )}
 
       {!isAnalystMode && analysisPackagePlan && (
-        <section className="analysis-package-panel compact" aria-label="Analysis package planning">
+        <section className="analysis-package-panel compact" aria-label="Suggested insight package">
           <div>
-            <p className="section-label">Analysis package</p>
-            <h3>{analysisPackagePlan.readinessSummary.label}</h3>
+            <p className="section-label">Insight package</p>
+            <h3>{toBusinessStatusLabel(analysisPackagePlan.readinessSummary.label)}</h3>
             <p>{analysisPackagePlan.humanSummary}</p>
           </div>
-          <div className="analysis-package-artifacts" aria-label="Recommended package contents">
+          <div className="analysis-package-artifacts" aria-label="Recommended insight contents">
             {packageRecommendations.map((recommendation) => (
               <span key={recommendation.recommendationId}>
                 {recommendation.label}
-                <strong>{recommendation.readiness.replace(/_/g, " ")}</strong>
+                <strong>{toBusinessStatusLabel(recommendation.readiness)}</strong>
               </span>
             ))}
           </div>
@@ -271,12 +277,12 @@ function VisualQueryBuilderPanel({
         <section className="workspace-hub-panel compact" aria-label="Investigation workspace summary">
           <div>
             <p className="section-label">Investigation workspace</p>
-            <h3>{investigationWorkspacePlan.readinessSummary.label}</h3>
+            <h3>{toBusinessStatusLabel(investigationWorkspacePlan.readinessSummary.label)}</h3>
             <p>{investigationWorkspacePlan.humanSummary}</p>
           </div>
-          <div className="workspace-hub-metrics" aria-label="Workspace session readiness">
+          <div className="workspace-hub-metrics" aria-label="Investigation session summary">
             <span>
-              Packages
+              Insight sets
               <strong>{investigationWorkspacePlan.readinessSummary.packageCount.toLocaleString()}</strong>
             </span>
             <span>
@@ -284,7 +290,7 @@ function VisualQueryBuilderPanel({
               <strong>{investigationWorkspacePlan.readinessSummary.stageCount.toLocaleString()}</strong>
             </span>
             <span>
-              Deliverables
+              Outputs
               <strong>{investigationWorkspacePlan.readinessSummary.deliverableCount.toLocaleString()}</strong>
             </span>
           </div>

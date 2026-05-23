@@ -190,6 +190,11 @@ body {
   transition: grid-template-columns 180ms ease;
 }
 
+.destination-settings .workspace-shell,
+.destination-settings.is-sidebar-collapsed .workspace-shell {
+  grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr);
+}
+
 .app.is-sidebar-collapsed .workspace-shell {
   grid-template-columns: 64px 0 minmax(0, 1fr) 286px;
 }
@@ -1497,6 +1502,43 @@ body.is-resizing-sidebar {
     border-color 150ms ease,
     box-shadow 150ms ease,
     transform 150ms ease;
+}
+
+.settings-panel {
+  display: grid;
+  max-width: 840px;
+  min-height: 320px;
+  align-content: start;
+  margin: 18px auto 0;
+  padding: 32px;
+  background: #ffffff;
+}
+
+.settings-panel .settings-section-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.settings-panel .settings-section-list span {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--fq-color-border);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.settings-panel .settings-section-list strong {
+  color: var(--fq-color-text);
+  font-size: 14px;
+  font-weight: var(--fq-font-title);
+}
+
+.settings-panel .settings-section-list small {
+  color: var(--fq-color-muted);
+  font-size: 12px;
+  font-weight: var(--fq-font-body);
 }
 
 .analyst-tool-grid article:hover {

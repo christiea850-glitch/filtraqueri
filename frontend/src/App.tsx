@@ -797,9 +797,23 @@ function App() {
     settings: () => (
       <section className="settings-panel standalone-panel">
         <div>
-          <p className="section-label">Settings</p>
+          <p className="section-label">System</p>
           <h2>Settings</h2>
-          <p>Preferences.</p>
+          <p>Preferences and system choices live here, separate from the active investigation.</p>
+          <div className="settings-section-list" aria-label="Settings sections">
+            <span>
+              <strong>Workspace preferences</strong>
+              <small>Default mode, navigation, and display choices.</small>
+            </span>
+            <span>
+              <strong>Data handling</strong>
+              <small>Session cleanup and dataset history controls.</small>
+            </span>
+            <span>
+              <strong>Exports</strong>
+              <small>Download defaults and result delivery options.</small>
+            </span>
+          </div>
         </div>
       </section>
     ),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { ActiveResultModel } from "../../features/results/activeResultModel";
 import type { SortDirection } from "../../features/results/resultTypes";
 import {
@@ -74,6 +74,7 @@ function ResultsGrid({
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
   const [copiedMessage, setCopiedMessage] = useState("");
   const [copiedCellKey, setCopiedCellKey] = useState("");
+  const columnMenuRef = useRef<HTMLDivElement | null>(null);
   const {
     rows,
     columns,
@@ -127,6 +128,31 @@ function ResultsGrid({
 
     return () => window.clearTimeout(clearCopiedMessage);
   }, [copiedMessage]);
+
+  useEffect(() => {
+    if (!isColumnMenuOpen) return undefined;
+
+    const closeColumnMenu = (event: MouseEvent) => {
+      if (
+        columnMenuRef.current &&
+        event.target instanceof Node &&
+        !columnMenuRef.current.contains(event.target)
+      ) {
+        setIsColumnMenuOpen(false);
+      }
+    };
+    const closeColumnMenuFromKeyboard = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setIsColumnMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", closeColumnMenu);
+    document.addEventListener("keydown", closeColumnMenuFromKeyboard);
+
+    return () => {
+      document.removeEventListener("mousedown", closeColumnMenu);
+      document.removeEventListener("keydown", closeColumnMenuFromKeyboard);
+    };
+  }, [isColumnMenuOpen]);
 
   const showAllColumns = () => onHiddenColumnsChange([]);
 
@@ -205,7 +231,7 @@ function ResultsGrid({
               placeholder="Column name"
             />
           </label>
-          <div className="visible-columns-control">
+          <div className="visible-columns-control" ref={columnMenuRef}>
             <button
               type="button"
               className="secondary-button"
