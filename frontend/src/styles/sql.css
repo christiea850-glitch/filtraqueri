@@ -280,7 +280,7 @@
 
 .sql-main-panel {
   display: grid;
-  grid-template-columns: minmax(420px, 1fr) minmax(280px, 360px);
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 300px);
   gap: 12px;
   min-width: 0;
   align-items: stretch;
