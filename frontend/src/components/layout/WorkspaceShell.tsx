@@ -429,10 +429,6 @@ function WorkspaceShell({
                   <small>Rows / columns</small>
                   <strong>{datasetShapeLabel}</strong>
                 </span>
-                <span>
-                  <small>Focus</small>
-                  <strong>{investigationFocusLabel}</strong>
-                </span>
               </section>
             </>
           )}

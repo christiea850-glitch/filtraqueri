@@ -591,3 +591,52 @@
   background: #f8fafc;
 }
 
+/* Inspection details pill */
+.sql-inspection-pill {
+  grid-column: 1 / -1;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.sql-inspection-pill > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  color: #64748b;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.sql-inspection-pill > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sql-inspection-pill > summary::after {
+  content: "▶";
+  margin-left: auto;
+  font-size: 10px;
+  color: #94a3b8;
+  transition: transform 140ms ease;
+}
+
+.sql-inspection-pill[open] > summary::after {
+  transform: rotate(90deg);
+}
+
+.sql-inspection-pill[open] > summary {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sql-inspection-pill .sql-inspection-overview {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+

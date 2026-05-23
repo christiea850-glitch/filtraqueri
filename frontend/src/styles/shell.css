@@ -663,7 +663,7 @@ body.is-resizing-sidebar {
 
 .workspace-context-strip {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) repeat(4, minmax(120px, 0.7fr));
+  grid-template-columns: minmax(180px, 1.2fr) repeat(2, minmax(120px, 0.7fr));
   gap: 8px;
   min-width: 0;
   margin-bottom: 18px;
@@ -700,6 +700,42 @@ body.is-resizing-sidebar {
   font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Analyst destination: compact single-line context strip */
+.destination-analyst .workspace-context-strip {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 5px 12px;
+  margin-bottom: 10px;
+}
+
+.destination-analyst .workspace-context-strip > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.destination-analyst .workspace-context-strip > span + span::before {
+  content: "·";
+  padding: 0 8px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.destination-analyst .workspace-context-strip small {
+  display: none;
+}
+
+.destination-analyst .workspace-context-strip strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
 }
 
 .workspace-active-flow {
