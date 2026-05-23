@@ -1586,10 +1586,12 @@ h1 {
   grid-template-columns: 48px 0 minmax(0, 1fr) minmax(176px, 208px);
 }
 
+.destination-home .workspace-shell,
 .destination-settings .workspace-shell {
   grid-template-columns: var(--sidebar-width, 128px) 2px minmax(0, 1fr);
 }
 
+.destination-home.is-sidebar-collapsed .workspace-shell,
 .destination-settings.is-sidebar-collapsed .workspace-shell {
   grid-template-columns: 48px 0 minmax(0, 1fr);
 }

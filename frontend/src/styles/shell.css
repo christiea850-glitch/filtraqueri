@@ -190,7 +190,9 @@ body {
   transition: grid-template-columns 180ms ease;
 }
 
+.destination-home .workspace-shell,
 .destination-settings .workspace-shell,
+.destination-home.is-sidebar-collapsed .workspace-shell,
 .destination-settings.is-sidebar-collapsed .workspace-shell {
   grid-template-columns: var(--sidebar-width, 224px) 4px minmax(0, 1fr);
 }

@@ -205,6 +205,8 @@ function WorkspaceShell({
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeDestination.label;
   const isSettingsView = activeDestination.id === "settings";
+  const hasDestinationRail = !isSettingsView && activeDestination.id !== "home";
+  const hasWorkspaceContextStrip = !isSettingsView && activeDestination.id !== "home";
   const isLoadedHome = activeView === "welcome" && Boolean(dataset);
   const workflowLabel = isLoadedHome
     ? "Continue"
@@ -396,7 +398,7 @@ function WorkspaceShell({
         />
 
         <main className="workspace-canvas">
-          {!isSettingsView && (
+          {hasWorkspaceContextStrip && (
             <>
               <section
                 className={[
@@ -443,7 +445,7 @@ function WorkspaceShell({
           </section>
         </main>
 
-        {!isSettingsView && (
+        {hasDestinationRail && (
           <aside
             className={[
               "runtime-context-panel",

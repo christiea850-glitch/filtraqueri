@@ -1,13 +1,11 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { humanIntentGuidance } from "./app/appCompositionConfig";
 import DatasetSummaryPanel, {
-  DatasetSessionPanel,
   type HumanIntent,
 } from "./components/dataset/DatasetSummaryPanel";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
 import QueryHistoryPanel from "./components/history/QueryHistoryPanel";
 import WorkspaceShell from "./components/layout/WorkspaceShell";
-import WorkspaceSplitPane from "./components/layout/WorkspaceSplitPane";
 import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuilderPanel";
 import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
@@ -71,7 +69,6 @@ function App() {
     view: ActiveView;
     tab: ResultTabKey;
   } | null>(null);
-  const [isResultsContextCollapsed, setIsResultsContextCollapsed] = useState(true);
   const {
     registry: executionRegistry,
     recordExecutionResult,
@@ -127,7 +124,6 @@ function App() {
     openDatasetPicker,
     handleFileUpload,
     handleWorksheetSelect,
-    handleRelationshipReview,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,
@@ -244,13 +240,6 @@ function App() {
     setWorkspaceMode,
     updateDatasetSessionView,
   });
-
-  const schemaTypeSummary = dataset
-    ? dataset.schema.reduce<Record<string, number>>((summary, column) => {
-        summary[column.inferred_type] = (summary[column.inferred_type] || 0) + 1;
-        return summary;
-      }, {})
-    : {};
 
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
   const {
@@ -692,87 +681,43 @@ function App() {
           {renderHumanIntentGuidance()}
           <section className="results-workspace" aria-label="Data exploration workspace">
             {activeResultModel && (
-              <WorkspaceSplitPane
-                secondaryLabel="Results metadata"
-                primary={
-                  <ResultsGrid
-                    title={
-                      activeResultModel.sourceType === "query"
-                        ? "Query results"
-                        : activeResultModel.sourceType === "filtered"
-                          ? "Filtered results"
-                          : "Preview"
-                    }
-                    label="Results"
-                    activeResultModel={activeResultModel}
-                    loading={isFiltering || isRunningQuery}
-                    activeSortColumn={activeResultModel.sorting.column}
-                    activeSortDirection={activeResultModel.sorting.direction}
-                    hiddenColumns={resultHiddenColumns}
-                    emptyTitle="No results yet."
-                    emptyDescription="Run a query or apply filters."
-                    onHiddenColumnsChange={setResultHiddenColumns}
-                    onSortColumn={sortWorkspaceColumn}
-                    onPageChange={changeWorkspacePage}
-                    onRowsPerPageChange={changeWorkspaceRowsPerPage}
-                    toolbarActions={
-                      <div className="workspace-actions">
-                        <ResultTabs
-                          activeTab={activeResultTab}
-                          hasFilteredResults={hasFilteredResults}
-                          hasQueryResults={hasQueryResults}
-                          onTabChange={handleResultTabChange}
-                        />
-                        <button type="button" className="secondary-button" onClick={exportCurrentResults}>
-                          {isExporting ? "Exporting..." : "Export CSV"}
-                        </button>
-                      </div>
-                    }
-                  />
-                }
-                secondary={
-                  <div
-                    className={[
-                      "results-side-context",
-                      isResultsContextCollapsed ? "is-collapsed" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => setIsResultsContextCollapsed((currentValue) => !currentValue)}
-                    >
-                      {isResultsContextCollapsed ? "Show context" : "Hide context"}
-                    </button>
-                    {isResultsContextCollapsed ? (
-                      <button
-                        type="button"
-                        className="collapsed-panel-bar"
-                        onClick={() => setIsResultsContextCollapsed(false)}
-                      >
-                        Context hidden | {activeFilterLabels.length} filters | {queryHistory.length} history
+              <>
+                {renderResultsInvestigationSurface()}
+                <ResultsGrid
+                  title={
+                    activeResultModel.sourceType === "query"
+                      ? "Query results"
+                      : activeResultModel.sourceType === "filtered"
+                        ? "Filtered results"
+                        : "Preview"
+                  }
+                  label="Results"
+                  activeResultModel={activeResultModel}
+                  loading={isFiltering || isRunningQuery}
+                  activeSortColumn={activeResultModel.sorting.column}
+                  activeSortDirection={activeResultModel.sorting.direction}
+                  hiddenColumns={resultHiddenColumns}
+                  emptyTitle="No results yet."
+                  emptyDescription="Run a query or apply filters."
+                  onHiddenColumnsChange={setResultHiddenColumns}
+                  onSortColumn={sortWorkspaceColumn}
+                  onPageChange={changeWorkspacePage}
+                  onRowsPerPageChange={changeWorkspaceRowsPerPage}
+                  toolbarActions={
+                    <div className="workspace-actions">
+                      <ResultTabs
+                        activeTab={activeResultTab}
+                        hasFilteredResults={hasFilteredResults}
+                        hasQueryResults={hasQueryResults}
+                        onTabChange={handleResultTabChange}
+                      />
+                      <button type="button" className="secondary-button" onClick={exportCurrentResults}>
+                        {isExporting ? "Exporting..." : "Export CSV"}
                       </button>
-                    ) : (
-                      <>
-                        {renderResultsInvestigationSurface()}
-                        <div className="results-context-strip" aria-label="Results context">
-                          <DatasetSessionPanel
-                            dataset={dataset}
-                            schemaTypeSummary={schemaTypeSummary}
-                            activeFilterLabels={activeFilterLabels}
-                            queryGroupBy={activeResultModel.grouping.columns || queryGroupBy}
-                            onRelationshipReview={handleRelationshipReview}
-                          />
-
-                          <QueryHistoryPanel history={queryHistory} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                }
-              />
+                    </div>
+                  }
+                />
+              </>
             )}
           </section>
         </>
