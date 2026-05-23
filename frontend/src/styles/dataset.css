@@ -1,6 +1,6 @@
 .human-dataset-workspace {
   display: grid;
-  gap: 14px;
+  gap: 24px;
 }
 
 .runtime-disclosure-slot {
@@ -110,6 +110,70 @@
     border-color 160ms ease,
     box-shadow 160ms ease,
     transform 160ms ease;
+}
+
+.dataset-hub-panel {
+  display: grid;
+  gap: 24px;
+  padding: clamp(24px, 3vw, 42px);
+  border-radius: 18px;
+}
+
+.dataset-hub-panel .summary-header {
+  align-items: flex-start;
+}
+
+.dataset-hub-panel .summary-header h2 {
+  margin-top: 4px;
+  font-size: clamp(30px, 3.2vw, 48px);
+  line-height: 1.04;
+}
+
+.dataset-hub-panel .summary-header p:not(.section-label) {
+  max-width: 680px;
+  margin: 10px 0 0;
+  color: #64748b;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.data-profile-surface {
+  display: grid;
+  gap: 22px;
+}
+
+.data-profile-overview {
+  padding: 22px;
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, #ffffff, #f8fbff),
+    #ffffff;
+}
+
+.data-profile-overview > div:first-child span,
+.semantic-hint-strip > span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.data-profile-overview > div:first-child strong {
+  color: #111827;
+  font-size: clamp(22px, 2vw, 30px);
+}
+
+.drill-in-summary-grid button {
+  min-height: 130px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.035);
+}
+
+.workbook-intelligence-panel,
+.semantic-hint-strip {
+  border-radius: 14px;
 }
 
 .human-guidance-panel:hover {

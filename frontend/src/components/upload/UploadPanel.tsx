@@ -45,11 +45,11 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
     return (
       <section className="welcome-screen">
         <div className="welcome-copy">
-          <p className="section-label">Home</p>
+          <p className="section-label">FiltraQueri</p>
           {dataset ? (
             <>
-              <h2>Continue where you left off</h2>
-              <p>Your workspace is ready. Pick up the current investigation or open another file.</p>
+              <h2>Welcome back.</h2>
+              <p>What would you like to do with your current investigation?</p>
               <div className="home-continuation-surface">
                 <div>
                   <span>Current workspace</span>
@@ -62,23 +62,23 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
             </>
           ) : (
             <>
-              <h2>Open data</h2>
-              <p>Start with a CSV or Excel workbook.</p>
-              <div className="welcome-actions">
-                <button type="button" className="primary-button" onClick={openFilePicker}>
-                  {buttonLabel}
-                </button>
-              </div>
+              <h2>Ask better questions of your data.</h2>
+              <p>Start with a CSV or Excel workbook. FiltraQueri will help you understand what is inside and where to go next.</p>
             </>
           )}
 
-          {dataset && (
-            <div className="welcome-actions">
-              <button type="button" className="secondary-button" onClick={openFilePicker}>
-                Open another file
-              </button>
-            </div>
-          )}
+          <div className="home-action-grid" aria-label="Primary actions">
+            <button type="button" className="home-action-card is-primary" onClick={dataset ? onContinue : openFilePicker}>
+              <span>{dataset ? "Continue" : "Start"}</span>
+              <strong>{dataset ? continueLabel : buttonLabel}</strong>
+              <small>{dataset ? "Return to your current work." : "Open a workbook or CSV."}</small>
+            </button>
+            <button type="button" className="home-action-card" onClick={openFilePicker}>
+              <span>Data</span>
+              <strong>Open another file</strong>
+              <small>Begin a new investigation without changing the system.</small>
+            </button>
+          </div>
 
           {usefulRecentDatasets.length > 0 && (
             <div className="home-recent-list" aria-label="Recent investigations">

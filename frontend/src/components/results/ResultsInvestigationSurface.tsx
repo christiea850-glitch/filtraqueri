@@ -178,6 +178,19 @@ function ResultsInvestigationSurface({
         .join(" ")}
       aria-label="Results review context"
     >
+      <div className="results-investigation-header">
+        <div>
+          <p className="section-label">Insights</p>
+          <h2>What did I find?</h2>
+          <span>{explainabilityPreview.takeawaySentence}</span>
+        </div>
+        <div className="results-investigation-focus">
+          <span>Next useful move</span>
+          <strong>{continuationSuggestion}</strong>
+          <small>{chartSupportLabel}</small>
+        </div>
+      </div>
+
       <div className="results-business-takeaway">
         <span>{isAnalystMode ? "Result inspection" : "Business takeaway"}</span>
         <strong>{explainabilityPreview.takeawaySentence}</strong>

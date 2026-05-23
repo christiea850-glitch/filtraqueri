@@ -1,7 +1,7 @@
 .sql-workspace {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
   align-items: stretch;
   min-height: min(760px, calc(100vh - 92px));
   transition: grid-template-columns 180ms ease;
@@ -14,10 +14,11 @@
   gap: 14px;
   align-items: center;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid #dbe5ef;
-  border-radius: 14px;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  border-radius: 18px;
   background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.045);
 }
 
 .sql-inspection-overview > div:first-child {
@@ -29,13 +30,13 @@
 .sql-inspection-overview h2 {
   margin: 0;
   color: #111827;
-  font-size: 18px;
+  font-size: clamp(30px, 3vw, 44px);
   font-weight: 850;
 }
 
 .sql-inspection-overview > div:first-child > span {
   color: #64748b;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 650;
   line-height: 1.4;
 }
@@ -51,9 +52,9 @@
   display: grid;
   gap: 4px;
   min-width: 0;
-  padding: 9px;
+  padding: 12px;
   border: 1px solid #e2e8f0;
-  border-radius: 9px;
+  border-radius: 12px;
   background: #f8fafc;
   color: #64748b;
   font-size: 11px;
@@ -88,9 +89,9 @@
 .sql-preview-panel,
 .sql-draft-panel {
   min-width: 0;
-  padding: 14px;
-  border: 1px solid #dbe5ef;
-  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid rgba(203, 213, 225, 0.82);
+  border-radius: 16px;
   background: #ffffff;
   box-shadow: none;
   transition:
@@ -104,6 +105,14 @@
 .sql-draft-panel:hover {
   border-color: #cbd5e1;
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+}
+
+.sql-editor-panel {
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.055);
+}
+
+.sql-main-panel {
+  gap: 18px;
 }
 
 .sql-context-panel {

@@ -497,7 +497,8 @@ function DatasetSummaryPanel({
         <div className="summary-header">
           <div>
             <p className="section-label">Data</p>
-            <h2>{dataset ? "Data profile" : "Open data"}</h2>
+            <h2>{dataset ? "What do I have?" : "Open data"}</h2>
+            {dataset && <p>FiltraQueri has profiled the file, softened the field names, and grouped the details into plain-language views.</p>}
           </div>
           {dataset && (
             <div className="dataset-summary-actions dataset-hub-actions">
@@ -518,7 +519,7 @@ function DatasetSummaryPanel({
             />
             <div className="data-profile-overview">
               <div>
-                <span>Business table</span>
+                <span>What FiltraQueri sees</span>
                 <strong>{datasetIntelligencePreview.detectedDataShapeSummary}</strong>
                 <p>{datasetIntelligencePreview.whyItMattersPreview}</p>
               </div>

@@ -65,8 +65,8 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
       <section className="sql-inspection-overview" aria-label="SQL inspection overview">
         <div>
           <p className="section-label">Analyst inspection</p>
-          <h2>Verify SQL before execution</h2>
-          <span>Inspection and verification only. Monaco and execution behavior are unchanged.</span>
+          <h2>SQL workspace</h2>
+          <span>Use the editor as the primary surface. Schema, context, and drafts stay available when you need them.</span>
         </div>
         <div className="sql-inspection-metrics">
           <span>

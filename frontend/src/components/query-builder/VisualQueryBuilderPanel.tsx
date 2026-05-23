@@ -211,6 +211,19 @@ function VisualQueryBuilderPanel({
 
   return (
     <section className="query-builder-panel" aria-label="Visual query builder">
+      <section className="query-builder-hero" aria-label="Analyze destination introduction">
+        <div>
+          <p className="section-label">Analyze</p>
+          <h2>What would you like to understand?</h2>
+          <span>Start with the business question. The query details stay available, but the investigation should lead the work.</span>
+        </div>
+        <div className="query-builder-hero-focus">
+          <span>Current direction</span>
+          <strong>{primaryInvestigation?.title || expectedResultType}</strong>
+          <small>{primaryInvestigation?.question || "Choose fields and review the result shape before running anything."}</small>
+        </div>
+      </section>
+
       <div className="query-builder-workflow-strip" aria-label="Query workflow status">
         <div>
           <span>{isAnalystMode ? "Prepared result" : "Expected result"}</span>

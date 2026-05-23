@@ -171,6 +171,10 @@
     grid-template-columns: 1fr;
   }
 
+  .home-action-grid {
+    grid-template-columns: 1fr;
+  }
+
   .workspace-context-strip > span {
     padding-right: 0;
     padding-bottom: 8px;
@@ -311,6 +315,7 @@
   .explore-question-surface,
   .query-workflow-tabs,
   .query-builder-workflow-strip,
+  .query-builder-hero,
   .query-approval-strip,
   .query-approval-facts,
   .query-builder-hero,
@@ -355,6 +360,7 @@
   }
 
   .results-review-strip,
+  .results-investigation-header,
   .results-review-facts,
   .results-insight-row,
   .results-investigation-header,
