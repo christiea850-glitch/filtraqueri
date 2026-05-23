@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
@@ -29,6 +29,8 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
+  const [contextHeight, setContextHeight] = useState(248);
+  const [bottomHeight, setBottomHeight] = useState(220);
   const {
     savedDrafts,
     characterCount,
@@ -47,6 +49,32 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
+  };
+
+  const startDockResize = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    dock: "context" | "bottom",
+  ) => {
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("is-dragging");
+    const startY = event.clientY;
+    const direction = dock === "context" ? 1 : -1;
+    const startHeight = dock === "context" ? contextHeight : bottomHeight;
+    const applyHeight = dock === "context" ? setContextHeight : setBottomHeight;
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const next = startHeight + (moveEvent.clientY - startY) * direction;
+      applyHeight(Math.min(560, Math.max(96, Math.round(next))));
+    };
+    const onRelease = () => {
+      handle.classList.remove("is-dragging");
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onRelease);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onRelease);
   };
 
   return (
@@ -69,22 +97,35 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
         </div>
 
         {isContextOpen && (
-          <section className="sqlw-dock sqlw-dock-top" aria-label="SQL context">
-            <div className="sqlw-dock-head">
-              <span>SQL context</span>
-              <button
-                type="button"
-                className="sqlw-dock-x"
-                onClick={() => setIsContextOpen(false)}
-                aria-label="Close SQL context"
-              >
-                Close
-              </button>
-            </div>
-            <div className="sqlw-dock-body">
-              <WorkbookContextPanel dataset={dataset} variant="analyst" />
-            </div>
-          </section>
+          <>
+            <section
+              className="sqlw-dock sqlw-dock-top"
+              aria-label="SQL context"
+              style={{ height: contextHeight }}
+            >
+              <div className="sqlw-dock-head">
+                <span>SQL context</span>
+                <button
+                  type="button"
+                  className="sqlw-dock-x"
+                  onClick={() => setIsContextOpen(false)}
+                  aria-label="Close SQL context"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="sqlw-dock-body">
+                <WorkbookContextPanel dataset={dataset} variant="analyst" />
+              </div>
+            </section>
+            <div
+              className="sqlw-split"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize SQL context panel"
+              onPointerDown={(event) => startDockResize(event, "context")}
+            />
+          </>
         )}
 
         <SqlEditorPanel
@@ -101,33 +142,46 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
         />
 
         {bottomTab && (
-          <section className="sqlw-dock sqlw-dock-bot" aria-label="Query output">
-            <div className="sqlw-dock-head">
-              <span>{bottomTabLabels[bottomTab]}</span>
-              <button
-                type="button"
-                className="sqlw-dock-x"
-                onClick={() => setBottomTab(null)}
-                aria-label="Close query output"
-              >
-                Close
-              </button>
-            </div>
-            <div className="sqlw-dock-body">
-              {bottomTab === "result" && <SqlPreviewGrid previewResult={previewResult} />}
-              {bottomTab === "guidance" && (
-                <SqlGuidancePanel
-                  diagnostics={sqlAnalysis.diagnostics}
-                  guidanceCards={sqlAnalysis.explanationCards}
-                  dialectContext={{ selectedDialectProfile }}
-                  validation={sqlAnalysis.validation}
-                />
-              )}
-              {bottomTab === "drafts" && (
-                <SqlDraftPanel savedDrafts={savedDrafts} onLoadDraft={loadDraft} />
-              )}
-            </div>
-          </section>
+          <>
+            <div
+              className="sqlw-split"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize query output panel"
+              onPointerDown={(event) => startDockResize(event, "bottom")}
+            />
+            <section
+              className="sqlw-dock sqlw-dock-bot"
+              aria-label="Query output"
+              style={{ height: bottomHeight }}
+            >
+              <div className="sqlw-dock-head">
+                <span>{bottomTabLabels[bottomTab]}</span>
+                <button
+                  type="button"
+                  className="sqlw-dock-x"
+                  onClick={() => setBottomTab(null)}
+                  aria-label="Close query output"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="sqlw-dock-body">
+                {bottomTab === "result" && <SqlPreviewGrid previewResult={previewResult} />}
+                {bottomTab === "guidance" && (
+                  <SqlGuidancePanel
+                    diagnostics={sqlAnalysis.diagnostics}
+                    guidanceCards={sqlAnalysis.explanationCards}
+                    dialectContext={{ selectedDialectProfile }}
+                    validation={sqlAnalysis.validation}
+                  />
+                )}
+                {bottomTab === "drafts" && (
+                  <SqlDraftPanel savedDrafts={savedDrafts} onLoadDraft={loadDraft} />
+                )}
+              </div>
+            </section>
+          </>
         )}
 
         <div className="sqlw-dockbar sqlw-dockbar-bottom">

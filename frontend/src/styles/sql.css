@@ -729,6 +729,7 @@
 
 .sqlw-dock {
   display: flex;
+  flex: none;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
@@ -738,12 +739,38 @@
   overflow: hidden;
 }
 
-.sqlw-dock-top {
-  max-height: 340px;
+/* Draggable resize handle between a dock and the editor. */
+.sqlw-split {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 9px;
+  margin: -1px 0;
+  border-radius: 4px;
+  background: #eef1f6;
+  cursor: row-resize;
+  touch-action: none;
+  transition: background 120ms ease;
 }
 
-.sqlw-dock-bot {
-  max-height: 320px;
+.sqlw-split::before {
+  content: "";
+  width: 36px;
+  height: 3px;
+  border-radius: 2px;
+  background: #cbd5e1;
+  transition: background 120ms ease;
+}
+
+.sqlw-split:hover,
+.sqlw-split.is-dragging {
+  background: var(--fq-accent, #4338ca);
+}
+
+.sqlw-split:hover::before,
+.sqlw-split.is-dragging::before {
+  background: #ffffff;
 }
 
 .sqlw-dock-head {

@@ -37,7 +37,7 @@
     "lastOpenedContext": "sqlWorkspace",
     "draftMetadata": {
       "draftCount": 1,
-      "lastDraftSavedAt": "2026-05-23T22:24:14.945Z"
+      "lastDraftSavedAt": "2026-05-23T22:43:09.397Z"
     },
     "snippetMetadata": {
       "snippetCount": 0,
@@ -50,11 +50,11 @@
         "label": "Query draft",
         "sql": "",
         "selectedDialect": "duckdb",
-        "updatedAt": "2026-05-23T22:24:14.945Z"
+        "updatedAt": "2026-05-23T22:43:09.397Z"
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-23T22:36:05.966Z"
+    "updatedAt": "2026-05-23T22:43:09.397Z"
   },
   "datasets": [
     {
@@ -4357,8 +4357,8 @@
     }
   ],
   "created_at": "2026-05-23T20:49:46.779754+00:00",
-  "last_opened_at": "2026-05-23T22:36:06.935177+00:00",
-  "updated_at": "2026-05-23T22:36:06.959450+00:00",
+  "last_opened_at": "2026-05-23T22:45:23.929021+00:00",
+  "updated_at": "2026-05-23T22:45:23.949872+00:00",
   "workbook_metadata": {
     "workbook_id": "7f08c3734e4b484a9bad1b632eb7f5bc",
     "workspace_id": "7f08c3734e4b484a9bad1b632eb7f5bc",
