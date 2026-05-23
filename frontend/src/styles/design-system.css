@@ -3529,3 +3529,107 @@ body {
     grid-column: auto;
   }
 }
+
+/* ============================================================
+   VISIBLE CLEANUP PASS  (appended last — authoritative)
+   C1 heading caps . C2 collapsed rail . C3 destination colour
+   . C4 colourful Home tiles.  Visual layer only.
+   ============================================================ */
+
+/* --- C1: no workspace page title renders oversized --------- */
+.app .welcome-copy h2,
+.app .dataset-hub-panel .summary-header h2,
+.app .summary-header h2,
+.app .query-builder-hero h2,
+.app .query-builder-header h2,
+.app .workspace-page-heading h1,
+.app .results-investigation-header h2,
+.app .sql-inspection-overview h2,
+.app .sql-context-panel h2,
+.app .explore-question-surface h2 {
+  font-size: clamp(20px, 1.5vw, 22px) !important;
+  line-height: 1.3 !important;
+  letter-spacing: 0 !important;
+  font-weight: 600 !important;
+  max-width: none !important;
+}
+
+/* secondary in-card headings stay modest too */
+.app .builder-block-header span,
+.app .query-stage-heading h3,
+.app .runtime-context-header h2 {
+  font-size: clamp(14px, 1vw, 16px) !important;
+  font-weight: 600 !important;
+}
+
+/* --- C2: collapsed right rail is a clean strip, never clipped */
+.app .runtime-context-panel.is-collapsed {
+  width: 44px !important;
+  overflow: hidden !important;
+  box-shadow: none;
+}
+.app .runtime-context-panel {
+  overflow-x: hidden;
+}
+
+/* --- C3: per-destination colour identity (Epic-style) ------ */
+.app.destination-home    { --fq-accent: #2563eb; --fq-accent-soft: #eaf0ff; --fq-accent-ink: #1e3a8a; }
+.app.destination-data    { --fq-accent: #0e7490; --fq-accent-soft: #e2f4f7; --fq-accent-ink: #0c4a55; }
+.app.destination-analyze { --fq-accent: #6d28d9; --fq-accent-soft: #f0eafd; --fq-accent-ink: #4c1d95; }
+.app.destination-insights{ --fq-accent: #0f766e; --fq-accent-soft: #e2f4ef; --fq-accent-ink: #0b4a44; }
+.app.destination-analyst { --fq-accent: #4338ca; --fq-accent-soft: #ebeafb; --fq-accent-ink: #312a8f; }
+.app.destination-settings{ --fq-accent: #475569; --fq-accent-soft: #eef1f5; --fq-accent-ink: #334155; }
+.app { --fq-accent: #2563eb; --fq-accent-soft: #eaf0ff; --fq-accent-ink: #1e3a8a; }
+
+/* active navigation item carries the destination colour */
+.app .hub-nav button.is-active {
+  background: var(--fq-accent-soft) !important;
+  color: var(--fq-accent-ink) !important;
+  box-shadow: inset 3px 0 0 var(--fq-accent) !important;
+}
+.app .hub-nav button.is-active .nav-icon {
+  color: var(--fq-accent) !important;
+}
+
+/* small caps section kickers pick up the destination colour */
+.app .workspace-canvas .section-label,
+.app .welcome-copy .section-label {
+  color: var(--fq-accent) !important;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* the active workspace mode toggle uses the accent */
+.app .mode-switcher button.is-active {
+  background: var(--fq-accent) !important;
+  color: #ffffff !important;
+}
+
+/* a quiet colour spine on the primary page card */
+.app .workspace-page-heading {
+  border-left: 3px solid var(--fq-accent);
+  padding-left: 12px;
+  border-radius: 0;
+}
+
+/* --- C4: colourful Home action tiles ----------------------- */
+.app .home-action-grid .home-action-card {
+  border-left: 4px solid var(--tile-accent, #2563eb) !important;
+  border-radius: 12px;
+  transition: background 140ms ease, box-shadow 140ms ease;
+}
+.app .home-action-grid .home-action-card span {
+  color: var(--tile-accent, #2563eb) !important;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.app .home-action-grid .home-action-card:hover {
+  background: var(--tile-soft, #eaf0ff) !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.app .home-action-grid .home-action-card:nth-child(1) { --tile-accent: #0e7490; --tile-soft: #e2f4f7; }
+.app .home-action-grid .home-action-card:nth-child(2) { --tile-accent: #6d28d9; --tile-soft: #f0eafd; }
+.app .home-action-grid .home-action-card:nth-child(3) { --tile-accent: #2563eb; --tile-soft: #eaf0ff; }
+.app .home-action-grid .home-action-card:nth-child(4) { --tile-accent: #0f766e; --tile-soft: #e2f4ef; }
+.app .home-action-grid .home-action-card:nth-child(5) { --tile-accent: #b45309; --tile-soft: #faedda; }
+.app .home-action-grid .home-action-card:nth-child(6) { --tile-accent: #475569; --tile-soft: #eef1f5; }
