@@ -281,9 +281,119 @@ function CountUp({ value }: { value: number }) {
   return <>{shownValue.toLocaleString()}</>;
 }
 
+function DatasetPreviewPage({
+  dataset,
+  worksheets,
+  initialWorksheetId,
+  onBack,
+}: {
+  dataset: DatasetMetadata;
+  worksheets: WorksheetMetadata[];
+  initialWorksheetId: string | null;
+  onBack: () => void;
+}) {
+  const hasWorkbook = worksheets.length > 0;
+  const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(
+    initialWorksheetId || worksheets[0]?.worksheetId || null,
+  );
+  const selectedWorksheet = hasWorkbook
+    ? worksheets.find((sheet) => sheet.worksheetId === selectedWorksheetId) || worksheets[0]
+    : null;
+  const previewColumns = selectedWorksheet
+    ? selectedWorksheet.schema
+    : Array.isArray(dataset.schema)
+      ? dataset.schema
+      : [];
+  const sampleRowCount = previewColumns.reduce(
+    (count, column) =>
+      Math.max(count, Array.isArray(column.sample_values) ? column.sample_values.length : 0),
+    0,
+  );
+  const visibleRowCount = Math.min(sampleRowCount, 25);
+  const previewLabel = selectedWorksheet
+    ? selectedWorksheet.displayName || selectedWorksheet.sheetName
+    : dataset.original_filename;
+  const previewRowTotal = selectedWorksheet ? selectedWorksheet.rowCount : dataset.row_count;
+
+  const formatCell = (value: unknown) => {
+    if (value === null || value === undefined || value === "") return "—";
+    return String(value);
+  };
+
+  return (
+    <div className="dataset-preview-page">
+      <div className="dataset-preview-head">
+        <button type="button" className="secondary-button" onClick={onBack}>
+          Back to Data
+        </button>
+        <div>
+          <p className="section-label">Preview dataset</p>
+          <h2>{previewLabel}</h2>
+          <p>
+            {previewRowTotal.toLocaleString()} rows &middot;{" "}
+            {previewColumns.length.toLocaleString()} columns &middot; showing a sample
+          </p>
+        </div>
+      </div>
+
+      {hasWorkbook && (
+        <div className="dataset-preview-sheets" aria-label="Worksheets">
+          {worksheets.map((sheet) => (
+            <button
+              type="button"
+              key={sheet.worksheetId}
+              className={`dataset-preview-sheet${
+                sheet.worksheetId === selectedWorksheet?.worksheetId ? " active" : ""
+              }`}
+              onClick={() => setSelectedWorksheetId(sheet.worksheetId)}
+            >
+              {sheet.displayName || sheet.sheetName}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="dataset-preview-table-wrap">
+        {previewColumns.length === 0 || visibleRowCount === 0 ? (
+          <p className="compact-empty">No sample data is available for this worksheet.</p>
+        ) : (
+          <table className="dataset-preview-table">
+            <thead>
+              <tr>
+                <th className="dataset-preview-rownum">#</th>
+                {previewColumns.map((column) => (
+                  <th key={column.name}>
+                    {column.name}
+                    <small>{column.inferred_type}</small>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: visibleRowCount }).map((_, rowIndex) => (
+                <tr key={rowIndex}>
+                  <td className="dataset-preview-rownum">{rowIndex + 1}</td>
+                  {previewColumns.map((column) => (
+                    <td key={column.name}>
+                      {formatCell(
+                        Array.isArray(column.sample_values)
+                          ? column.sample_values[rowIndex]
+                          : undefined,
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DatasetSummaryPanel({
   dataset,
-  onViewPreview,
   onHumanIntentSelect,
   onOpenDataset,
   onClearCurrentDataset,
@@ -295,6 +405,7 @@ function DatasetSummaryPanel({
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
+  const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -480,6 +591,17 @@ function DatasetSummaryPanel({
     });
   }, []);
 
+  if (dataset && isDatasetPreviewOpen) {
+    return (
+      <DatasetPreviewPage
+        dataset={dataset}
+        worksheets={workbookWorksheets}
+        initialWorksheetId={activeWorksheet?.worksheetId || null}
+        onBack={() => setIsDatasetPreviewOpen(false)}
+      />
+    );
+  }
+
   if (dataset && isDatasetIntelligenceDetailOpen) {
     return (
       <DatasetIntelligenceDetailPage
@@ -563,8 +685,12 @@ function DatasetSummaryPanel({
               </article>
             </div>
             <div className="data-profile-actions">
-              <button type="button" className="secondary-button" onClick={onViewPreview}>
-                View results
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setIsDatasetPreviewOpen(true)}
+              >
+                Preview dataset
               </button>
               <button
                 type="button"

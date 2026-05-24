@@ -3781,3 +3781,130 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* --- D2: Data page — dataset preview page ------------------- */
+.app .dataset-preview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: dataStatRise 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.app .dataset-preview-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.app .dataset-preview-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app .dataset-preview-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(18px, 1.4vw, 22px);
+  font-weight: 600;
+}
+
+.app .dataset-preview-head p:not(.section-label) {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.app .dataset-preview-sheets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app .dataset-preview-sheet {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.app .dataset-preview-sheet:hover {
+  border-color: #0e7490;
+  color: #0c4a55;
+}
+
+.app .dataset-preview-sheet.active {
+  border-color: #0e7490;
+  background: #e2f4f7;
+  color: #0c4a55;
+}
+
+.app .dataset-preview-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.app .dataset-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.app .dataset-preview-table th,
+.app .dataset-preview-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #eef2f5;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.app .dataset-preview-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #172033;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.app .dataset-preview-table thead th small {
+  display: block;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app .dataset-preview-table tbody tr:hover {
+  background: #f8fbfc;
+}
+
+.app .dataset-preview-table td {
+  color: #334155;
+}
+
+.app .dataset-preview-table .dataset-preview-rownum {
+  width: 1%;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .dataset-preview-table-wrap .compact-empty {
+  margin: 0;
+  padding: 24px;
+  color: #64748b;
+  font-size: 13px;
+}
