@@ -709,6 +709,7 @@ function DatasetSummaryPanel({
                   <CountUp value={dataset.row_count} />
                 </strong>
                 <span className="data-stat-lbl">Rows</span>
+                <span className="data-stat-sub">Total rows of data</span>
               </article>
               <article className="data-stat data-stat--columns">
                 <span className="data-stat-ic" aria-hidden="true">
@@ -720,6 +721,7 @@ function DatasetSummaryPanel({
                   <CountUp value={dataset.column_count} />
                 </strong>
                 <span className="data-stat-lbl">Columns</span>
+                <span className="data-stat-sub">Total columns in dataset</span>
               </article>
               <article className="data-stat data-stat--worksheets">
                 <span className="data-stat-ic" aria-hidden="true">
@@ -732,6 +734,7 @@ function DatasetSummaryPanel({
                   <CountUp value={workbookWorksheets.length} />
                 </strong>
                 <span className="data-stat-lbl">Worksheets</span>
+                <span className="data-stat-sub">Total worksheets available</span>
               </article>
               <article className="data-stat data-stat--types">
                 <span className="data-stat-ic" aria-hidden="true">
@@ -745,6 +748,7 @@ function DatasetSummaryPanel({
                   <CountUp value={Object.keys(schemaTypeSummary).length} />
                 </strong>
                 <span className="data-stat-lbl">Field types</span>
+                <span className="data-stat-sub">Unique field types</span>
               </article>
             </div>
             <div className="data-tabs-row">
@@ -757,16 +761,39 @@ function DatasetSummaryPanel({
               <div className="data-profile-actions">
                 <button
                   type="button"
-                  className="secondary-button"
+                  className="secondary-button data-action-btn"
                   onClick={() => setIsDatasetPreviewOpen(true)}
                 >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
                   Preview dataset
                 </button>
                 <button
                   type="button"
-                  className="text-button danger-text-button"
+                  className="text-button danger-text-button data-action-btn"
                   onClick={() => onDeleteDataset(dataset.dataset_id)}
                 >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                  </svg>
                   Delete dataset
                 </button>
               </div>
