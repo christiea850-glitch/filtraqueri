@@ -16,7 +16,6 @@ import {
   createNavigationBackStateDescriptor,
   createNavigationOriginDescriptor,
   emptyNavigationContextPreservation,
-  openControlledHashDetailRoute,
   subscribeControlledHashDetailRoute,
   type ControlledHashDetailRouteId,
 } from "../../features/navigation";
@@ -470,10 +469,6 @@ function DatasetSummaryPanel({
       selectedItemType: "dataset",
     },
   });
-  const openDatasetIntelligenceDetail = () => {
-    openControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
-    setIsDatasetIntelligenceDetailOpen(true);
-  };
   const closeDatasetIntelligenceDetail = () => {
     closeControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
     setIsDatasetIntelligenceDetailOpen(false);
@@ -568,9 +563,6 @@ function DatasetSummaryPanel({
               </article>
             </div>
             <div className="data-profile-actions">
-              <button type="button" className="text-button" onClick={openDatasetIntelligenceDetail}>
-                View details
-              </button>
               <button type="button" className="secondary-button" onClick={onViewPreview}>
                 View results
               </button>
@@ -588,7 +580,7 @@ function DatasetSummaryPanel({
               label="Data views"
               onChange={setActiveDrillInView}
             />
-            {semanticHints.length > 0 && (
+            {activeDrillInView === "overview" && semanticHints.length > 0 && (
               <div className="semantic-hint-strip" aria-label="Business field hints">
                 <span>Likely business fields</span>
                 {semanticHints.map((profile) => (
@@ -599,32 +591,8 @@ function DatasetSummaryPanel({
                 ))}
               </div>
             )}
-            {workbookRelationshipIntelligence && (
+            {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
               <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
-            )}
-            {activeDrillInView === "overview" && (
-              <div className="drill-in-summary-grid" aria-label="Data detail summaries">
-              <button type="button" onClick={() => setActiveDrillInView("columns")}>
-                <span>Detected columns</span>
-                <strong>{detectedColumns.length.toLocaleString()}</strong>
-                <small>Open column list</small>
-              </button>
-              <button type="button" onClick={() => setActiveDrillInView("worksheets")}>
-                <span>Worksheets</span>
-                <strong>{workbookWorksheets.length.toLocaleString()}</strong>
-                <small>Review workbook sheets</small>
-              </button>
-              <button type="button" onClick={() => setActiveDrillInView("dataIntelligence")}>
-                <span>Data intelligence</span>
-                <strong>{dataProfile ? dataProfile.shape.shapeLabel.replace(/_/g, " ") : "Profile"}</strong>
-                <small>Open details</small>
-              </button>
-              <button type="button" onClick={() => setActiveDrillInView("businessSemantics")}>
-                <span>Business semantics</span>
-                <strong>{detectedSemanticEntities.length.toLocaleString()}</strong>
-                <small>Review business context</small>
-              </button>
-            </div>
             )}
           </div>
         ) : (
