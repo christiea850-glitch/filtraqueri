@@ -35,7 +35,6 @@ import {
   type WorkbookRelationshipIntelligence,
 } from "../../features/workbookIntelligence";
 import { TaskLauncherPanel } from "../../features/tasksLauncher";
-import CompactStatGrid from "../layout/CompactStatGrid";
 import DrillInDetailPanel from "../layout/DrillInDetailPanel";
 import WorkspaceTabs from "../layout/WorkspaceTabs";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
@@ -264,6 +263,25 @@ function WorkbookRelationshipSummaryPanel({
   );
 }
 
+function CountUp({ value }: { value: number }) {
+  const [shownValue, setShownValue] = useState(0);
+
+  useEffect(() => {
+    let frameId = 0;
+    const startTime = performance.now();
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startTime) / 850);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setShownValue(Math.round(value * eased));
+      if (progress < 1) frameId = requestAnimationFrame(animate);
+    };
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [value]);
+
+  return <>{shownValue.toLocaleString()}</>;
+}
+
 function DatasetSummaryPanel({
   dataset,
   onViewPreview,
@@ -373,11 +391,6 @@ function DatasetSummaryPanel({
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
   const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
   const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
-  const dateColumnCount = detectedColumns.filter((column) => column.inferred_type === "date").length;
-  const numericColumnCount = detectedColumns.filter((column) => column.inferred_type === "numeric").length;
-  const textColumnCount = detectedColumns.filter(
-    (column) => column.inferred_type === "text" || column.inferred_type === "categorical",
-  ).length;
   const closeDrillIn = () => setActiveDrillInView("overview");
   const dataTabs = [
     { id: "overview", label: "Overview" },
@@ -386,12 +399,6 @@ function DatasetSummaryPanel({
     { id: "dataIntelligence", label: "Intelligence" },
     { id: "businessSemantics", label: "Semantics" },
   ] satisfies Array<{ id: DataDrillInView; label: string }>;
-  const profileStats = [
-    { label: "Numeric", value: numericColumnCount.toLocaleString() },
-    { label: "Text/category", value: textColumnCount.toLocaleString() },
-    { label: "Date", value: dateColumnCount.toLocaleString() },
-    { label: "Types", value: Object.keys(schemaTypeSummary).length.toLocaleString() },
-  ];
   const datasetIntelligencePreview = createDatasetIntelligencePreviewViewModel({
     sourceDescriptorVersion: "dataset-summary-panel-v1",
     generatedAt: "deterministic-dataset-preview",
@@ -511,39 +518,76 @@ function DatasetSummaryPanel({
 
         {dataset ? (
           <div className="data-profile-surface">
+            <div className="data-stat-row" aria-label="Dataset profile">
+              <article className="data-stat data-stat--rows">
+                <span className="data-stat-ic" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </span>
+                <strong className="data-stat-num">
+                  <CountUp value={dataset.row_count} />
+                </strong>
+                <span className="data-stat-lbl">Rows</span>
+              </article>
+              <article className="data-stat data-stat--columns">
+                <span className="data-stat-ic" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M6 4v16M12 4v16M18 4v16" />
+                  </svg>
+                </span>
+                <strong className="data-stat-num">
+                  <CountUp value={dataset.column_count} />
+                </strong>
+                <span className="data-stat-lbl">Columns</span>
+              </article>
+              <article className="data-stat data-stat--worksheets">
+                <span className="data-stat-ic" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="4" y="8" width="12" height="12" rx="2" />
+                    <path d="M8 8V4h12v12h-4" />
+                  </svg>
+                </span>
+                <strong className="data-stat-num">
+                  <CountUp value={workbookWorksheets.length} />
+                </strong>
+                <span className="data-stat-lbl">Worksheets</span>
+              </article>
+              <article className="data-stat data-stat--types">
+                <span className="data-stat-ic" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="8" cy="8" r="4" />
+                    <rect x="13" y="4" width="7" height="7" rx="1.5" />
+                    <path d="M8 14l5 6H3z" />
+                  </svg>
+                </span>
+                <strong className="data-stat-num">
+                  <CountUp value={Object.keys(schemaTypeSummary).length} />
+                </strong>
+                <span className="data-stat-lbl">Field types</span>
+              </article>
+            </div>
+            <div className="data-profile-actions">
+              <button type="button" className="text-button" onClick={openDatasetIntelligenceDetail}>
+                View details
+              </button>
+              <button type="button" className="secondary-button" onClick={onViewPreview}>
+                View results
+              </button>
+              <button
+                type="button"
+                className="text-button danger-text-button"
+                onClick={() => onDeleteDataset(dataset.dataset_id)}
+              >
+                Delete
+              </button>
+            </div>
             <WorkspaceTabs
               items={dataTabs}
               activeItem={activeDrillInView}
               label="Data views"
               onChange={setActiveDrillInView}
             />
-            <div className="data-profile-overview">
-              <div>
-                <span>What FiltraQueri sees</span>
-                <strong>{datasetIntelligencePreview.detectedDataShapeSummary}</strong>
-                <p>{datasetIntelligencePreview.whyItMattersPreview}</p>
-              </div>
-              <div className="dataset-card-actions">
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={openDatasetIntelligenceDetail}
-                >
-                  View details
-                </button>
-                <button type="button" className="secondary-button" onClick={onViewPreview}>
-                  View results
-                </button>
-                <button
-                  type="button"
-                  className="text-button danger-text-button"
-                  onClick={() => onDeleteDataset(dataset.dataset_id)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-            <CompactStatGrid items={profileStats} label="Detected data profile" />
             {semanticHints.length > 0 && (
               <div className="semantic-hint-strip" aria-label="Business field hints">
                 <span>Likely business fields</span>

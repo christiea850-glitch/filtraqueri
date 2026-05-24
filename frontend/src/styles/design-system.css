@@ -3662,3 +3662,122 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- D1: Data page — modern animated profile stats ---------- */
+@keyframes dataStatRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.app .data-stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 2px 0 14px;
+}
+
+.app .data-stat {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 14px 15px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  overflow: hidden;
+  animation: dataStatRise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.app .data-stat:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
+}
+
+.app .data-stat::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--data-accent, #0e7490);
+}
+
+.app .data-stat:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.app .data-stat:nth-child(3) {
+  animation-delay: 0.14s;
+}
+.app .data-stat:nth-child(4) {
+  animation-delay: 0.21s;
+}
+
+.app .data-stat--rows {
+  --data-accent: #0e7490;
+  --data-soft: #e2f4f7;
+}
+.app .data-stat--columns {
+  --data-accent: #4338ca;
+  --data-soft: #ebeafb;
+}
+.app .data-stat--worksheets {
+  --data-accent: #b45309;
+  --data-soft: #faedda;
+}
+.app .data-stat--types {
+  --data-accent: #15803d;
+  --data-soft: #e9f6ec;
+}
+
+.app .data-stat-ic {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--data-soft, #e2f4f7);
+  color: var(--data-accent, #0e7490);
+}
+
+.app .data-stat-ic svg {
+  width: 16px;
+  height: 16px;
+}
+
+.app .data-stat-num {
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.app .data-stat-lbl {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app .data-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 720px) {
+  .app .data-stat-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
