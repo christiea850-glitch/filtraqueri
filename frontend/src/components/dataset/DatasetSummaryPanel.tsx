@@ -745,55 +745,111 @@ function DatasetSummaryPanel({
             </div>
             <div className="data-stat-row" aria-label="Dataset profile">
               <article className="data-stat data-stat--rows">
-                <span className="data-stat-ic" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                </span>
+                <div className="data-stat-top">
+                  <span className="data-stat-ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </span>
+                  <span className="data-stat-lbl">Rows</span>
+                </div>
                 <strong className="data-stat-num">
                   <CountUp value={dataset.row_count} />
                 </strong>
-                <span className="data-stat-lbl">Rows</span>
                 <span className="data-stat-sub">Total rows of data</span>
+                <svg
+                  className="data-stat-spark"
+                  viewBox="0 0 64 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="2,17 13,11 24,14 35,7 46,12 62,4" />
+                </svg>
               </article>
               <article className="data-stat data-stat--columns">
-                <span className="data-stat-ic" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <path d="M6 4v16M12 4v16M18 4v16" />
-                  </svg>
-                </span>
+                <div className="data-stat-top">
+                  <span className="data-stat-ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M6 4v16M12 4v16M18 4v16" />
+                    </svg>
+                  </span>
+                  <span className="data-stat-lbl">Columns</span>
+                </div>
                 <strong className="data-stat-num">
                   <CountUp value={dataset.column_count} />
                 </strong>
-                <span className="data-stat-lbl">Columns</span>
                 <span className="data-stat-sub">Total columns in dataset</span>
+                <svg
+                  className="data-stat-spark"
+                  viewBox="0 0 64 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="2,14 13,16 24,8 35,12 46,5 62,9" />
+                </svg>
               </article>
               <article className="data-stat data-stat--worksheets">
-                <span className="data-stat-ic" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="4" y="8" width="12" height="12" rx="2" />
-                    <path d="M8 8V4h12v12h-4" />
-                  </svg>
-                </span>
+                <div className="data-stat-top">
+                  <span className="data-stat-ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="4" y="8" width="12" height="12" rx="2" />
+                      <path d="M8 8V4h12v12h-4" />
+                    </svg>
+                  </span>
+                  <span className="data-stat-lbl">Worksheets</span>
+                </div>
                 <strong className="data-stat-num">
                   <CountUp value={workbookWorksheets.length} />
                 </strong>
-                <span className="data-stat-lbl">Worksheets</span>
                 <span className="data-stat-sub">Total worksheets available</span>
+                <svg
+                  className="data-stat-spark"
+                  viewBox="0 0 64 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="2,8 13,14 24,10 35,16 46,9 62,13" />
+                </svg>
               </article>
               <article className="data-stat data-stat--types">
-                <span className="data-stat-ic" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="8" cy="8" r="4" />
-                    <rect x="13" y="4" width="7" height="7" rx="1.5" />
-                    <path d="M8 14l5 6H3z" />
-                  </svg>
-                </span>
+                <div className="data-stat-top">
+                  <span className="data-stat-ic" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="8" cy="8" r="4" />
+                      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+                      <path d="M8 14l5 6H3z" />
+                    </svg>
+                  </span>
+                  <span className="data-stat-lbl">Field types</span>
+                </div>
                 <strong className="data-stat-num">
                   <CountUp value={Object.keys(schemaTypeSummary).length} />
                 </strong>
-                <span className="data-stat-lbl">Field types</span>
                 <span className="data-stat-sub">Unique field types</span>
+                <svg
+                  className="data-stat-spark"
+                  viewBox="0 0 64 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="2,18 13,9 24,13 35,6 46,11 62,5" />
+                </svg>
               </article>
             </div>
             <div className="data-tabs-row">

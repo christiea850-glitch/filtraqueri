@@ -32,7 +32,10 @@ type IconName =
   | "settings"
   | "upload"
   | "collapse"
-  | "expand";
+  | "expand"
+  | "spreadsheet"
+  | "chevronDown"
+  | "support";
 
 type WorkspaceShellProps = {
   activeView: ActiveView;
@@ -176,6 +179,20 @@ function WorkspaceIcon({ name }: { name: IconName }) {
       )}
       {name === "collapse" && <path {...commonProps} d="m15 6-6 6 6 6" />}
       {name === "expand" && <path {...commonProps} d="m9 6 6 6-6 6" />}
+      {name === "spreadsheet" && (
+        <>
+          <rect {...commonProps} x="4" y="4" width="16" height="16" rx="2" />
+          <path {...commonProps} d="M4 9h16M4 14h16M9 4v16M15 4v16" />
+        </>
+      )}
+      {name === "chevronDown" && <path {...commonProps} d="m6 9 6 6 6-6" />}
+      {name === "support" && (
+        <>
+          <circle {...commonProps} cx="12" cy="12" r="8" />
+          <path {...commonProps} d="M9.5 9a3 3 0 1 1 4.2 2.8c-.9.4-1.7 1.1-1.7 2.2" />
+          <path {...commonProps} d="M12 17h.01" />
+        </>
+      )}
     </svg>
   );
 }
@@ -328,7 +345,17 @@ function WorkspaceShell({
           aria-label="Workspace identity"
           onClick={() => (dataset ? onViewChange("dataset") : onOpenFile())}
         >
+          {activeDestination.id === "data" && (
+            <span className="workspace-switcher-icon" aria-hidden="true">
+              <WorkspaceIcon name="spreadsheet" />
+            </span>
+          )}
           <strong>{workspaceIdentityLabel}</strong>
+          {activeDestination.id === "data" && (
+            <span className="workspace-switcher-chevron" aria-hidden="true">
+              <WorkspaceIcon name="chevronDown" />
+            </span>
+          )}
         </button>
         <div className="mode-switcher" aria-label="Workspace mode">
           <button
@@ -349,13 +376,20 @@ function WorkspaceShell({
         <button
           type="button"
           className="settings-button"
+          aria-label="Settings"
           onClick={() =>
             changeDestination(
               productDestinations.find((destination) => destination.id === "settings")!,
             )
           }
         >
-          Settings
+          {activeDestination.id === "data" ? (
+            <span className="settings-button-icon" aria-hidden="true">
+              <WorkspaceIcon name="settings" />
+            </span>
+          ) : (
+            "Settings"
+          )}
         </button>
       </header>
 
@@ -393,9 +427,43 @@ function WorkspaceShell({
                     <span className="nav-label">{destination.label}</span>
                   </button>
                 ))}
+                {activeDestination.id === "data" && (
+                  <button
+                    type="button"
+                    className="sidebar-support-item"
+                    title="Support"
+                    aria-label="Support"
+                  >
+                    <span className="nav-icon" aria-hidden="true">
+                      <WorkspaceIcon name="support" />
+                    </span>
+                    <span className="nav-label">Support</span>
+                  </button>
+                )}
               </div>
             </section>
           </nav>
+          {activeDestination.id === "data" && (
+            <div className="sidebar-bottom-stack" aria-label="Account and plan">
+              <section className="sidebar-plan-card" aria-label="Pro plan storage">
+                <div>
+                  <span>Pro Plan</span>
+                  <strong>18.2 GB used</strong>
+                </div>
+                <div className="sidebar-storage-meter" aria-hidden="true">
+                  <span />
+                </div>
+                <small>72% of 25 GB</small>
+              </section>
+              <section className="sidebar-profile-card" aria-label="Signed in user">
+                <span className="sidebar-profile-avatar" aria-hidden="true">CR</span>
+                <div>
+                  <strong>Christie R.</strong>
+                  <span>christie@filtraqueri.com</span>
+                </div>
+              </section>
+            </div>
+          )}
         </aside>
         <button
           type="button"

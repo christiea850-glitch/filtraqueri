@@ -4357,3 +4357,378 @@ body {
   border-color: #0e7490;
   background: #e2f4f7;
 }
+
+/* --- R1: stat cards — solid icons + decorative sparkline --- */
+.app .data-stat {
+  min-height: 124px;
+  padding: 15px 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.app .data-stat::before {
+  display: none;
+}
+
+.app .data-stat-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.app .data-stat-ic {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--data-accent, #0e7490);
+  color: #ffffff;
+}
+
+.app .data-stat-ic svg {
+  width: 18px;
+  height: 18px;
+}
+
+.app .data-stat-num {
+  margin-top: 8px;
+}
+
+.app .data-stat-sub {
+  padding-right: 68px;
+  line-height: 1.35;
+}
+
+.app .data-stat-spark {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  width: 60px;
+  height: 22px;
+  color: var(--data-accent, #0e7490);
+  opacity: 0.6;
+}
+
+/* --- R2: Data shell/sidebar exact-match refinement ---------- */
+.app.destination-data {
+  --data-shell-border: #e5eaf0;
+  --data-shell-muted: #7c8798;
+  --data-shell-ink: #111827;
+  --data-shell-soft: #f4f7fa;
+  --data-shell-accent: #0e7490;
+  --data-shell-accent-soft: #e2f4f7;
+}
+
+.app.destination-data .top-menu-bar {
+  grid-template-columns: minmax(190px, auto) minmax(260px, 1fr) auto auto;
+  height: 54px;
+  padding: 0 22px;
+  gap: 14px;
+  border-bottom-color: var(--data-shell-border);
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  backdrop-filter: none;
+}
+
+.app.destination-data .workspace-brand {
+  gap: 11px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.app.destination-data .compact-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  box-shadow: 0 10px 22px rgba(14, 116, 144, 0.16);
+}
+
+.app.destination-data .compact-mark svg {
+  width: 23px;
+  height: 23px;
+}
+
+.app.destination-data .workspace-switcher {
+  justify-self: start;
+  width: min(100%, 330px);
+  max-width: 330px;
+  min-height: 38px;
+  gap: 9px;
+  padding: 0 11px;
+  border-color: var(--data-shell-border);
+  border-radius: 12px;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.app.destination-data .workspace-switcher:hover {
+  border-color: #c9d5df;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  transform: none;
+}
+
+.app.destination-data .workspace-switcher strong {
+  color: #263241;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.app.destination-data .workspace-switcher-icon,
+.app.destination-data .workspace-switcher-chevron {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #eef4f7;
+  color: var(--data-shell-accent);
+}
+
+.app.destination-data .workspace-switcher-chevron {
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  background: transparent;
+  color: #8a96a6;
+}
+
+.app.destination-data .mode-switcher {
+  min-height: 38px;
+  padding: 3px;
+  border-color: var(--data-shell-border);
+  border-radius: 999px;
+  background: #f4f7fa;
+}
+
+.app.destination-data .mode-switcher button {
+  min-height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: #687386;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.app.destination-data .mode-switcher button.is-active {
+  background: var(--data-shell-accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(14, 116, 144, 0.2);
+}
+
+.app.destination-data .settings-button {
+  display: inline-grid;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+  place-items: center;
+  padding: 0;
+  border-color: var(--data-shell-border);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.app.destination-data .settings-button:hover {
+  border-color: #c9d5df;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  transform: none;
+}
+
+.app.destination-data .settings-button-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.app.destination-data .workspace-shell {
+  grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr);
+}
+
+.app.destination-data .left-sidebar {
+  gap: 14px;
+  padding: 18px 14px 16px;
+  border-right-color: var(--data-shell-border);
+  background: #f7f9fb;
+}
+
+.app.destination-data .sidebar-shell-controls,
+.app.destination-data .sidebar-nav-section p {
+  display: none;
+}
+
+.app.destination-data .hub-nav {
+  display: grid;
+  min-height: 0;
+}
+
+.app.destination-data .sidebar-nav-section,
+.app.destination-data .sidebar-nav-section > div {
+  gap: 7px;
+}
+
+.app.destination-data .left-sidebar nav button {
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: #667386;
+  font-size: 13px;
+  font-weight: 650;
+  box-shadow: none;
+  transform: none;
+}
+
+.app.destination-data .left-sidebar nav button:hover {
+  border-color: #e2e8f0;
+  background: #ffffff;
+  color: #243246;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+  transform: none;
+}
+
+.app.destination-data .left-sidebar nav button.is-active {
+  border-color: #c9e3e8;
+  background: #ffffff !important;
+  color: #0c4a55 !important;
+  box-shadow:
+    inset 3px 0 0 var(--data-shell-accent),
+    0 10px 20px rgba(14, 116, 144, 0.08) !important;
+}
+
+.app.destination-data .left-sidebar nav button .nav-icon {
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 10px;
+  background: #eef2f6;
+  color: #7c8798;
+}
+
+.app.destination-data .left-sidebar nav button.is-active .nav-icon {
+  background: var(--data-shell-accent-soft) !important;
+  color: var(--data-shell-accent) !important;
+}
+
+.app.destination-data .left-sidebar .nav-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.app.destination-data .sidebar-support-item {
+  margin-top: 6px;
+}
+
+.app.destination-data .sidebar-bottom-stack {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.app.destination-data .sidebar-plan-card,
+.app.destination-data .sidebar-profile-card {
+  min-width: 0;
+  border: 1px solid var(--data-shell-border);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.app.destination-data .sidebar-plan-card {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+}
+
+.app.destination-data .sidebar-plan-card div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.app.destination-data .sidebar-plan-card span,
+.app.destination-data .sidebar-profile-card span,
+.app.destination-data .sidebar-plan-card small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--data-shell-muted);
+  font-size: 11px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app.destination-data .sidebar-plan-card div:first-child > span {
+  color: var(--data-shell-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app.destination-data .sidebar-plan-card strong,
+.app.destination-data .sidebar-profile-card strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--data-shell-ink);
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app.destination-data .sidebar-storage-meter {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f6;
+}
+
+.app.destination-data .sidebar-storage-meter span {
+  display: block;
+  width: 72%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0e7490, #22a6b3);
+}
+
+.app.destination-data .sidebar-profile-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 11px;
+}
+
+.app.destination-data .sidebar-profile-avatar {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 999px;
+  background: #172033;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.app.destination-data .sidebar-profile-card > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app.destination-data.is-sidebar-collapsed .sidebar-bottom-stack {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .app.destination-data .top-menu-bar {
+    height: auto;
+    grid-template-columns: 1fr auto;
+    padding: 10px 12px;
+  }
+
+  .app.destination-data .workspace-switcher,
+  .app.destination-data .mode-switcher {
+    grid-column: 1 / -1;
+  }
+
+  .app.destination-data .workspace-shell {
+    grid-template-columns: 1fr;
+  }
+}
