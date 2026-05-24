@@ -845,13 +845,22 @@ function DatasetSummaryPanel({
             </div>
             {activeDrillInView === "overview" && semanticHints.length > 0 && (
               <div className="semantic-hint-strip" aria-label="Business field hints">
-                <span>Likely business fields</span>
-                {semanticHints.map((profile) => (
-                  <small key={profile.sourceName} title={profile.sourceName}>
-                    {getBusinessRoleLabel(profile.role)}
-                    <strong>{profile.displayName}</strong>
-                  </small>
-                ))}
+                <span className="semantic-hint-label">Likely business fields</span>
+                <div className="semantic-hint-chips">
+                  {semanticHints.map((profile) => (
+                    <small key={profile.sourceName} title={profile.sourceName}>
+                      {getBusinessRoleLabel(profile.role)}
+                      <strong>{profile.displayName}</strong>
+                    </small>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="semantic-hint-action"
+                  onClick={() => setActiveDrillInView("columns")}
+                >
+                  View all columns
+                </button>
               </div>
             )}
             {activeDrillInView === "overview" && workbookRelationshipIntelligence && (

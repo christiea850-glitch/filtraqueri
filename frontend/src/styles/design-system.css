@@ -4288,3 +4288,72 @@ body {
   border-color: #0e7490;
   background: #e2f4f7;
 }
+
+/* --- D-slice 4: Likely business fields row ----------------- */
+.app .semantic-hint-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+  padding: 13px 18px;
+  border: 1px solid #e7ebef;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.app .semantic-hint-label {
+  flex: none;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app .semantic-hint-chips {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app .semantic-hint-strip small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.app .semantic-hint-strip small strong {
+  color: #172033;
+  font-weight: 600;
+}
+
+.app .semantic-hint-action {
+  flex: none;
+  padding: 7px 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #0c4a55;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.app .semantic-hint-action:hover {
+  border-color: #0e7490;
+  background: #e2f4f7;
+}
