@@ -214,7 +214,10 @@ function WorkspaceShell({
     activeDestination.id !== "home" &&
     activeDestination.id !== "analyst" &&
     activeDestination.id !== "data";
-  const hasWorkspaceContextStrip = !isSettingsView && activeDestination.id !== "home";
+  const hasWorkspaceContextStrip =
+    !isSettingsView &&
+    activeDestination.id !== "home" &&
+    activeDestination.id !== "data";
   const isLoadedHome = activeView === "welcome" && Boolean(dataset);
   const workflowLabel = isLoadedHome
     ? "Continue"

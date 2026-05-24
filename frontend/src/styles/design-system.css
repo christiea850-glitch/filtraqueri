@@ -3868,32 +3868,47 @@ body {
 }
 
 .app .dataset-preview-table {
-  width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 12px;
 }
 
 .app .dataset-preview-table th,
 .app .dataset-preview-table td {
+  position: relative;
   padding: 8px 12px;
   border: 1px solid #d6e1e8;
+  overflow: hidden;
   text-align: left;
   vertical-align: top;
 }
 
 .app .dataset-preview-cell {
   display: block;
-  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .app .dataset-preview-table.is-wrapped .dataset-preview-cell {
-  max-width: 360px;
   overflow: visible;
   white-space: normal;
   word-break: break-word;
+}
+
+.app .dataset-preview-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.app .dataset-preview-resizer:hover,
+.app .dataset-preview-resizer.is-dragging {
+  background: rgba(14, 116, 144, 0.28);
 }
 
 .app .dataset-preview-table thead th {
@@ -3984,4 +3999,133 @@ body {
   border-color: #bfe3e9;
   box-shadow: inset 3px 0 0 #0e7490;
   transform: translateX(3px);
+}
+
+/* --- D-image: Data page header, context card, tabs row ----- */
+.app .data-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.app .data-page-head h2 {
+  margin: 3px 0 4px;
+  color: #0f172a;
+  font-size: clamp(20px, 1.6vw, 24px);
+  font-weight: 600;
+}
+
+.app .data-page-head .section-label {
+  color: #0e7490;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+}
+
+.app .data-page-head > div > p:not(.section-label) {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.app .data-page-head-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+}
+
+.app .data-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.app .data-updated::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #15803d;
+}
+
+.app .data-context-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.app .data-context-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 11px;
+  background: #e7f6ef;
+  color: #15803d;
+}
+
+.app .data-context-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.app .data-context-item {
+  display: grid;
+  flex: none;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app .data-context-item--name {
+  flex: 1;
+  min-width: 0;
+}
+
+.app .data-context-item small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.app .data-context-item strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .data-tabs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.app .data-tabs-row .data-profile-actions {
+  margin-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .app .data-context-card {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
 }

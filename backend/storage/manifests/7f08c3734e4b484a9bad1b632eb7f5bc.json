@@ -10,10 +10,10 @@
   "filter_metadata": {},
   "query_builder_metadata": {
     "selected_columns": [
-      "realtor_id",
-      "realtor_agent",
-      "company",
-      "phone"
+      "manager_id",
+      "first_name",
+      "last_name",
+      "manager_phone"
     ],
     "group_by": [],
     "aggregations": [
@@ -37,7 +37,7 @@
     "lastOpenedContext": "sqlWorkspace",
     "draftMetadata": {
       "draftCount": 1,
-      "lastDraftSavedAt": "2026-05-23T22:43:09.397Z"
+      "lastDraftSavedAt": "2026-05-24T13:02:30.183Z"
     },
     "snippetMetadata": {
       "snippetCount": 0,
@@ -48,13 +48,13 @@
         "version": 1,
         "id": "active-draft",
         "label": "Query draft",
-        "sql": "",
+        "sql": "SELECT\n  \"realtor_id\",\n  \"realtor_agent\",\n  \"company\",\n  \"phone\"\nFROM \"data\"\nLIMIT 100;",
         "selectedDialect": "duckdb",
-        "updatedAt": "2026-05-23T22:43:09.397Z"
+        "updatedAt": "2026-05-24T13:02:30.183Z"
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-24T12:47:36.459Z"
+    "updatedAt": "2026-05-24T17:50:02.200Z"
   },
   "datasets": [
     {
@@ -65,56 +65,111 @@
       "duckdb_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\sessions\\7f08c3734e4b484a9bad1b632eb7f5bc.duckdb",
       "schema": [
         {
-          "name": "realtor_id",
+          "name": "manager_id",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 3,
+          "unique_count": 6,
           "sample_values": [
-            "RLTR0002",
-            "RLTR0001",
-            "RLTR0003"
+            "MGT004",
+            "MGT005",
+            "MGT006",
+            "MGT001",
+            "MGT002",
+            "MGT003"
           ]
         },
         {
-          "name": "realtor_agent",
+          "name": "first_name",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 3,
+          "unique_count": 6,
           "sample_values": [
-            "Divya Kataria",
-            "Shawn Taylor",
-            "Jacek Mikolajczyk"
+            "Liam",
+            "Noah",
+            "Sophia",
+            "Emma",
+            "Ava",
+            "Ethan"
           ]
         },
         {
-          "name": "company",
+          "name": "last_name",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 3,
+          "unique_count": 6,
           "sample_values": [
-            "OctFest LLC",
-            "Valley Fine Homes, LLC",
-            "LevelUp Realty"
+            "Johnson",
+            "Ross",
+            "Patel",
+            "Silva",
+            "Kim",
+            "Nguyen"
           ]
         },
         {
-          "name": "phone",
+          "name": "manager_phone",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 3,
+          "unique_count": 6,
           "sample_values": [
-            "860-713-5506",
-            "860-713-5501",
-            "860-713-5502"
+            "617-555-0103",
+            "617-555-0106",
+            "617-555-0105",
+            "617-555-0104",
+            "617-555-0101",
+            "617-555-0102"
+          ]
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR",
+          "inferred_type": "text",
+          "null_count": 0,
+          "unique_count": 6,
+          "sample_values": [
+            "noah.johnson@pmco.com",
+            "sophia.nguyen@pmco.com",
+            "ethan.ross@pmco.com",
+            "liam.patel@pmco.com",
+            "ava.kim@pmco.com",
+            "emma.silva@pmco.com"
+          ]
+        },
+        {
+          "name": "hire_date",
+          "type": "VARCHAR",
+          "inferred_type": "text",
+          "null_count": 0,
+          "unique_count": 6,
+          "sample_values": [
+            "43013",
+            "44298",
+            "43160",
+            "43631",
+            "43850",
+            "42581"
+          ]
+        },
+        {
+          "name": "manager_type",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 4,
+          "sample_values": [
+            "Property Manager",
+            "Regional Manager",
+            "Assistant Manager",
+            "General Manager"
           ]
         }
       ],
-      "row_count": 3,
-      "column_count": 4,
+      "row_count": 6,
+      "column_count": 7,
       "created_at": "2026-05-23T20:49:46.779754+00:00",
       "workbook_metadata": {
         "workbook_id": "7f08c3734e4b484a9bad1b632eb7f5bc",
@@ -148,7 +203,7 @@
           "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:17",
           "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:18"
         ],
-        "active_worksheet_id": "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:2",
+        "active_worksheet_id": "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:1",
         "worksheets": [
           {
             "worksheet_id": "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:1",
@@ -4352,13 +4407,13 @@
           "warnings": []
         },
         "created_at": "2026-05-23T20:49:46.779754+00:00",
-        "updated_at": "2026-05-24T12:20:06.761286+00:00"
+        "updated_at": "2026-05-24T13:06:15.433525+00:00"
       }
     }
   ],
   "created_at": "2026-05-23T20:49:46.779754+00:00",
-  "last_opened_at": "2026-05-24T12:47:36.819983+00:00",
-  "updated_at": "2026-05-24T12:47:36.844548+00:00",
+  "last_opened_at": "2026-05-24T17:50:02.942246+00:00",
+  "updated_at": "2026-05-24T17:50:02.987919+00:00",
   "workbook_metadata": {
     "workbook_id": "7f08c3734e4b484a9bad1b632eb7f5bc",
     "workspace_id": "7f08c3734e4b484a9bad1b632eb7f5bc",
@@ -4391,7 +4446,7 @@
       "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:17",
       "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:18"
     ],
-    "active_worksheet_id": "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:2",
+    "active_worksheet_id": "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:1",
     "worksheets": [
       {
         "worksheet_id": "7f08c3734e4b484a9bad1b632eb7f5bc:worksheet:1",
@@ -8595,6 +8650,6 @@
       "warnings": []
     },
     "created_at": "2026-05-23T20:49:46.779754+00:00",
-    "updated_at": "2026-05-24T12:20:06.761286+00:00"
+    "updated_at": "2026-05-24T13:06:15.433525+00:00"
   }
 }

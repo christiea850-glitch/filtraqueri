@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
-import { useAnalyticsIntentGraph } from "../../features/analyticsIntentGraph";
-import { useAnalyticsPlanning } from "../../features/analyticsPlanning";
 import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
-import { useExecutionContracts } from "../../features/executionContracts";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
@@ -262,6 +259,18 @@ function WorkbookRelationshipSummaryPanel({
   );
 }
 
+function formatRelativeTime(value: string): string {
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return "recently";
+  const minutes = Math.round((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 function CountUp({ value }: { value: number }) {
   const [shownValue, setShownValue] = useState(0);
 
@@ -294,6 +303,7 @@ function DatasetPreviewPage({
 }) {
   const hasWorkbook = worksheets.length > 0;
   const [isWrapped, setIsWrapped] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(
     initialWorksheetId || worksheets[0]?.worksheetId || null,
   );
@@ -319,6 +329,38 @@ function DatasetPreviewPage({
   const formatCell = (value: unknown) => {
     if (value === null || value === undefined || value === "") return "—";
     return String(value);
+  };
+
+  const baseColumnWidth = 168;
+  const getColumnWidth = (columnName: string) => columnWidths[columnName] ?? baseColumnWidth;
+  const totalTableWidth =
+    52 + previewColumns.reduce((sum, column) => sum + getColumnWidth(column.name), 0);
+
+  const startColumnResize = (
+    event: ReactPointerEvent<HTMLSpanElement>,
+    columnName: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("is-dragging");
+    const startX = event.clientX;
+    const startWidth = getColumnWidth(columnName);
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextWidth = startWidth + (moveEvent.clientX - startX);
+      setColumnWidths((current) => ({
+        ...current,
+        [columnName]: Math.min(560, Math.max(72, Math.round(nextWidth))),
+      }));
+    };
+    const onRelease = () => {
+      handle.classList.remove("is-dragging");
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onRelease);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onRelease);
   };
 
   return (
@@ -369,14 +411,28 @@ function DatasetPreviewPage({
             className={["dataset-preview-table", isWrapped ? "is-wrapped" : ""]
               .filter(Boolean)
               .join(" ")}
+            style={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
           >
+            <colgroup>
+              <col style={{ width: "52px" }} />
+              {previewColumns.map((column) => (
+                <col key={column.name} style={{ width: `${getColumnWidth(column.name)}px` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <th className="dataset-preview-rownum">#</th>
                 {previewColumns.map((column) => (
                   <th key={column.name}>
-                    {column.name}
+                    <span className="dataset-preview-cell">{column.name}</span>
                     <small>{column.inferred_type}</small>
+                    <span
+                      className="dataset-preview-resizer"
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Resize ${column.name} column`}
+                      onPointerDown={(event) => startColumnResize(event, column.name)}
+                    />
                   </th>
                 ))}
               </tr>
@@ -411,7 +467,6 @@ function DatasetSummaryPanel({
   dataset,
   onHumanIntentSelect,
   onOpenDataset,
-  onClearCurrentDataset,
   onDeleteDataset,
   onWorksheetSelect,
   isSwitchingWorksheet,
@@ -460,7 +515,6 @@ function DatasetSummaryPanel({
   });
   const {
     interpretedQuestions,
-    businessQuestionReport,
     humanSummary: questionSummary,
   } = useBusinessQuestions({
     datasetId: dataset?.dataset_id || null,
@@ -474,43 +528,6 @@ function DatasetSummaryPanel({
     businessSemanticReport,
     kpiIntelligenceReport,
     workflowRecommendationReport,
-  });
-  const {
-    analyticsIntentGraph,
-    humanSummary: graphSummary,
-  } = useAnalyticsIntentGraph({
-    datasetId: dataset?.dataset_id || null,
-    dataProfile,
-    dialectRecommendation,
-    workflowRecommendationReport,
-    businessSemanticReport,
-    kpiIntelligenceReport,
-    businessQuestionReport,
-  });
-  const {
-    analyticsPlan,
-    humanSummary: planningSummary,
-  } = useAnalyticsPlanning({
-    datasetId: dataset?.dataset_id || null,
-    dataProfile,
-    workflowRecommendationReport,
-    kpiIntelligenceReport,
-    businessSemanticReport,
-    businessQuestionReport,
-    analyticsIntentGraph,
-  });
-  const {
-    executionContract,
-    humanSummary: executionContractSummary,
-  } = useExecutionContracts({
-    datasetId: dataset?.dataset_id || null,
-    analyticsPlan,
-    analyticsIntentGraph,
-    dataProfile,
-    workflowRecommendationReport,
-    kpiIntelligenceReport,
-    businessSemanticReport,
-    businessQuestionReport,
   });
   const schemaTypeSummary = dataset ? createSchemaTypeSummary(dataset) : {};
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
@@ -633,16 +650,21 @@ function DatasetSummaryPanel({
   return (
     <div className="human-dataset-workspace">
       <section className="dataset-hub-panel" aria-label="Dataset management hub">
-        <div className="summary-header">
+        <div className="data-page-head">
           <div>
             <p className="section-label">Data</p>
-            <h2>{dataset ? "What do I have?" : "Open data"}</h2>
-            {dataset && <p>FiltraQueri has profiled the file, softened the field names, and grouped the details into plain-language views.</p>}
+            <h2>Data</h2>
+            <p>Explore your dataset, understand connections, and prepare for analysis.</p>
           </div>
           {dataset && (
-            <div className="dataset-summary-actions dataset-hub-actions">
-              <button type="button" className="secondary-button" onClick={onClearCurrentDataset}>
-                Clear session
+            <div className="data-page-head-actions">
+              <span className="data-updated">Last updated: {formatRelativeTime(dataset.uploaded_at)}</span>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => window.location.reload()}
+              >
+                Refresh
               </button>
             </div>
           )}
@@ -650,6 +672,32 @@ function DatasetSummaryPanel({
 
         {dataset ? (
           <div className="data-profile-surface">
+            <div className="data-context-card" aria-label="Dataset context">
+              <span className="data-context-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <path d="M3 9h18M3 15h18M9 3v18" />
+                </svg>
+              </span>
+              <div className="data-context-item data-context-item--name">
+                <small>Dataset</small>
+                <strong title={dataset.original_filename}>{dataset.original_filename}</strong>
+              </div>
+              <div className="data-context-item">
+                <small>Worksheet</small>
+                <strong>
+                  {activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
+                </strong>
+              </div>
+              <div className="data-context-item">
+                <small>Rows</small>
+                <strong>{dataset.row_count.toLocaleString()}</strong>
+              </div>
+              <div className="data-context-item">
+                <small>Columns</small>
+                <strong>{dataset.column_count.toLocaleString()}</strong>
+              </div>
+            </div>
             <div className="data-stat-row" aria-label="Dataset profile">
               <article className="data-stat data-stat--rows">
                 <span className="data-stat-ic" aria-hidden="true">
@@ -699,28 +747,30 @@ function DatasetSummaryPanel({
                 <span className="data-stat-lbl">Field types</span>
               </article>
             </div>
-            <div className="data-profile-actions">
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => setIsDatasetPreviewOpen(true)}
-              >
-                Preview dataset
-              </button>
-              <button
-                type="button"
-                className="text-button danger-text-button"
-                onClick={() => onDeleteDataset(dataset.dataset_id)}
-              >
-                Delete
-              </button>
+            <div className="data-tabs-row">
+              <WorkspaceTabs
+                items={dataTabs}
+                activeItem={activeDrillInView}
+                label="Data views"
+                onChange={setActiveDrillInView}
+              />
+              <div className="data-profile-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => setIsDatasetPreviewOpen(true)}
+                >
+                  Preview dataset
+                </button>
+                <button
+                  type="button"
+                  className="text-button danger-text-button"
+                  onClick={() => onDeleteDataset(dataset.dataset_id)}
+                >
+                  Delete dataset
+                </button>
+              </div>
             </div>
-            <WorkspaceTabs
-              items={dataTabs}
-              activeItem={activeDrillInView}
-              label="Data views"
-              onChange={setActiveDrillInView}
-            />
             {activeDrillInView === "overview" && semanticHints.length > 0 && (
               <div className="semantic-hint-strip" aria-label="Business field hints">
                 <span>Likely business fields</span>
@@ -1002,127 +1052,6 @@ function DatasetSummaryPanel({
                 </div>
               </article>
             ))}
-          </div>
-        </section>
-        </RuntimeDisclosureSlot>
-      )}
-
-      {dataset && analyticsIntentGraph && activeDrillInView === "dataIntelligence" && (
-        <RuntimeDisclosureSlot
-          id="runtime-slot-intent-graph"
-          label="Details"
-          title="Intent graph"
-          summary={graphSummary}
-          badge={analyticsIntentGraph.confidence}
-        >
-        <section className="analytics-intent-graph-panel" aria-label="Analytics intent graph">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Intent graph</p>
-              <h2>Connected analysis context</h2>
-              <p>{graphSummary}</p>
-            </div>
-            <span className="dataset-count-pill">{analyticsIntentGraph.confidence}</span>
-          </div>
-          <div className="analytics-intent-graph-grid">
-            <span>
-              Nodes
-              <strong>{analyticsIntentGraph.nodes.length}</strong>
-            </span>
-            <span>
-              Edges
-              <strong>{analyticsIntentGraph.edges.length}</strong>
-            </span>
-            <span>
-              Workflows
-              <strong>{analyticsIntentGraph.connectedWorkflows.length}</strong>
-            </span>
-            <span>
-              KPIs
-              <strong>{analyticsIntentGraph.connectedKpis.length}</strong>
-            </span>
-            <span>
-              Needs review
-              <strong>{analyticsIntentGraph.missingMetadataDependencies.length}</strong>
-            </span>
-          </div>
-        </section>
-        </RuntimeDisclosureSlot>
-      )}
-
-      {dataset && analyticsPlan && activeDrillInView === "dataIntelligence" && (
-        <RuntimeDisclosureSlot
-          id="runtime-slot-analytics-plan"
-          label="Details"
-          title="Analytics plan"
-          summary={planningSummary}
-          badge={analyticsPlan.status.replace(/_/g, " ")}
-        >
-        <section className="analytics-planning-panel" aria-label="Analytics planning">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Analytics plan</p>
-              <h2>Possible workflow plan</h2>
-              <p>{planningSummary}</p>
-            </div>
-            <span className="dataset-count-pill">{analyticsPlan.status.replace(/_/g, " ")}</span>
-          </div>
-          <div className="analytics-planning-grid">
-            <span>
-              Steps
-              <strong>{analyticsPlan.sizing.estimatedFutureStepCount}</strong>
-            </span>
-            <span>
-              Complexity
-              <strong>{analyticsPlan.complexity}</strong>
-            </span>
-            <span>
-              Outputs
-              <strong>{analyticsPlan.projectedOutputs.length}</strong>
-            </span>
-            <span>
-              Warnings
-              <strong>{analyticsPlan.warnings.length}</strong>
-            </span>
-          </div>
-        </section>
-        </RuntimeDisclosureSlot>
-      )}
-
-      {dataset && executionContract && activeDrillInView === "dataIntelligence" && (
-        <RuntimeDisclosureSlot
-          id="runtime-slot-execution-contract"
-          label="Details"
-          title="Run boundary"
-          summary={executionContractSummary}
-          badge={executionContract.lifecycleState.replace(/_/g, " ")}
-        >
-        <section className="execution-contract-panel" aria-label="Run boundary layer">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Run boundary</p>
-              <h2>Run boundary</h2>
-              <p>{executionContractSummary}</p>
-            </div>
-            <span className="dataset-count-pill">{executionContract.lifecycleState.replace(/_/g, " ")}</span>
-          </div>
-          <div className="execution-contract-grid">
-            <span>
-              Stages
-              <strong>{executionContract.sizing.estimatedExecutionStages}</strong>
-            </span>
-            <span>
-              Outputs
-              <strong>{executionContract.sizing.estimatedProjectedOutputs}</strong>
-            </span>
-            <span>
-              Analysis paths
-              <strong>{executionContract.engines.length}</strong>
-            </span>
-            <span>
-              Fit
-              <strong>{executionContract.readinessScore}</strong>
-            </span>
           </div>
         </section>
         </RuntimeDisclosureSlot>
