@@ -3647,18 +3647,22 @@ body {
    handle, canvas — with no empty fourth track. The .app.destination-
    analyst specificity (0,3,0) intentionally beats every other
    .workspace-shell rule, including the .view-sqlWorkspace overrides. */
-.app.destination-analyst .workspace-shell {
+.app.destination-analyst .workspace-shell,
+.app.destination-data .workspace-shell {
   grid-template-columns: var(--sidebar-width, 240px) 4px minmax(0, 1fr);
 }
 
-.app.destination-analyst.is-sidebar-collapsed .workspace-shell {
+.app.destination-analyst.is-sidebar-collapsed .workspace-shell,
+.app.destination-data.is-sidebar-collapsed .workspace-shell {
   grid-template-columns: 64px 0 minmax(0, 1fr);
 }
 
 /* Preserve single-column stacking on narrow screens. */
 @media (max-width: 860px) {
   .app.destination-analyst .workspace-shell,
-  .app.destination-analyst.is-sidebar-collapsed .workspace-shell {
+  .app.destination-analyst.is-sidebar-collapsed .workspace-shell,
+  .app.destination-data .workspace-shell,
+  .app.destination-data.is-sidebar-collapsed .workspace-shell {
     grid-template-columns: 1fr;
   }
 }
@@ -3798,8 +3802,15 @@ body {
 
 .app .dataset-preview-head > div {
   display: grid;
+  flex: 1;
   gap: 3px;
   min-width: 0;
+}
+
+.app .dataset-preview-wrap-toggle {
+  flex: none;
+  align-self: flex-start;
+  white-space: nowrap;
 }
 
 .app .dataset-preview-head h2 {
@@ -3864,10 +3875,25 @@ body {
 
 .app .dataset-preview-table th,
 .app .dataset-preview-table td {
-  padding: 9px 12px;
-  border-bottom: 1px solid #eef2f5;
+  padding: 8px 12px;
+  border: 1px solid #d6e1e8;
   text-align: left;
+  vertical-align: top;
+}
+
+.app .dataset-preview-cell {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.app .dataset-preview-table.is-wrapped .dataset-preview-cell {
+  max-width: 360px;
+  overflow: visible;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .app .dataset-preview-table thead th {
@@ -3907,4 +3933,55 @@ body {
   padding: 24px;
   color: #64748b;
   font-size: 13px;
+}
+
+/* --- D2: Workbook Connections — clearer, livelier identity -- */
+.app .workbook-intelligence-panel {
+  border: 1px solid #bfe3e9;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: inset 4px 0 0 #0e7490;
+  animation: dataStatRise 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.app .workbook-intelligence-heading .section-label {
+  color: #0e7490;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.app .workbook-intelligence-heading h3 {
+  color: #0c4a55;
+}
+
+.app .workbook-intelligence-heading > span {
+  border-color: #bfe3e9;
+  background: #e2f4f7;
+  color: #0c4a55;
+  font-weight: 600;
+}
+
+.app .workbook-intelligence-strip span {
+  border-color: #d6e1e8;
+  background: #f3fafb;
+}
+
+.app .workbook-intelligence-strip strong {
+  color: #0c4a55;
+}
+
+.app .workbook-connection-list article {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: inset 3px 0 0 #67b8c4;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.app .workbook-connection-list article:hover {
+  border-color: #bfe3e9;
+  box-shadow: inset 3px 0 0 #0e7490;
+  transform: translateX(3px);
 }

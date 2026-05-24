@@ -293,6 +293,7 @@ function DatasetPreviewPage({
   onBack: () => void;
 }) {
   const hasWorkbook = worksheets.length > 0;
+  const [isWrapped, setIsWrapped] = useState(false);
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(
     initialWorksheetId || worksheets[0]?.worksheetId || null,
   );
@@ -334,6 +335,13 @@ function DatasetPreviewPage({
             {previewColumns.length.toLocaleString()} columns &middot; showing a sample
           </p>
         </div>
+        <button
+          type="button"
+          className="secondary-button dataset-preview-wrap-toggle"
+          onClick={() => setIsWrapped((current) => !current)}
+        >
+          {isWrapped ? "Compact cells" : "Expand cells"}
+        </button>
       </div>
 
       {hasWorkbook && (
@@ -357,7 +365,11 @@ function DatasetPreviewPage({
         {previewColumns.length === 0 || visibleRowCount === 0 ? (
           <p className="compact-empty">No sample data is available for this worksheet.</p>
         ) : (
-          <table className="dataset-preview-table">
+          <table
+            className={["dataset-preview-table", isWrapped ? "is-wrapped" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
             <thead>
               <tr>
                 <th className="dataset-preview-rownum">#</th>
@@ -373,15 +385,18 @@ function DatasetPreviewPage({
               {Array.from({ length: visibleRowCount }).map((_, rowIndex) => (
                 <tr key={rowIndex}>
                   <td className="dataset-preview-rownum">{rowIndex + 1}</td>
-                  {previewColumns.map((column) => (
-                    <td key={column.name}>
-                      {formatCell(
-                        Array.isArray(column.sample_values)
-                          ? column.sample_values[rowIndex]
-                          : undefined,
-                      )}
-                    </td>
-                  ))}
+                  {previewColumns.map((column) => {
+                    const cellText = formatCell(
+                      Array.isArray(column.sample_values)
+                        ? column.sample_values[rowIndex]
+                        : undefined,
+                    );
+                    return (
+                      <td key={column.name} title={cellText}>
+                        <span className="dataset-preview-cell">{cellText}</span>
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
