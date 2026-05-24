@@ -209,9 +209,15 @@ function WorkbookRelationshipSummaryPanel({
 }: {
   intelligence: WorkbookRelationshipIntelligence;
 }) {
+  const [showAllConnections, setShowAllConnections] = useState(false);
   const visibleRoles = intelligence.entityRoles.slice(0, 5);
-  const visibleConnections = intelligence.joinSuggestions.slice(0, 3);
-  const detectedEntityCount = intelligence.entityRoles.filter((role) => role.role !== "unknown").length;
+  const allConnections = intelligence.joinSuggestions;
+  const visibleConnections = showAllConnections ? allConnections : allConnections.slice(0, 3);
+  const detectedEntityCount = intelligence.entityRoles.filter(
+    (role) => role.role !== "unknown",
+  ).length;
+  const formatConfidence = (value: string) =>
+    value ? `${value.charAt(0).toUpperCase()}${value.slice(1)} confidence` : "Confidence";
 
   return (
     <section className="workbook-intelligence-panel" aria-label="Workbook relationship guidance">
@@ -241,19 +247,58 @@ function WorkbookRelationshipSummaryPanel({
         <div className="workbook-connection-list" aria-label="Likely worksheet connections">
           {visibleConnections.map((connection) => (
             <article key={connection.id}>
-              <strong>{connection.guidance}</strong>
-              <span>{connection.confidence} confidence</span>
+              <span className="workbook-connection-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 15l6-6" />
+                  <path d="M11 6l1-1a3.5 3.5 0 0 1 5 5l-1 1" />
+                  <path d="M13 18l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
+                </svg>
+              </span>
+              <p className="workbook-connection-text">{connection.guidance}</p>
+              <span className={`workbook-connection-confidence is-${connection.confidence}`}>
+                {formatConfidence(connection.confidence)}
+              </span>
+              <span className="workbook-connection-chevron" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
+              </span>
             </article>
           ))}
         </div>
       )}
-      <div className="workbook-entity-list" aria-label="Detected workbook entities">
-        {visibleRoles.map((role) => (
-          <span key={role.worksheetId} title={role.reasons.join(" ")}>
-            {workbookRoleLabels[role.role]}
-            <strong>{role.worksheetName}</strong>
-          </span>
-        ))}
+      <div className="workbook-intelligence-footer">
+        <div className="workbook-entity-list" aria-label="Detected workbook entities">
+          {visibleRoles.map((role) => (
+            <span key={role.worksheetId} title={role.reasons.join(" ")}>
+              {workbookRoleLabels[role.role]}
+              <strong>{role.worksheetName}</strong>
+            </span>
+          ))}
+        </div>
+        {allConnections.length > 3 && (
+          <button
+            type="button"
+            className="workbook-view-all"
+            onClick={() => setShowAllConnections((current) => !current)}
+          >
+            {showAllConnections ? "Show fewer" : "View all connections"}
+          </button>
+        )}
       </div>
     </section>
   );

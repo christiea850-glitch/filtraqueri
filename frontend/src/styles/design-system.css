@@ -4149,3 +4149,142 @@ body {
     gap: 14px;
   }
 }
+
+/* --- D-slice 3: Workbook connections — premium panel ------- */
+.app .workbook-connection-list {
+  gap: 8px;
+}
+
+.app .workbook-connection-list article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: none;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.app .workbook-connection-list article:hover {
+  border-color: #bfe3e9;
+  background: #f7fcfd;
+  box-shadow: none;
+  transform: none;
+}
+
+.app .workbook-connection-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: #e2f4f7;
+  color: #0e7490;
+}
+
+.app .workbook-connection-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.app .workbook-connection-text {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.app .workbook-connection-confidence {
+  flex: none;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app .workbook-connection-confidence.is-high {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.app .workbook-connection-confidence.is-medium {
+  background: #fef3c7;
+  color: #92660a;
+}
+
+.app .workbook-connection-confidence.is-low {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.app .workbook-connection-chevron {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: #cbd5e1;
+  transition:
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.app .workbook-connection-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+.app .workbook-connection-list article:hover .workbook-connection-chevron {
+  color: #0e7490;
+  transform: translateX(2px);
+}
+
+.app .workbook-intelligence-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app .workbook-intelligence-footer .workbook-entity-list {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.app .workbook-entity-list span {
+  border-color: #d6e1e8;
+  border-radius: 999px;
+  background: #f3fafb;
+}
+
+.app .workbook-view-all {
+  flex: none;
+  padding: 8px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #0c4a55;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.app .workbook-view-all:hover {
+  border-color: #0e7490;
+  background: #e2f4f7;
+}
