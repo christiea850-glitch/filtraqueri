@@ -4360,8 +4360,9 @@ body {
 
 /* --- R1: stat cards — solid icons + decorative sparkline --- */
 .app .data-stat {
-  min-height: 124px;
-  padding: 15px 16px;
+  min-height: 92px;
+  padding: 10px 12px;
+  border-radius: 10px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -4372,39 +4373,42 @@ body {
 .app .data-stat-top {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
 }
 
 .app .data-stat-ic {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
   background: var(--data-accent, #0e7490);
   color: #ffffff;
 }
 
 .app .data-stat-ic svg {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
 }
 
 .app .data-stat-num {
-  margin-top: 8px;
+  margin-top: 5px;
+  font-size: 19px;
+  line-height: 1.05;
 }
 
 .app .data-stat-sub {
-  padding-right: 68px;
-  line-height: 1.35;
+  padding-right: 48px;
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 .app .data-stat-spark {
   position: absolute;
-  right: 14px;
-  bottom: 14px;
-  width: 60px;
-  height: 22px;
+  right: 10px;
+  bottom: 10px;
+  width: 42px;
+  height: 16px;
   color: var(--data-accent, #0e7490);
-  opacity: 0.6;
+  opacity: 0.42;
 }
 
 /* --- R2: Data shell/sidebar exact-match refinement ---------- */

@@ -588,10 +588,8 @@ function DatasetSummaryPanel({
   const closeDrillIn = () => setActiveDrillInView("overview");
   const dataTabs = [
     { id: "overview", label: "Overview" },
-    { id: "columns", label: "Columns" },
+    { id: "columns", label: "Fields" },
     { id: "worksheets", label: "Worksheets" },
-    { id: "dataIntelligence", label: "Intelligence" },
-    { id: "businessSemantics", label: "Semantics" },
   ] satisfies Array<{ id: DataDrillInView; label: string }>;
   const datasetIntelligencePreview = createDatasetIntelligencePreviewViewModel({
     sourceDescriptorVersion: "dataset-summary-panel-v1",
@@ -950,26 +948,6 @@ function DatasetSummaryPanel({
                 </button>
               </div>
             </div>
-            {activeDrillInView === "overview" && semanticHints.length > 0 && (
-              <div className="semantic-hint-strip" aria-label="Business field hints">
-                <span className="semantic-hint-label">Likely business fields</span>
-                <div className="semantic-hint-chips">
-                  {semanticHints.map((profile) => (
-                    <small key={profile.sourceName} title={profile.sourceName}>
-                      {getBusinessRoleLabel(profile.role)}
-                      <strong>{profile.displayName}</strong>
-                    </small>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="semantic-hint-action"
-                  onClick={() => setActiveDrillInView("columns")}
-                >
-                  View all columns
-                </button>
-              </div>
-            )}
             {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
               <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
             )}
