@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata, WorkspaceMode } from "../dataset/datasetTypes";
-import type { AnalyticsTask } from "../tasks";
+import type { AnalyticsTask, AnalyticsTaskCategory } from "../tasks";
 import {
   getAnalysisPlanReadinessLabel,
   useAnalysisPlan,
@@ -218,6 +219,7 @@ function TaskDetail({
     businessExplanation?.metadataAwareSummary ||
     businessExplanation?.businessMeaning ||
     "Choose the required inputs to prepare this workflow preview.";
+  const canShowPreparationContext = missingInputs.length === 0;
 
   return (
     <aside className="task-detail-panel" aria-label="Task details">
@@ -225,7 +227,7 @@ function TaskDetail({
         <span>Selected workflow</span>
         {onClose && (
           <button type="button" className="text-button" onClick={onClose}>
-            Close
+            Back to workflows
           </button>
         )}
       </div>
@@ -289,38 +291,50 @@ function TaskDetail({
       )}
       </section>
 
-      <section className={`task-focus-section task-readiness-summary ${getPlanningReadinessTone(planningReadiness.status)}`} aria-label="Readiness">
-        <div className="task-focus-section-heading">
-          <span>Readiness</span>
-          <small>{getPlanningReadinessStatusLabel(planningReadiness.status)}</small>
-        </div>
-        <p>{primaryReadinessSummary}</p>
-      </section>
+      {canShowPreparationContext ? (
+        <>
+          <section className={`task-focus-section task-readiness-summary ${getPlanningReadinessTone(planningReadiness.status)}`} aria-label="Readiness">
+            <div className="task-focus-section-heading">
+              <span>Readiness</span>
+              <small>{getPlanningReadinessStatusLabel(planningReadiness.status)}</small>
+            </div>
+            <p>{primaryReadinessSummary}</p>
+          </section>
 
-      <section className="task-focus-section" aria-label="Recommended Path">
-        <div className="task-focus-section-heading">
-          <span>Recommended Path</span>
-          <small>{planningReadiness.confidenceLevel} confidence</small>
-        </div>
-        <strong>{recommendedPathLabel}</strong>
-        <p>{recommendedPathSummary}</p>
-      </section>
+          <section className="task-focus-section" aria-label="Recommended Path">
+            <div className="task-focus-section-heading">
+              <span>Recommended Path</span>
+              <small>{planningReadiness.confidenceLevel} confidence</small>
+            </div>
+            <strong>{recommendedPathLabel}</strong>
+            <p>{recommendedPathSummary}</p>
+          </section>
 
-      <section className="task-focus-section" aria-label="Notes and Guidance">
-        <div className="task-focus-section-heading">
-          <span>Notes / Guidance</span>
-          <small>{mode === "analyst" ? "Analyst view" : "Human view"}</small>
-        </div>
-        {visibleNotes.length > 0 ? (
-          <div className="task-guidance-list">
-            {visibleNotes.map((note) => (
-              <p key={note}>{note}</p>
-            ))}
+          <section className="task-focus-section" aria-label="Notes and Guidance">
+            <div className="task-focus-section-heading">
+              <span>Notes / Guidance</span>
+              <small>{mode === "analyst" ? "Analyst view" : "Human view"}</small>
+            </div>
+            {visibleNotes.length > 0 ? (
+              <div className="task-guidance-list">
+                {visibleNotes.map((note) => (
+                  <p key={note}>{note}</p>
+                ))}
+              </div>
+            ) : (
+              <p>Nothing runs from this preview. Review the prepared workflow context before moving forward.</p>
+            )}
+          </section>
+        </>
+      ) : (
+        <section className="task-focus-section task-next-step-note" aria-label="Next step">
+          <div className="task-focus-section-heading">
+            <span>Next Step</span>
+            <small>Prepare</small>
           </div>
-        ) : (
-          <p>Nothing runs from this preview. Select inputs first, then review the prepared workflow context.</p>
-        )}
-      </section>
+          <p>{primaryReadinessSummary}</p>
+        </section>
+      )}
 
       <details className="task-advanced-disclosure">
         <summary>Advanced workflow metadata</summary>
@@ -746,53 +760,118 @@ function TaskLauncherPanel({
   selectedTaskId?: string | null;
   onSelectedTaskIdChange?: (taskId: string | null) => void;
 }) {
-  const { taskGroups, selectedTask, selectTask } = useTaskLauncher({
+  const { taskGroups, selectedTask, selectTask, clearSelectedTask } = useTaskLauncher({
     selectedTaskId,
     onSelectedTaskIdChange,
   });
-  const activeTask = selectedTask || taskGroups[0]?.tasks[0] || null;
+  const [selectedCategoryId, setSelectedCategoryId] = useState<AnalyticsTaskCategory | null>(
+    selectedTask?.category || null,
+  );
+  const selectedCategoryGroup = useMemo(
+    () => taskGroups.find((group) => group.category.id === selectedCategoryId) || null,
+    [selectedCategoryId, taskGroups],
+  );
+
+  useEffect(() => {
+    if (selectedTask) setSelectedCategoryId(selectedTask.category);
+  }, [selectedTask]);
+
+  const chooseCategory = (categoryId: AnalyticsTaskCategory) => {
+    setSelectedCategoryId(categoryId);
+  };
+
+  const returnToGoals = () => {
+    clearSelectedTask();
+    setSelectedCategoryId(null);
+  };
+
+  const returnToWorkflows = () => {
+    clearSelectedTask();
+  };
 
   return (
     <section className="task-launcher-panel task-launcher-panel--focused" aria-label="Human mode analytics task launcher">
-      <div className="summary-header">
+      <div className="summary-header task-investigation-heading">
         <div>
           <p className="section-label">Tasks & Utilities</p>
-          <h2>Guided analytics tasks</h2>
-          <p>Choose a business workflow to preview the inputs and outputs FiltraQueri will support.</p>
+          <h2>Guided analytics investigation</h2>
+          <p>
+            Start with a goal, choose one workflow, then prepare only the context that workflow needs.
+          </p>
         </div>
         <span className="dataset-count-pill">
           {taskGroups.reduce((count, group) => count + group.tasks.length, 0)}
         </span>
       </div>
 
-      <div className="task-launcher-layout">
-        <div className="task-category-list">
-          {taskGroups.map((group) => (
-            <section className="task-category-section task-category-section--pills" aria-label={group.category.label} key={group.category.id}>
-              <div className="builder-block-header">
-                <span>{group.category.label}</span>
-                <small>{group.tasks.length}</small>
-              </div>
-              <div className="task-pill-row">
-                {group.tasks.map((task) => (
-                  <button
-                    type="button"
-                    className={`task-workflow-pill${task.id === activeTask?.id ? " is-selected" : ""}`}
-                    key={task.id}
-                    onClick={() => selectTask(task)}
-                    aria-pressed={task.id === activeTask?.id}
-                  >
-                    {task.label}
-                  </button>
-                ))}
-              </div>
-            </section>
-          ))}
-        </div>
-        {activeTask && (
-          <TaskDetail task={activeTask} dataset={dataset} mode={mode} />
-        )}
+      <div className="task-investigation-progress" aria-label="Investigation progress">
+        <span className={!selectedCategoryGroup && !selectedTask ? "is-active" : "is-complete"}>Goal</span>
+        <span className={selectedCategoryGroup && !selectedTask ? "is-active" : selectedTask ? "is-complete" : ""}>Workflow</span>
+        <span className={selectedTask ? "is-active" : ""}>Prepare</span>
       </div>
+
+      {!selectedCategoryGroup && !selectedTask && (
+        <div className="task-investigation-step" aria-label="Choose Investigation Goal">
+          <div className="task-step-header">
+            <span>Step 1</span>
+            <strong>Choose investigation goal</strong>
+            <p>Select the area you want to investigate. Workflows stay hidden until a goal is selected.</p>
+          </div>
+          <div className="task-goal-grid">
+          {taskGroups.map((group) => (
+            <button
+              type="button"
+              className="task-goal-card"
+              key={group.category.id}
+              onClick={() => chooseCategory(group.category.id)}
+            >
+              <span>{group.tasks.length} workflows</span>
+              <strong>{group.category.label}</strong>
+              <small>{group.category.description}</small>
+            </button>
+          ))}
+          </div>
+        </div>
+      )}
+
+      {selectedCategoryGroup && !selectedTask && (
+        <div className="task-investigation-step" aria-label="Choose Workflow">
+          <div className="task-flow-nav">
+            <button type="button" className="text-button" onClick={returnToGoals}>
+              Back to goals
+            </button>
+          </div>
+          <div className="task-step-header">
+            <span>Step 2</span>
+            <strong>{selectedCategoryGroup.category.label}</strong>
+            <p>{selectedCategoryGroup.category.description}</p>
+          </div>
+          <div className="task-workflow-list">
+            {selectedCategoryGroup.tasks.map((task) => (
+              <button
+                type="button"
+                className="task-workflow-option"
+                key={task.id}
+                onClick={() => selectTask(task)}
+              >
+                <strong>{task.label}</strong>
+                <span>{task.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedTask && (
+        <div className="task-investigation-step task-workspace-stage" aria-label="Focused Workflow Workspace">
+          <TaskDetail
+            task={selectedTask}
+            dataset={dataset}
+            mode={mode}
+            onClose={returnToWorkflows}
+          />
+        </div>
+      )}
     </section>
   );
 }

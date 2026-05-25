@@ -4270,11 +4270,160 @@ body {
 
 .app .task-launcher-panel--focused {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .app .task-launcher-panel--focused > .summary-header {
   margin-bottom: 0;
+}
+
+.app .task-investigation-heading {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.app .task-investigation-progress {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-self: start;
+  padding: 4px;
+  border: 1px solid #e7edf3;
+  border-radius: 999px;
+  background: #fbfcfd;
+}
+
+.app .task-investigation-progress span {
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.app .task-investigation-progress span.is-active {
+  background: #edf8fa;
+  color: #0f6575;
+}
+
+.app .task-investigation-progress span.is-complete {
+  color: #334155;
+}
+
+.app .task-investigation-step {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app .task-step-header {
+  display: grid;
+  gap: 4px;
+  max-width: 720px;
+}
+
+.app .task-step-header span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.app .task-step-header strong {
+  color: #172033;
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.app .task-step-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.45;
+}
+
+.app .task-goal-grid,
+.app .task-workflow-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app .task-goal-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.app .task-goal-card,
+.app .task-workflow-option {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e7edf3;
+  border-radius: 8px;
+  background: #fbfcfd;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.app .task-goal-card:hover,
+.app .task-goal-card:focus-visible,
+.app .task-workflow-option:hover,
+.app .task-workflow-option:focus-visible {
+  outline: none;
+  border-color: #b9dbe2;
+  background: #f4fbfc;
+}
+
+.app .task-goal-card > span {
+  justify-self: start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f3f6f8;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.app .task-goal-card strong,
+.app .task-workflow-option strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .task-goal-card small,
+.app .task-workflow-option span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.42;
+}
+
+.app .task-workflow-list {
+  max-width: 760px;
+}
+
+.app .task-flow-nav {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.app .task-workspace-stage {
+  gap: 0;
 }
 
 .app .task-launcher-layout {
@@ -4342,8 +4491,8 @@ body {
 
 .app .task-detail-panel {
   display: grid;
-  max-height: min(72vh, 760px);
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
   gap: 0;
   padding: 14px 16px;
   border-color: #dbe3ea;
@@ -4445,6 +4594,11 @@ body {
 .app .task-readiness-summary.blocked .task-focus-section-heading small {
   background: #fff1f2;
   color: #991b1b;
+}
+
+.app .task-next-step-note .task-focus-section-heading small {
+  background: #f6f8fa;
+  color: #526071;
 }
 
 .app .guided-input-list {
