@@ -42,7 +42,6 @@ import {
 } from "../taskPlanPreview";
 import { useKpiIntelligence } from "../kpiIntelligence";
 import { useWorkflowRecommendations } from "../workflowRecommendations";
-import TaskCategorySection from "./TaskCategorySection";
 import useTaskLauncher from "./useTaskLauncher";
 
 function TaskDetail({
@@ -54,7 +53,7 @@ function TaskDetail({
   task: AnalyticsTask;
   dataset: DatasetMetadata | null;
   mode: WorkspaceMode;
-  onClose: () => void;
+  onClose?: () => void;
 }) {
   const { configuration, updateInput } = useTaskConfiguration(task);
   const guidedInputs = useGuidedInputs({
@@ -201,9 +200,11 @@ function TaskDetail({
     <aside className="task-detail-panel" aria-label="Task details">
       <div className="builder-block-header">
         <span>Task preview</span>
-        <button type="button" className="text-button" onClick={onClose}>
-          Close
-        </button>
+        {onClose && (
+          <button type="button" className="text-button" onClick={onClose}>
+            Close
+          </button>
+        )}
       </div>
       <div>
         <p className="section-label">Guided workflow</p>
@@ -343,6 +344,8 @@ function TaskDetail({
           })}
         </div>
       )}
+      <details className="task-advanced-disclosure">
+        <summary>Advanced workflow metadata</summary>
       {analysisPlan && (
         <div className="analysis-plan-preview">
           <span>Future execution-step preview</span>
@@ -664,6 +667,7 @@ function TaskDetail({
           ))}
         </div>
       )}
+      </details>
       <p className="task-safe-note">
         This is a preview only. Nothing runs, and no SQL is created from this view.
       </p>
@@ -682,13 +686,14 @@ function TaskLauncherPanel({
   selectedTaskId?: string | null;
   onSelectedTaskIdChange?: (taskId: string | null) => void;
 }) {
-  const { taskGroups, selectedTask, selectTask, clearSelectedTask } = useTaskLauncher({
+  const { taskGroups, selectedTask, selectTask } = useTaskLauncher({
     selectedTaskId,
     onSelectedTaskIdChange,
   });
+  const activeTask = selectedTask || taskGroups[0]?.tasks[0] || null;
 
   return (
-    <section className="task-launcher-panel" aria-label="Human mode analytics task launcher">
+    <section className="task-launcher-panel task-launcher-panel--focused" aria-label="Human mode analytics task launcher">
       <div className="summary-header">
         <div>
           <p className="section-label">Tasks & Utilities</p>
@@ -703,16 +708,29 @@ function TaskLauncherPanel({
       <div className="task-launcher-layout">
         <div className="task-category-list">
           {taskGroups.map((group) => (
-            <TaskCategorySection
-              key={group.category.id}
-              group={group}
-              selectedTaskId={selectedTask?.id || null}
-              onTaskSelect={selectTask}
-            />
+            <section className="task-category-section task-category-section--pills" aria-label={group.category.label} key={group.category.id}>
+              <div className="builder-block-header">
+                <span>{group.category.label}</span>
+                <small>{group.tasks.length}</small>
+              </div>
+              <div className="task-pill-row">
+                {group.tasks.map((task) => (
+                  <button
+                    type="button"
+                    className={`task-workflow-pill${task.id === activeTask?.id ? " is-selected" : ""}`}
+                    key={task.id}
+                    onClick={() => selectTask(task)}
+                    aria-pressed={task.id === activeTask?.id}
+                  >
+                    {task.label}
+                  </button>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
-        {selectedTask && (
-          <TaskDetail task={selectedTask} dataset={dataset} mode={mode} onClose={clearSelectedTask} />
+        {activeTask && (
+          <TaskDetail task={activeTask} dataset={dataset} mode={mode} />
         )}
       </div>
     </section>

@@ -4216,6 +4216,129 @@ body {
   line-height: 1.35;
 }
 
+.app .human-dataset-workspace:has(.drill-in-detail-panel) {
+  gap: 10px;
+}
+
+.app .task-launcher-panel--focused {
+  display: grid;
+  gap: 12px;
+}
+
+.app .task-launcher-panel--focused > .summary-header {
+  margin-bottom: 0;
+}
+
+.app .task-launcher-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.75fr) minmax(340px, 1.25fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.app .task-category-list {
+  display: grid;
+  gap: 10px;
+}
+
+.app .task-category-section--pills {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.app .task-category-section--pills .builder-block-header {
+  margin-bottom: 0;
+}
+
+.app .task-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.app .task-workflow-pill {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.app .task-workflow-pill:hover,
+.app .task-workflow-pill:focus-visible {
+  outline: none;
+  border-color: #b9dbe2;
+  background: #f4fbfc;
+  color: #0f6575;
+}
+
+.app .task-workflow-pill.is-selected {
+  border-color: #0e7490;
+  background: #e2f4f7;
+  color: #0f6575;
+}
+
+.app .task-detail-panel {
+  display: grid;
+  max-height: min(72vh, 760px);
+  overflow: auto;
+  gap: 10px;
+  padding: 12px;
+}
+
+.app .task-detail-panel > div > h3 {
+  margin: 2px 0 4px;
+}
+
+.app .task-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.app .task-detail-grid span,
+.app .planning-readiness-grid small {
+  min-width: 0;
+}
+
+.app .task-advanced-disclosure {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.app .task-advanced-disclosure > summary {
+  padding: 8px 10px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app .task-advanced-disclosure > :not(summary) {
+  margin: 8px 10px;
+}
+
+@media (max-width: 980px) {
+  .app .task-launcher-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .app .task-detail-panel {
+    max-height: none;
+  }
+}
+
 @media (max-width: 720px) {
   .app .data-context-card {
     flex-wrap: wrap;

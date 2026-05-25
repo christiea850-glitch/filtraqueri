@@ -6,6 +6,7 @@ type DrillInDetailPanelProps = {
   summary?: string;
   children: ReactNode;
   onBack: () => void;
+  backLabel?: string;
 };
 
 function DrillInDetailPanel({
@@ -14,12 +15,13 @@ function DrillInDetailPanel({
   summary,
   children,
   onBack,
+  backLabel = "Back",
 }: DrillInDetailPanelProps) {
   return (
     <section className="drill-in-detail-panel" aria-label={title}>
       <div className="drill-in-detail-header">
         <button type="button" className="text-button drill-in-back-button" onClick={onBack}>
-          ← Back
+          {backLabel}
         </button>
         <div>
           <p className="section-label">{eyebrow}</p>

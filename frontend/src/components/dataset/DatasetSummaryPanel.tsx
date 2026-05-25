@@ -782,6 +782,7 @@ function DatasetSummaryPanel({
 
   return (
     <div className="human-dataset-workspace">
+      {!activeFocusedWorkflow && (
       <section className="dataset-hub-panel" aria-label="Dataset management hub">
         <div className="data-page-head">
           <div>
@@ -1091,6 +1092,7 @@ function DatasetSummaryPanel({
           </div>
         )}
       </section>
+      )}
 
       {dataset && activeDrillInView === "columns" && (
         <DrillInDetailPanel
@@ -1154,6 +1156,7 @@ function DatasetSummaryPanel({
           title="Data intelligence"
           summary={humanSummary}
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-data-intelligence"
@@ -1210,6 +1213,7 @@ function DatasetSummaryPanel({
           title="Suggested analysis paths"
           summary={workflowSummary}
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-workflow-recommendations"
@@ -1253,6 +1257,7 @@ function DatasetSummaryPanel({
           title="Business semantics"
           summary={semanticSummary || "Business context is derived from the available data profile."}
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         {businessSemanticReport && (
         <RuntimeDisclosureSlot
@@ -1303,6 +1308,7 @@ function DatasetSummaryPanel({
           title="KPI intelligence"
           summary={kpiSummary}
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-kpi-intelligence"
@@ -1346,6 +1352,7 @@ function DatasetSummaryPanel({
           title="Business questions"
           summary={questionSummary}
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-business-questions"
@@ -1389,6 +1396,7 @@ function DatasetSummaryPanel({
           title="Guided analytics tasks"
           summary="Preview task inputs and planning context."
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-task-launcher"
@@ -1412,6 +1420,7 @@ function DatasetSummaryPanel({
           title="Human Mode guidance"
           summary="Choose a simple continuation into the existing Human Mode workflow."
           onBack={closeDrillIn}
+          backLabel="Back to Data"
         >
         <RuntimeDisclosureSlot
           id="runtime-slot-human-guidance"
