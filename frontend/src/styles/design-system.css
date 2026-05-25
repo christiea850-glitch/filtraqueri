@@ -7156,3 +7156,215 @@ body {
   color: #667789;
   font-size: 10px;
 }
+
+/* --- H8: Compact semantic rhythm and density refinement --- */
+.app .human-understanding-panel {
+  gap: 9px;
+  padding: 11px 12px;
+}
+
+.app .investigation-stage-strip {
+  padding-bottom: 6px;
+}
+
+.app .investigation-stage-strip span {
+  min-height: 21px;
+  padding: 3px 8px;
+}
+
+.app .human-understanding-grid,
+.app .human-opportunity-row div,
+.app .business-activity-list,
+.app .smart-question-layer div {
+  gap: 5px;
+}
+
+.app .human-understanding-grid span,
+.app .human-opportunity-row button,
+.app .business-activity-list span,
+.app .smart-question-layer button {
+  min-height: 22px;
+  padding: 3px 7px;
+  font-size: 10px;
+}
+
+.app .business-priority-panel {
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.55fr);
+  gap: 10px;
+  padding: 11px 12px;
+}
+
+.app .business-priority-copy {
+  gap: 6px;
+}
+
+.app .business-priority-copy h3,
+.app .investigation-next-step-copy h3 {
+  font-size: 15px;
+}
+
+.app .business-priority-copy p:not(.section-label),
+.app .investigation-next-step-copy p:not(.section-label) {
+  font-size: 11px;
+  line-height: 1.38;
+}
+
+.app .business-priority-panel .business-signal-grid {
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.app .business-signal-grid > .human-signal-card,
+.app .business-priority-panel .human-signal-card {
+  min-height: 0;
+  padding: 7px 8px;
+}
+
+.app .business-priority-panel .human-signal-card.is-primary {
+  padding: 10px;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.055);
+}
+
+.app .business-priority-panel .human-signal-card.is-primary .human-signal-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  border-left-width: 2px;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) .human-signal-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) .human-signal-icon svg {
+  width: 11px;
+  height: 11px;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) strong {
+  font-size: 11px;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) small {
+  display: none;
+}
+
+.app .investigation-next-step-panel {
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.55fr);
+  gap: 10px;
+  padding: 11px 12px;
+}
+
+.app .investigation-next-step-actions {
+  grid-template-columns: minmax(0, 1.05fr) repeat(2, minmax(135px, 0.8fr));
+  gap: 6px;
+}
+
+.app .investigation-next-step-actions button {
+  min-height: 0;
+  padding: 8px 9px;
+}
+
+.app .investigation-next-step-actions button:not(.is-primary) {
+  align-items: center;
+}
+
+.app .investigation-next-step-actions button:not(.is-primary) .human-signal-icon {
+  width: 21px;
+  height: 21px;
+  border-radius: 6px;
+}
+
+.app .investigation-next-step-actions button:not(.is-primary) small {
+  display: none;
+}
+
+.app .investigation-next-step-actions button.is-primary {
+  padding: 9px 10px;
+  box-shadow: 0 8px 18px rgba(47, 125, 92, 0.075);
+}
+
+.app .smart-question-layer {
+  padding-top: 7px;
+}
+
+.app .data-stat-row {
+  gap: 7px;
+  margin: 2px 0 10px;
+  opacity: 0.76;
+}
+
+.app .data-stat {
+  min-height: 48px;
+  gap: 2px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+
+.app .data-stat-top {
+  gap: 5px;
+}
+
+.app .data-stat-ic {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+}
+
+.app .data-stat-ic svg {
+  width: 10px;
+  height: 10px;
+}
+
+.app .data-stat-num {
+  margin-top: 0;
+  font-size: 14px;
+}
+
+.app .data-stat-lbl,
+.app .data-stat-sub {
+  font-size: 9px;
+}
+
+.app .workbook-intelligence-panel {
+  gap: 9px;
+  padding: 11px 12px;
+}
+
+.app .workbook-intelligence-strip {
+  gap: 6px;
+}
+
+.app .workbook-intelligence-strip span {
+  padding: 6px 8px;
+}
+
+.app .workbook-connection-list article,
+.app .workbook-connection-list article.is-high,
+.app .workbook-connection-list article.is-medium,
+.app .workbook-connection-list article.is-low {
+  padding: 7px 8px;
+}
+
+@media (max-width: 920px) {
+  .app .business-priority-panel,
+  .app .investigation-next-step-panel,
+  .app .business-priority-panel .business-signal-grid,
+  .app .investigation-next-step-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .app .business-priority-panel .human-signal-card.is-primary {
+    grid-row: auto;
+  }
+}
