@@ -6515,3 +6515,297 @@ body {
 .app .workbook-profile-list strong {
   font-size: 12px;
 }
+
+/* --- H5: Semantic color hierarchy and filled attention system --- */
+.app {
+  --semantic-info: #2f6fb2;
+  --semantic-info-soft: #eaf3ff;
+  --semantic-info-fill: #d9ebff;
+  --semantic-info-hover: #c9e2fb;
+  --semantic-info-border: #a9caef;
+  --semantic-connected: #0f7a75;
+  --semantic-connected-soft: #e5f7f4;
+  --semantic-connected-fill: #cfefea;
+  --semantic-connected-hover: #bde6df;
+  --semantic-connected-border: #8fcbc3;
+  --semantic-opportunity: #2f7d5c;
+  --semantic-opportunity-soft: #edf9f3;
+  --semantic-opportunity-fill: #d8f0e3;
+  --semantic-opportunity-hover: #c4e7d3;
+  --semantic-opportunity-border: #98c9ad;
+  --semantic-attention: #a66f16;
+  --semantic-attention-soft: #fff7e8;
+  --semantic-attention-fill: #f8e5bb;
+  --semantic-attention-hover: #efd69d;
+  --semantic-attention-border: #dfbd75;
+  --semantic-intelligence: #6f55b5;
+  --semantic-intelligence-soft: #f3efff;
+  --semantic-intelligence-fill: #e5dcfb;
+  --semantic-intelligence-hover: #d8caf5;
+  --semantic-intelligence-border: #c3b1ea;
+  --semantic-risk: #b85c56;
+  --semantic-risk-soft: #fff0ef;
+  --semantic-risk-fill: #f8d6d3;
+  --semantic-risk-hover: #efc4c0;
+  --semantic-risk-border: #dfaaa5;
+}
+
+.app .is-info {
+  --signal-accent: var(--semantic-info);
+  --signal-soft: var(--semantic-info-soft);
+  --signal-fill: var(--semantic-info-fill);
+  --signal-hover: var(--semantic-info-hover);
+  --signal-border: var(--semantic-info-border);
+  --signal-ink: #234f82;
+}
+
+.app .is-connected {
+  --signal-accent: var(--semantic-connected);
+  --signal-soft: var(--semantic-connected-soft);
+  --signal-fill: var(--semantic-connected-fill);
+  --signal-hover: var(--semantic-connected-hover);
+  --signal-border: var(--semantic-connected-border);
+  --signal-ink: #0b625e;
+}
+
+.app .is-opportunity,
+.app .is-ready {
+  --signal-accent: var(--semantic-opportunity);
+  --signal-soft: var(--semantic-opportunity-soft);
+  --signal-fill: var(--semantic-opportunity-fill);
+  --signal-hover: var(--semantic-opportunity-hover);
+  --signal-border: var(--semantic-opportunity-border);
+  --signal-ink: #256348;
+}
+
+.app .is-warning,
+.app .is-attention {
+  --signal-accent: var(--semantic-attention);
+  --signal-soft: var(--semantic-attention-soft);
+  --signal-fill: var(--semantic-attention-fill);
+  --signal-hover: var(--semantic-attention-hover);
+  --signal-border: var(--semantic-attention-border);
+  --signal-ink: #7a500f;
+}
+
+.app .is-intelligence {
+  --signal-accent: var(--semantic-intelligence);
+  --signal-soft: var(--semantic-intelligence-soft);
+  --signal-fill: var(--semantic-intelligence-fill);
+  --signal-hover: var(--semantic-intelligence-hover);
+  --signal-border: var(--semantic-intelligence-border);
+  --signal-ink: #574293;
+}
+
+.app .is-risk {
+  --signal-accent: var(--semantic-risk);
+  --signal-soft: var(--semantic-risk-soft);
+  --signal-fill: var(--semantic-risk-fill);
+  --signal-hover: var(--semantic-risk-hover);
+  --signal-border: var(--semantic-risk-border);
+  --signal-ink: #93453f;
+}
+
+.app .human-signal-icon {
+  background: var(--signal-fill, #eef4f7);
+  color: var(--signal-ink, #526071);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--signal-border, #d6e1e8) 65%, transparent);
+}
+
+.app .human-understanding-panel {
+  border-color: var(--semantic-info-border);
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  box-shadow: inset 3px 0 0 var(--semantic-info);
+}
+
+.app .human-understanding-grid span {
+  border-color: var(--semantic-info-border);
+  background: var(--semantic-info-fill);
+  color: #234f82;
+}
+
+.app .human-opportunity-row button,
+.app .business-activity-list span {
+  border-color: var(--semantic-opportunity-border);
+  background: var(--semantic-opportunity-fill);
+  color: #256348;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.app .human-opportunity-row button:hover,
+.app .human-opportunity-row button:focus-visible,
+.app .business-activity-list span:hover {
+  border-color: var(--semantic-opportunity);
+  background: var(--semantic-opportunity-hover);
+  box-shadow: 0 8px 18px rgba(47, 125, 92, 0.1);
+}
+
+.app .business-narrative-panel {
+  border-color: #e1e9ef;
+  background: #ffffff;
+  box-shadow: inset 3px 0 0 var(--semantic-connected);
+}
+
+.app .business-signals-panel {
+  border-color: #d9e7e9;
+  background: #f8fbfb;
+}
+
+.app .business-signal-grid > .human-signal-card {
+  min-height: 76px;
+  border-color: var(--signal-border, #e4ebf1);
+  border-left-width: 4px;
+  background: linear-gradient(180deg, var(--signal-soft, #ffffff) 0%, #ffffff 100%);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+}
+
+.app .business-signal-grid > .human-signal-card:hover {
+  border-color: var(--signal-accent, #d8e3ec);
+  background: var(--signal-soft, #ffffff);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.app .business-signal-grid > .human-signal-card strong {
+  color: color-mix(in srgb, var(--signal-ink, #172033) 75%, #172033);
+}
+
+.app .investigation-next-step-panel {
+  border-color: var(--semantic-connected-border);
+  background: linear-gradient(180deg, #f7fcfb 0%, #ffffff 100%);
+  box-shadow: inset 3px 0 0 var(--semantic-connected);
+}
+
+.app .investigation-next-step-copy .section-label,
+.app .investigation-next-step-copy h3 {
+  color: #0b625e;
+}
+
+.app .investigation-next-step-actions button {
+  border-color: var(--semantic-connected-border);
+  background: var(--semantic-connected-soft);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.app .investigation-next-step-actions button:hover,
+.app .investigation-next-step-actions button:focus-visible {
+  border-color: var(--semantic-connected);
+  background: var(--semantic-connected-fill);
+  box-shadow: 0 12px 24px rgba(15, 122, 117, 0.12);
+}
+
+.app .smart-question-layer button {
+  border-color: #d8e3ec;
+  background: #f8fafc;
+  color: #425061;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.app .smart-question-layer button:hover,
+.app .smart-question-layer button:focus-visible {
+  border-color: var(--semantic-info-border);
+  background: var(--semantic-info-fill);
+  color: #234f82;
+  box-shadow: 0 8px 18px rgba(47, 111, 178, 0.1);
+}
+
+.app .smart-question-layer button.is-recommended {
+  min-height: 30px;
+  border-color: var(--semantic-opportunity-border);
+  background: var(--semantic-opportunity-fill);
+  color: #256348;
+  box-shadow: 0 7px 16px rgba(47, 125, 92, 0.09);
+}
+
+.app .smart-question-layer button.is-recommended:hover,
+.app .smart-question-layer button.is-recommended:focus-visible {
+  border-color: var(--semantic-opportunity);
+  background: var(--semantic-opportunity-hover);
+  color: #1f563e;
+}
+
+.app .workbook-connection-list article {
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+}
+
+.app .workbook-connection-list article.is-high {
+  border-color: var(--semantic-opportunity-border);
+  border-left-color: var(--semantic-opportunity);
+  background: linear-gradient(90deg, var(--semantic-opportunity-soft) 0%, #ffffff 55%);
+}
+
+.app .workbook-connection-list article.is-medium {
+  border-color: var(--semantic-connected-border);
+  border-left-color: var(--semantic-connected);
+  background: linear-gradient(90deg, var(--semantic-connected-soft) 0%, #ffffff 55%);
+}
+
+.app .workbook-connection-list article.is-low {
+  border-color: var(--semantic-attention-border);
+  border-left-color: var(--semantic-attention);
+  background: linear-gradient(90deg, var(--semantic-attention-soft) 0%, #ffffff 55%);
+}
+
+.app .workbook-connection-list article:hover {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.app .workbook-connection-icon {
+  background: var(--semantic-connected-fill);
+  color: var(--semantic-connected);
+}
+
+.app .workbook-connection-list article.is-high .workbook-connection-icon {
+  background: var(--semantic-opportunity-fill);
+  color: var(--semantic-opportunity);
+}
+
+.app .workbook-connection-list article.is-low .workbook-connection-icon {
+  background: var(--semantic-attention-fill);
+  color: var(--semantic-attention);
+}
+
+.app .workbook-connection-confidence.is-high {
+  border-color: var(--semantic-opportunity-border);
+  background: var(--semantic-opportunity-fill);
+  color: #256348;
+}
+
+.app .workbook-connection-confidence.is-medium {
+  border-color: var(--semantic-connected-border);
+  background: var(--semantic-connected-fill);
+  color: #0b625e;
+}
+
+.app .workbook-connection-confidence.is-low {
+  border-color: var(--semantic-attention-border);
+  background: var(--semantic-attention-fill);
+  color: #7a500f;
+}
+
+.app .dataset-count-pill,
+.app .workflow-recommendation-card small,
+.app .business-semantic-card span,
+.app .business-kpi-list small,
+.app .kpi-opportunity-card small,
+.app .business-question-card small,
+.app .task-workflow-pill,
+.app .dataset-preview-sheet.active {
+  border-color: var(--semantic-intelligence-border);
+  background: var(--semantic-intelligence-fill);
+  color: #574293;
+}
