@@ -213,13 +213,22 @@
   border-top: 1px solid #e2e8f0;
 }
 
+.question-workspace-schema-review {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
 .question-workspace-intent-grid,
-.question-workspace-strategy-grid {
+.question-workspace-strategy-grid,
+.question-workspace-schema-grid {
   display: grid;
   gap: 8px;
 }
 
-.question-workspace-intent-grid {
+.question-workspace-intent-grid,
+.question-workspace-schema-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -228,7 +237,8 @@
 }
 
 .question-workspace-intent-grid article,
-.question-workspace-strategy-grid article {
+.question-workspace-strategy-grid article,
+.question-workspace-schema-grid article {
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -239,7 +249,9 @@
 }
 
 .question-workspace-intent-grid span,
-.question-workspace-strategy-grid span {
+.question-workspace-strategy-grid span,
+.question-workspace-schema-grid span,
+.question-workspace-schema-list > span {
   color: #64748b;
   font-size: 11px;
   font-weight: 700;
@@ -247,7 +259,8 @@
 }
 
 .question-workspace-intent-grid strong,
-.question-workspace-strategy-grid strong {
+.question-workspace-strategy-grid strong,
+.question-workspace-schema-grid strong {
   overflow: hidden;
   color: #172033;
   font-size: 14px;
@@ -258,6 +271,36 @@
 .question-workspace-intent-grid small {
   color: #64748b;
   font-size: 12px;
+}
+
+.question-workspace-schema-list {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.question-workspace-schema-list p {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.question-workspace-schema-list.is-clarification {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.question-workspace-fallback {
+  padding: 10px 12px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
 }
 
 .question-workspace-boundary {
@@ -342,6 +385,7 @@
 
 @media (max-width: 900px) {
   .question-workspace-intent-grid,
+  .question-workspace-schema-grid,
   .question-workspace-timeline {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -350,6 +394,7 @@
 @media (max-width: 560px) {
   .question-workspace-review-card div,
   .question-workspace-intent-grid,
+  .question-workspace-schema-grid,
   .question-workspace-timeline {
     grid-template-columns: 1fr;
   }

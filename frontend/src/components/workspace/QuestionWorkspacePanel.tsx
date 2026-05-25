@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
+import { createSchemaAwareDraftPlan } from "../../features/questionWorkspace/schemaQuestionTranslator";
+import type {
+  CandidateFieldMatch,
+  SchemaAwareQuestionDraftPlan,
+} from "../../features/questionWorkspace/questionTranslatorTypes";
 
 type QuestionDraftStatus = "idle" | "drafted";
 
@@ -179,6 +184,7 @@ const createQuestionReviewHints = (question: string): QuestionReviewHints => {
 function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
+  const [schemaDraftPlan, setSchemaDraftPlan] = useState<SchemaAwareQuestionDraftPlan | null>(null);
 
   const datasetContext = useMemo(
     () => [
@@ -221,17 +227,43 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
     [reviewHints.detectedIntents, reviewHints.possibleDimensions, reviewHints.possibleMeasures],
   );
 
+  const formatCandidateFields = (candidates: CandidateFieldMatch[]) =>
+    candidates.length > 0
+      ? candidates
+          .slice(0, 4)
+          .map((candidate) => `${candidate.columnName} (${candidate.confidence})`)
+          .join(", ")
+      : "Not identified yet";
+
+  const hasSchemaCandidates = Boolean(
+    schemaDraftPlan &&
+      (
+        schemaDraftPlan.candidateDimensions.length > 0 ||
+        schemaDraftPlan.candidateMeasures.length > 0 ||
+        schemaDraftPlan.candidateDateFields.length > 0
+      ),
+  );
+
   const prepareDraft = () => {
     const nextQuestion = rawQuestion.trim();
     if (!nextQuestion) return;
+    const nextSourceName = sourceName || dataset.table_name;
 
     setDraft({
       rawQuestion: nextQuestion,
       draftStatus: "drafted",
       activeDatasetId: dataset.dataset_id,
-      activeWorksheetName: sourceName || dataset.table_name,
+      activeWorksheetName: nextSourceName,
       createdAt: new Date().toISOString(),
     });
+    setSchemaDraftPlan(
+      createSchemaAwareDraftPlan({
+        rawQuestion: nextQuestion,
+        schema: dataset.schema,
+        dataset,
+        activeSourceName: nextSourceName,
+      }),
+    );
   };
 
   return (
@@ -309,25 +341,35 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
             </div>
             <div>
               <dt>Possible focus</dt>
-              <dd>{reviewHints.possibleFocus}</dd>
+              <dd>{schemaDraftPlan?.candidateDimensions[0]?.columnName || reviewHints.possibleFocus}</dd>
             </div>
             <div>
               <dt>Possible analysis type</dt>
-              <dd>{reviewHints.possibleAnalysisType}</dd>
+              <dd>{schemaDraftPlan?.detectedIntent || reviewHints.possibleAnalysisType}</dd>
             </div>
             <div>
               <dt>Possible dimensions</dt>
-              <dd>{reviewHints.possibleDimensions.join(", ")}</dd>
+              <dd>{formatCandidateFields(schemaDraftPlan?.candidateDimensions || [])}</dd>
             </div>
             <div>
               <dt>Possible measures</dt>
-              <dd>{reviewHints.possibleMeasures.join(", ")}</dd>
+              <dd>{formatCandidateFields(schemaDraftPlan?.candidateMeasures || [])}</dd>
+            </div>
+            <div>
+              <dt>Possible date fields</dt>
+              <dd>{formatCandidateFields(schemaDraftPlan?.candidateDateFields || [])}</dd>
             </div>
             <div>
               <dt>Status</dt>
-              <dd>Execution has not started</dd>
+              <dd>{schemaDraftPlan?.executionStatus || "Execution has not started"}</dd>
             </div>
           </dl>
+
+          {schemaDraftPlan && !hasSchemaCandidates && (
+            <p className="question-workspace-fallback">
+              FiltraQueri could not confidently match this question to fields yet.
+            </p>
+          )}
 
           <section className="question-workspace-intent" aria-label="Investigation intent">
             <div className="question-workspace-section-heading">
@@ -337,21 +379,78 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
             <div className="question-workspace-intent-grid">
               <article>
                 <span>Primary intent</span>
-                <strong>{reviewHints.detectedIntents[0]}</strong>
-                <small>{reviewHints.confidence} confidence</small>
+                <strong>{schemaDraftPlan?.detectedIntent || reviewHints.detectedIntents[0]}</strong>
+                <small>{schemaDraftPlan?.confidence || reviewHints.confidence} confidence</small>
               </article>
               <article>
-                <span>Detected business entities</span>
-                <strong>{reviewHints.detectedEntities.join(", ")}</strong>
-                <small>Frontend text match only</small>
+                <span>Candidate fields</span>
+                <strong>
+                  {formatCandidateFields([
+                    ...(schemaDraftPlan?.candidateDimensions || []),
+                    ...(schemaDraftPlan?.candidateMeasures || []),
+                    ...(schemaDraftPlan?.candidateDateFields || []),
+                  ])}
+                </strong>
+                <small>Schema match only</small>
               </article>
               <article>
                 <span>Planned outputs</span>
-                <strong>{reviewHints.plannedOutputs.join(", ")}</strong>
+                <strong>{schemaDraftPlan?.plannedOutputType || reviewHints.plannedOutputs.join(", ")}</strong>
                 <small>Non-executable preview</small>
               </article>
             </div>
           </section>
+
+          {schemaDraftPlan && (
+            <section className="question-workspace-schema-review" aria-label="Schema-aware draft plan">
+              <div className="question-workspace-section-heading">
+                <p className="section-label">Matched Dataset Fields</p>
+                <h4>Schema-aware draft plan</h4>
+              </div>
+              <div className="question-workspace-schema-grid">
+                <article>
+                  <span>Dimensions</span>
+                  <strong>{formatCandidateFields(schemaDraftPlan.candidateDimensions)}</strong>
+                </article>
+                <article>
+                  <span>Measures</span>
+                  <strong>{formatCandidateFields(schemaDraftPlan.candidateMeasures)}</strong>
+                </article>
+                <article>
+                  <span>Date fields</span>
+                  <strong>{formatCandidateFields(schemaDraftPlan.candidateDateFields)}</strong>
+                </article>
+              </div>
+
+              {schemaDraftPlan.ambiguousTerms.length > 0 && (
+                <div className="question-workspace-schema-list">
+                  <span>Ambiguous terms</span>
+                  {schemaDraftPlan.ambiguousTerms.map((item) => (
+                    <p key={item.term}>
+                      <strong>{item.term}</strong>:{" "}
+                      {item.candidates.map((candidate) => candidate.columnName).join(", ")}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {schemaDraftPlan.missingRequirements.length > 0 && (
+                <div className="question-workspace-schema-list is-clarification">
+                  <span>Clarification needs</span>
+                  <p>{schemaDraftPlan.missingRequirements.join(", ")}</p>
+                </div>
+              )}
+
+              {schemaDraftPlan.suggestedClarifyingQuestions.length > 0 && (
+                <div className="question-workspace-schema-list">
+                  <span>Suggested clarifying questions</span>
+                  {schemaDraftPlan.suggestedClarifyingQuestions.map((question) => (
+                    <p key={question}>{question}</p>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
           <section className="question-workspace-strategy" aria-label="Potential investigation strategy">
             <div className="question-workspace-section-heading">
@@ -397,6 +496,7 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
           <section className="question-workspace-boundary" aria-label="Execution boundary">
             <p className="section-label">Execution Boundary</p>
             <ul>
+              <li>No query has been generated.</li>
               <li>No SQL has been generated.</li>
               <li>No backend query has executed.</li>
               <li>This is a planning-only review layer.</li>
