@@ -4,7 +4,6 @@ import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutio
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
 import SqlEditorPanel, { SqlDraftPanel, SqlGuidancePanel } from "./SqlEditorPanel";
-import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import type { SqlPreviewResult } from "./sqlTypes";
 import useSqlWorkspace from "./useSqlWorkspace";
@@ -16,29 +15,57 @@ type SqlWorkspaceProps = {
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
 };
 
-type BottomTab = "result" | "guidance" | "drafts";
+type BottomTab = "guidance" | "drafts";
 
 const bottomTabLabels: Record<BottomTab, string> = {
-  result: "Result preview",
-  guidance: "SQL guidance",
+  guidance: "Explain query",
   drafts: "Drafts",
 };
 
-const bottomTabOrder: BottomTab[] = ["result", "guidance", "drafts"];
+const bottomTabOrder: BottomTab[] = ["guidance", "drafts"];
 
 function SqlFocusedResultPreview({
-  dataset,
-  sql,
   previewResult,
   onBack,
 }: {
-  dataset: DatasetMetadata | null;
-  sql: string;
   previewResult: SqlPreviewResult;
   onBack: () => void;
 }) {
+  const [isWrapped, setIsWrapped] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const hasColumns = previewResult.columns.length > 0;
   const hasRows = previewResult.rows.length > 0;
+  const baseColumnWidth = 168;
+  const getColumnWidth = (columnName: string) => columnWidths[columnName] ?? baseColumnWidth;
+  const totalTableWidth =
+    52 + previewResult.columns.reduce((sum, column) => sum + getColumnWidth(column), 0);
+
+  const startColumnResize = (
+    event: ReactPointerEvent<HTMLSpanElement>,
+    columnName: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("is-dragging");
+    const startX = event.clientX;
+    const startWidth = getColumnWidth(columnName);
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextWidth = startWidth + (moveEvent.clientX - startX);
+      setColumnWidths((current) => ({
+        ...current,
+        [columnName]: Math.min(560, Math.max(72, Math.round(nextWidth))),
+      }));
+    };
+    const onRelease = () => {
+      handle.classList.remove("is-dragging");
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onRelease);
+    };
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onRelease);
+  };
 
   return (
     <section className="sql-result-page" aria-label="SQL result preview">
@@ -52,6 +79,13 @@ function SqlFocusedResultPreview({
           <p>{previewResult.message}</p>
         </div>
         <div className="sql-result-page-actions" aria-label="Future result actions">
+          <button
+            type="button"
+            className="secondary-button dataset-preview-wrap-toggle"
+            onClick={() => setIsWrapped((current) => !current)}
+          >
+            {isWrapped ? "Compact cells" : "Expand cells"}
+          </button>
           <button type="button" className="secondary-button" disabled title="Export for SQL results is planned.">
             Export
           </button>
@@ -61,37 +95,36 @@ function SqlFocusedResultPreview({
         </div>
       </div>
 
-      <div className="sql-result-summary" aria-label="SQL result summary">
-        <span>
-          <strong>{previewResult.rows.length.toLocaleString()}</strong>
-          Rows
-        </span>
-        <span>
-          <strong>{previewResult.columns.length.toLocaleString()}</strong>
-          Columns
-        </span>
-        <span title={dataset?.original_filename || "No dataset"}>
-          <strong>{dataset?.table_name || "data"}</strong>
-          Source
-        </span>
-      </div>
-
-      <div className="sql-result-query-card">
-        <span>Query</span>
-        <pre>{sql}</pre>
-      </div>
-
       {hasColumns ? (
-        <div className="sql-result-table-shell">
-          <table aria-label="SQL result data grid">
+        <div className="dataset-preview-table-wrap sql-result-table-wrap">
+          <table
+            className={["dataset-preview-table", "sql-result-table", isWrapped ? "is-wrapped" : ""]
+              .filter(Boolean)
+              .join(" ")}
+            style={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
+            aria-label="SQL result data grid"
+          >
+            <colgroup>
+              <col style={{ width: "52px" }} />
+              {previewResult.columns.map((column) => (
+                <col key={column} style={{ width: `${getColumnWidth(column)}px` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
-                <th className="row-number-cell" scope="col">
-                  Row
+                <th className="dataset-preview-rownum" scope="col">
+                  #
                 </th>
                 {previewResult.columns.map((column) => (
                   <th key={column} scope="col">
-                    {column}
+                    <span className="dataset-preview-cell">{column}</span>
+                    <span
+                      className="dataset-preview-resizer"
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label={`Resize ${column} column`}
+                      onPointerDown={(event) => startColumnResize(event, column)}
+                    />
                   </th>
                 ))}
               </tr>
@@ -100,11 +133,13 @@ function SqlFocusedResultPreview({
               {hasRows ? (
                 previewResult.rows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
-                    <th className="row-number-cell" scope="row">
+                    <td className="dataset-preview-rownum">
                       {rowIndex + 1}
-                    </th>
+                    </td>
                     {previewResult.columns.map((column) => (
-                      <td key={column}>{String(row[column] ?? "")}</td>
+                      <td key={column} title={String(row[column] ?? "")}>
+                        <span className="dataset-preview-cell">{String(row[column] ?? "")}</span>
+                      </td>
                     ))}
                   </tr>
                 ))
@@ -149,7 +184,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     editor,
     insertSql,
     loadDraft,
-    sqlDraft,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
   const toggleBottomTab = (tab: BottomTab) => {
@@ -186,8 +220,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     return (
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
         <SqlFocusedResultPreview
-          dataset={dataset}
-          sql={sqlDraft}
           previewResult={previewResult}
           onBack={() => setIsFocusedPreviewOpen(false)}
         />
@@ -287,7 +319,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
                 </button>
               </div>
               <div className="sqlw-dock-body">
-                {bottomTab === "result" && <SqlPreviewGrid previewResult={previewResult} />}
                 {bottomTab === "guidance" && (
                   <SqlGuidancePanel
                     diagnostics={sqlAnalysis.diagnostics}

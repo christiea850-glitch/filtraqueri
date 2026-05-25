@@ -32,25 +32,49 @@
     "version": 1,
     "selectedDialect": "mariadb",
     "activeSqlTab": "editor",
-    "activeDraftId": "active-draft",
-    "activeSnippetId": "1779673034923",
+    "activeDraftId": "1779675608483",
+    "activeSnippetId": "1779675608483",
     "lastOpenedContext": "sqlWorkspace",
     "draftMetadata": {
-      "draftCount": 3,
-      "lastDraftSavedAt": "2026-05-25T01:50:33.207Z"
+      "draftCount": 6,
+      "lastDraftSavedAt": "10:20 PM"
     },
     "snippetMetadata": {
-      "snippetCount": 2,
-      "lastSnippetSavedAt": "2026-05-25T01:37:14.924Z"
+      "snippetCount": 5,
+      "lastSnippetSavedAt": "2026-05-25T02:20:08.483Z"
     },
     "drafts": [
       {
         "version": 1,
+        "id": "1779675608483",
+        "label": "Draft 6",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "selectedDialect": "mariadb",
+        "updatedAt": "2026-05-25T02:20:08.483Z"
+      },
+      {
+        "version": 1,
+        "id": "1779675509985",
+        "label": "Draft 5",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "selectedDialect": "mariadb",
+        "updatedAt": "2026-05-25T02:18:29.985Z"
+      },
+      {
+        "version": 1,
+        "id": "1779675507909",
+        "label": "Draft 4",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "selectedDialect": "mariadb",
+        "updatedAt": "2026-05-25T02:18:27.909Z"
+      },
+      {
+        "version": 1,
         "id": "active-draft",
         "label": "Query draft",
-        "sql": "",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
         "selectedDialect": "mariadb",
-        "updatedAt": "2026-05-25T01:50:33.207Z"
+        "updatedAt": "2026-05-25T02:14:25.653Z"
       },
       {
         "version": 1,
@@ -70,6 +94,45 @@
       }
     ],
     "snippets": [
+      {
+        "version": 1,
+        "id": "1779675608483",
+        "name": "Draft 6",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "dialect": "mariadb",
+        "createdAt": "2026-05-25T02:20:08.483Z",
+        "updatedAt": "2026-05-25T02:20:08.483Z",
+        "tags": [
+          "draft"
+        ],
+        "description": "Saved from the SQL Workspace draft action."
+      },
+      {
+        "version": 1,
+        "id": "1779675509985",
+        "name": "Draft 5",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "dialect": "mariadb",
+        "createdAt": "2026-05-25T02:18:29.985Z",
+        "updatedAt": "2026-05-25T02:18:29.985Z",
+        "tags": [
+          "draft"
+        ],
+        "description": "Saved from the SQL Workspace draft action."
+      },
+      {
+        "version": 1,
+        "id": "1779675507909",
+        "name": "Draft 4",
+        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "dialect": "mariadb",
+        "createdAt": "2026-05-25T02:18:27.910Z",
+        "updatedAt": "2026-05-25T02:18:27.910Z",
+        "tags": [
+          "draft"
+        ],
+        "description": "Saved from the SQL Workspace draft action."
+      },
       {
         "version": 1,
         "id": "1779673034923",
@@ -97,7 +160,7 @@
         "description": "Saved from the SQL Workspace draft action."
       }
     ],
-    "updatedAt": "2026-05-25T01:50:33.207Z"
+    "updatedAt": "2026-05-25T02:20:08.483Z"
   },
   "datasets": [
     {
@@ -4400,8 +4463,8 @@
     }
   ],
   "created_at": "2026-05-24T22:48:12.481877+00:00",
-  "last_opened_at": "2026-05-25T01:55:19.120528+00:00",
-  "updated_at": "2026-05-25T01:55:19.136529+00:00",
+  "last_opened_at": "2026-05-25T02:20:08.967331+00:00",
+  "updated_at": "2026-05-25T02:20:09.003262+00:00",
   "workbook_metadata": {
     "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
     "workspace_id": "d9846836ff374a09a6e59494256dbdd6",
