@@ -46,6 +46,7 @@ import {
   MetadataFooter,
   OperationalList,
   OperationalTag,
+  OperationalWorkspaceLayout,
   PrimaryFocusBlock,
   WorkspaceHeader,
 } from "../workspace";
@@ -1146,7 +1147,7 @@ function DatasetSummaryPanel({
 
         {dataset ? (
             <div className="data-profile-surface">
-            <div className="operational-workspace-layout">
+            <OperationalWorkspaceLayout>
               <InvestigationThread>
                 <WorkspaceHeader
                   eyebrow="Active case"
@@ -1198,7 +1199,7 @@ function DatasetSummaryPanel({
                     <p className="section-label">Evidence</p>
                     <strong>{businessNarrative}</strong>
                   </div>
-                  {businessSignals.slice(0, 4).map((signal, index) => (
+                  {businessSignals.slice(0, 3).map((signal, index) => (
                     <EvidenceRow
                       key={signal.title}
                       tone={signal.tone}
@@ -1232,7 +1233,7 @@ function DatasetSummaryPanel({
                   ))}
                 </ActionRail>
 
-                <InlineDisclosure summary="Follow-up questions" open>
+                <InlineDisclosure summary="Follow-up questions">
                   <OperationalList>
                     {smartBusinessQuestions.map((question, index) => (
                       <button
@@ -1283,7 +1284,7 @@ function DatasetSummaryPanel({
                 {opportunityLabels.length > 0 && (
                   <ContextRailSection title="Related opportunities">
                     <div className="context-rail-actions">
-                      {opportunityLabels.map((label) => (
+                      {opportunityLabels.slice(0, 2).map((label) => (
                         <button
                           type="button"
                           key={label}
@@ -1301,10 +1302,12 @@ function DatasetSummaryPanel({
                   </p>
                 </InlineDisclosure>
                 {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
-                  <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
+                  <InlineDisclosure summary="Connected source detail" className="context-disclosure">
+                    <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
+                  </InlineDisclosure>
                 )}
               </ContextRail>
-            </div>
+            </OperationalWorkspaceLayout>
             <div className="data-tabs-row">
               <WorkspaceTabs
                 items={dataTabs}

@@ -26,6 +26,10 @@ export function InvestigationThread({ children }: { children: ReactNode }) {
   );
 }
 
+export function OperationalWorkspaceLayout({ children }: { children: ReactNode }) {
+  return <div className="operational-workspace-layout">{children}</div>;
+}
+
 type InvestigationThreadStageProps = {
   ariaLabel: string;
   className?: string;

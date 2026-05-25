@@ -9,6 +9,7 @@ export {
   InvestigationThread,
   InvestigationThreadStage,
   MetadataFooter,
+  OperationalWorkspaceLayout,
   OperationalList,
   OperationalTag,
   PrimaryFocusBlock,

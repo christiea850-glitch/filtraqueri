@@ -7709,26 +7709,26 @@ body {
 }
 
 .app .context-disclosure {
-  padding: 10px 0 0;
+  padding: 8px 0 0;
 }
 
-.app .context-rail .workbook-intelligence-panel {
+.app .context-disclosure .workbook-intelligence-panel {
   padding: 10px 0 0;
   border: 0;
-  border-top: 1px solid #edf2f6;
+  border-top: 0;
   border-radius: 0;
 }
 
-.app .context-rail .workbook-intelligence-strip,
-.app .context-rail .workbook-intelligence-footer {
+.app .context-disclosure .workbook-intelligence-strip,
+.app .context-disclosure .workbook-intelligence-footer {
   display: none;
 }
 
-.app .context-rail .workbook-intelligence-heading {
+.app .context-disclosure .workbook-intelligence-heading {
   grid-template-columns: 1fr;
 }
 
-.app .context-rail .workbook-intelligence-heading > span {
+.app .context-disclosure .workbook-intelligence-heading > span {
   justify-self: start;
 }
 
