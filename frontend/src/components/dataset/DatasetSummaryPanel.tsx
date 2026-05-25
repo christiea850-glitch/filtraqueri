@@ -92,6 +92,7 @@ type DataFocusedWorkflow =
   | "kpiIntelligence"
   | "businessQuestions"
   | "humanGuidance";
+type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
 type DataWorkspaceCommandTarget =
   | "preview"
   | "worksheetPreview"
@@ -713,6 +714,8 @@ function DatasetSummaryPanel({
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
   const [activeFocusedWorkflow, setActiveFocusedWorkflow] = useState<DataFocusedWorkflow | null>(null);
+  const [activeOperationalWorkspace, setActiveOperationalWorkspace] =
+    useState<FocusedOperationalWorkspace | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
   const [selectedEvidenceTitle, setSelectedEvidenceTitle] = useState<string | null>(null);
@@ -1024,6 +1027,7 @@ function DatasetSummaryPanel({
   const openFocusedWorkflow = (workflow: DataFocusedWorkflow) => {
     setIsDatasetPreviewOpen(false);
     setIsDatasetIntelligenceDetailOpen(false);
+    setActiveOperationalWorkspace(null);
     setActiveWorkflowMenu(null);
     setActiveFocusedWorkflow(workflow);
     setActiveDrillInView(
@@ -1034,6 +1038,32 @@ function DatasetSummaryPanel({
         : "businessSemantics",
     );
   };
+  const openOperationalWorkspace = (workspace: FocusedOperationalWorkspace) => {
+    setIsDatasetPreviewOpen(false);
+    setIsDatasetIntelligenceDetailOpen(false);
+    setActiveFocusedWorkflow(null);
+    setActiveWorkflowMenu(null);
+    setActiveOperationalWorkspace(workspace);
+    setActiveDrillInView("overview");
+  };
+  const closeOperationalWorkspace = () => {
+    setActiveOperationalWorkspace(null);
+    setActiveDrillInView("overview");
+  };
+  const getWorkspaceForStep = (step: (typeof investigationNextSteps)[number]) => {
+    if (step.icon === "trend" || step.target === "suggestedAnalysisPaths") return "trends";
+    if (step.icon === "connected" || step.target === "overview") return "connections";
+    if (step.icon === "entity" || step.icon === "comparison") return "entities";
+    return "kpis";
+  };
+  const selectedEvidenceWorkspace: FocusedOperationalWorkspace =
+    selectedEvidence?.icon === "timeline"
+      ? "trends"
+      : selectedEvidence?.icon === "connected"
+        ? "connections"
+        : selectedEvidence?.icon === "entity" || selectedEvidence?.icon === "comparison"
+          ? "entities"
+          : "kpis";
 
   useEffect(() => {
     return subscribeControlledHashDetailRoute(datasetIntelligenceDetailRouteId, (event) => {
@@ -1071,6 +1101,7 @@ function DatasetSummaryPanel({
         setIsDatasetPreviewOpen(false);
         setIsDatasetIntelligenceDetailOpen(false);
         setActiveFocusedWorkflow(null);
+        setActiveOperationalWorkspace("connections");
         setActiveDrillInView("overview");
         return;
       }
@@ -1118,6 +1149,168 @@ function DatasetSummaryPanel({
         preservedContextLabel={datasetIntelligenceBackState.preservationId}
         onBack={closeDatasetIntelligenceDetail}
       />
+    );
+  }
+
+  if (dataset && activeOperationalWorkspace) {
+    const workspaceTitle =
+      activeOperationalWorkspace === "connections"
+        ? "Connected Sources Workspace"
+        : activeOperationalWorkspace === "entities"
+          ? "Entity Workspace"
+          : activeOperationalWorkspace === "kpis"
+            ? "KPI Workspace"
+            : "Trend Workspace";
+    const workspaceRoute = `/workspace/${activeOperationalWorkspace}`;
+    const workspaceSummary =
+      activeOperationalWorkspace === "connections"
+        ? "Inspect source relationships, lineage cues, and operational mappings without crowding the main Data page."
+        : activeOperationalWorkspace === "entities"
+          ? "Review entity, segment, and behavior cues as a focused operational investigation."
+          : activeOperationalWorkspace === "kpis"
+            ? "Review metric candidates and business measures before preparing a deeper investigation."
+            : "Review timeline readiness, date signals, and trend-oriented investigation paths.";
+
+    return (
+      <FocusedWorkspaceShell
+        eyebrow={workspaceRoute}
+        title={workspaceTitle}
+        summary={workspaceSummary}
+        onBack={closeOperationalWorkspace}
+      >
+        <div className="focused-operational-workspace">
+          <InvestigationThread>
+            <WorkspaceHeader
+              eyebrow="Focused workspace"
+              title={workspaceTitle}
+              meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
+            />
+            <PrimaryFocusBlock
+              eyebrow="Current focus"
+              title={
+                activeOperationalWorkspace === "connections"
+                  ? "Review how sources may work together"
+                  : activeOperationalWorkspace === "entities"
+                    ? "Review who or what the activity is about"
+                    : activeOperationalWorkspace === "kpis"
+                      ? "Review measurable business activity"
+                      : "Review how activity changes over time"
+              }
+              description={workspaceSummary}
+            />
+            <EvidenceRows>
+              <div className="thread-section-heading">
+                <p className="section-label">Operational evidence</p>
+                <strong>Existing intelligence, focused for this workspace.</strong>
+              </div>
+              {activeOperationalWorkspace === "connections" &&
+                (workbookRelationshipIntelligence?.joinSuggestions.slice(0, 5).map((connection) => (
+                  <EvidenceRow
+                    key={connection.id}
+                    tone="connected"
+                    icon={<HumanSignalIcon name="connected" />}
+                    title={toBusinessConnectionGuidance(connection)}
+                    description={`${connection.sourceWorksheetName} and ${connection.targetWorksheetName}`}
+                  />
+                )) || (
+                  <EvidenceRow
+                    tone="info"
+                    icon={<HumanSignalIcon name="info" />}
+                    title="No connected sources detected yet"
+                    description="Upload a workbook with multiple related sheets to review source relationships."
+                  />
+                ))}
+              {activeOperationalWorkspace === "entities" &&
+                (businessEntityHints.length > 0 || dataProfile?.possibleDimensions.length ? (
+                  [...businessEntityHints.map((profile) => profile.displayName), ...(dataProfile?.possibleDimensions || []).map((field) => field.name)]
+                    .slice(0, 6)
+                    .map((label) => (
+                      <EvidenceRow
+                        key={label}
+                        tone="info"
+                        icon={<HumanSignalIcon name="entity" />}
+                        title={label}
+                        description="Potential entity, segment, or comparison field."
+                      />
+                    ))
+                ) : (
+                  <EvidenceRow
+                    tone="attention"
+                    icon={<HumanSignalIcon name="warning" />}
+                    title="Entity signal needs review"
+                    description="FiltraQueri has not found a strong customer, product, tenant, or segment cue yet."
+                  />
+                ))}
+              {activeOperationalWorkspace === "kpis" &&
+                (dataProfile?.possibleMetrics.length || kpiOpportunities.length ? (
+                  [
+                    ...(dataProfile?.possibleMetrics || []).map((field) => field.name),
+                    ...kpiOpportunities.map((opportunity) => opportunity.label),
+                  ]
+                    .slice(0, 6)
+                    .map((label) => (
+                      <EvidenceRow
+                        key={label}
+                        tone="opportunity"
+                        icon={<HumanSignalIcon name="opportunity" />}
+                        title={label}
+                        description="Potential business measure for a focused review."
+                      />
+                    ))
+                ) : (
+                  <EvidenceRow
+                    tone="attention"
+                    icon={<HumanSignalIcon name="warning" />}
+                    title="Metric signal needs review"
+                    description="A stronger measurable field is needed before KPI review will be useful."
+                  />
+                ))}
+              {activeOperationalWorkspace === "trends" &&
+                (dataProfile?.dateTimeFields.length ? (
+                  dataProfile.dateTimeFields.slice(0, 6).map((field) => (
+                    <EvidenceRow
+                      key={field.name}
+                      tone="ready"
+                      icon={<HumanSignalIcon name="timeline" />}
+                      title={field.name}
+                      description="Timeline candidate for trend-oriented investigation."
+                    />
+                  ))
+                ) : (
+                  <EvidenceRow
+                    tone="attention"
+                    icon={<HumanSignalIcon name="warning" />}
+                    title="Timeline signal needs review"
+                    description="Trend workspaces need a clearer date or time field."
+                  />
+                ))}
+            </EvidenceRows>
+            <ActionRail eyebrow="Continue" title="Move deeper only when the evidence is useful">
+              <button type="button" className="is-primary" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
+                Continue investigation
+              </button>
+              <button type="button" onClick={() => setIsDatasetPreviewOpen(true)}>
+                Inspect source preview
+              </button>
+            </ActionRail>
+          </InvestigationThread>
+          <ContextRail>
+            <ContextRailHeader
+              eyebrow="Context"
+              title="Operational workspace"
+              description="This focused surface keeps detailed inspection out of the main Data page while preserving the same dataset context."
+            />
+            <ContextRailSection title="Route">
+              <p>{workspaceRoute}</p>
+            </ContextRailSection>
+            <InlineDisclosure summary="Advanced context" className="context-disclosure">
+              <p>
+                This workspace reuses existing profile, workbook, and recommendation metadata. No execution or SQL is triggered here.
+              </p>
+            </InlineDisclosure>
+          </ContextRail>
+        </div>
+      </FocusedWorkspaceShell>
     );
   }
 
@@ -1181,14 +1374,10 @@ function DatasetSummaryPanel({
                       <button
                         type="button"
                         onClick={() => {
-                          if (primaryNextStep.target === "overview") {
-                            setActiveDrillInView("overview");
-                            return;
-                          }
-                          openFocusedWorkflow(primaryNextStep.target);
+                          openOperationalWorkspace(getWorkspaceForStep(primaryNextStep));
                         }}
                       >
-                        Start
+                        Open workspace
                       </button>
                     ) : null
                   }
@@ -1218,15 +1407,11 @@ function DatasetSummaryPanel({
                     <button
                       type="button"
                       key={step.label}
-                      className={index === 0 ? "is-primary" : undefined}
-                      onClick={() => {
-                        if (step.target === "overview") {
-                          setActiveDrillInView("overview");
-                          return;
-                        }
-                        openFocusedWorkflow(step.target);
-                      }}
-                    >
+                        className={index === 0 ? "is-primary" : undefined}
+                        onClick={() => {
+                          openOperationalWorkspace(getWorkspaceForStep(step));
+                        }}
+                      >
                       <HumanSignalIcon name={step.icon} />
                       <span>{step.label}</span>
                     </button>
@@ -1280,6 +1465,11 @@ function DatasetSummaryPanel({
                       ? "This signal helps FiltraQueri keep the investigation focused before exposing deeper setup details."
                       : "FiltraQueri uses the available signals to recommend the next useful question."}
                   </p>
+                  <div className="context-rail-actions">
+                    <button type="button" onClick={() => openOperationalWorkspace(selectedEvidenceWorkspace)}>
+                      Open workspace
+                    </button>
+                  </div>
                 </ContextRailSection>
                 {opportunityLabels.length > 0 && (
                   <ContextRailSection title="Related opportunities">

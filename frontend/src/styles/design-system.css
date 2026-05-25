@@ -7745,3 +7745,25 @@ body {
     padding-top: 12px;
   }
 }
+
+/* --- UX-W4: Focused operational workspace shells --- */
+.app .focused-operational-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.3fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.app .focused-operational-workspace .investigation-thread {
+  padding-top: 0;
+}
+
+.app .focused-operational-workspace .context-rail {
+  top: 0;
+}
+
+@media (max-width: 920px) {
+  .app .focused-operational-workspace {
+    grid-template-columns: 1fr;
+  }
+}
