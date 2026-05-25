@@ -347,8 +347,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     characterCount,
     editorStatus,
     previewResult,
-    templates,
-    keywordSuggestions,
     sqlAnalysis,
     selectedDialect,
     selectedDialectProfile,
@@ -559,6 +557,7 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
           canOpenResultPreview={canOpenResultPreview}
           onOpenResultPreview={() => setFocusedView("result")}
           onOpenSavedDrafts={() => setFocusedView("drafts")}
+          onInsertSql={insertSql}
           dialectContext={{
             selectedDialect,
             selectedDialectProfile,
@@ -624,8 +623,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
 
       <SqlSchemaPanel
         dataset={dataset}
-        templates={templates}
-        keywordSuggestions={keywordSuggestions}
         collapsed={isRailCollapsed}
         onToggleCollapsed={() => setIsRailCollapsed((current) => !current)}
         onInsertSql={insertSql}

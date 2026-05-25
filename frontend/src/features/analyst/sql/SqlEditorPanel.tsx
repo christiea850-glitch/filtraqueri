@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import SqlEditorHost from "./SqlEditorHost";
 import type {
   SqlEditorInterface,
@@ -15,6 +16,7 @@ type SqlEditorPanelProps = {
   canOpenResultPreview: boolean;
   onOpenResultPreview: () => void;
   onOpenSavedDrafts: () => void;
+  onInsertSql: (sql: string) => void;
   dialectContext: SqlDialectContext;
 };
 
@@ -27,6 +29,100 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   error: "Query failed",
 };
 
+function SqlHelpersPopup({
+  editor,
+  onInsertSql,
+  onClose,
+}: {
+  editor: SqlEditorInterface;
+  onInsertSql: (sql: string) => void;
+  onClose: () => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredTemplates = useMemo(
+    () =>
+      editor.templates.filter((template) =>
+        [template.label, template.description, template.category, template.sql]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedQuery),
+      ),
+    [editor.templates, normalizedQuery],
+  );
+  const filteredKeywords = useMemo(
+    () =>
+      editor.keywordSuggestions.filter((keyword) =>
+        keyword.toLowerCase().includes(normalizedQuery),
+      ),
+    [editor.keywordSuggestions, normalizedQuery],
+  );
+  const insertSql = (sql: string) => {
+    onInsertSql(sql);
+    onClose();
+  };
+
+  return (
+    <div className="sql-helper-popover" role="dialog" aria-label="SQL helpers">
+      <div className="sql-helper-popover-head">
+        <div>
+          <span>SQL helpers</span>
+          <strong>Templates and keywords</strong>
+        </div>
+        <button type="button" className="sqlw-dock-x" onClick={onClose} aria-label="Close SQL helpers">
+          Close
+        </button>
+      </div>
+      <label className="sql-helper-search">
+        <span>Search helpers</span>
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Template, keyword, or SQL pattern"
+          autoFocus
+        />
+      </label>
+      <div className="sql-helper-popover-body">
+        <section className="sql-helper-picker-section">
+          <div className="builder-block-header">
+            <span>Templates</span>
+            <small>{filteredTemplates.length} shown</small>
+          </div>
+          <div className="sql-template-list sql-helper-picker-list">
+            {filteredTemplates.map((template) => (
+              <button type="button" key={template.id} onClick={() => insertSql(template.sql)}>
+                <strong>{template.label}</strong>
+                <span>{template.description}</span>
+                <small>{template.category}</small>
+              </button>
+            ))}
+            {filteredTemplates.length === 0 && (
+              <p className="sql-helper-empty">No templates match your search.</p>
+            )}
+          </div>
+        </section>
+        <section className="sql-helper-picker-section">
+          <div className="builder-block-header">
+            <span>Keywords</span>
+            <small>{filteredKeywords.length} shown</small>
+          </div>
+          <div className="sql-keyword-list sql-helper-keyword-list">
+            {filteredKeywords.map((keyword) => (
+              <button type="button" key={keyword} onClick={() => insertSql(keyword)}>
+                {keyword}
+              </button>
+            ))}
+            {filteredKeywords.length === 0 && (
+              <p className="sql-helper-empty">No keywords match your search.</p>
+            )}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function SqlEditorPanel({
   editor,
   executionStatus,
@@ -35,8 +131,11 @@ function SqlEditorPanel({
   canOpenResultPreview,
   onOpenResultPreview,
   onOpenSavedDrafts,
+  onInsertSql,
   dialectContext,
 }: SqlEditorPanelProps) {
+  const [isHelperOpen, setIsHelperOpen] = useState(false);
+
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
       <div className="sql-editor-toolbar">
@@ -74,10 +173,25 @@ function SqlEditorPanel({
           <button type="button" className="secondary-button" onClick={onOpenSavedDrafts}>
             Saved Drafts
           </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setIsHelperOpen((currentValue) => !currentValue)}
+            aria-expanded={isHelperOpen}
+          >
+            SQL helpers
+          </button>
           <button type="button" className="text-button" onClick={editor.onClear}>
             Clear
           </button>
         </div>
+        {isHelperOpen && (
+          <SqlHelpersPopup
+            editor={editor}
+            onInsertSql={onInsertSql}
+            onClose={() => setIsHelperOpen(false)}
+          />
+        )}
       </div>
 
       <SqlEditorHost editor={editor} />

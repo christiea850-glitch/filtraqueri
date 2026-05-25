@@ -1,10 +1,7 @@
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
-import type { SqlTemplate } from "./sqlTypes";
 
 type SqlSchemaPanelProps = {
   dataset: DatasetMetadata | null;
-  templates: SqlTemplate[];
-  keywordSuggestions: string[];
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onInsertSql: (sql: string) => void;
@@ -12,8 +9,6 @@ type SqlSchemaPanelProps = {
 
 function SqlSchemaPanel({
   dataset,
-  templates,
-  keywordSuggestions,
   collapsed,
   onToggleCollapsed,
   onInsertSql,
@@ -51,35 +46,6 @@ function SqlSchemaPanel({
             ) : (
               <p className="sql-helper-empty">No dataset open.</p>
             )}
-          </div>
-        </div>
-
-        <div className="sql-helper-section">
-          <div className="builder-block-header">
-            <span>Keywords</span>
-            <small>Autocomplete</small>
-          </div>
-          <div className="sql-keyword-list">
-            {keywordSuggestions.map((keyword) => (
-              <button type="button" key={keyword} onClick={() => onInsertSql(keyword)}>
-                {keyword}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="sql-helper-section">
-          <div className="builder-block-header">
-            <span>Templates</span>
-            <small>{templates.length} ready</small>
-          </div>
-          <div className="sql-template-list">
-            {templates.map((template) => (
-              <button type="button" key={template.id} onClick={() => onInsertSql(template.sql)}>
-                <strong>{template.label}</strong>
-                <span>{template.description}</span>
-              </button>
-            ))}
           </div>
         </div>
       </div>

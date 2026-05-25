@@ -334,6 +334,119 @@
   backdrop-filter: blur(12px);
 }
 
+.sql-helper-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 8;
+  display: grid;
+  gap: 10px;
+  width: min(520px, calc(100vw - 56px));
+  max-height: min(560px, calc(100vh - 180px));
+  overflow: hidden;
+  padding: 12px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.16);
+}
+
+.sql-helper-popover-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.sql-helper-popover-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sql-helper-popover-head span,
+.sql-helper-search span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sql-helper-popover-head strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-helper-search {
+  display: grid;
+  gap: 6px;
+}
+
+.sql-helper-search input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid #dbe5ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #172033;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sql-helper-search input:focus {
+  border-color: #93c5fd;
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+}
+
+.sql-helper-popover-body {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sql-helper-picker-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sql-helper-picker-list {
+  display: grid;
+}
+
+.sql-helper-keyword-list {
+  max-height: 132px;
+  overflow: auto;
+}
+
+.sql-template-list button small {
+  justify-self: start;
+  color: #2563eb;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.sql-helper-empty {
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .sql-actions {
   display: flex;
   flex-wrap: wrap;
