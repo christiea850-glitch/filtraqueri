@@ -548,6 +548,37 @@ Once Workspace owns the real typed-question loop:
 - storytelling layouts
 - presentation/export composition after validated results exist
 
+## Approved Open Decisions
+
+### Open Decision #1 - Question Translation Architecture
+
+Approved approach: hybrid translator.
+
+Workspace question translation should use deterministic fast-path parsing first for recognized question shapes. If deterministic parsing cannot confidently translate the question, an LLM may be used as fallback translation assistance only.
+
+Architectural requirements:
+
+- Deterministic fast-path comes first for known question patterns.
+- LLM fallback is allowed only when deterministic parsing cannot confidently translate the question.
+- Structured Query Builder specs are preferred over raw SQL.
+- Safe SELECT SQL is allowed only as fallback when the question cannot be represented cleanly as a Query Builder request.
+- All execution must still pass through existing `executeWorkspaceQuery`, backend validation, and DuckDB.
+- No LLM-generated answer text may be treated as a result unless backed by executed data.
+- No direct LLM execution is allowed.
+- Provider choice remains implementation-configurable.
+- The LLM is translation assistance only, not the analytics engine.
+
+Preservation requirements:
+
+- Do not change the existing execution engine.
+- Do not change backend query validation.
+- Do not change `ActiveResultModel`.
+- Do not change `ResultsGrid`.
+- Do not change pagination.
+- Do not change export.
+- Do not change upload/session restore.
+- Do not change SQL workspace behavior.
+
 ## Implementation Phases
 
 ### A. Audit Existing Execution / Query Flow
@@ -606,10 +637,14 @@ Implementation direction:
 - create a Workspace-owned question interpretation module or hook
 - input: typed question, dataset schema, workbook active worksheet, Data profile hints
 - output: structured draft intent and field candidates
+- use deterministic translation first for recognized patterns
+- call an implementation-configurable LLM provider only as translation fallback when deterministic confidence is too low
+- prefer a Query Builder draft spec before considering safe SELECT SQL
 
 Rules:
 
-- deterministic first is acceptable
+- deterministic first is required
+- LLM output is only a draft translation, never an answer
 - ambiguity must be explicit
 - no execution
 - no backend calls
@@ -629,6 +664,7 @@ Preferred output:
   - recent records
   - trend by date
 - Safe SELECT SQL for cases that cannot be represented by Query Builder.
+- LLM fallback may help translate the user question into one of these draft forms, but it must not execute, summarize results, or bypass review.
 
 Review UI:
 
