@@ -4601,6 +4601,121 @@ body {
   color: #526071;
 }
 
+.app .task-ai-suggestion-section {
+  gap: 10px;
+}
+
+.app .task-ai-guidance-banner {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.app .task-ai-guidance-banner > span,
+.app .task-suggestion-group > span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.app .task-ai-guidance-banner strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.app .task-ai-guidance-banner div,
+.app .task-suggestion-group div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.app .task-ai-guidance-banner small {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #526071;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app .task-suggestion-groups {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.app .task-suggestion-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+
+.app .task-suggestion-group button {
+  min-height: 25px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #e1e8ef;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 680;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.app .task-suggestion-group button:hover,
+.app .task-suggestion-group button:focus-visible {
+  outline: none;
+  border-color: #b9dbe2;
+  background: #f4fbfc;
+  color: #0f6575;
+}
+
+.app .task-suggestion-group button.is-applied {
+  border-color: #a7d3dc;
+  background: #edf8fa;
+  color: #0f6575;
+}
+
+.app .task-suggestion-group button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app .task-prep-disclosure {
+  margin: 2px 0 0;
+  border-top: 1px solid #eef2f6;
+}
+
+.app .task-prep-disclosure > summary {
+  padding: 12px 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.app .task-prep-disclosure > .guided-input-list {
+  padding-bottom: 12px;
+}
+
 .app .guided-input-list {
   gap: 7px;
   padding: 0;

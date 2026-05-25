@@ -10,6 +10,7 @@ import { useAnalyticsPlanning } from "../analyticsPlanning";
 import { useBusinessQuestions } from "../businessQuestionIntelligence";
 import { useBusinessSemantics } from "../businessSemantics";
 import { useDataIntelligence } from "../dataIntelligence";
+import { createSchemaDisplayProfiles, getBusinessRoleLabel } from "../dataIntelligence/structuralPresentation";
 import { getEngineReadinessLabel, listEngineCapabilities, useEngineAdapters } from "../engineAdapters";
 import { useExecutionContracts } from "../executionContracts";
 import {
@@ -44,6 +45,23 @@ import {
 import { useKpiIntelligence } from "../kpiIntelligence";
 import { useWorkflowRecommendations } from "../workflowRecommendations";
 import useTaskLauncher from "./useTaskLauncher";
+
+type FieldSuggestion = {
+  label: string;
+  value: string;
+  inputType: "metric" | "dateField" | "entityField" | "groupingField" | "dimension";
+  helper: string;
+};
+
+const uniqueSuggestionValues = (suggestions: FieldSuggestion[]) => {
+  const seen = new Set<string>();
+  return suggestions.filter((suggestion) => {
+    const key = `${suggestion.inputType}:${suggestion.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 function TaskDetail({
   task,
@@ -94,6 +112,8 @@ function TaskDetail({
     explanation: businessExplanation,
   });
   const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
+  const schema = Array.isArray(dataset?.schema) ? dataset.schema : [];
+  const displayProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
   const {
     recommendations,
     humanSummary: workflowRecommendationSummary,
@@ -213,6 +233,8 @@ function TaskDetail({
     ...planningReadiness.futureExecutionNotes,
   ].slice(0, 4);
   const visibleInputs = [...task.requiredInputs, ...task.optionalInputs];
+  const requiredInputs = task.requiredInputs;
+  const optionalInputs = task.optionalInputs;
   const recommendedPathLabel = engineCompatibility.recommendedEngine?.label || "Guided planning";
   const recommendedPathSummary =
     recommendations[0]?.humanSummary ||
@@ -220,6 +242,103 @@ function TaskDetail({
     businessExplanation?.businessMeaning ||
     "Choose the required inputs to prepare this workflow preview.";
   const canShowPreparationContext = missingInputs.length === 0;
+  const metricSuggestions = uniqueSuggestionValues([
+    ...(dataProfile?.possibleMetrics.slice(0, 4).map((field) => ({
+      label: field.name,
+      value: field.name,
+      inputType: "metric" as const,
+      helper: "Likely business metric",
+    })) || []),
+    ...displayProfiles
+      .filter((profile) => profile.role === "amount" || profile.role === "quantity")
+      .slice(0, 3)
+      .map((profile) => ({
+        label: profile.sourceName,
+        value: profile.sourceName,
+        inputType: "metric" as const,
+        helper: getBusinessRoleLabel(profile.role),
+      })),
+  ]).slice(0, 4);
+  const dateSuggestions = uniqueSuggestionValues([
+    ...(dataProfile?.dateTimeFields.slice(0, 3).map((field) => ({
+      label: field.name,
+      value: field.name,
+      inputType: "dateField" as const,
+      helper: "Likely timeline field",
+    })) || []),
+    ...displayProfiles
+      .filter((profile) => profile.role === "date")
+      .slice(0, 2)
+      .map((profile) => ({
+        label: profile.sourceName,
+        value: profile.sourceName,
+        inputType: "dateField" as const,
+        helper: getBusinessRoleLabel(profile.role),
+      })),
+  ]).slice(0, 3);
+  const entitySuggestions = uniqueSuggestionValues(
+    displayProfiles
+      .filter((profile) => profile.role === "customer" || profile.role === "identifier" || profile.role === "description")
+      .slice(0, 4)
+      .map((profile) => ({
+        label: profile.sourceName,
+        value: profile.sourceName,
+        inputType: "entityField" as const,
+        helper: getBusinessRoleLabel(profile.role),
+      })),
+  ).slice(0, 3);
+  const dimensionSuggestions = uniqueSuggestionValues([
+    ...(dataProfile?.possibleDimensions.slice(0, 4).map((field) => ({
+      label: field.name,
+      value: field.name,
+      inputType: "groupingField" as const,
+      helper: "Likely grouping dimension",
+    })) || []),
+    ...displayProfiles
+      .filter((profile) => profile.role === "location" || profile.role === "status")
+      .slice(0, 3)
+      .map((profile) => ({
+        label: profile.sourceName,
+        value: profile.sourceName,
+        inputType: "groupingField" as const,
+        helper: getBusinessRoleLabel(profile.role),
+      })),
+  ]).slice(0, 4);
+  const primaryMetric = metricSuggestions[0] || null;
+  const primaryDate = dateSuggestions[0] || null;
+  const primaryDimension = dimensionSuggestions[0] || entitySuggestions[0] || null;
+  const suggestionGroups = [
+    { id: "metric", title: "Suggested metric", suggestions: metricSuggestions },
+    { id: "date", title: "Suggested timeline", suggestions: dateSuggestions },
+    { id: "entity", title: "Suggested entity", suggestions: entitySuggestions },
+    { id: "dimension", title: "Suggested dimension", suggestions: dimensionSuggestions },
+  ].filter((group) => group.suggestions.length > 0);
+  const getInputForSuggestion = (suggestion: FieldSuggestion) =>
+    visibleInputs.find((input) => input.type === suggestion.inputType) ||
+    (suggestion.inputType === "groupingField"
+      ? visibleInputs.find((input) => input.type === "dimension")
+      : null) ||
+    (suggestion.inputType === "entityField"
+      ? visibleInputs.find((input) => input.type === "groupingField")
+      : null);
+  const applySuggestion = (suggestion: FieldSuggestion) => {
+    const input = getInputForSuggestion(suggestion);
+    if (!input) return;
+    guidedInputs.selectInputValue(input, suggestion.value);
+  };
+  const guidanceSummary =
+    primaryMetric || primaryDate || primaryDimension
+      ? `FiltraQueri detected a likely ${task.label.toLowerCase()} setup for this dataset.`
+      : "FiltraQueri will suggest setup fields as soon as enough dataset context is available.";
+  const readinessStateLabel = canShowPreparationContext
+    ? "Ready to prepare"
+    : missingInputs.some((input) => input.type === "metric")
+      ? "Needs business metric"
+      : missingInputs.some((input) => input.type === "dateField")
+        ? "Missing timeline field"
+        : suggestionGroups.length > 0
+          ? "Suggested setup available"
+          : "Needs required input";
 
   return (
     <aside className="task-detail-panel" aria-label="Task details">
@@ -232,7 +351,7 @@ function TaskDetail({
         )}
       </div>
 
-      <section className="task-focus-section task-summary-section" aria-label="Task Summary">
+      <section className="task-focus-section task-summary-section" aria-label="Workflow Summary">
         <p className="section-label">Task Summary</p>
         <h3>{task.label}</h3>
         <p>{businessExplanation?.summary || task.description}</p>
@@ -246,18 +365,62 @@ function TaskDetail({
         </div>
       </section>
 
+      <section className="task-focus-section task-ai-suggestion-section" aria-label="AI Suggestions">
+        <div className="task-ai-guidance-banner">
+          <span>AI Suggestions</span>
+          <strong>{guidanceSummary}</strong>
+          <div>
+            {primaryMetric && <small>Metric: {primaryMetric.label}</small>}
+            {primaryDate && <small>Timeline: {primaryDate.label}</small>}
+            {primaryDimension && <small>Dimension: {primaryDimension.label}</small>}
+          </div>
+        </div>
+        {suggestionGroups.length > 0 ? (
+          <div className="task-suggestion-groups">
+            {suggestionGroups.map((group) => (
+              <div className="task-suggestion-group" key={group.id}>
+                <span>{group.title}</span>
+                <div>
+                  {group.suggestions.map((suggestion) => {
+                    const input = getInputForSuggestion(suggestion);
+                    const isApplied = input
+                      ? guidedInputs.getSelectionForInput(input.id)?.value === suggestion.value
+                      : false;
+
+                    return (
+                      <button
+                        type="button"
+                        key={`${group.id}:${suggestion.value}`}
+                        className={isApplied ? "is-applied" : ""}
+                        onClick={() => applySuggestion(suggestion)}
+                        disabled={!input}
+                        title={suggestion.helper}
+                      >
+                        {suggestion.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No likely field mappings were detected yet. Use the required inputs below to guide preparation.</p>
+        )}
+      </section>
+
       <section className="task-focus-section" aria-label="Inputs Required">
         <div className="task-focus-section-heading">
           <span>Inputs Required</span>
           <small>
             {missingInputs.length > 0
               ? `${missingInputs.length} missing`
-              : "Ready"}
+            : "Ready"}
           </small>
         </div>
-      {visibleInputs.length > 0 ? (
+      {requiredInputs.length > 0 ? (
         <div className="guided-input-list">
-          {visibleInputs.map((input) => {
+          {requiredInputs.map((input) => {
             const options = guidedInputs.getOptionsForInput(input.id);
             const selection = guidedInputs.getSelectionForInput(input.id);
             const validation = getGuidedInputValidationMessage(guidedInputs.state, input.id);
@@ -291,12 +454,45 @@ function TaskDetail({
       )}
       </section>
 
+      {optionalInputs.length > 0 && (
+        <details className="task-prep-disclosure">
+          <summary>Optional refinements</summary>
+          <div className="guided-input-list">
+            {optionalInputs.map((input) => {
+              const options = guidedInputs.getOptionsForInput(input.id);
+              const selection = guidedInputs.getSelectionForInput(input.id);
+              const validation = getGuidedInputValidationMessage(guidedInputs.state, input.id);
+
+              return (
+                <label key={input.id}>
+                  <small>{input.label}</small>
+                  <span>{getGuidedInputPrompt(input)}</span>
+                  <select
+                    value={selection?.value || ""}
+                    onChange={(event) => guidedInputs.selectInputValue(input, event.target.value)}
+                    aria-label={`${input.label} guided selection`}
+                  >
+                    <option value="">{input.placeholder || "Choose an option"}</option>
+                    {options.map((option) => (
+                      <option key={option.id} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {validation && <em className={validation.severity}>{validation.message}</em>}
+                </label>
+              );
+            })}
+          </div>
+        </details>
+      )}
+
       {canShowPreparationContext ? (
         <>
           <section className={`task-focus-section task-readiness-summary ${getPlanningReadinessTone(planningReadiness.status)}`} aria-label="Readiness">
             <div className="task-focus-section-heading">
-              <span>Readiness</span>
-              <small>{getPlanningReadinessStatusLabel(planningReadiness.status)}</small>
+              <span>Ready State</span>
+              <small>{readinessStateLabel}</small>
             </div>
             <p>{primaryReadinessSummary}</p>
           </section>
@@ -329,8 +525,8 @@ function TaskDetail({
       ) : (
         <section className="task-focus-section task-next-step-note" aria-label="Next step">
           <div className="task-focus-section-heading">
-            <span>Next Step</span>
-            <small>Prepare</small>
+            <span>Ready State</span>
+            <small>{readinessStateLabel}</small>
           </div>
           <p>{primaryReadinessSummary}</p>
         </section>
