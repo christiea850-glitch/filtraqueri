@@ -1165,13 +1165,13 @@ function TaskLauncherPanel({
   };
 
   return (
-    <section className="task-launcher-panel task-launcher-panel--focused" aria-label="Human mode analytics task launcher">
+    <section className="task-launcher-panel task-launcher-panel--focused" aria-label="Business investigation suggestions">
       <div className="summary-header task-investigation-heading">
         <div>
           <p className="section-label">Explore opportunities</p>
-          <h2>Suggested investigations</h2>
+          <h2>Business questions you can explore</h2>
           <p>
-            Start with a business goal, choose one investigation, then confirm only the context that matters.
+            Start with a business question, choose one direction, then confirm only the context that matters.
           </p>
         </div>
         <span className="dataset-count-pill">

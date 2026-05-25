@@ -372,7 +372,7 @@ function App() {
     if (!dataset) {
       return {
         title: guidance.label,
-        explanation: "No dataset open. Choose CSV.",
+        explanation: "Choose a file so FiltraQueri can suggest the first business question.",
         metrics: [
           { label: "Rows", value: "0" },
           { label: "Columns", value: "0" },
@@ -571,8 +571,8 @@ function App() {
 
   const renderNoDatasetView = () => (
     <section className="empty-state">
-      <p className="section-label">No dataset</p>
-      <h2>No dataset open. Choose CSV.</h2>
+      <p className="section-label">Start investigation</p>
+      <h2>Choose a file so FiltraQueri can look for business signals.</h2>
     </section>
   );
 
@@ -599,8 +599,8 @@ function App() {
         uploading={isUploading}
         errorMessage={errorMessage}
         selectedFileName={selectedFileName}
-        buttonLabel="Choose CSV"
-        context="Open data"
+        buttonLabel="Choose file"
+        context="Start with data"
         dataset={dataset}
         recentDatasets={recentDatasets}
         continueLabel={activeResultModel ? "Review results" : "Review data"}
@@ -720,8 +720,8 @@ function App() {
                   activeSortColumn={activeResultModel.sorting.column}
                   activeSortDirection={activeResultModel.sorting.direction}
                   hiddenColumns={resultHiddenColumns}
-                  emptyTitle="No results yet."
-                  emptyDescription="Run a query or apply filters."
+                  emptyTitle="No findings yet."
+                  emptyDescription="Choose an investigation or shape a business question to create findings."
                   onHiddenColumnsChange={setResultHiddenColumns}
                   onSortColumn={sortWorkspaceColumn}
                   onPageChange={changeWorkspacePage}
@@ -910,16 +910,16 @@ function App() {
         commands.push(
           {
             id: "data:worksheet-preview",
-            title: "Open Worksheet Preview",
-            description: "Preview workbook worksheets in the Data Preview surface.",
+            title: "Preview Source Areas",
+            description: "Review the available business areas in the Data Preview surface.",
             category: "Data",
             keywords: ["sheet", "excel", "workbook"],
             onRun: () => openDataCommand("worksheetPreview"),
           },
           {
             id: "data:connections",
-            title: "Open Workbook Connections",
-            description: "Review detected worksheet connection guidance.",
+            title: "Review Connected Operations",
+            description: "See how business areas may interact operationally.",
             category: "Data",
             keywords: ["relationships", "joins", "workbook"],
             onRun: () => openDataCommand("connections"),

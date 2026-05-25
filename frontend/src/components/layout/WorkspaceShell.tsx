@@ -270,7 +270,7 @@ function WorkspaceShell({
       : "Business questions, findings, and next steps stay connected.";
   const activeWorksheetLabel =
     runtimeContext.snapshot.workbook.activeWorksheetName ||
-    (runtimeContext.snapshot.workbook.hasWorkbook ? "Workbook worksheet" : "Dataset table");
+    (runtimeContext.snapshot.workbook.hasWorkbook ? "Workbook source" : "Dataset table");
   const datasetShapeLabel = dataset
     ? `${dataset.row_count.toLocaleString()} rows / ${dataset.column_count.toLocaleString()} columns`
     : "No rows loaded";
@@ -278,6 +278,31 @@ function WorkspaceShell({
     dataset?.original_filename || (workspaceMode === "analyst" ? "Analyst workspace" : "Workspace");
   const primaryRecommendationItem = runtimeContext.recommendationGroups[0]?.items[0] || null;
   const compactTrail = runtimeContext.trail.slice(-5);
+  const investigationJourneySteps = [
+    {
+      label: "Dataset understood",
+      complete: Boolean(dataset),
+      active: activeDestination.id === "data" || activeView === "welcome",
+    },
+    {
+      label: "Business signals detected",
+      complete: Boolean(dataset) && activeDestination.id !== "home",
+      active: activeDestination.id === "data",
+    },
+    {
+      label: "Question chosen",
+      complete:
+        activeDestination.id === "analyze" ||
+        activeDestination.id === "insights" ||
+        activeDestination.id === "analyst",
+      active: activeDestination.id === "analyze",
+    },
+    {
+      label: "Findings ready",
+      complete: activeDestination.id === "insights",
+      active: activeDestination.id === "insights",
+    },
+  ];
 
   const changeDestination = (destination: ProductDestination) => {
     if (destination.mode !== workspaceMode) onModeChange(destination.mode);
@@ -535,6 +560,24 @@ function WorkspaceShell({
                   <strong>{datasetShapeLabel}</strong>
                 </span>
               </section>
+
+              {workspaceMode === "human" && activeDestination.id !== "settings" && (
+                <section className="investigation-status-strip" aria-label="Investigation progress">
+                  {investigationJourneySteps.map((step) => (
+                    <span
+                      key={step.label}
+                      className={[
+                        step.complete ? "is-complete" : "",
+                        step.active ? "is-active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {step.label}
+                    </span>
+                  ))}
+                </section>
+              )}
             </>
           )}
 

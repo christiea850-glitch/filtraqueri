@@ -722,6 +722,59 @@ function DatasetSummaryPanel({
         }
       : null,
   ].filter(Boolean) as Array<{ title: string; detail: string }>;
+  const investigationNextSteps = [
+    dataProfile?.dateTimeFields.length
+      ? {
+          label: "Explore timeline trends",
+          detail: "Look for changes, seasonality, or operational shifts over time.",
+          target: "suggestedAnalysisPaths" as const,
+        }
+      : null,
+    dataProfile?.possibleMetrics.length
+      ? {
+          label: "Start a metric-focused investigation",
+          detail: "Use the strongest measurable field to frame a business question.",
+          target: "guidedAnalyticsTasks" as const,
+        }
+      : null,
+    businessEntityHints.length
+      ? {
+          label: "Review possible entity patterns",
+          detail: "See whether customers, products, tenants, or other entities need attention.",
+          target: "businessQuestions" as const,
+        }
+      : null,
+    (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
+      ? {
+          label: "Review connected business areas",
+          detail: "Understand how multiple sources may describe one operational flow.",
+          target: "overview" as const,
+        }
+      : null,
+    dataProfile?.possibleDimensions.length
+      ? {
+          label: "Compare operational groups",
+          detail: "Investigate which categories, regions, or groups differ most.",
+          target: "businessQuestions" as const,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    label: string;
+    detail: string;
+    target: "suggestedAnalysisPaths" | "guidedAnalyticsTasks" | "businessQuestions" | "overview";
+  }>;
+  const smartBusinessQuestions = Array.from(
+    new Set([
+      ...(dataProfile?.possibleMetrics.length ? ["Which areas appear most active or valuable?"] : []),
+      ...(dataProfile?.dateTimeFields.length ? ["Are there timeline-related changes worth reviewing?"] : []),
+      ...(dataProfile?.possibleDimensions.length ? ["Which business groups differ most?"] : []),
+      ...(businessEntityHints.length ? ["Which entities may need attention?"] : []),
+      ...((workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
+        ? ["What operational patterns appear across connected areas?"]
+        : []),
+      "Where are unusual patterns most likely to appear?",
+    ]),
+  ).slice(0, 5);
   const opportunityLabels = Array.from(
     new Set([
       ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
@@ -1024,6 +1077,48 @@ function DatasetSummaryPanel({
                     <small>{signal.detail}</small>
                   </span>
                 ))}
+              </div>
+            </section>
+            <section className="investigation-next-step-panel" aria-label="Suggested next steps">
+              <div className="investigation-next-step-copy">
+                <p className="section-label">Suggested next step</p>
+                <h3>{investigationNextSteps[0]?.label || "Choose a business question to explore"}</h3>
+                <p>
+                  {investigationNextSteps[0]?.detail ||
+                    "FiltraQueri can help turn this dataset into a focused investigation path."}
+                </p>
+              </div>
+              <div className="investigation-next-step-actions">
+                {investigationNextSteps.slice(0, 3).map((step) => (
+                  <button
+                    type="button"
+                    key={step.label}
+                    onClick={() => {
+                      if (step.target === "overview") {
+                        setActiveDrillInView("overview");
+                        return;
+                      }
+                      openFocusedWorkflow(step.target);
+                    }}
+                  >
+                    <strong>{step.label}</strong>
+                    <span>{step.detail}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="smart-question-layer" aria-label="Business questions you can explore">
+                <strong>Business questions you can explore</strong>
+                <div>
+                  {smartBusinessQuestions.map((question) => (
+                    <button
+                      type="button"
+                      key={question}
+                      onClick={() => openFocusedWorkflow("businessQuestions")}
+                    >
+                      {question}
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
             <div className="data-stat-row" aria-label="Dataset profile">

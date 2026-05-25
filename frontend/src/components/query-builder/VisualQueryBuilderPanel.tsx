@@ -210,17 +210,17 @@ function VisualQueryBuilderPanel({
       ];
 
   return (
-    <section className="query-builder-panel" aria-label="Visual query builder">
-      <section className="query-builder-hero" aria-label="Analyze destination introduction">
+    <section className="query-builder-panel" aria-label="Business question investigation">
+      <section className="query-builder-hero" aria-label="Business question introduction">
         <div>
-          <p className="section-label">Analyze</p>
-          <h2>What would you like to understand?</h2>
-          <span>Start with the business question. The query details stay available, but the investigation should lead the work.</span>
+          <p className="section-label">Business questions</p>
+          <h2>What should FiltraQueri help you explore?</h2>
+          <span>Start with curiosity about the business. Fields and filters stay available only as support for the investigation.</span>
         </div>
         <div className="query-builder-hero-focus">
-          <span>Current direction</span>
+          <span>Investigation direction</span>
           <strong>{primaryInvestigation?.title || expectedResultType}</strong>
-          <small>{primaryInvestigation?.question || "Choose fields and review the result shape before running anything."}</small>
+          <small>{primaryInvestigation?.question || "Choose a question, compare useful groups, and keep the result reviewable."}</small>
         </div>
       </section>
 
