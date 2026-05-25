@@ -4143,6 +4143,79 @@ body {
   height: 15px;
 }
 
+.app .data-workflow-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.app .data-workflow-trigger[aria-expanded="true"] {
+  border-color: #bfe3e9;
+  background: #f2fbfc;
+  color: #0f6575;
+}
+
+.app .data-workflow-trigger svg {
+  width: 13px;
+  height: 13px;
+}
+
+.app .data-workflow-menu {
+  position: absolute;
+  z-index: 35;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, calc(100vw - 32px));
+  padding: 6px;
+  border: 1px solid rgba(203, 213, 225, 0.88);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.14);
+}
+
+.app .data-workflow-menu::before {
+  position: absolute;
+  top: -5px;
+  right: 18px;
+  width: 9px;
+  height: 9px;
+  border-top: 1px solid rgba(203, 213, 225, 0.88);
+  border-left: 1px solid rgba(203, 213, 225, 0.88);
+  background: rgba(255, 255, 255, 0.98);
+  content: "";
+  transform: rotate(45deg);
+}
+
+.app .data-workflow-menu button {
+  display: grid;
+  width: 100%;
+  gap: 2px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app .data-workflow-menu button:hover,
+.app .data-workflow-menu button:focus-visible {
+  outline: none;
+  background: #f1f8fa;
+}
+
+.app .data-workflow-menu strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.app .data-workflow-menu span {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 @media (max-width: 720px) {
   .app .data-context-card {
     flex-wrap: wrap;

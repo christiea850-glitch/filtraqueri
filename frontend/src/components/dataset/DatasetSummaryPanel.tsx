@@ -66,6 +66,7 @@ type DatasetSummaryPanelProps = {
 };
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
+type DataWorkflowMenu = "intelligence" | "semantic";
 type DataWorkspaceCommandTarget =
   | "preview"
   | "worksheetPreview"
@@ -526,6 +527,7 @@ function DatasetSummaryPanel({
   onSelectedTaskIdChange,
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
+  const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
@@ -666,12 +668,36 @@ function DatasetSummaryPanel({
     closeControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
     setIsDatasetIntelligenceDetailOpen(false);
   };
+  const openDrillInWorkflow = (view: DataDrillInView) => {
+    setIsDatasetPreviewOpen(false);
+    setIsDatasetIntelligenceDetailOpen(false);
+    setActiveWorkflowMenu(null);
+    setActiveDrillInView(view);
+  };
+  const openFullIntelligenceDetail = () => {
+    setIsDatasetPreviewOpen(false);
+    setActiveWorkflowMenu(null);
+    setIsDatasetIntelligenceDetailOpen(true);
+  };
 
   useEffect(() => {
     return subscribeControlledHashDetailRoute(datasetIntelligenceDetailRouteId, (event) => {
       setIsDatasetIntelligenceDetailOpen(event.active);
     });
   }, []);
+
+  useEffect(() => {
+    if (!activeWorkflowMenu) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setActiveWorkflowMenu(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeWorkflowMenu]);
 
   useEffect(() => {
     const handleDataWorkspaceCommand = (event: Event) => {
@@ -909,6 +935,106 @@ function DatasetSummaryPanel({
                 onChange={setActiveDrillInView}
               />
               <div className="data-profile-actions">
+                <div className="data-workflow-menu-wrap">
+                  <button
+                    type="button"
+                    className="secondary-button data-action-btn data-workflow-trigger"
+                    aria-haspopup="menu"
+                    aria-expanded={activeWorkflowMenu === "intelligence"}
+                    onClick={() =>
+                      setActiveWorkflowMenu((current) =>
+                        current === "intelligence" ? null : "intelligence",
+                      )
+                    }
+                  >
+                    Intelligence
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  {activeWorkflowMenu === "intelligence" && (
+                    <div className="data-workflow-menu" role="menu" aria-label="Intelligence workflows">
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("dataIntelligence")}>
+                        <strong>Overview intelligence</strong>
+                        <span>Review shape, metrics, dimensions, dates, and readiness.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("dataIntelligence")}>
+                        <strong>Data quality</strong>
+                        <span>Open available profile and readiness signals.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("columns")}>
+                        <strong>Field patterns</strong>
+                        <span>Inspect detected fields and semantic labels.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("overview")}>
+                        <strong>Workbook relationships</strong>
+                        <span>Return to the connection summary on the Data overview.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={openFullIntelligenceDetail}>
+                        <strong>Open full Intelligence detail</strong>
+                        <span>Open the focused intelligence detail page.</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="data-workflow-menu-wrap">
+                  <button
+                    type="button"
+                    className="secondary-button data-action-btn data-workflow-trigger"
+                    aria-haspopup="menu"
+                    aria-expanded={activeWorkflowMenu === "semantic"}
+                    onClick={() =>
+                      setActiveWorkflowMenu((current) =>
+                        current === "semantic" ? null : "semantic",
+                      )
+                    }
+                  >
+                    Semantic
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  {activeWorkflowMenu === "semantic" && (
+                    <div className="data-workflow-menu" role="menu" aria-label="Semantic workflows">
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("columns")}>
+                        <strong>Business fields</strong>
+                        <span>Review detected fields and business role labels.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
+                        <strong>Field meanings</strong>
+                        <span>Open detected business context and entity signals.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
+                        <strong>Suggested analysis questions</strong>
+                        <span>Open the available business question guidance.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
+                        <strong>Business relationships</strong>
+                        <span>Review semantic and KPI relationship signals.</span>
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
+                        <strong>Open full Semantic detail</strong>
+                        <span>Open the focused semantic workflow surface.</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="secondary-button data-action-btn"
