@@ -195,22 +195,135 @@ function TaskDetail({
     ? getTaskConfigurationReadinessLabel(configuration)
     : "Task not ready";
   const planReadinessLabel = getAnalysisPlanReadinessLabel(analysisPlan);
+  const primaryReadinessSummary =
+    planningReadiness.status === "ready_for_future_execution"
+      ? "This workflow has the inputs needed to prepare an analysis plan."
+      : missingInputs.length > 0
+        ? "Additional inputs are needed before this workflow can be prepared."
+        : planningReadiness.status === "unsupported"
+          ? "This workflow is not supported for the current data context."
+          : planningReadiness.status === "engine_limited"
+            ? "This workflow can be planned, but analysis support is limited."
+            : planningReadiness.status === "relationship_dependent"
+              ? "Workbook relationships need review before this workflow can be prepared."
+              : "This workflow is partly prepared and needs a little more context.";
+  const visibleNotes = [
+    ...planningReadiness.futureExecutionBlockers,
+    ...planningReadiness.futureExecutionNotes,
+  ].slice(0, 4);
+  const visibleInputs = [...task.requiredInputs, ...task.optionalInputs];
+  const recommendedPathLabel = engineCompatibility.recommendedEngine?.label || "Guided planning";
+  const recommendedPathSummary =
+    recommendations[0]?.humanSummary ||
+    businessExplanation?.metadataAwareSummary ||
+    businessExplanation?.businessMeaning ||
+    "Choose the required inputs to prepare this workflow preview.";
 
   return (
     <aside className="task-detail-panel" aria-label="Task details">
       <div className="builder-block-header">
-        <span>Task preview</span>
+        <span>Selected workflow</span>
         {onClose && (
           <button type="button" className="text-button" onClick={onClose}>
             Close
           </button>
         )}
       </div>
-      <div>
-        <p className="section-label">Guided workflow</p>
+
+      <section className="task-focus-section task-summary-section" aria-label="Task Summary">
+        <p className="section-label">Task Summary</p>
         <h3>{task.label}</h3>
-        <p>{task.description}</p>
-      </div>
+        <p>{businessExplanation?.summary || task.description}</p>
+        {businessExplanation?.businessMeaning && (
+          <strong>{businessExplanation.businessMeaning}</strong>
+        )}
+        <div className="task-light-pill-row" aria-label="Expected outputs">
+          {task.supportedResultTypes.slice(0, 3).map((resultType) => (
+            <small key={resultType}>{resultType.replace(/_/g, " ")}</small>
+          ))}
+        </div>
+      </section>
+
+      <section className="task-focus-section" aria-label="Inputs Required">
+        <div className="task-focus-section-heading">
+          <span>Inputs Required</span>
+          <small>
+            {missingInputs.length > 0
+              ? `${missingInputs.length} missing`
+              : "Ready"}
+          </small>
+        </div>
+      {visibleInputs.length > 0 ? (
+        <div className="guided-input-list">
+          {visibleInputs.map((input) => {
+            const options = guidedInputs.getOptionsForInput(input.id);
+            const selection = guidedInputs.getSelectionForInput(input.id);
+            const validation = getGuidedInputValidationMessage(guidedInputs.state, input.id);
+
+            return (
+            <label key={input.id}>
+              <small>
+                {input.label}
+                {input.required ? " *" : ""}
+              </small>
+              <span>{getGuidedInputPrompt(input)}</span>
+              <select
+                value={selection?.value || ""}
+                onChange={(event) => guidedInputs.selectInputValue(input, event.target.value)}
+                aria-label={`${input.label} guided selection`}
+              >
+                <option value="">{input.placeholder || "Choose an option"}</option>
+                {options.map((option) => (
+                  <option key={option.id} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {validation && <em className={validation.severity}>{validation.message}</em>}
+            </label>
+            );
+          })}
+        </div>
+      ) : (
+        <p>No required inputs for this workflow.</p>
+      )}
+      </section>
+
+      <section className={`task-focus-section task-readiness-summary ${getPlanningReadinessTone(planningReadiness.status)}`} aria-label="Readiness">
+        <div className="task-focus-section-heading">
+          <span>Readiness</span>
+          <small>{getPlanningReadinessStatusLabel(planningReadiness.status)}</small>
+        </div>
+        <p>{primaryReadinessSummary}</p>
+      </section>
+
+      <section className="task-focus-section" aria-label="Recommended Path">
+        <div className="task-focus-section-heading">
+          <span>Recommended Path</span>
+          <small>{planningReadiness.confidenceLevel} confidence</small>
+        </div>
+        <strong>{recommendedPathLabel}</strong>
+        <p>{recommendedPathSummary}</p>
+      </section>
+
+      <section className="task-focus-section" aria-label="Notes and Guidance">
+        <div className="task-focus-section-heading">
+          <span>Notes / Guidance</span>
+          <small>{mode === "analyst" ? "Analyst view" : "Human view"}</small>
+        </div>
+        {visibleNotes.length > 0 ? (
+          <div className="task-guidance-list">
+            {visibleNotes.map((note) => (
+              <p key={note}>{note}</p>
+            ))}
+          </div>
+        ) : (
+          <p>Nothing runs from this preview. Select inputs first, then review the prepared workflow context.</p>
+        )}
+      </section>
+
+      <details className="task-advanced-disclosure">
+        <summary>Advanced workflow metadata</summary>
       {businessExplanation && (
         <div className="business-explanation-panel">
           <span>{businessExplanation.title}</span>
@@ -250,15 +363,11 @@ function TaskDetail({
           <strong>{task.supportedEngines.join(", ")}</strong>
         </span>
         <span>
-          Recommended path
-          <strong>{engineCompatibility.recommendedEngine?.label || "Not available yet"}</strong>
-        </span>
-        <span>
           Explanation
           <strong>{task.explanationTemplateKey}</strong>
         </span>
         <span>
-          Validation readiness
+          Validation
           <strong>{readinessLabel}</strong>
         </span>
         <span>
@@ -270,36 +379,9 @@ function TaskDetail({
           <strong>{getRelationshipPlanningReadinessLabel(relationshipPlan)}</strong>
         </span>
         <span>
-          Unified readiness
-          <strong>{getPlanningReadinessStatusLabel(planningReadiness.status)}</strong>
+          Workflow scope
+          <strong>{planningReadiness.supportedWorkflowScope.replace(/_/g, " ")}</strong>
         </span>
-      </div>
-      <div className={`planning-readiness-panel ${getPlanningReadinessTone(planningReadiness.status)}`}>
-        <span>Planning readiness</span>
-        <strong>{getPlanningReadinessStatusLabel(planningReadiness.status)}</strong>
-        <p>{planningReadiness.beginnerSummary}</p>
-        <div className="planning-readiness-grid">
-          <small>{planningReadiness.confidenceLevel} confidence</small>
-          <small>{planningReadiness.supportedWorkflowScope.replace(/_/g, " ")}</small>
-          <small>{planningReadiness.explanationReadiness.replace(/_/g, " ")}</small>
-          <small>
-            {planningReadiness.engineCompatibilitySummary.compatibleEngines.length} analysis options
-          </small>
-        </div>
-        {planningReadiness.futureExecutionBlockers.length > 0 && (
-          <div className="planning-readiness-list">
-            <span>Needs review</span>
-            {planningReadiness.futureExecutionBlockers.slice(0, 3).map((blocker) => (
-              <small key={blocker}>{blocker}</small>
-            ))}
-          </div>
-        )}
-        <div className="planning-readiness-list">
-          <span>Notes</span>
-          {planningReadiness.futureExecutionNotes.slice(0, 3).map((note) => (
-            <small key={note}>{note}</small>
-          ))}
-        </div>
       </div>
       {configuration && (
         <div className={`task-validation-state ${configuration.validationState}`}>
@@ -311,41 +393,19 @@ function TaskDetail({
           </small>
         </div>
       )}
-      {task.requiredInputs.length > 0 && (
-        <div className="guided-input-list">
-          <span>Guided input selection</span>
-          {[...task.requiredInputs, ...task.optionalInputs].map((input) => {
-            const options = guidedInputs.getOptionsForInput(input.id);
-            const selection = guidedInputs.getSelectionForInput(input.id);
-            const validation = getGuidedInputValidationMessage(guidedInputs.state, input.id);
-
-            return (
-            <label key={input.id}>
-              <small>
-                {input.label}
-                {input.required ? " *" : ""}
-              </small>
-              <span>{getGuidedInputPrompt(input)}</span>
-              <select
-                value={selection?.value || ""}
-                onChange={(event) => guidedInputs.selectInputValue(input, event.target.value)}
-                aria-label={`${input.label} guided selection`}
-              >
-                <option value="">{input.placeholder || "Choose an option"}</option>
-                {options.map((option) => (
-                  <option key={option.id} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              {validation && <em className={validation.severity}>{validation.message}</em>}
-            </label>
-            );
-          })}
+      <div className={`planning-readiness-panel ${getPlanningReadinessTone(planningReadiness.status)}`}>
+        <span>Planning metadata</span>
+        <strong>{getPlanningReadinessStatusLabel(planningReadiness.status)}</strong>
+        <p>{planningReadiness.beginnerSummary}</p>
+        <div className="planning-readiness-grid">
+          <small>{planningReadiness.confidenceLevel} confidence</small>
+          <small>{planningReadiness.supportedWorkflowScope.replace(/_/g, " ")}</small>
+          <small>{planningReadiness.explanationReadiness.replace(/_/g, " ")}</small>
+          <small>
+            {planningReadiness.engineCompatibilitySummary.compatibleEngines.length} analysis options
+          </small>
         </div>
-      )}
-      <details className="task-advanced-disclosure">
-        <summary>Advanced workflow metadata</summary>
+      </div>
       {analysisPlan && (
         <div className="analysis-plan-preview">
           <span>Future execution-step preview</span>

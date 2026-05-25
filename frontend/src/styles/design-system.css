@@ -4231,20 +4231,23 @@ body {
 
 .app .task-launcher-layout {
   display: grid;
-  grid-template-columns: minmax(240px, 0.75fr) minmax(340px, 1.25fr);
-  gap: 14px;
+  grid-template-columns: minmax(230px, 0.68fr) minmax(360px, 1.32fr);
+  gap: 12px;
   align-items: start;
 }
 
 .app .task-category-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .app .task-category-section--pills {
   display: grid;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px 10px;
+  border-color: #e7edf3;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .app .task-category-section--pills .builder-block-header {
@@ -4254,15 +4257,15 @@ body {
 .app .task-pill-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .app .task-workflow-pill {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid #dbe3ea;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: #ffffff;
+  background: #f8fafc;
   color: #334155;
   font: inherit;
   font-size: 11px;
@@ -4283,21 +4286,140 @@ body {
 }
 
 .app .task-workflow-pill.is-selected {
-  border-color: #0e7490;
-  background: #e2f4f7;
+  border-color: #a7d3dc;
+  background: #edf8fa;
   color: #0f6575;
+  box-shadow: inset 0 0 0 1px rgba(14, 116, 144, 0.08);
 }
 
 .app .task-detail-panel {
   display: grid;
   max-height: min(72vh, 760px);
   overflow: auto;
-  gap: 10px;
-  padding: 12px;
+  gap: 0;
+  padding: 14px 16px;
+  border-color: #dbe3ea;
+  border-radius: 10px;
+  background: #ffffff;
 }
 
 .app .task-detail-panel > div > h3 {
   margin: 2px 0 4px;
+}
+
+.app .task-focus-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px 0;
+  border-top: 1px solid #eef2f6;
+}
+
+.app .task-detail-panel > .builder-block-header + .task-focus-section {
+  border-top: 0;
+}
+
+.app .task-summary-section h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.app .task-summary-section strong,
+.app .task-focus-section > strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.app .task-focus-section p,
+.app .task-guidance-list p {
+  margin: 0;
+  color: #556170;
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.48;
+}
+
+.app .task-focus-section-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.app .task-focus-section-heading span {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.app .task-focus-section-heading small,
+.app .task-light-pill-row small {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f3f6f8;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.app .task-light-pill-row,
+.app .task-guidance-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.app .task-guidance-list {
+  display: grid;
+  gap: 6px;
+}
+
+.app .task-readiness-summary.ready .task-focus-section-heading small {
+  background: #ecfdf3;
+  color: #166534;
+}
+
+.app .task-readiness-summary.partial .task-focus-section-heading small,
+.app .task-readiness-summary.warning .task-focus-section-heading small {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.app .task-readiness-summary.blocked .task-focus-section-heading small {
+  background: #fff1f2;
+  color: #991b1b;
+}
+
+.app .guided-input-list {
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.app .guided-input-list label {
+  gap: 4px;
+  padding: 0 0 9px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.app .guided-input-list label:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.app .guided-input-list select {
+  height: 32px;
 }
 
 .app .task-detail-grid {
@@ -4312,13 +4434,14 @@ body {
 }
 
 .app .task-advanced-disclosure {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f8fafc;
+  margin-top: 8px;
+  border: 1px solid #e7edf3;
+  border-radius: 8px;
+  background: #fbfcfd;
 }
 
 .app .task-advanced-disclosure > summary {
-  padding: 8px 10px;
+  padding: 9px 10px;
   color: #475569;
   font-size: 12px;
   font-weight: 700;
@@ -4327,6 +4450,29 @@ body {
 
 .app .task-advanced-disclosure > :not(summary) {
   margin: 8px 10px;
+}
+
+.app .task-detail-grid span,
+.app .task-validation-state,
+.app .analysis-plan-preview,
+.app .task-plan-preview-panel,
+.app .execution-preview-panel,
+.app .relationship-aware-planning-panel,
+.app .planning-readiness-panel,
+.app .engine-compatibility-panel,
+.app .business-explanation-panel {
+  border-color: #e7edf3;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.app .task-safe-note {
+  margin-top: 8px;
+  padding: 10px 0 0;
+  border-top: 1px solid #eef2f6;
+  border-radius: 0;
+  background: transparent;
+  color: #64748b;
 }
 
 @media (max-width: 980px) {
