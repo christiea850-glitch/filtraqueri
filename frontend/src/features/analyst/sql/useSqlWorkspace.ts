@@ -3,7 +3,7 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { executeWorkspaceQuery } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import {
-  MAX_SQL_DRAFT_SNAPSHOTS,
+  deleteSqlSnippet,
   getActiveSqlDraftSnapshot,
   normalizeSqlWorkspaceMetadataSnapshot,
   updateSqlWorkspaceDialect,
@@ -72,11 +72,12 @@ function useSqlWorkspace(
     () => restoredActiveDraft?.sql ?? createInitialSql(dataset?.table_name),
   );
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>(() =>
-    normalizedMetadata.drafts.map((draft) => ({
-      id: draft.id,
-      name: draft.label,
-      sql: draft.sql,
-      savedAt: draft.updatedAt,
+    normalizedMetadata.snippets.map((snippet) => ({
+      id: snippet.id,
+      name: snippet.name,
+      sql: snippet.sql,
+      savedAt: snippet.updatedAt,
+      dialect: snippet.dialect,
     })),
   );
   const [editorStatus, setEditorStatus] = useState<SqlExecutionStatus>("idle");
@@ -122,14 +123,15 @@ function useSqlWorkspace(
 
   useEffect(() => {
     setSavedDrafts(
-      normalizedMetadata.drafts.map((draft) => ({
-        id: draft.id,
-        name: draft.label,
-        sql: draft.sql,
-        savedAt: draft.updatedAt,
+      normalizedMetadata.snippets.map((snippet) => ({
+        id: snippet.id,
+        name: snippet.name,
+        sql: snippet.sql,
+        savedAt: snippet.updatedAt,
+        dialect: snippet.dialect,
       })),
     );
-  }, [normalizedMetadata.drafts]);
+  }, [normalizedMetadata.snippets]);
 
   useEffect(() => {
     const persistTimer = window.setTimeout(() => {
@@ -190,17 +192,22 @@ function useSqlWorkspace(
     const trimmedSql = sqlDraft.trim();
     if (!trimmedSql) return;
 
-    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const fallbackName = `Draft ${savedDrafts.length + 1}`;
+    const requestedName = window.prompt("Name this SQL draft", fallbackName);
+    if (requestedName === null) return;
+    const draftName = requestedName.trim() || fallbackName;
+    const timestamp = new Date().toISOString();
     const draft: SqlQueryDraft = {
       id: `${Date.now()}`,
-      name: `Draft ${savedDrafts.length + 1}`,
+      name: draftName,
       sql: trimmedSql,
       savedAt: timestamp,
+      dialect: selectedDialect,
     };
 
     setSavedDrafts((currentDrafts) => [
       draft,
-      ...currentDrafts.filter((currentDraft) => currentDraft.id !== draft.id).slice(0, 5),
+      ...currentDrafts.filter((currentDraft) => currentDraft.id !== draft.id),
     ]);
     onMetadataChange?.(
       updateSqlWorkspaceDraftMetadata(
@@ -221,12 +228,58 @@ function useSqlWorkspace(
           },
         ),
         {
-          draftCount: Math.min(savedDrafts.length + 1, MAX_SQL_DRAFT_SNAPSHOTS),
+          draftCount: savedDrafts.length + 1,
           lastDraftSavedAt: draft.savedAt,
         },
       ),
     );
     updateStatus("draft-saved");
+  };
+
+  const renameDraft = (draftId: string, nextName: string) => {
+    const draft = savedDrafts.find((currentDraft) => currentDraft.id === draftId);
+    const trimmedName = nextName.trim();
+    if (!draft || !trimmedName) return;
+
+    const timestamp = new Date().toISOString();
+    setSavedDrafts((currentDrafts) =>
+      currentDrafts.map((currentDraft) =>
+        currentDraft.id === draftId
+          ? { ...currentDraft, name: trimmedName, savedAt: timestamp }
+          : currentDraft,
+      ),
+    );
+    onMetadataChange?.(
+      upsertSqlSnippet(normalizedMetadata, {
+        id: draft.id,
+        name: trimmedName,
+        sql: draft.sql,
+        dialect: draft.dialect,
+        tags: ["draft"],
+        description: "Saved from the SQL Workspace draft action.",
+      }),
+    );
+  };
+
+  const deleteDraft = (draftId: string) => {
+    setSavedDrafts((currentDrafts) =>
+      currentDrafts.filter((currentDraft) => currentDraft.id !== draftId),
+    );
+    onMetadataChange?.(deleteSqlSnippet(normalizedMetadata, draftId));
+  };
+
+  const deleteDrafts = (draftIds: string[]) => {
+    const draftIdSet = new Set(draftIds);
+    if (draftIdSet.size === 0) return;
+
+    setSavedDrafts((currentDrafts) =>
+      currentDrafts.filter((currentDraft) => !draftIdSet.has(currentDraft.id)),
+    );
+    const nextMetadata = draftIds.reduce(
+      (currentMetadata, draftId) => deleteSqlSnippet(currentMetadata, draftId),
+      normalizedMetadata,
+    );
+    onMetadataChange?.(nextMetadata);
   };
 
   const clearDraft = () => {
@@ -306,9 +359,10 @@ function useSqlWorkspace(
         id: draft.id,
         label: draft.name,
         sql: draft.sql,
-        selectedDialect,
+        selectedDialect: draft.dialect,
       }),
     );
+    setSelectedDialect(draft.dialect);
     updateStatus("idle");
   };
 
@@ -347,6 +401,9 @@ function useSqlWorkspace(
     explainDraft,
     runDraft,
     loadDraft,
+    renameDraft,
+    deleteDraft,
+    deleteDrafts,
   };
 }
 

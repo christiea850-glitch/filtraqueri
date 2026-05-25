@@ -3,9 +3,9 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
-import SqlEditorPanel, { SqlDraftPanel, SqlGuidancePanel } from "./SqlEditorPanel";
+import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
-import type { SqlPreviewResult } from "./sqlTypes";
+import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 import useSqlWorkspace from "./useSqlWorkspace";
 
 type SqlWorkspaceProps = {
@@ -15,14 +15,31 @@ type SqlWorkspaceProps = {
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
 };
 
-type BottomTab = "guidance" | "drafts";
+type BottomTab = "guidance";
+type FocusedSqlView = "editor" | "result" | "drafts" | "draft-detail";
 
 const bottomTabLabels: Record<BottomTab, string> = {
   guidance: "Explain query",
-  drafts: "Drafts",
 };
 
-const bottomTabOrder: BottomTab[] = ["guidance", "drafts"];
+const bottomTabOrder: BottomTab[] = ["guidance"];
+
+const formatDraftTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const createSqlPreview = (sql: string) => {
+  const normalized = sql.replace(/\s+/g, " ").trim();
+  return normalized.length > 150 ? `${normalized.slice(0, 150)}...` : normalized;
+};
 
 function SqlFocusedResultPreview({
   previewResult,
@@ -162,10 +179,165 @@ function SqlFocusedResultPreview({
   );
 }
 
+function SavedDraftsPage({
+  drafts,
+  selectedDraftIds,
+  onSelectedDraftIdsChange,
+  onBack,
+  onOpenDraft,
+  onRenameDraft,
+  onDeleteDraft,
+  onBulkDelete,
+}: {
+  drafts: SqlQueryDraft[];
+  selectedDraftIds: string[];
+  onSelectedDraftIdsChange: (draftIds: string[]) => void;
+  onBack: () => void;
+  onOpenDraft: (draft: SqlQueryDraft) => void;
+  onRenameDraft: (draft: SqlQueryDraft) => void;
+  onDeleteDraft: (draft: SqlQueryDraft) => void;
+  onBulkDelete: () => void;
+}) {
+  const selectedDraftIdSet = new Set(selectedDraftIds);
+  const allSelected = drafts.length > 0 && selectedDraftIds.length === drafts.length;
+  const toggleDraft = (draftId: string) => {
+    onSelectedDraftIdsChange(
+      selectedDraftIdSet.has(draftId)
+        ? selectedDraftIds.filter((selectedDraftId) => selectedDraftId !== draftId)
+        : [...selectedDraftIds, draftId],
+    );
+  };
+
+  return (
+    <section className="sql-drafts-page" aria-label="Saved SQL drafts">
+      <div className="sql-result-page-header">
+        <button type="button" className="secondary-button" onClick={onBack}>
+          Back to Analyst
+        </button>
+        <div>
+          <p className="section-label">Analyst SQL</p>
+          <h2>Saved Drafts</h2>
+          <p>{drafts.length.toLocaleString()} saved draft{drafts.length === 1 ? "" : "s"}</p>
+        </div>
+        <div className="sql-result-page-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => onSelectedDraftIdsChange(allSelected ? [] : drafts.map((draft) => draft.id))}
+            disabled={drafts.length === 0}
+          >
+            {allSelected ? "Clear selection" : "Select all"}
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onBulkDelete}
+            disabled={selectedDraftIds.length === 0}
+          >
+            Delete selected
+          </button>
+        </div>
+      </div>
+
+      {drafts.length === 0 ? (
+        <div className="empty-state compact-empty">
+          <p className="section-label">No drafts</p>
+          <h2>No saved drafts yet</h2>
+          <p>Save a SQL draft from the editor to manage it here.</p>
+        </div>
+      ) : (
+        <div className="sql-drafts-list">
+          {drafts.map((draft) => (
+            <article className="sql-draft-row" key={draft.id}>
+              <label className="sql-draft-check">
+                <input
+                  type="checkbox"
+                  checked={selectedDraftIdSet.has(draft.id)}
+                  onChange={() => toggleDraft(draft.id)}
+                  aria-label={`Select ${draft.name}`}
+                />
+              </label>
+              <button type="button" className="sql-draft-open" onClick={() => onOpenDraft(draft)}>
+                <strong>{draft.name}</strong>
+                <span>
+                  {draft.dialect.toUpperCase()} | {formatDraftTimestamp(draft.savedAt)}
+                </span>
+                <p>{createSqlPreview(draft.sql)}</p>
+              </button>
+              <div className="sql-draft-actions">
+                <button type="button" className="secondary-button" onClick={() => onRenameDraft(draft)}>
+                  Rename
+                </button>
+                <button type="button" className="text-button" onClick={() => onDeleteDraft(draft)}>
+                  Delete
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function DraftDetailPage({
+  draft,
+  onBackToDrafts,
+  onBackToAnalyst,
+  onLoadDraft,
+  onRenameDraft,
+  onDeleteDraft,
+}: {
+  draft: SqlQueryDraft;
+  onBackToDrafts: () => void;
+  onBackToAnalyst: () => void;
+  onLoadDraft: (draft: SqlQueryDraft) => void;
+  onRenameDraft: (draft: SqlQueryDraft) => void;
+  onDeleteDraft: (draft: SqlQueryDraft) => void;
+}) {
+  return (
+    <section className="sql-draft-detail-page" aria-label="Saved SQL draft detail">
+      <div className="sql-result-page-header">
+        <div className="sql-draft-detail-nav">
+          <button type="button" className="secondary-button" onClick={onBackToDrafts}>
+            Back to Saved Drafts
+          </button>
+          <button type="button" className="secondary-button" onClick={onBackToAnalyst}>
+            Back to Analyst
+          </button>
+        </div>
+        <div>
+          <p className="section-label">Saved draft</p>
+          <h2>{draft.name}</h2>
+          <p>
+            {draft.dialect.toUpperCase()} | Saved {formatDraftTimestamp(draft.savedAt)}
+          </p>
+        </div>
+        <div className="sql-result-page-actions">
+          <button type="button" className="primary-button" onClick={() => onLoadDraft(draft)}>
+            Open in editor
+          </button>
+          <button type="button" className="secondary-button" onClick={() => onRenameDraft(draft)}>
+            Rename
+          </button>
+          <button type="button" className="text-button" onClick={() => onDeleteDraft(draft)}>
+            Delete
+          </button>
+        </div>
+      </div>
+      <div className="sql-draft-detail-body">
+        <pre>{draft.sql}</pre>
+      </div>
+    </section>
+  );
+}
+
 function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
-  const [isFocusedPreviewOpen, setIsFocusedPreviewOpen] = useState(false);
+  const [focusedView, setFocusedView] = useState<FocusedSqlView>("editor");
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
@@ -184,10 +356,53 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     editor,
     insertSql,
     loadDraft,
+    renameDraft,
+    deleteDraft,
+    deleteDrafts,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
+  const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
+  };
+  const openDraftDetail = (draft: SqlQueryDraft) => {
+    setActiveDraftId(draft.id);
+    setFocusedView("draft-detail");
+  };
+  const requestRenameDraft = (draft: SqlQueryDraft) => {
+    const nextName = window.prompt("Rename saved draft", draft.name);
+    if (nextName === null) return;
+    renameDraft(draft.id, nextName);
+  };
+  const requestDeleteDraft = (draft: SqlQueryDraft) => {
+    const shouldDelete = window.confirm(
+      "Deleting saved draft will permanently erase this information.",
+    );
+    if (!shouldDelete) return;
+
+    deleteDraft(draft.id);
+    setSelectedDraftIds((currentIds) => currentIds.filter((draftId) => draftId !== draft.id));
+    if (activeDraftId === draft.id) {
+      setActiveDraftId(null);
+      setFocusedView("drafts");
+    }
+  };
+  const requestBulkDelete = () => {
+    const shouldDelete = window.confirm(
+      "Deleting selected saved drafts will permanently erase all selected draft information.",
+    );
+    if (!shouldDelete) return;
+
+    deleteDrafts(selectedDraftIds);
+    if (activeDraftId && selectedDraftIds.includes(activeDraftId)) {
+      setActiveDraftId(null);
+      setFocusedView("drafts");
+    }
+    setSelectedDraftIds([]);
+  };
+  const openDraftInEditor = (draft: SqlQueryDraft) => {
+    loadDraft(draft);
+    setFocusedView("editor");
   };
 
   const startDockResize = (
@@ -216,12 +431,44 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     handle.addEventListener("pointerup", onRelease);
   };
 
-  if (isFocusedPreviewOpen) {
+  if (focusedView === "result") {
     return (
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
         <SqlFocusedResultPreview
           previewResult={previewResult}
-          onBack={() => setIsFocusedPreviewOpen(false)}
+          onBack={() => setFocusedView("editor")}
+        />
+      </section>
+    );
+  }
+
+  if (focusedView === "drafts") {
+    return (
+      <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
+        <SavedDraftsPage
+          drafts={savedDrafts}
+          selectedDraftIds={selectedDraftIds}
+          onSelectedDraftIdsChange={setSelectedDraftIds}
+          onBack={() => setFocusedView("editor")}
+          onOpenDraft={openDraftDetail}
+          onRenameDraft={requestRenameDraft}
+          onDeleteDraft={requestDeleteDraft}
+          onBulkDelete={requestBulkDelete}
+        />
+      </section>
+    );
+  }
+
+  if (focusedView === "draft-detail" && activeDraft) {
+    return (
+      <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
+        <DraftDetailPage
+          draft={activeDraft}
+          onBackToDrafts={() => setFocusedView("drafts")}
+          onBackToAnalyst={() => setFocusedView("editor")}
+          onLoadDraft={openDraftInEditor}
+          onRenameDraft={requestRenameDraft}
+          onDeleteDraft={requestDeleteDraft}
         />
       </section>
     );
@@ -284,7 +531,8 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
           characterCount={characterCount}
           canRunQuery={Boolean(dataset)}
           canOpenResultPreview={canOpenResultPreview}
-          onOpenResultPreview={() => setIsFocusedPreviewOpen(true)}
+          onOpenResultPreview={() => setFocusedView("result")}
+          onOpenSavedDrafts={() => setFocusedView("drafts")}
           dialectContext={{
             selectedDialect,
             selectedDialectProfile,
@@ -327,16 +575,13 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
                     validation={sqlAnalysis.validation}
                   />
                 )}
-                {bottomTab === "drafts" && (
-                  <SqlDraftPanel savedDrafts={savedDrafts} onLoadDraft={loadDraft} />
-                )}
               </div>
             </section>
           </>
         )}
 
         <div className="sqlw-dockbar sqlw-dockbar-bottom">
-          <span className="sqlw-dockbar-label">Query output</span>
+          <span className="sqlw-dockbar-label">Support</span>
           {bottomTabOrder.map((tab) => (
             <button
               type="button"

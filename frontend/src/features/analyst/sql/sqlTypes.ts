@@ -20,6 +20,7 @@ export type SqlQueryDraft = {
   name: string;
   sql: string;
   savedAt: string;
+  dialect: SqlDialectId;
 };
 
 export type SqlPreviewResult = {

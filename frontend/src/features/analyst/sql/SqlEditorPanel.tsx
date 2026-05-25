@@ -4,7 +4,6 @@ import type {
   SqlDialectContext,
   SqlExecutionStatus,
   SqlGuidanceCard,
-  SqlQueryDraft,
   SqlValidationSummary,
 } from "./sqlTypes";
 
@@ -15,6 +14,7 @@ type SqlEditorPanelProps = {
   canRunQuery: boolean;
   canOpenResultPreview: boolean;
   onOpenResultPreview: () => void;
+  onOpenSavedDrafts: () => void;
   dialectContext: SqlDialectContext;
 };
 
@@ -34,6 +34,7 @@ function SqlEditorPanel({
   canRunQuery,
   canOpenResultPreview,
   onOpenResultPreview,
+  onOpenSavedDrafts,
   dialectContext,
 }: SqlEditorPanelProps) {
   return (
@@ -77,6 +78,9 @@ function SqlEditorPanel({
           <button type="button" className="secondary-button" onClick={editor.onSaveDraft}>
             Save draft
           </button>
+          <button type="button" className="secondary-button" onClick={onOpenSavedDrafts}>
+            Saved Drafts
+          </button>
           <button type="button" className="text-button" onClick={editor.onClear}>
             Clear
           </button>
@@ -92,11 +96,6 @@ function SqlEditorPanel({
     </section>
   );
 }
-
-type SqlDraftPanelProps = {
-  savedDrafts: SqlQueryDraft[];
-  onLoadDraft: (draft: SqlQueryDraft) => void;
-};
 
 type SqlGuidancePanelProps = {
   diagnostics: SqlEditorInterface["diagnostics"];
@@ -148,29 +147,6 @@ export function SqlGuidancePanel({
               </article>
             ))}
           </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-export function SqlDraftPanel({ savedDrafts, onLoadDraft }: SqlDraftPanelProps) {
-  return (
-    <section className="sql-draft-panel" aria-label="Saved SQL drafts">
-      <div className="sql-draft-list" aria-label="Saved SQL drafts">
-        <div className="builder-block-header">
-          <span>Drafts</span>
-          <small>{savedDrafts.length} saved</small>
-        </div>
-        {savedDrafts.length === 0 ? (
-          <p>No drafts yet.</p>
-        ) : (
-          savedDrafts.map((draft) => (
-            <button type="button" key={draft.id} onClick={() => onLoadDraft(draft)}>
-              <strong>{draft.name}</strong>
-              <span>{draft.savedAt}</span>
-            </button>
-          ))
         )}
       </div>
     </section>
