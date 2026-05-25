@@ -1,11 +1,11 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { humanIntentGuidance } from "./app/appCompositionConfig";
 import DatasetSummaryPanel, {
   type HumanIntent,
 } from "./components/dataset/DatasetSummaryPanel";
 import DynamicFiltersPanel from "./components/filters/DynamicFiltersPanel";
 import QueryHistoryPanel from "./components/history/QueryHistoryPanel";
-import WorkspaceShell from "./components/layout/WorkspaceShell";
+import WorkspaceShell, { type CommandLauncherItem } from "./components/layout/WorkspaceShell";
 import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuilderPanel";
 import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
@@ -291,6 +291,29 @@ function App() {
     setErrorMessage("");
     const exportError = await runExportCurrentResults();
     if (exportError) setErrorMessage(exportError);
+  };
+
+  const dispatchDeferredWorkspaceCommand = (eventName: string, detail: Record<string, unknown>) => {
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent(eventName, { detail })), 0);
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent(eventName, { detail })), 80);
+  };
+
+  const openHumanView = (view: ActiveView) => {
+    setWorkspaceMode("human");
+    updateDatasetSessionView(view);
+  };
+
+  const openDataCommand = (target?: string) => {
+    openHumanView("dataset");
+    if (target) {
+      dispatchDeferredWorkspaceCommand("filtraqueri:data-workspace-command", { target });
+    }
+  };
+
+  const openAnalystCommand = (target: "editor" | "result" | "drafts" = "editor") => {
+    setWorkspaceMode("analyst");
+    updateDatasetSessionView("sqlWorkspace");
+    dispatchDeferredWorkspaceCommand("filtraqueri:sql-workspace-command", { target });
   };
 
   const selectHumanIntent = (intent: HumanIntent) => {
@@ -806,6 +829,180 @@ function App() {
     );
   };
 
+  const hasWorkbookMetadata = Boolean(dataset?.workbook_metadata);
+  const hasSqlResult =
+    activeView === "sqlWorkspace" &&
+    executionRegistry.records.some(
+      (record) =>
+        record.datasetId === dataset?.dataset_id &&
+        record.source === "sql" &&
+        record.status === "success" &&
+        record.visibleColumns.length > 0,
+    );
+  const canExportActiveResult = Boolean(
+    dataset && activeResultModel && activeResultModel.export.rowCount > 0,
+  );
+  const commandItems = useMemo<CommandLauncherItem[]>(() => {
+    const commands: CommandLauncherItem[] = [
+      {
+        id: "nav:data",
+        title: "Open Data",
+        description: dataset ? "Review the active dataset workspace." : "Open the Data workspace.",
+        category: "Navigation",
+        keywords: ["dataset", "table", "workbook"],
+        onRun: () => openDataCommand(),
+      },
+      {
+        id: "nav:analyze",
+        title: "Open Analyze",
+        description: "Open the visual Query Builder workspace.",
+        category: "Navigation",
+        keywords: ["query builder", "filters", "guided"],
+        onRun: () => openHumanView("queryBuilder"),
+      },
+      {
+        id: "nav:insights",
+        title: "Open Insights",
+        description: "Review the current result and investigation surface.",
+        category: "Navigation",
+        keywords: ["results", "preview", "investigation"],
+        onRun: () => openHumanView("results"),
+      },
+      {
+        id: "nav:analyst",
+        title: "Open Analyst",
+        description: "Open the Analyst SQL workspace.",
+        category: "Navigation",
+        keywords: ["sql", "monaco", "analyst"],
+        onRun: () => openAnalystCommand("editor"),
+      },
+    ];
+
+    if (dataset) {
+      commands.push(
+        {
+          id: "data:preview",
+          title: "Preview Dataset",
+          description: "Open the focused Data Preview surface.",
+          category: "Data",
+          keywords: ["sample", "rows", "table"],
+          onRun: () => openDataCommand("preview"),
+        },
+        {
+          id: "data:intelligence",
+          title: "Open Intelligence Detail",
+          description: "Open the dataset intelligence detail surface.",
+          category: "Data",
+          keywords: ["profile", "quality", "fields"],
+          onRun: () => openDataCommand("intelligenceDetail"),
+        },
+        {
+          id: "data:semantics",
+          title: "Open Semantic Detail",
+          description: "Open business semantics for the active dataset.",
+          category: "Data",
+          keywords: ["business fields", "semantic", "kpi"],
+          onRun: () => openDataCommand("semantics"),
+        },
+      );
+
+      if (hasWorkbookMetadata) {
+        commands.push(
+          {
+            id: "data:worksheet-preview",
+            title: "Open Worksheet Preview",
+            description: "Preview workbook worksheets in the Data Preview surface.",
+            category: "Data",
+            keywords: ["sheet", "excel", "workbook"],
+            onRun: () => openDataCommand("worksheetPreview"),
+          },
+          {
+            id: "data:connections",
+            title: "Open Workbook Connections",
+            description: "Review detected worksheet connection guidance.",
+            category: "Data",
+            keywords: ["relationships", "joins", "workbook"],
+            onRun: () => openDataCommand("connections"),
+          },
+        );
+      }
+    }
+
+    commands.push(
+      {
+        id: "analyst:sql",
+        title: "Open SQL Workspace",
+        description: "Write and run SELECT-only SQL against the active dataset.",
+        category: "Analyst",
+        keywords: ["sql", "duckdb", "monaco"],
+        onRun: () => openAnalystCommand("editor"),
+      },
+      {
+        id: "analyst:drafts",
+        title: "Open Saved Drafts",
+        description: "Manage saved SQL queries.",
+        category: "Analyst",
+        keywords: ["saved queries", "snippets", "drafts"],
+        onRun: () => openAnalystCommand("drafts"),
+      },
+    );
+
+    if (hasSqlResult) {
+      commands.push({
+        id: "analyst:result-preview",
+        title: "Open Result Preview",
+        description: "Open the latest SQL result preview.",
+        category: "Analyst",
+        keywords: ["sql result", "preview", "rows"],
+        onRun: () => openAnalystCommand("result"),
+      });
+    }
+
+    commands.push(
+      {
+        id: "workflow:query-builder",
+        title: "Open Query Builder",
+        description: "Build a result with fields, grouping, sorting, and limits.",
+        category: "Workflows",
+        keywords: ["analyze", "visual query", "builder"],
+        disabled: !dataset,
+        disabledReason: "Open data first",
+        onRun: () => openHumanView("queryBuilder"),
+      },
+      {
+        id: "workflow:guided-analysis",
+        title: "Run Guided Analysis",
+        description: "Start the existing summary guidance workflow.",
+        category: "Workflows",
+        keywords: ["human mode", "summary", "guided"],
+        disabled: !dataset,
+        disabledReason: "Open data first",
+        onRun: () => selectHumanIntent("summary"),
+      },
+      {
+        id: "workflow:export-active-result",
+        title: "Export Active Result",
+        description: "Export the current Human Mode result when export is supported.",
+        category: "Workflows",
+        keywords: ["csv", "download", "results"],
+        disabled: !canExportActiveResult || isExporting,
+        disabledReason: isExporting ? "Exporting" : "No exportable result",
+        onRun: exportCurrentResults,
+      },
+    );
+
+    return commands;
+  }, [
+    activeView,
+    activeResultModel,
+    canExportActiveResult,
+    dataset,
+    executionRegistry.records,
+    hasSqlResult,
+    hasWorkbookMetadata,
+    isExporting,
+  ]);
+
   return (
     <WorkspaceShell
       activeView={activeView}
@@ -816,6 +1013,7 @@ function App() {
       errorMessage={errorMessage}
       runtimeContext={workspaceRuntimeContext}
       isRuntimePanelCollapsed={runtimePersistence.isRuntimePanelCollapsed}
+      commandItems={commandItems}
       onOpenFile={() => {
         openDatasetPicker();
       }}

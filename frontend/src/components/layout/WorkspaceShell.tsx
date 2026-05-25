@@ -6,6 +6,7 @@ import type {
   WorkspaceMode,
 } from "../../features/dataset/datasetTypes";
 import type { WorkspaceRuntimeContext } from "../../features/workspaceRuntime";
+import CommandLauncher, { type CommandLauncherItem } from "./CommandLauncher";
 
 type AnalystNavItem = {
   view: ActiveView;
@@ -46,6 +47,7 @@ type WorkspaceShellProps = {
   errorMessage: string;
   runtimeContext: WorkspaceRuntimeContext;
   isRuntimePanelCollapsed: boolean;
+  commandItems: CommandLauncherItem[];
   children: ReactNode;
   onOpenFile: () => void;
   onViewChange: (view: ActiveView) => void;
@@ -205,6 +207,7 @@ function WorkspaceShell({
   errorMessage,
   runtimeContext,
   isRuntimePanelCollapsed,
+  commandItems,
   children,
   onOpenFile,
   onViewChange,
@@ -215,6 +218,7 @@ function WorkspaceShell({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [isCommandLauncherOpen, setIsCommandLauncherOpen] = useState(false);
   const activeDestinationId = destinationByActiveView[activeView];
   const activeDestination =
     productDestinations.find((destination) => destination.id === activeDestinationId) ||
@@ -279,6 +283,18 @@ function WorkspaceShell({
     if (destination.mode !== workspaceMode) onModeChange(destination.mode);
     onViewChange(destination.defaultView);
   };
+
+  useEffect(() => {
+    const openLauncher = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandLauncherOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", openLauncher);
+    return () => window.removeEventListener("keydown", openLauncher);
+  }, []);
 
   useEffect(() => {
     if (!isResizingSidebar) return undefined;
@@ -356,6 +372,21 @@ function WorkspaceShell({
               <WorkspaceIcon name="chevronDown" />
             </span>
           )}
+        </button>
+        <button
+          type="button"
+          className="command-launcher-trigger"
+          onClick={() => setIsCommandLauncherOpen(true)}
+          aria-label="Open command launcher"
+        >
+          <span aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m16 16 4 4" />
+            </svg>
+          </span>
+          <strong>Search workflows</strong>
+          <kbd>Ctrl K</kbd>
         </button>
         <div className="mode-switcher" aria-label="Workspace mode">
           <button
@@ -627,8 +658,14 @@ function WorkspaceShell({
           </aside>
         )}
       </div>
+      <CommandLauncher
+        open={isCommandLauncherOpen}
+        commands={commandItems}
+        onClose={() => setIsCommandLauncherOpen(false)}
+      />
     </div>
   );
 }
 
 export default WorkspaceShell;
+export type { CommandLauncherItem };

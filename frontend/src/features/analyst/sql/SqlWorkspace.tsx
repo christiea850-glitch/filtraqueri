@@ -1,4 +1,4 @@
-import { useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
@@ -17,6 +17,7 @@ type SqlWorkspaceProps = {
 
 type BottomTab = "guidance";
 type FocusedSqlView = "editor" | "result" | "drafts" | "draft-detail";
+type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts";
 
 const bottomTabLabels: Record<BottomTab, string> = {
   guidance: "Explain query",
@@ -404,6 +405,31 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     loadDraft(draft);
     setFocusedView("editor");
   };
+
+  useEffect(() => {
+    const handleSqlWorkspaceCommand = (event: Event) => {
+      const commandEvent = event as CustomEvent<{ target?: SqlWorkspaceCommandTarget }>;
+      const target = commandEvent.detail?.target;
+
+      if (target === "drafts") {
+        setFocusedView("drafts");
+        return;
+      }
+
+      if (target === "result") {
+        if (canOpenResultPreview) setFocusedView("result");
+        return;
+      }
+
+      if (target === "editor") {
+        setFocusedView("editor");
+      }
+    };
+
+    window.addEventListener("filtraqueri:sql-workspace-command", handleSqlWorkspaceCommand);
+    return () =>
+      window.removeEventListener("filtraqueri:sql-workspace-command", handleSqlWorkspaceCommand);
+  }, [canOpenResultPreview]);
 
   const startDockResize = (
     event: ReactPointerEvent<HTMLDivElement>,

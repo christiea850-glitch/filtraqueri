@@ -66,6 +66,13 @@ type DatasetSummaryPanelProps = {
 };
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
+type DataWorkspaceCommandTarget =
+  | "preview"
+  | "worksheetPreview"
+  | "connections"
+  | "intelligence"
+  | "intelligenceDetail"
+  | "semantics";
 
 const datasetIntelligenceDetailRouteId: ControlledHashDetailRouteId = "detail:dataset-intelligence";
 
@@ -667,6 +674,50 @@ function DatasetSummaryPanel({
       setIsDatasetIntelligenceDetailOpen(event.active);
     });
   }, []);
+
+  useEffect(() => {
+    const handleDataWorkspaceCommand = (event: Event) => {
+      if (!dataset) return;
+
+      const commandEvent = event as CustomEvent<{ target?: DataWorkspaceCommandTarget }>;
+      const target = commandEvent.detail?.target;
+
+      if (target === "preview" || target === "worksheetPreview") {
+        setIsDatasetPreviewOpen(true);
+        return;
+      }
+
+      if (target === "connections") {
+        setIsDatasetPreviewOpen(false);
+        setIsDatasetIntelligenceDetailOpen(false);
+        setActiveDrillInView("overview");
+        return;
+      }
+
+      if (target === "intelligenceDetail") {
+        setIsDatasetPreviewOpen(false);
+        setIsDatasetIntelligenceDetailOpen(true);
+        return;
+      }
+
+      if (target === "intelligence") {
+        setIsDatasetPreviewOpen(false);
+        setIsDatasetIntelligenceDetailOpen(false);
+        setActiveDrillInView("dataIntelligence");
+        return;
+      }
+
+      if (target === "semantics") {
+        setIsDatasetPreviewOpen(false);
+        setIsDatasetIntelligenceDetailOpen(false);
+        setActiveDrillInView("businessSemantics");
+      }
+    };
+
+    window.addEventListener("filtraqueri:data-workspace-command", handleDataWorkspaceCommand);
+    return () =>
+      window.removeEventListener("filtraqueri:data-workspace-command", handleDataWorkspaceCommand);
+  }, [dataset]);
 
   if (dataset && isDatasetPreviewOpen) {
     return (
