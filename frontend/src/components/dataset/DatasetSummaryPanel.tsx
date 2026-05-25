@@ -774,59 +774,59 @@ function DatasetSummaryPanel({
   ).slice(0, 4);
   const businessActivityLabels = Array.from(
     new Set([
-      ...(dataProfile?.possibleMetrics.length ? ["measurable business movement"] : []),
-      ...(dataProfile?.dateTimeFields.length ? ["activity over time"] : []),
-      ...(businessEntityHints.length ? ["customer or entity behavior"] : []),
-      ...(dataProfile?.possibleDimensions.length ? ["segment and category patterns"] : []),
+      ...(dataProfile?.possibleMetrics.length ? ["measurable activity"] : []),
+      ...(dataProfile?.dateTimeFields.length ? ["time-based activity"] : []),
+      ...(businessEntityHints.length ? ["entity behavior"] : []),
+      ...(dataProfile?.possibleDimensions.length ? ["comparison dimensions"] : []),
       ...workbookActivityLabels,
     ]),
   ).slice(0, 6);
   const businessNarrative =
     businessActivityLabels.length > 0
-      ? `FiltraQueri sees signals of ${businessActivityLabels.slice(0, 3).join(", ")}. These patterns can help frame what to investigate before anyone has to inspect the raw sheet.`
-      : "FiltraQueri is building a business picture from this dataset so you can decide what is worth investigating first.";
+      ? `Start with ${businessActivityLabels.slice(0, 3).join(", ")}. These cues help narrow the first useful question.`
+      : "FiltraQueri is building a first read so you can choose a useful question sooner.";
   const businessSignals = [
     dataProfile?.possibleMetrics.length
       ? {
-          title: "Financial or measurable activity detected",
-          detail: `${dataProfile.possibleMetrics[0].name} may help explain business movement.`,
+          title: "Measurable activity",
+          detail: `${dataProfile.possibleMetrics[0].name} may anchor the first review.`,
           tone: "opportunity" as HumanSignalTone,
           icon: "opportunity" as HumanSignalIcon,
         }
       : null,
     dataProfile?.dateTimeFields.length
       ? {
-          title: "Timeline available for trend questions",
-          detail: `${dataProfile.dateTimeFields[0].name} can help organize activity over time.`,
+          title: "Timeline ready",
+          detail: `${dataProfile.dateTimeFields[0].name} can order change over time.`,
           tone: "ready" as HumanSignalTone,
           icon: "timeline" as HumanSignalIcon,
         }
       : {
-          title: "Timeline needs review",
+          title: "Timeline unclear",
           detail: "Trend investigations may need a clearer date field.",
           tone: "attention" as HumanSignalTone,
           icon: "warning" as HumanSignalIcon,
         },
     businessEntityHints.length
       ? {
-          title: "Entity behavior patterns detected",
-          detail: `${businessEntityHints[0].displayName} may represent who or what the activity is about.`,
+          title: "Entity signal",
+          detail: `${businessEntityHints[0].displayName} may show who or what the activity concerns.`,
           tone: "info" as HumanSignalTone,
           icon: "entity" as HumanSignalIcon,
         }
       : null,
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
-          title: "Connected operations likely present",
-          detail: "Multiple sheets may describe related parts of the same business flow.",
+          title: "Connected sources",
+          detail: "Multiple sheets may describe one shared workflow.",
           tone: "connected" as HumanSignalTone,
           icon: "connected" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleDimensions.length
       ? {
-          title: "Useful comparison groups found",
-          detail: `${dataProfile.possibleDimensions[0].name} may help compare segments or categories.`,
+          title: "Comparison field",
+          detail: `${dataProfile.possibleDimensions[0].name} may separate performance views.`,
           tone: "opportunity" as HumanSignalTone,
           icon: "comparison" as HumanSignalIcon,
         }
@@ -840,15 +840,15 @@ function DatasetSummaryPanel({
   const investigationNextSteps = [
     dataProfile?.dateTimeFields.length
       ? {
-          label: "Explore timeline trends",
-          detail: "Look for changes, seasonality, or operational shifts over time.",
+          label: "Review change over time",
+          detail: "Look for shifts, seasonality, or timing effects.",
           target: "suggestedAnalysisPaths" as const,
           icon: "trend" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleMetrics.length
       ? {
-          label: "Start a metric-focused investigation",
+          label: "Start with the key metric",
           detail: "Use the strongest measurable field to frame a business question.",
           target: "guidedAnalyticsTasks" as const,
           icon: "opportunity" as HumanSignalIcon,
@@ -856,24 +856,24 @@ function DatasetSummaryPanel({
       : null,
     businessEntityHints.length
       ? {
-          label: "Review possible entity patterns",
-          detail: "See whether customers, products, tenants, or other entities need attention.",
+          label: "Review entity behavior",
+          detail: "See whether customers, products, tenants, or similar records need attention.",
           target: "businessQuestions" as const,
           icon: "entity" as HumanSignalIcon,
         }
       : null,
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
-          label: "Review connected business areas",
-          detail: "Understand how multiple sources may describe one operational flow.",
+          label: "Review connected sources",
+          detail: "See how multiple sheets may describe one workflow.",
           target: "overview" as const,
           icon: "connected" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleDimensions.length
       ? {
-          label: "Compare operational groups",
-          detail: "Investigate which categories, regions, or groups differ most.",
+          label: "Compare segments",
+          detail: "Check which categories, regions, or segments differ most.",
           target: "businessQuestions" as const,
           icon: "comparison" as HumanSignalIcon,
         }
@@ -886,14 +886,14 @@ function DatasetSummaryPanel({
   }>;
   const smartBusinessQuestions = Array.from(
     new Set([
-      ...(dataProfile?.possibleMetrics.length ? ["Which areas appear most active or valuable?"] : []),
-      ...(dataProfile?.dateTimeFields.length ? ["Are there timeline-related changes worth reviewing?"] : []),
-      ...(dataProfile?.possibleDimensions.length ? ["Which business groups differ most?"] : []),
+      ...(dataProfile?.possibleMetrics.length ? ["Where is value concentrated?"] : []),
+      ...(dataProfile?.dateTimeFields.length ? ["What changed over time?"] : []),
+      ...(dataProfile?.possibleDimensions.length ? ["Which segments differ most?"] : []),
       ...(businessEntityHints.length ? ["Which entities may need attention?"] : []),
       ...((workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
-        ? ["What operational patterns appear across connected areas?"]
+        ? ["How do connected sources relate?"]
         : []),
-      "Where are unusual patterns most likely to appear?",
+      "Where might unusual activity appear?",
     ]),
   ).slice(0, 5);
   const opportunityLabels = Array.from(
@@ -1143,6 +1143,12 @@ function DatasetSummaryPanel({
               </div>
             </div>
             <section className="human-understanding-panel" aria-label="What FiltraQueri noticed">
+              <div className="investigation-stage-strip" aria-label="Investigation stages">
+                <span className="is-complete">Understand</span>
+                <span className="is-active">Prioritize</span>
+                <span>Investigate</span>
+                <span>Act</span>
+              </div>
               <div>
                 <p className="section-label">What FiltraQueri noticed</p>
                 <h3>{datasetPurposeLabel}</h3>
@@ -1170,28 +1176,25 @@ function DatasetSummaryPanel({
                 </div>
               )}
             </section>
-            <section className="business-narrative-panel" aria-label="Business understanding">
-              <div>
-                <p className="section-label">Business context</p>
-                <h3>What may matter operationally</h3>
+            <section className="business-priority-panel" aria-label="Prioritized business signals">
+              <div className="business-priority-copy">
+                <p className="section-label">Prioritize</p>
+                <h3>Best starting points</h3>
                 <p>{businessNarrative}</p>
-              </div>
-              {businessActivityLabels.length > 0 && (
-                <div className="business-activity-list" aria-label="Possible business activities detected">
-                  {businessActivityLabels.map((activity) => (
-                    <span key={activity}>{activity}</span>
-                  ))}
-                </div>
-              )}
-            </section>
-            <section className="business-signals-panel" aria-label="Business signals found">
-              <div className="business-signals-heading">
-                <p className="section-label">Business signals found</p>
-                <strong>Useful patterns to investigate</strong>
+                {businessActivityLabels.length > 0 && (
+                  <div className="business-activity-list" aria-label="Useful business cues">
+                    {businessActivityLabels.slice(0, 4).map((activity) => (
+                      <span key={activity}>{activity}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="business-signal-grid">
-                {businessSignals.map((signal) => (
-                  <span key={signal.title} className={`human-signal-card is-${signal.tone}`}>
+                {businessSignals.slice(0, 4).map((signal, index) => (
+                  <span
+                    key={signal.title}
+                    className={`human-signal-card is-${signal.tone}${index === 0 ? " is-primary" : ""}`}
+                  >
                     <HumanSignalIcon name={signal.icon} />
                     <span>
                       <strong>{signal.title}</strong>
@@ -1203,7 +1206,7 @@ function DatasetSummaryPanel({
             </section>
             <section className="investigation-next-step-panel" aria-label="Suggested next steps">
               <div className="investigation-next-step-copy">
-                <p className="section-label">Suggested next step</p>
+                <p className="section-label">Investigate</p>
                 <h3>{investigationNextSteps[0]?.label || "Choose a business question to explore"}</h3>
                 <p>
                   {investigationNextSteps[0]?.detail ||
@@ -1211,10 +1214,11 @@ function DatasetSummaryPanel({
                 </p>
               </div>
               <div className="investigation-next-step-actions">
-                {investigationNextSteps.slice(0, 3).map((step) => (
+                {investigationNextSteps.slice(0, 3).map((step, index) => (
                   <button
                     type="button"
                     key={step.label}
+                    className={index === 0 ? "is-primary" : undefined}
                     onClick={() => {
                       if (step.target === "overview") {
                         setActiveDrillInView("overview");
@@ -1232,7 +1236,7 @@ function DatasetSummaryPanel({
                 ))}
               </div>
               <div className="smart-question-layer" aria-label="Business questions you can explore">
-                <strong>Business questions you can explore</strong>
+                <strong>Follow-up questions</strong>
                 <div>
                   {smartBusinessQuestions.map((question, index) => (
                     <button

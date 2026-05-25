@@ -6809,3 +6809,180 @@ body {
   background: var(--semantic-intelligence-fill);
   color: #574293;
 }
+
+/* --- H6: Investigation flow unification and redundancy reduction --- */
+.app .data-profile-surface {
+  gap: 10px;
+}
+
+.app .investigation-stage-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e6eef4;
+}
+
+.app .investigation-stage-strip span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f5f7fa;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.02em;
+}
+
+.app .investigation-stage-strip span.is-complete {
+  background: var(--semantic-opportunity-fill);
+  color: #256348;
+}
+
+.app .investigation-stage-strip span.is-active {
+  background: var(--semantic-connected-fill);
+  color: #0b625e;
+  box-shadow: inset 0 0 0 1px var(--semantic-connected-border);
+}
+
+.app .business-priority-panel {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.8fr) minmax(0, 1.4fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #d9e7e9;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f9fcfb 0%, #ffffff 100%);
+  box-shadow: inset 3px 0 0 var(--semantic-connected);
+}
+
+.app .business-priority-copy {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app .business-priority-copy h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.3;
+}
+
+.app .business-priority-copy p:not(.section-label) {
+  margin: 0;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.45;
+}
+
+.app .business-priority-panel .business-activity-list {
+  gap: 5px;
+}
+
+.app .business-priority-panel .business-activity-list span {
+  min-height: 23px;
+  padding: 4px 8px;
+  background: var(--semantic-connected-fill);
+  border-color: var(--semantic-connected-border);
+  color: #0b625e;
+}
+
+.app .business-priority-panel .business-signal-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.app .business-priority-panel .human-signal-card {
+  min-height: 66px;
+}
+
+.app .business-priority-panel .human-signal-card.is-primary {
+  grid-row: span 2;
+  align-items: flex-start;
+  padding: 13px;
+  background: var(--signal-fill, #ffffff);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+}
+
+.app .business-priority-panel .human-signal-card.is-primary .human-signal-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+
+.app .business-priority-panel .human-signal-card.is-primary strong {
+  font-size: 13px;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) {
+  opacity: 0.9;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary):hover {
+  opacity: 1;
+}
+
+.app .investigation-next-step-panel {
+  grid-template-columns: minmax(230px, 0.75fr) minmax(0, 1.45fr);
+  align-items: start;
+}
+
+.app .investigation-next-step-actions {
+  grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(150px, 0.85fr));
+}
+
+.app .investigation-next-step-actions button {
+  min-height: 68px;
+}
+
+.app .investigation-next-step-actions button.is-primary {
+  border-color: var(--semantic-opportunity-border);
+  background: var(--semantic-opportunity-fill);
+  box-shadow: 0 12px 24px rgba(47, 125, 92, 0.1);
+}
+
+.app .investigation-next-step-actions button.is-primary .human-signal-icon {
+  background: var(--semantic-opportunity-hover);
+  color: #256348;
+}
+
+.app .investigation-next-step-actions button.is-primary strong {
+  color: #1f563e;
+}
+
+.app .smart-question-layer {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+}
+
+.app .data-stat-row {
+  margin-top: 4px;
+  opacity: 0.82;
+}
+
+.app .data-stat {
+  min-height: 62px;
+}
+
+@media (max-width: 920px) {
+  .app .business-priority-panel,
+  .app .investigation-next-step-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .app .business-priority-panel .business-signal-grid,
+  .app .investigation-next-step-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .app .business-priority-panel .human-signal-card.is-primary {
+    grid-row: auto;
+  }
+}
