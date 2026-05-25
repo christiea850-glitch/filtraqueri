@@ -929,7 +929,6 @@ function DatasetSummaryPanel({
     businessSignals.find((signal) => signal.title === selectedEvidenceTitle) ||
     businessSignals[0] ||
     null;
-  const primaryNextStep = investigationNextSteps[0] || null;
   const opportunityLabels = Array.from(
     new Set([
       ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
@@ -1343,18 +1342,12 @@ function DatasetSummaryPanel({
             <OperationalWorkspaceLayout>
               <InvestigationThread>
                 <WorkspaceHeader
-                  eyebrow="Active case"
+                  eyebrow="Dataset"
                   title={<span title={dataset.original_filename}>{dataset.original_filename}</span>}
                   meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
                 />
 
                 <InvestigationThreadStage ariaLabel="Understand" className="is-understand">
-                  <div className="investigation-stage-strip" aria-label="Investigation stages">
-                    <span className="is-complete">Understand</span>
-                    <span className="is-active">Prioritize</span>
-                    <span>Investigate</span>
-                    <span>Next action</span>
-                  </div>
                   <p className="section-label">Understand</p>
                   <h3>{datasetPurposeLabel}</h3>
                   <p>Early read of the business shape behind the data.</p>
@@ -1364,24 +1357,6 @@ function DatasetSummaryPanel({
                     ))}
                   </div>
                 </InvestigationThreadStage>
-
-                <PrimaryFocusBlock
-                  eyebrow="Primary focus"
-                  title={primaryNextStep?.label || "Choose a business question"}
-                  description={primaryNextStep?.detail || businessNarrative}
-                  action={
-                    primaryNextStep ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          openOperationalWorkspace(getWorkspaceForStep(primaryNextStep));
-                        }}
-                      >
-                        Open workspace
-                      </button>
-                    ) : null
-                  }
-                />
 
                 <EvidenceRows>
                   <div className="thread-section-heading">
