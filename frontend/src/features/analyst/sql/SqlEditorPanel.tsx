@@ -40,10 +40,6 @@ function SqlEditorPanel({
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
       <div className="sql-editor-toolbar">
-        <div>
-          <p className="section-label">SQL workspace</p>
-          <h2>Query draft</h2>
-        </div>
         <div className="sql-actions">
           <label className="sql-dialect-selector">
             <span>Dialect</span>
@@ -71,9 +67,6 @@ function SqlEditorPanel({
             disabled={!canOpenResultPreview}
           >
             Result Preview
-          </button>
-          <button type="button" className="secondary-button" onClick={editor.onExplain}>
-            Explain query
           </button>
           <button type="button" className="secondary-button" onClick={editor.onSaveDraft}>
             Save Query
