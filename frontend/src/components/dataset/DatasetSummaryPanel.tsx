@@ -374,7 +374,7 @@ function WorkbookRelationshipSummaryPanel({
   const [showAllConnections, setShowAllConnections] = useState(false);
   const visibleRoles = intelligence.entityRoles.slice(0, 5);
   const allConnections = intelligence.joinSuggestions;
-  const visibleConnections = showAllConnections ? allConnections : allConnections.slice(0, 3);
+  const visibleConnections = showAllConnections ? allConnections : allConnections.slice(0, 2);
   const detectedEntityCount = intelligence.entityRoles.filter(
     (role) => role.role !== "unknown",
   ).length;
@@ -384,6 +384,11 @@ function WorkbookRelationshipSummaryPanel({
       : intelligence.humanSummary;
   const formatConfidence = (value: string) =>
     value ? `${value.charAt(0).toUpperCase()}${value.slice(1)} confidence` : "Confidence";
+  const formatConnectionStrength = (value: string) => {
+    if (value === "high") return "Strong";
+    if (value === "medium") return "Likely";
+    return "Review";
+  };
 
   return (
     <section className="workbook-intelligence-panel" aria-label="Connected business operations">
@@ -433,8 +438,11 @@ function WorkbookRelationshipSummaryPanel({
                   {connection.sourceWorksheetName} and {connection.targetWorksheetName}
                 </small>
               </div>
-              <span className={`workbook-connection-confidence is-${connection.confidence}`}>
-                {formatConfidence(connection.confidence)}
+              <span
+                className={`workbook-connection-confidence is-${connection.confidence}`}
+                title={formatConfidence(connection.confidence)}
+              >
+                {formatConnectionStrength(connection.confidence)}
               </span>
               <span className="workbook-connection-chevron" aria-hidden="true">
                 <svg
@@ -461,13 +469,13 @@ function WorkbookRelationshipSummaryPanel({
             </span>
           ))}
         </div>
-        {allConnections.length > 3 && (
+        {allConnections.length > 2 && (
           <button
             type="button"
             className="workbook-view-all"
             onClick={() => setShowAllConnections((current) => !current)}
           >
-            {showAllConnections ? "Show fewer" : "View all business links"}
+            {showAllConnections ? "Show fewer" : `Show ${allConnections.length - 2} more`}
           </button>
         )}
       </div>
@@ -895,7 +903,7 @@ function DatasetSummaryPanel({
         : []),
       "Where might unusual activity appear?",
     ]),
-  ).slice(0, 5);
+  ).slice(0, 4);
   const opportunityLabels = Array.from(
     new Set([
       ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
@@ -905,7 +913,7 @@ function DatasetSummaryPanel({
       ...kpiOpportunities.slice(0, 2).map((opportunity) => opportunity.label),
       ...interpretedQuestions.slice(0, 2).map((question) => question.questionText),
     ]),
-  ).slice(0, 5);
+  ).slice(0, 3);
   const closeDrillIn = () => {
     setActiveDrillInView("overview");
     setActiveFocusedWorkflow(null);

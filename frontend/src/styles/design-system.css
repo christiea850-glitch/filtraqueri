@@ -6986,3 +6986,173 @@ body {
     grid-row: auto;
   }
 }
+
+/* --- H7: Calm semantic density and signal prioritization --- */
+.app .human-understanding-grid span {
+  border-color: #dbe6ef;
+  background: #ffffff;
+  color: #526071;
+  box-shadow: none;
+}
+
+.app .human-opportunity-row button {
+  border-color: var(--semantic-opportunity-border);
+  background: var(--semantic-opportunity-soft);
+  color: #256348;
+}
+
+.app .human-opportunity-row button:hover,
+.app .human-opportunity-row button:focus-visible {
+  background: var(--semantic-opportunity-fill);
+  box-shadow: 0 6px 14px rgba(47, 125, 92, 0.08);
+}
+
+.app .business-priority-panel {
+  border-color: #e2ebef;
+  background: #ffffff;
+  box-shadow: inset 2px 0 0 var(--semantic-connected);
+}
+
+.app .business-priority-panel .business-activity-list span {
+  border-color: #dfe9ee;
+  background: #f8fafc;
+  color: #526071;
+}
+
+.app .business-priority-panel .business-activity-list span:hover {
+  border-color: #ccdbe3;
+  background: #f3f7f9;
+  box-shadow: none;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) {
+  border-color: #e6edf3;
+  border-left-color: #d7e1e8;
+  background: #fbfcfd;
+  box-shadow: none;
+  opacity: 0.86;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary) .human-signal-icon {
+  background: #eef3f6;
+  color: #667789;
+  box-shadow: none;
+}
+
+.app .business-priority-panel .human-signal-card:not(.is-primary):hover {
+  border-color: #d6e2e9;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+  opacity: 1;
+}
+
+.app .business-priority-panel .human-signal-card.is-primary {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+}
+
+.app .investigation-next-step-panel {
+  border-color: #e1ebef;
+  background: #ffffff;
+  box-shadow: inset 2px 0 0 var(--semantic-connected);
+}
+
+.app .investigation-next-step-actions button:not(.is-primary) {
+  border-color: #e3ebf1;
+  background: #fbfcfd;
+  box-shadow: none;
+}
+
+.app .investigation-next-step-actions button:not(.is-primary) .human-signal-icon {
+  background: #eef3f6;
+  color: #667789;
+  box-shadow: none;
+}
+
+.app .investigation-next-step-actions button:not(.is-primary):hover,
+.app .investigation-next-step-actions button:not(.is-primary):focus-visible {
+  border-color: #d6e2e9;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.app .smart-question-layer button {
+  border-color: transparent;
+  background: transparent;
+  color: #526071;
+  box-shadow: none;
+}
+
+.app .smart-question-layer button:hover,
+.app .smart-question-layer button:focus-visible {
+  border-color: #d8e3ec;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.app .smart-question-layer button.is-recommended {
+  border-color: var(--semantic-opportunity-border);
+  background: var(--semantic-opportunity-soft);
+  box-shadow: none;
+}
+
+.app .workbook-intelligence-panel {
+  border-color: #e6edf3;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.app .workbook-intelligence-strip span,
+.app .workbook-entity-list span {
+  border-color: #e8eef3;
+  background: #fbfcfd;
+  color: #64748b;
+}
+
+.app .workbook-connection-list {
+  gap: 6px;
+}
+
+.app .workbook-connection-list article,
+.app .workbook-connection-list article.is-high,
+.app .workbook-connection-list article.is-medium,
+.app .workbook-connection-list article.is-low {
+  border-color: #e6edf3;
+  border-left: 2px solid #cdd9e1;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.app .workbook-connection-list article.is-high {
+  border-left-color: var(--semantic-opportunity-border);
+}
+
+.app .workbook-connection-list article.is-medium {
+  border-left-color: var(--semantic-connected-border);
+}
+
+.app .workbook-connection-list article.is-low {
+  border-left-color: var(--semantic-attention-border);
+}
+
+.app .workbook-connection-list article:hover {
+  border-color: #d7e2e9;
+  background: #fbfcfd;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.app .workbook-connection-icon,
+.app .workbook-connection-list article.is-high .workbook-connection-icon,
+.app .workbook-connection-list article.is-low .workbook-connection-icon {
+  background: #f1f5f8;
+  color: #667789;
+}
+
+.app .workbook-connection-confidence,
+.app .workbook-connection-confidence.is-high,
+.app .workbook-connection-confidence.is-medium,
+.app .workbook-connection-confidence.is-low {
+  border-color: transparent;
+  background: transparent;
+  color: #667789;
+  font-size: 10px;
+}
