@@ -67,6 +67,14 @@ type DatasetSummaryPanelProps = {
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
 type DataWorkflowMenu = "intelligence" | "semantic";
+type DataFocusedWorkflow =
+  | "dataIntelligence"
+  | "suggestedAnalysisPaths"
+  | "guidedAnalyticsTasks"
+  | "businessSemantics"
+  | "kpiIntelligence"
+  | "businessQuestions"
+  | "humanGuidance";
 type DataWorkspaceCommandTarget =
   | "preview"
   | "worksheetPreview"
@@ -528,6 +536,7 @@ function DatasetSummaryPanel({
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
+  const [activeFocusedWorkflow, setActiveFocusedWorkflow] = useState<DataFocusedWorkflow | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
@@ -587,7 +596,10 @@ function DatasetSummaryPanel({
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
   const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
   const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
-  const closeDrillIn = () => setActiveDrillInView("overview");
+  const closeDrillIn = () => {
+    setActiveDrillInView("overview");
+    setActiveFocusedWorkflow(null);
+  };
   const dataTabs = [
     { id: "overview", label: "Overview" },
     { id: "columns", label: "Fields" },
@@ -668,16 +680,18 @@ function DatasetSummaryPanel({
     closeControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
     setIsDatasetIntelligenceDetailOpen(false);
   };
-  const openDrillInWorkflow = (view: DataDrillInView) => {
+  const openFocusedWorkflow = (workflow: DataFocusedWorkflow) => {
     setIsDatasetPreviewOpen(false);
     setIsDatasetIntelligenceDetailOpen(false);
     setActiveWorkflowMenu(null);
-    setActiveDrillInView(view);
-  };
-  const openFullIntelligenceDetail = () => {
-    setIsDatasetPreviewOpen(false);
-    setActiveWorkflowMenu(null);
-    setIsDatasetIntelligenceDetailOpen(true);
+    setActiveFocusedWorkflow(workflow);
+    setActiveDrillInView(
+      workflow === "dataIntelligence" ||
+        workflow === "suggestedAnalysisPaths" ||
+        workflow === "guidedAnalyticsTasks"
+        ? "dataIntelligence"
+        : "businessSemantics",
+    );
   };
 
   useEffect(() => {
@@ -707,6 +721,7 @@ function DatasetSummaryPanel({
       const target = commandEvent.detail?.target;
 
       if (target === "preview" || target === "worksheetPreview") {
+        setActiveFocusedWorkflow(null);
         setIsDatasetPreviewOpen(true);
         return;
       }
@@ -714,27 +729,25 @@ function DatasetSummaryPanel({
       if (target === "connections") {
         setIsDatasetPreviewOpen(false);
         setIsDatasetIntelligenceDetailOpen(false);
+        setActiveFocusedWorkflow(null);
         setActiveDrillInView("overview");
         return;
       }
 
       if (target === "intelligenceDetail") {
         setIsDatasetPreviewOpen(false);
+        setActiveFocusedWorkflow(null);
         setIsDatasetIntelligenceDetailOpen(true);
         return;
       }
 
       if (target === "intelligence") {
-        setIsDatasetPreviewOpen(false);
-        setIsDatasetIntelligenceDetailOpen(false);
-        setActiveDrillInView("dataIntelligence");
+        openFocusedWorkflow("dataIntelligence");
         return;
       }
 
       if (target === "semantics") {
-        setIsDatasetPreviewOpen(false);
-        setIsDatasetIntelligenceDetailOpen(false);
-        setActiveDrillInView("businessSemantics");
+        openFocusedWorkflow("businessSemantics");
       }
     };
 
@@ -932,7 +945,10 @@ function DatasetSummaryPanel({
                 items={dataTabs}
                 activeItem={activeDrillInView}
                 label="Data views"
-                onChange={setActiveDrillInView}
+                onChange={(view) => {
+                  setActiveFocusedWorkflow(null);
+                  setActiveDrillInView(view);
+                }}
               />
               <div className="data-profile-actions">
                 <div className="data-workflow-menu-wrap">
@@ -962,25 +978,17 @@ function DatasetSummaryPanel({
                   </button>
                   {activeWorkflowMenu === "intelligence" && (
                     <div className="data-workflow-menu" role="menu" aria-label="Intelligence workflows">
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("dataIntelligence")}>
-                        <strong>Overview intelligence</strong>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
+                        <strong>Data intelligence</strong>
                         <span>Review shape, metrics, dimensions, dates, and readiness.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("dataIntelligence")}>
-                        <strong>Data quality</strong>
-                        <span>Open available profile and readiness signals.</span>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}>
+                        <strong>Suggested analysis paths</strong>
+                        <span>Open recommended next analysis paths for this dataset.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("columns")}>
-                        <strong>Field patterns</strong>
-                        <span>Inspect detected fields and semantic labels.</span>
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("overview")}>
-                        <strong>Workbook relationships</strong>
-                        <span>Return to the connection summary on the Data overview.</span>
-                      </button>
-                      <button type="button" role="menuitem" onClick={openFullIntelligenceDetail}>
-                        <strong>Open full Intelligence detail</strong>
-                        <span>Open the focused intelligence detail page.</span>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
+                        <strong>Guided analytics tasks</strong>
+                        <span>Open task-oriented analysis guidance.</span>
                       </button>
                     </div>
                   )}
@@ -1012,25 +1020,21 @@ function DatasetSummaryPanel({
                   </button>
                   {activeWorkflowMenu === "semantic" && (
                     <div className="data-workflow-menu" role="menu" aria-label="Semantic workflows">
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("columns")}>
-                        <strong>Business fields</strong>
-                        <span>Review detected fields and business role labels.</span>
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
-                        <strong>Field meanings</strong>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
+                        <strong>Business semantics</strong>
                         <span>Open detected business context and entity signals.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
-                        <strong>Suggested analysis questions</strong>
-                        <span>Open the available business question guidance.</span>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
+                        <strong>KPI intelligence</strong>
+                        <span>Open detected KPI and insight opportunities.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
-                        <strong>Business relationships</strong>
-                        <span>Review semantic and KPI relationship signals.</span>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessQuestions")}>
+                        <strong>Business questions</strong>
+                        <span>Open suggested business question mappings.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openDrillInWorkflow("businessSemantics")}>
-                        <strong>Open full Semantic detail</strong>
-                        <span>Open the focused semantic workflow surface.</span>
+                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
+                        <strong>Human Mode guidance</strong>
+                        <span>Open simple continuation actions for Human Mode.</span>
                       </button>
                     </div>
                   )}
@@ -1144,7 +1148,7 @@ function DatasetSummaryPanel({
         </DrillInDetailPanel>
       )}
 
-      {dataset && dataProfile && activeDrillInView === "dataIntelligence" && (
+      {dataset && dataProfile && activeFocusedWorkflow === "dataIntelligence" && (
         <DrillInDetailPanel
           eyebrow="Data detail"
           title="Data intelligence"
@@ -1200,7 +1204,13 @@ function DatasetSummaryPanel({
         </DrillInDetailPanel>
       )}
 
-      {dataset && recommendations.length > 0 && activeDrillInView === "dataIntelligence" && (
+      {dataset && activeFocusedWorkflow === "suggestedAnalysisPaths" && (
+        <DrillInDetailPanel
+          eyebrow="Data detail"
+          title="Suggested analysis paths"
+          summary={workflowSummary}
+          onBack={closeDrillIn}
+        >
         <RuntimeDisclosureSlot
           id="runtime-slot-workflow-recommendations"
           label="Details"
@@ -1229,11 +1239,15 @@ function DatasetSummaryPanel({
               </article>
             ))}
           </div>
+          {recommendations.length === 0 && (
+            <p className="compact-empty">No suggested analysis paths are available for this dataset yet.</p>
+          )}
         </section>
         </RuntimeDisclosureSlot>
+        </DrillInDetailPanel>
       )}
 
-      {dataset && activeDrillInView === "businessSemantics" && (
+      {dataset && activeFocusedWorkflow === "businessSemantics" && (
         <DrillInDetailPanel
           eyebrow="Business detail"
           title="Business semantics"
@@ -1283,7 +1297,13 @@ function DatasetSummaryPanel({
         </DrillInDetailPanel>
       )}
 
-      {dataset && kpiOpportunities.length > 0 && activeDrillInView === "businessSemantics" && (
+      {dataset && activeFocusedWorkflow === "kpiIntelligence" && (
+        <DrillInDetailPanel
+          eyebrow="Business detail"
+          title="KPI intelligence"
+          summary={kpiSummary}
+          onBack={closeDrillIn}
+        >
         <RuntimeDisclosureSlot
           id="runtime-slot-kpi-intelligence"
           label="Details"
@@ -1312,11 +1332,21 @@ function DatasetSummaryPanel({
               </article>
             ))}
           </div>
+          {kpiOpportunities.length === 0 && (
+            <p className="compact-empty">No KPI opportunities are available for this dataset yet.</p>
+          )}
         </section>
         </RuntimeDisclosureSlot>
+        </DrillInDetailPanel>
       )}
 
-      {dataset && interpretedQuestions.length > 0 && activeDrillInView === "businessSemantics" && (
+      {dataset && activeFocusedWorkflow === "businessQuestions" && (
+        <DrillInDetailPanel
+          eyebrow="Business detail"
+          title="Business questions"
+          summary={questionSummary}
+          onBack={closeDrillIn}
+        >
         <RuntimeDisclosureSlot
           id="runtime-slot-business-questions"
           label="Details"
@@ -1345,11 +1375,21 @@ function DatasetSummaryPanel({
               </article>
             ))}
           </div>
+          {interpretedQuestions.length === 0 && (
+            <p className="compact-empty">No business questions are available for this dataset yet.</p>
+          )}
         </section>
         </RuntimeDisclosureSlot>
+        </DrillInDetailPanel>
       )}
 
-      {dataset && activeDrillInView === "dataIntelligence" && (
+      {dataset && activeFocusedWorkflow === "guidedAnalyticsTasks" && (
+        <DrillInDetailPanel
+          eyebrow="Data detail"
+          title="Guided analytics tasks"
+          summary="Preview task inputs and planning context."
+          onBack={closeDrillIn}
+        >
         <RuntimeDisclosureSlot
           id="runtime-slot-task-launcher"
           label="Details"
@@ -1363,9 +1403,16 @@ function DatasetSummaryPanel({
           onSelectedTaskIdChange={onSelectedTaskIdChange}
         />
         </RuntimeDisclosureSlot>
+        </DrillInDetailPanel>
       )}
 
-      {dataset && activeDrillInView === "businessSemantics" && (
+      {dataset && activeFocusedWorkflow === "humanGuidance" && (
+        <DrillInDetailPanel
+          eyebrow="Business detail"
+          title="Human Mode guidance"
+          summary="Choose a simple continuation into the existing Human Mode workflow."
+          onBack={closeDrillIn}
+        >
         <RuntimeDisclosureSlot
           id="runtime-slot-human-guidance"
           label="Details"
@@ -1392,6 +1439,7 @@ function DatasetSummaryPanel({
           </div>
         </section>
         </RuntimeDisclosureSlot>
+        </DrillInDetailPanel>
       )}
     </div>
   );
