@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
@@ -84,6 +84,99 @@ type DataWorkspaceCommandTarget =
   | "semantics";
 
 const datasetIntelligenceDetailRouteId: ControlledHashDetailRouteId = "detail:dataset-intelligence";
+
+type HumanSignalTone =
+  | "info"
+  | "warning"
+  | "opportunity"
+  | "ready"
+  | "attention"
+  | "connected";
+
+type HumanSignalIcon =
+  | "trend"
+  | "connected"
+  | "warning"
+  | "opportunity"
+  | "timeline"
+  | "entity"
+  | "comparison"
+  | "info";
+
+function HumanSignalIcon({ name }: { name: HumanSignalIcon }) {
+  const iconPaths: Record<HumanSignalIcon, ReactNode> = {
+    trend: (
+      <>
+        <path d="M4 18h16" />
+        <path d="m5 14 4-4 4 3 6-7" />
+        <path d="M16 6h3v3" />
+      </>
+    ),
+    connected: (
+      <>
+        <path d="M9 12a3 3 0 1 0-3 3" />
+        <path d="M15 12a3 3 0 1 1 3 3" />
+        <path d="M8 12h8" />
+      </>
+    ),
+    warning: (
+      <>
+        <path d="M12 4 3 20h18L12 4Z" />
+        <path d="M12 9v4" />
+        <path d="M12 17h.01" />
+      </>
+    ),
+    opportunity: (
+      <>
+        <path d="M9 18h6" />
+        <path d="M10 22h4" />
+        <path d="M8.5 14.5a5 5 0 1 1 7 0c-.7.7-1.1 1.4-1.3 2.5H9.8c-.2-1.1-.6-1.8-1.3-2.5Z" />
+      </>
+    ),
+    timeline: (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <path d="M8 3v4M16 3v4M4 10h16" />
+      </>
+    ),
+    entity: (
+      <>
+        <path d="M16 19a4 4 0 0 0-8 0" />
+        <circle cx="12" cy="8" r="3" />
+        <path d="M19 18a3 3 0 0 0-2.4-2.9" />
+        <path d="M17 5.4a2.5 2.5 0 0 1 0 5" />
+      </>
+    ),
+    comparison: (
+      <>
+        <path d="M5 6h6M5 12h10M5 18h14" />
+        <path d="M17 6h2" />
+      </>
+    ),
+    info: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5" />
+        <path d="M12 8h.01" />
+      </>
+    ),
+  };
+
+  return (
+    <span className="human-signal-icon" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {iconPaths[name]}
+      </svg>
+    </span>
+  );
+}
 
 const humanGuidanceCards: HumanGuidanceCard[] = [
   { intent: "summary", label: "Summarize" },
@@ -319,7 +412,7 @@ function WorkbookRelationshipSummaryPanel({
       {visibleConnections.length > 0 && (
         <div className="workbook-connection-list" aria-label="Likely business connections">
           {visibleConnections.map((connection) => (
-            <article key={connection.id}>
+            <article key={connection.id} className={`is-${connection.confidence}`}>
               <span className="workbook-connection-icon" aria-hidden="true">
                 <svg
                   viewBox="0 0 24 24"
@@ -334,7 +427,12 @@ function WorkbookRelationshipSummaryPanel({
                   <path d="M13 18l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
                 </svg>
               </span>
-              <p className="workbook-connection-text">{toBusinessConnectionGuidance(connection)}</p>
+              <div className="workbook-connection-copy">
+                <p className="workbook-connection-text">{toBusinessConnectionGuidance(connection)}</p>
+                <small>
+                  {connection.sourceWorksheetName} and {connection.targetWorksheetName}
+                </small>
+              </div>
               <span className={`workbook-connection-confidence is-${connection.confidence}`}>
                 {formatConfidence(connection.confidence)}
               </span>
@@ -692,42 +790,60 @@ function DatasetSummaryPanel({
       ? {
           title: "Financial or measurable activity detected",
           detail: `${dataProfile.possibleMetrics[0].name} may help explain business movement.`,
+          tone: "opportunity" as HumanSignalTone,
+          icon: "opportunity" as HumanSignalIcon,
         }
       : null,
     dataProfile?.dateTimeFields.length
       ? {
           title: "Timeline available for trend questions",
           detail: `${dataProfile.dateTimeFields[0].name} can help organize activity over time.`,
+          tone: "ready" as HumanSignalTone,
+          icon: "timeline" as HumanSignalIcon,
         }
       : {
           title: "Timeline needs review",
           detail: "Trend investigations may need a clearer date field.",
+          tone: "attention" as HumanSignalTone,
+          icon: "warning" as HumanSignalIcon,
         },
     businessEntityHints.length
       ? {
           title: "Entity behavior patterns detected",
           detail: `${businessEntityHints[0].displayName} may represent who or what the activity is about.`,
+          tone: "info" as HumanSignalTone,
+          icon: "entity" as HumanSignalIcon,
         }
       : null,
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
           title: "Connected operations likely present",
           detail: "Multiple sheets may describe related parts of the same business flow.",
+          tone: "connected" as HumanSignalTone,
+          icon: "connected" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleDimensions.length
       ? {
           title: "Useful comparison groups found",
           detail: `${dataProfile.possibleDimensions[0].name} may help compare segments or categories.`,
+          tone: "opportunity" as HumanSignalTone,
+          icon: "comparison" as HumanSignalIcon,
         }
       : null,
-  ].filter(Boolean) as Array<{ title: string; detail: string }>;
+  ].filter(Boolean) as Array<{
+    title: string;
+    detail: string;
+    tone: HumanSignalTone;
+    icon: HumanSignalIcon;
+  }>;
   const investigationNextSteps = [
     dataProfile?.dateTimeFields.length
       ? {
           label: "Explore timeline trends",
           detail: "Look for changes, seasonality, or operational shifts over time.",
           target: "suggestedAnalysisPaths" as const,
+          icon: "trend" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleMetrics.length
@@ -735,6 +851,7 @@ function DatasetSummaryPanel({
           label: "Start a metric-focused investigation",
           detail: "Use the strongest measurable field to frame a business question.",
           target: "guidedAnalyticsTasks" as const,
+          icon: "opportunity" as HumanSignalIcon,
         }
       : null,
     businessEntityHints.length
@@ -742,6 +859,7 @@ function DatasetSummaryPanel({
           label: "Review possible entity patterns",
           detail: "See whether customers, products, tenants, or other entities need attention.",
           target: "businessQuestions" as const,
+          icon: "entity" as HumanSignalIcon,
         }
       : null,
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
@@ -749,6 +867,7 @@ function DatasetSummaryPanel({
           label: "Review connected business areas",
           detail: "Understand how multiple sources may describe one operational flow.",
           target: "overview" as const,
+          icon: "connected" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleDimensions.length
@@ -756,12 +875,14 @@ function DatasetSummaryPanel({
           label: "Compare operational groups",
           detail: "Investigate which categories, regions, or groups differ most.",
           target: "businessQuestions" as const,
+          icon: "comparison" as HumanSignalIcon,
         }
       : null,
   ].filter(Boolean) as Array<{
     label: string;
     detail: string;
     target: "suggestedAnalysisPaths" | "guidedAnalyticsTasks" | "businessQuestions" | "overview";
+    icon: HumanSignalIcon;
   }>;
   const smartBusinessQuestions = Array.from(
     new Set([
@@ -1025,9 +1146,7 @@ function DatasetSummaryPanel({
               <div>
                 <p className="section-label">What FiltraQueri noticed</p>
                 <h3>{datasetPurposeLabel}</h3>
-                <p>
-                  FiltraQueri is looking for business opportunities in this dataset, not just field names.
-                </p>
+                <p>Early read of the business shape behind the data.</p>
               </div>
               <div className="human-understanding-grid">
                 {understandingSignals.map((signal) => (
@@ -1072,9 +1191,12 @@ function DatasetSummaryPanel({
               </div>
               <div className="business-signal-grid">
                 {businessSignals.map((signal) => (
-                  <span key={signal.title}>
-                    <strong>{signal.title}</strong>
-                    <small>{signal.detail}</small>
+                  <span key={signal.title} className={`human-signal-card is-${signal.tone}`}>
+                    <HumanSignalIcon name={signal.icon} />
+                    <span>
+                      <strong>{signal.title}</strong>
+                      <small>{signal.detail}</small>
+                    </span>
                   </span>
                 ))}
               </div>
@@ -1101,20 +1223,25 @@ function DatasetSummaryPanel({
                       openFocusedWorkflow(step.target);
                     }}
                   >
-                    <strong>{step.label}</strong>
-                    <span>{step.detail}</span>
+                    <HumanSignalIcon name={step.icon} />
+                    <span>
+                      <strong>{step.label}</strong>
+                      <small>{step.detail}</small>
+                    </span>
                   </button>
                 ))}
               </div>
               <div className="smart-question-layer" aria-label="Business questions you can explore">
                 <strong>Business questions you can explore</strong>
                 <div>
-                  {smartBusinessQuestions.map((question) => (
+                  {smartBusinessQuestions.map((question, index) => (
                     <button
                       type="button"
                       key={question}
+                      className={index === 0 ? "is-recommended" : undefined}
                       onClick={() => openFocusedWorkflow("businessQuestions")}
                     >
+                      {index === 0 && <HumanSignalIcon name="opportunity" />}
                       {question}
                     </button>
                   ))}

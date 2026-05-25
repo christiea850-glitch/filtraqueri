@@ -2395,16 +2395,36 @@ body,
 
 .workbook-connection-list article {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: var(--fq-space-2);
   align-items: center;
   padding: 9px 10px;
 }
 
-.workbook-connection-list span {
+.workbook-connection-list span,
+.workbook-connection-list small {
   color: var(--fq-text-muted);
   font-size: 12px;
   font-weight: var(--fq-font-label);
+}
+
+.workbook-connection-list span {
+  white-space: nowrap;
+}
+
+.workbook-connection-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workbook-connection-copy p {
+  margin: 0;
+}
+
+.workbook-connection-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -3896,6 +3916,9 @@ body {
 
 .app .human-understanding-grid span,
 .app .human-opportunity-row button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 25px;
   padding: 5px 8px;
   border: 1px solid #e1e8ef;
@@ -3929,6 +3952,54 @@ body {
   outline: none;
   border-color: #b9dbe2;
   background: #f4fbfc;
+  transform: translateY(-1px);
+}
+
+.app .human-signal-icon {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: var(--signal-soft, #f1f5f9);
+  color: var(--signal-ink, #526071);
+}
+
+.app .human-signal-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.app .is-info {
+  --signal-accent: #7c8a9a;
+  --signal-soft: #f3f6f8;
+  --signal-ink: #526071;
+}
+
+.app .is-warning,
+.app .is-attention {
+  --signal-accent: #b98a33;
+  --signal-soft: #fff8ea;
+  --signal-ink: #8a5f14;
+}
+
+.app .is-opportunity {
+  --signal-accent: #0e7490;
+  --signal-soft: #edf9fb;
+  --signal-ink: #0c6475;
+}
+
+.app .is-ready {
+  --signal-accent: #2f7d5c;
+  --signal-soft: #f0faf5;
+  --signal-ink: #256348;
+}
+
+.app .is-connected {
+  --signal-accent: #5968a8;
+  --signal-soft: #f2f4ff;
+  --signal-ink: #44508d;
 }
 
 .app .business-narrative-panel,
@@ -3996,13 +4067,36 @@ body {
 }
 
 .app .business-signal-grid span {
-  display: grid;
+  display: flex;
+  align-items: flex-start;
   flex: 1 1 210px;
-  gap: 3px;
+  gap: 8px;
   min-width: 0;
   padding: 9px 10px;
-  border-left: 2px solid #c9d8e4;
+  border: 1px solid #e4ebf1;
+  border-left: 3px solid var(--signal-accent, #c9d8e4);
+  border-radius: 10px;
   background: #ffffff;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+
+.app .business-signal-grid > span:hover {
+  border-color: color-mix(in srgb, var(--signal-accent, #c9d8e4) 35%, #e4ebf1);
+  background: var(--signal-soft, #ffffff);
+  transform: translateY(-1px);
+}
+
+.app .business-signal-grid span > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .app .business-signal-grid strong {
@@ -4051,8 +4145,9 @@ body {
 }
 
 .app .investigation-next-step-actions button {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   min-width: 0;
   padding: 10px 11px;
   border: 1px solid #e1e8ef;
@@ -4069,6 +4164,14 @@ body {
   outline: none;
   border-color: #bfd8e1;
   background: #f4fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.app .investigation-next-step-actions button > span:not(.human-signal-icon) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
 .app .investigation-next-step-actions strong {
@@ -4078,7 +4181,7 @@ body {
   line-height: 1.25;
 }
 
-.app .investigation-next-step-actions span {
+.app .investigation-next-step-actions small {
   color: #64748b;
   font-size: 11px;
   font-weight: 500;
@@ -4105,6 +4208,9 @@ body {
 }
 
 .app .smart-question-layer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-height: 25px;
   padding: 5px 8px;
   border: 1px solid #e1e8ef;
@@ -4122,6 +4228,24 @@ body {
   outline: none;
   border-color: #bfd8e1;
   background: #f4fafc;
+  transform: translateY(-1px);
+}
+
+.app .smart-question-layer button.is-recommended {
+  border-color: #bcdce3;
+  background: #f4fbfc;
+  color: #0c6475;
+}
+
+.app .smart-question-layer button .human-signal-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.app .smart-question-layer button .human-signal-icon svg {
+  width: 11px;
+  height: 11px;
 }
 
 @media (max-width: 720px) {
@@ -4333,14 +4457,90 @@ body {
   border: 1px solid #e6edf4;
   border-radius: 10px;
   box-shadow: none;
+  background: #ffffff;
   transition:
     border-color 150ms ease,
-    background-color 150ms ease;
+    background-color 150ms ease,
+    transform 150ms ease;
 }
 
 .app .workbook-connection-list article:hover {
   border-color: #d8e3ec;
   background: #fbfcfd;
+  transform: translateY(-1px);
+}
+
+.app .workbook-connection-list article.is-high {
+  border-left: 3px solid #2f7d5c;
+}
+
+.app .workbook-connection-list article.is-medium {
+  border-left: 3px solid #5968a8;
+}
+
+.app .workbook-connection-list article.is-low {
+  border-left: 3px solid #b98a33;
+}
+
+.app .workbook-connection-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #f2f4ff;
+  color: #44508d;
+}
+
+.app .workbook-connection-icon svg,
+.app .workbook-connection-chevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.app .workbook-connection-text {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+}
+
+.app .workbook-connection-copy small {
+  color: #7c8798;
+  font-size: 10px;
+  font-weight: 620;
+}
+
+.app .workbook-connection-confidence {
+  justify-self: end;
+  padding: 4px 7px;
+  border: 1px solid #e1e8ef;
+  border-radius: 999px;
+  background: #f8fafc;
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.app .workbook-connection-confidence.is-high {
+  border-color: #d5e5df;
+  background: #f3faf7;
+  color: #256348;
+}
+
+.app .workbook-connection-confidence.is-medium {
+  border-color: #dce2fb;
+  background: #f2f4ff;
+  color: #44508d;
+}
+
+.app .workbook-connection-confidence.is-low {
+  border-color: #f1dfbd;
+  background: #fff8ea;
+  color: #8a5f14;
+}
+
+.app .workbook-connection-chevron {
+  color: #a1adbb;
 }
 
 /* --- D-image: Data page header, context card, tabs row ----- */
