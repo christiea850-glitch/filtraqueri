@@ -11,16 +11,8 @@ import type { InvestigationReport } from "../../features/investigationIntelligen
 import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
 import {
   ActionRail,
-  ContextRail,
-  ContextRailHeader,
-  ContextRailSection,
-  EvidenceRow,
-  EvidenceRows,
-  InlineDisclosure,
   InvestigationThread,
   InvestigationThreadStage,
-  MetadataFooter,
-  OperationalList,
   PrimaryFocusBlock,
   WorkspaceHeader,
 } from "../workspace";
@@ -103,7 +95,6 @@ function VisualQueryBuilderPanel({
   const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
   const investigationSuggestions = investigationReport?.suggestions.slice(0, 4) || [];
   const primaryInvestigation = investigationSuggestions[0] || null;
-  const workspaceRecommendations = investigationWorkspacePlan?.recommendations.slice(0, 2) || [];
   const visibleSchema = useMemo(
     () =>
       normalizedSearch
@@ -190,8 +181,9 @@ function VisualQueryBuilderPanel({
           complete: selectedColumns.length > 0 || groupBy.length > 0 || activeAggregations.length > 0,
           detail: expectedResultType,
         },
-      ];
+  ];
   void analysisPackagePlan;
+  void investigationWorkspacePlan;
   const approvalSummary = isAnalystMode
     ? [
         { label: "Data source", value: "Current workspace" },
@@ -217,29 +209,10 @@ function VisualQueryBuilderPanel({
         { label: "Filters active", value: activeFilterCount.toLocaleString() },
         { label: "Row limit", value: rowLimit || "No limit" },
       ];
-  const questionEvidenceRows = [
-    primaryInvestigation
-      ? {
-          title: primaryInvestigation.title,
-          description: primaryInvestigation.question,
-        }
-      : null,
-    {
-      title: expectedResultType,
-      description: "Current result shape based on selected fields and grouping.",
-    },
-    selectedColumns.length > 0
-      ? {
-          title: `${selectedColumns.length.toLocaleString()} fields selected`,
-          description: "The question has an initial field scope.",
-        }
-      : null,
-  ].filter(Boolean) as Array<{ title: string; description: string }>;
-
   return (
     <section className="query-builder-panel" aria-label="Business question investigation">
       {!isAnalystMode && (
-        <div className="query-operational-shell">
+        <div className="query-operational-shell is-stage-only">
           <InvestigationThread>
             <WorkspaceHeader
               eyebrow="Explore question"
@@ -249,26 +222,13 @@ function VisualQueryBuilderPanel({
             <InvestigationThreadStage ariaLabel="Question setup">
               <p className="section-label">Orient</p>
               <h3>Start with the question, then choose only the fields that support it.</h3>
-              <p>Technical query details stay available below, but they no longer lead the Human Mode experience.</p>
+              <p>Use this workspace to shape fields, comparisons, filters, and review before any run.</p>
             </InvestigationThreadStage>
             <PrimaryFocusBlock
               eyebrow="Primary direction"
               title={primaryInvestigation?.title || "Choose fields for a reviewable result"}
               description={primaryInvestigation?.question || "Select the smallest useful field set, then review before running."}
             />
-            <EvidenceRows>
-              <div className="thread-section-heading">
-                <p className="section-label">Evidence</p>
-                <strong>Question shape</strong>
-              </div>
-              {questionEvidenceRows.map((item) => (
-                <EvidenceRow
-                  key={item.title}
-                  title={item.title}
-                  description={item.description}
-                />
-              ))}
-            </EvidenceRows>
             <ActionRail eyebrow="Next move" title="Continue shaping the question">
               <button type="button" className="is-primary" onClick={() => setActiveStep("data")}>
                 Review fields
@@ -280,46 +240,7 @@ function VisualQueryBuilderPanel({
                 Review run
               </button>
             </ActionRail>
-            <MetadataFooter>
-              {approvalSummary.map((item) => (
-                <span key={item.label}>
-                  {item.label}
-                  <strong>{item.value}</strong>
-                </span>
-              ))}
-            </MetadataFooter>
           </InvestigationThread>
-          <ContextRail>
-            <ContextRailHeader
-              eyebrow="Context"
-              title="Question workspace"
-              description="Fields, filters, grouping, and preview are still available below as controlled setup steps."
-            />
-            {primaryInvestigation && (
-              <ContextRailSection title="Suggested comparisons">
-                <OperationalList>
-                  {primaryInvestigation.compareBy.slice(0, 3).map((item) => (
-                    <button type="button" key={item} onClick={() => setActiveStep("group")}>
-                      {item}
-                    </button>
-                  ))}
-                </OperationalList>
-              </ContextRailSection>
-            )}
-            <InlineDisclosure summary="Workspace recommendations" className="context-disclosure">
-              <OperationalList>
-                {workspaceRecommendations.map((recommendation) => (
-                  <button
-                    type="button"
-                    key={recommendation.recommendationId}
-                    onClick={() => setActiveStep("question")}
-                  >
-                    {recommendation.label}
-                  </button>
-                ))}
-              </OperationalList>
-            </InlineDisclosure>
-          </ContextRail>
         </div>
       )}
 

@@ -29,14 +29,10 @@ import {
 } from "../../features/navigation";
 import {
   ActionRail,
-  ContextRail,
-  ContextRailHeader,
-  ContextRailSection,
   EvidenceRow,
   EvidenceRows,
   InlineDisclosure,
   InvestigationThread,
-  MetadataFooter,
   OperationalList,
   PrimaryFocusBlock,
   WorkspaceHeader,
@@ -187,7 +183,7 @@ function ResultsInvestigationSurface({
       aria-label="Results review context"
     >
       {!isAnalystMode && (
-        <div className="results-operational-shell">
+        <div className="results-operational-shell is-stage-only">
           <InvestigationThread>
             <WorkspaceHeader eyebrow="Review result" title="What did FiltraQueri find?" meta={sourceLabel} />
             <PrimaryFocusBlock
@@ -220,28 +216,7 @@ function ResultsInvestigationSurface({
                 Continue investigation
               </button>
             </ActionRail>
-            <MetadataFooter>
-              <span>
-                Rows
-                <strong>{activeResultModel.totalCount.toLocaleString()}</strong>
-              </span>
-              <span>
-                Filters / sort
-                <strong>{filterSortLabel}</strong>
-              </span>
-              <span>
-                Export
-                <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows"}</strong>
-              </span>
-            </MetadataFooter>
-          </InvestigationThread>
-          <ContextRail>
-            <ContextRailHeader
-              eyebrow="Context"
-              title="Finding review"
-              description="Heavy interpretation and technical details stay behind focused detail or disclosure."
-            />
-            <ContextRailSection title="Follow-up">
+            <InlineDisclosure summary="Follow-up and result details">
               <OperationalList>
                 {resultFollowUps.map((suggestion) => (
                   <button type="button" key={suggestion.id} onClick={openResultsInsightDetail}>
@@ -249,13 +224,13 @@ function ResultsInvestigationSurface({
                   </button>
                 ))}
               </OperationalList>
-            </ContextRailSection>
-            <InlineDisclosure summary="Result details" className="context-disclosure">
-              <p>
-                {activeResultTab} / {activeResultModel.sourceType} / {hiddenColumnCount.toLocaleString()} hidden columns
-              </p>
+              <div className="results-disclosure-facts">
+                <span>{resultRowsLabel} rows</span>
+                <span>{filterSortLabel}</span>
+                <span>{activeResultModel.export.rowCount > 0 ? "Export ready" : "No export rows"}</span>
+              </div>
             </InlineDisclosure>
-          </ContextRail>
+          </InvestigationThread>
         </div>
       )}
 

@@ -7771,6 +7771,12 @@ body {
   margin-bottom: 14px;
 }
 
+.app .query-operational-shell.is-stage-only,
+.app .results-operational-shell.is-stage-only {
+  display: block;
+  max-width: 980px;
+}
+
 .app .query-operational-shell .context-rail,
 .app .results-operational-shell .context-rail {
   top: 0;
@@ -7789,6 +7795,25 @@ body {
 .app.mode-human .results-insight-row,
 .app.mode-human .results-review-facts {
   display: none;
+}
+
+.app .results-disclosure-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.app .results-disclosure-facts span {
+  padding-right: 10px;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.app .results-disclosure-facts span:last-child {
+  padding-right: 0;
+  border-right: 0;
 }
 
 @media (max-width: 920px) {
