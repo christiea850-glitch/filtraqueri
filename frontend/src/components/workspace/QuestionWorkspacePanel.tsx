@@ -21,6 +21,8 @@ type QuestionWorkspacePanelProps = {
   sourceName: string;
 };
 
+type PlanningSelectionRole = "dimension" | "measure" | "date";
+
 type QuestionReviewHints = {
   possibleFocus: string;
   possibleAnalysisType: string;
@@ -185,6 +187,9 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
   const [schemaDraftPlan, setSchemaDraftPlan] = useState<SchemaAwareQuestionDraftPlan | null>(null);
+  const [selectedDimension, setSelectedDimension] = useState<string | null>(null);
+  const [selectedMeasure, setSelectedMeasure] = useState<string | null>(null);
+  const [selectedDateField, setSelectedDateField] = useState<string | null>(null);
 
   const datasetContext = useMemo(
     () => [
@@ -243,6 +248,49 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
         schemaDraftPlan.candidateDateFields.length > 0
       ),
   );
+  const requiredPlanningSelections = schemaDraftPlan
+    ? [
+        schemaDraftPlan.candidateDimensions.length > 0 ? selectedDimension : "not-needed",
+        schemaDraftPlan.candidateMeasures.length > 0 ? selectedMeasure : "not-needed",
+        schemaDraftPlan.candidateDateFields.length > 0 &&
+        ["trend", "timeline_review"].includes(schemaDraftPlan.detectedIntent)
+          ? selectedDateField
+          : "not-needed",
+      ]
+    : [];
+  const needsClarification = Boolean(
+    schemaDraftPlan &&
+      (
+        schemaDraftPlan.missingRequirements.length > 0 ||
+        requiredPlanningSelections.some((selection) => selection === null)
+      ),
+  );
+  const planningClarityStatus = needsClarification
+    ? "Needs clarification"
+    : "Ready for future logic generation";
+
+  const updatePlanningSelection = (role: PlanningSelectionRole, columnName: string) => {
+    if (role === "dimension") setSelectedDimension(columnName);
+    if (role === "measure") setSelectedMeasure(columnName);
+    if (role === "date") setSelectedDateField(columnName);
+  };
+
+  const renderCandidateChoice = (
+    candidate: CandidateFieldMatch,
+    role: PlanningSelectionRole,
+    selectedColumn: string | null,
+  ) => (
+    <button
+      type="button"
+      key={`${role}-${candidate.columnName}`}
+      className={selectedColumn === candidate.columnName ? "is-selected" : ""}
+      onClick={() => updatePlanningSelection(role, candidate.columnName)}
+    >
+      <strong>{candidate.columnName}</strong>
+      <span>{candidate.confidence} confidence</span>
+      <small>{candidate.matchReason.replace(/_/g, " ")}</small>
+    </button>
+  );
 
   const prepareDraft = () => {
     const nextQuestion = rawQuestion.trim();
@@ -264,6 +312,9 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
         activeSourceName: nextSourceName,
       }),
     );
+    setSelectedDimension(null);
+    setSelectedMeasure(null);
+    setSelectedDateField(null);
   };
 
   return (
@@ -441,12 +492,73 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
                 </div>
               )}
 
+              <section className="question-workspace-clarification" aria-label="Planning clarification choices">
+                <div className="question-workspace-section-heading">
+                  <p className="section-label">Planning Choices Only</p>
+                  <h4>{planningClarityStatus}</h4>
+                </div>
+
+                {schemaDraftPlan.missingRequirements.length > 0 && (
+                  <div className="question-workspace-clarification-needs">
+                    <span>Needs clarification</span>
+                    <p>{schemaDraftPlan.missingRequirements.join(", ")}</p>
+                  </div>
+                )}
+
+                {schemaDraftPlan.candidateDimensions.length > 0 && (
+                  <div className="question-workspace-choice-group">
+                    <span>Selected dimension: {selectedDimension || "None yet"}</span>
+                    <div>
+                      {schemaDraftPlan.candidateDimensions
+                        .slice(0, 5)
+                        .map((candidate) =>
+                          renderCandidateChoice(candidate, "dimension", selectedDimension),
+                        )}
+                    </div>
+                  </div>
+                )}
+
+                {schemaDraftPlan.candidateMeasures.length > 0 && (
+                  <div className="question-workspace-choice-group">
+                    <span>Selected measure: {selectedMeasure || "None yet"}</span>
+                    <div>
+                      {schemaDraftPlan.candidateMeasures
+                        .slice(0, 5)
+                        .map((candidate) =>
+                          renderCandidateChoice(candidate, "measure", selectedMeasure),
+                        )}
+                    </div>
+                  </div>
+                )}
+
+                {schemaDraftPlan.candidateDateFields.length > 0 && (
+                  <div className="question-workspace-choice-group">
+                    <span>Selected date field: {selectedDateField || "None yet"}</span>
+                    <div>
+                      {schemaDraftPlan.candidateDateFields
+                        .slice(0, 5)
+                        .map((candidate) =>
+                          renderCandidateChoice(candidate, "date", selectedDateField),
+                        )}
+                    </div>
+                  </div>
+                )}
+              </section>
+
               {schemaDraftPlan.suggestedClarifyingQuestions.length > 0 && (
                 <div className="question-workspace-schema-list">
                   <span>Suggested clarifying questions</span>
-                  {schemaDraftPlan.suggestedClarifyingQuestions.map((question) => (
-                    <p key={question}>{question}</p>
-                  ))}
+                  <div className="question-workspace-clarifying-chips">
+                    {schemaDraftPlan.suggestedClarifyingQuestions.map((question) => (
+                      <button
+                        type="button"
+                        key={question}
+                        onClick={() => setRawQuestion(question)}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </section>
