@@ -16,12 +16,55 @@ type QuestionWorkspacePanelProps = {
   sourceName: string;
 };
 
+type QuestionReviewHints = {
+  possibleFocus: string;
+  possibleAnalysisType: string;
+  possibleDimensions: string[];
+  possibleMeasures: string[];
+  detectedIntents: string[];
+  starterSuggestions: string[];
+};
+
 const starterPrompts = [
   "Which realtor manages the most properties?",
   "What changed most recently?",
   "Which locations perform best?",
   "Which customers generate the most revenue?",
 ];
+
+const measureTerms = [
+  "revenue",
+  "sales",
+  "amount",
+  "payment",
+  "cost",
+  "profit",
+  "margin",
+  "properties",
+  "customers",
+  "orders",
+  "count",
+  "total",
+];
+
+const groupingTerms = [
+  "realtor",
+  "manager",
+  "customer",
+  "location",
+  "region",
+  "property",
+  "product",
+  "category",
+  "team",
+  "department",
+  "source",
+];
+
+const timeTerms = ["recent", "recently", "change", "changed", "trend", "monthly", "weekly", "year", "date", "time"];
+const comparisonTerms = ["compare", "versus", "vs", "by", "between", "best", "worst", "underperforming"];
+const rankingTerms = ["most", "least", "top", "bottom", "best", "worst", "highest", "lowest"];
+const trendTerms = ["trend", "changed", "change", "over time", "monthly", "weekly", "recently"];
 
 const createInitialDraft = (): WorkspaceQuestionDraft => ({
   rawQuestion: "",
@@ -30,6 +73,49 @@ const createInitialDraft = (): WorkspaceQuestionDraft => ({
   activeWorksheetName: null,
   createdAt: null,
 });
+
+const findMatchingTerms = (question: string, terms: string[]) => {
+  const normalizedQuestion = question.toLowerCase();
+  return terms.filter((term) => normalizedQuestion.includes(term));
+};
+
+const createQuestionReviewHints = (question: string): QuestionReviewHints => {
+  const normalizedQuestion = question.toLowerCase();
+  const measures = findMatchingTerms(normalizedQuestion, measureTerms);
+  const dimensions = findMatchingTerms(normalizedQuestion, groupingTerms);
+  const hasTimeIntent = findMatchingTerms(normalizedQuestion, timeTerms).length > 0;
+  const hasComparisonIntent = findMatchingTerms(normalizedQuestion, comparisonTerms).length > 0;
+  const hasRankingIntent = findMatchingTerms(normalizedQuestion, rankingTerms).length > 0;
+  const hasTrendIntent = findMatchingTerms(normalizedQuestion, trendTerms).length > 0;
+  const detectedIntents = [
+    hasRankingIntent ? "ranking" : "",
+    hasTrendIntent || hasTimeIntent ? "time review" : "",
+    hasComparisonIntent ? "comparison" : "",
+  ].filter(Boolean);
+  const possibleAnalysisType = hasTrendIntent || hasTimeIntent
+    ? "Change over time"
+    : hasRankingIntent
+      ? "Ranked comparison"
+      : hasComparisonIntent
+        ? "Group comparison"
+        : "Exploratory review";
+  const possibleFocus = dimensions[0] || measures[0] || detectedIntents[0] || "business question";
+  const starterSuggestions = [
+    dimensions[0] ? `Compare by ${dimensions[0]}` : "",
+    hasRankingIntent || normalizedQuestion.includes("perform") ? "Review top performers" : "",
+    hasTrendIntent || hasTimeIntent ? "Analyze changes over time" : "",
+    measures[0] ? `Review ${measures[0]} movement` : "",
+  ].filter(Boolean);
+
+  return {
+    possibleFocus,
+    possibleAnalysisType,
+    possibleDimensions: dimensions.length > 0 ? Array.from(new Set(dimensions)) : ["Not identified yet"],
+    possibleMeasures: measures.length > 0 ? Array.from(new Set(measures)) : ["Not identified yet"],
+    detectedIntents: detectedIntents.length > 0 ? detectedIntents : ["question review"],
+    starterSuggestions: Array.from(new Set(starterSuggestions)).slice(0, 4),
+  };
+};
 
 function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
@@ -43,6 +129,37 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
       { label: "Rows", value: dataset.row_count.toLocaleString() },
     ],
     [dataset.column_count, dataset.original_filename, dataset.row_count, dataset.table_name, sourceName],
+  );
+
+  const activeReviewQuestion = draft.draftStatus === "drafted" ? draft.rawQuestion : rawQuestion;
+  const reviewHints = useMemo(
+    () => createQuestionReviewHints(activeReviewQuestion),
+    [activeReviewQuestion],
+  );
+  const plannedSteps = useMemo(
+    () => [
+      {
+        label: "Understand entities",
+        detail: reviewHints.possibleDimensions[0],
+      },
+      {
+        label: "Identify measures",
+        detail: reviewHints.possibleMeasures[0],
+      },
+      {
+        label: "Prepare grouping",
+        detail: reviewHints.possibleDimensions[0],
+      },
+      {
+        label: "Review trends",
+        detail: reviewHints.detectedIntents.includes("time review") ? "Possible" : "Optional",
+      },
+      {
+        label: "Validate result",
+        detail: "Future checkpoint",
+      },
+    ],
+    [reviewHints.detectedIntents, reviewHints.possibleDimensions, reviewHints.possibleMeasures],
   );
 
   const prepareDraft = () => {
@@ -110,9 +227,14 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
       {draft.draftStatus === "drafted" && (
         <section className="question-workspace-review" aria-label="Question review shell">
           <div>
-            <p className="section-label">Review shell</p>
+            <p className="section-label">Investigation Review</p>
             <h3>FiltraQueri will prepare an analysis plan here.</h3>
           </div>
+
+          <div className="question-workspace-protected-status" role="status">
+            No query has been generated yet.
+          </div>
+
           <dl>
             <div>
               <dt>Question</dt>
@@ -126,7 +248,54 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
               <dt>Source</dt>
               <dd>{draft.activeWorksheetName || dataset.table_name}</dd>
             </div>
+            <div>
+              <dt>Possible focus</dt>
+              <dd>{reviewHints.possibleFocus}</dd>
+            </div>
+            <div>
+              <dt>Possible analysis type</dt>
+              <dd>{reviewHints.possibleAnalysisType}</dd>
+            </div>
+            <div>
+              <dt>Possible dimensions</dt>
+              <dd>{reviewHints.possibleDimensions.join(", ")}</dd>
+            </div>
+            <div>
+              <dt>Possible measures</dt>
+              <dd>{reviewHints.possibleMeasures.join(", ")}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>Execution has not started</dd>
+            </div>
           </dl>
+
+          <div className="question-workspace-timeline" aria-label="Planned investigation steps">
+            {plannedSteps.map((step, index) => (
+              <span key={step.label}>
+                <strong>{index + 1}. {step.label}</strong>
+                <small>{step.detail}</small>
+              </span>
+            ))}
+          </div>
+
+          {reviewHints.starterSuggestions.length > 0 && (
+            <div className="question-workspace-suggestions" aria-label="Suggested question refinements">
+              <span>Suggested refinements</span>
+              <div>
+                {reviewHints.starterSuggestions.map((suggestion) => (
+                  <button
+                    type="button"
+                    key={suggestion}
+                    onClick={() => setRawQuestion(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <p>
             <strong>No query has run yet.</strong>
           </p>
