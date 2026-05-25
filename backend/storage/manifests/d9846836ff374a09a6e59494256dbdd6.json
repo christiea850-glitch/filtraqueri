@@ -5,15 +5,15 @@
   "active_dataset_id": "d9846836ff374a09a6e59494256dbdd6",
   "active_result_id": "preview",
   "active_execution_id": null,
-  "current_mode": "analyst",
+  "current_mode": "human",
   "current_result_tab": "preview",
   "filter_metadata": {},
   "query_builder_metadata": {
     "selected_columns": [
-      "DATA TYPE",
-      "VARCHAR(8)",
-      "DATE",
-      "SMALLINT(5)"
+      "realtor_id",
+      "realtor_agent",
+      "company",
+      "phone"
     ],
     "group_by": [],
     "aggregations": [
@@ -94,7 +94,7 @@
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-25T15:36:40.672Z"
+    "updatedAt": "2026-05-25T16:25:50.903Z"
   },
   "datasets": [
     {
@@ -105,135 +105,56 @@
       "duckdb_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\sessions\\d9846836ff374a09a6e59494256dbdd6.duckdb",
       "schema": [
         {
-          "name": "DATA TYPE",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 24,
-          "unique_count": 1,
-          "sample_values": [
-            "ATTRIBUTE NAME"
-          ]
-        },
-        {
-          "name": "VARCHAR(8)",
+          "name": "realtor_id",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 25,
+          "unique_count": 3,
           "sample_values": [
-            "ACH-8150",
-            "TRX-1277",
-            "ACH-8401",
-            "TRX-1470",
-            "ACH-9055",
-            "ACH-7842",
-            "ACH-7001",
-            "reference   ",
-            "ACH-7921",
-            "ACH-8200",
-            "ACH-7055",
-            "TRX-1510"
+            "RLTR0001",
+            "RLTR0003",
+            "RLTR0002"
           ]
         },
         {
-          "name": "DATE",
+          "name": "realtor_agent",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 21,
+          "unique_count": 3,
           "sample_values": [
-            "45383",
-            "44986",
-            "45413",
-            "45474",
-            "45323",
-            "45204",
-            "45292",
-            "45668",
-            "45597",
-            "44958",
-            "45566",
-            "45627"
+            "Shawn Taylor",
+            "Jacek Mikolajczyk",
+            "Divya Kataria"
           ]
         },
         {
-          "name": "SMALLINT(5)",
+          "name": "company",
           "type": "VARCHAR",
-          "inferred_type": "categorical",
+          "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 11,
+          "unique_count": 3,
           "sample_values": [
-            "amount   ",
-            "1815",
-            "1285",
-            "1175",
-            "1210",
-            "1120",
-            "1630",
-            "1135",
-            "1870",
-            "1260",
-            "1565"
+            "LevelUp Realty",
+            "OctFest LLC",
+            "Valley Fine Homes, LLC"
           ]
         },
         {
-          "name": "CHAR(6)",
+          "name": "phone",
           "type": "VARCHAR",
-          "inferred_type": "categorical",
+          "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 4,
+          "unique_count": 3,
           "sample_values": [
-            "Card",
-            "ACH",
-            "method   ",
-            "Check"
-          ]
-        },
-        {
-          "name": "VARCHAR(5)",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 12,
-          "sample_values": [
-            "tenant_id   ",
-            "T011",
-            "T013",
-            "T016",
-            "T005",
-            "T019",
-            "T020",
-            "T001",
-            "T002",
-            "T018",
-            "T014",
-            "T004"
-          ]
-        },
-        {
-          "name": "VARCHAR(6)",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 12,
-          "sample_values": [
-            "L0002",
-            "L0010",
-            "L0011",
-            "L0017",
-            "L0003",
-            "L0015",
-            "L0004",
-            "lease_id   ",
-            "L0012",
-            "L0016",
-            "L0001",
-            "L0014"
+            "860-713-5506",
+            "860-713-5501",
+            "860-713-5502"
           ]
         }
       ],
-      "row_count": 25,
-      "column_count": 7,
+      "row_count": 3,
+      "column_count": 4,
       "created_at": "2026-05-24T22:48:12.481877+00:00",
       "workbook_metadata": {
         "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
@@ -267,7 +188,7 @@
           "d9846836ff374a09a6e59494256dbdd6:worksheet:17",
           "d9846836ff374a09a6e59494256dbdd6:worksheet:18"
         ],
-        "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:12",
+        "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:2",
         "worksheets": [
           {
             "worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:1",
@@ -4471,13 +4392,13 @@
           "warnings": []
         },
         "created_at": "2026-05-24T22:48:12.481877+00:00",
-        "updated_at": "2026-05-25T05:12:24.704396+00:00"
+        "updated_at": "2026-05-25T16:20:35.797234+00:00"
       }
     }
   ],
   "created_at": "2026-05-24T22:48:12.481877+00:00",
-  "last_opened_at": "2026-05-25T16:00:33.697946+00:00",
-  "updated_at": "2026-05-25T16:00:33.720915+00:00",
+  "last_opened_at": "2026-05-25T16:25:51.664511+00:00",
+  "updated_at": "2026-05-25T16:25:51.686436+00:00",
   "workbook_metadata": {
     "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
     "workspace_id": "d9846836ff374a09a6e59494256dbdd6",
@@ -4510,7 +4431,7 @@
       "d9846836ff374a09a6e59494256dbdd6:worksheet:17",
       "d9846836ff374a09a6e59494256dbdd6:worksheet:18"
     ],
-    "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:12",
+    "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:2",
     "worksheets": [
       {
         "worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:1",
@@ -8714,6 +8635,6 @@
       "warnings": []
     },
     "created_at": "2026-05-24T22:48:12.481877+00:00",
-    "updated_at": "2026-05-25T05:12:24.704396+00:00"
+    "updated_at": "2026-05-25T16:20:35.797234+00:00"
   }
 }

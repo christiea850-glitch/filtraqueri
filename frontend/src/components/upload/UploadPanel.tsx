@@ -59,9 +59,9 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
               <small>{dataset ? "Return to the active workspace." : "Open data to begin."}</small>
             </button>
             <button type="button" className="home-action-card" onClick={onContinue}>
-              <span>Analyze</span>
+              <span>Investigate</span>
               <strong>Ask a question</strong>
-              <small>Start with guided analysis.</small>
+              <small>Start with a business opportunity.</small>
             </button>
             <button type="button" className="home-action-card" onClick={onContinue}>
               <span>Insights</span>
@@ -76,7 +76,7 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
             <button type="button" className="home-action-card">
               <span>Support</span>
               <strong>Guides & help</strong>
-              <small>Learn investigation workflows.</small>
+              <small>Learn how to investigate business data.</small>
             </button>
           </div>
 

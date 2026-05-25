@@ -592,6 +592,34 @@ function DatasetSummaryPanel({
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
   const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
   const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
+  const businessEntityHints = displayColumnProfiles
+    .filter((profile) => profile.role === "customer" || profile.role === "description" || profile.role === "identifier")
+    .slice(0, 3);
+  const datasetPurposeLabel =
+    semanticHints.some((profile) => profile.role === "customer") &&
+    (dataProfile?.possibleMetrics.length || 0) > 0
+      ? "This looks like customer transaction and sales data."
+      : (dataProfile?.possibleMetrics.length || 0) > 0 && (dataProfile?.dateTimeFields.length || 0) > 0
+        ? "This looks like business activity data with values over time."
+        : (dataProfile?.possibleMetrics.length || 0) > 0
+          ? "This looks like operational data with measurable business values."
+          : "FiltraQueri found structure it can help you investigate.";
+  const understandingSignals = [
+    businessEntityHints[0] ? `Business entity: ${businessEntityHints[0].displayName}` : null,
+    dataProfile?.possibleMetrics[0] ? `Possible metric: ${dataProfile.possibleMetrics[0].name}` : null,
+    dataProfile?.dateTimeFields[0] ? `Timeline signal: ${dataProfile.dateTimeFields[0].name}` : "Timeline signal needs review",
+    dataProfile?.possibleDimensions[0] ? `Possible segment: ${dataProfile.possibleDimensions[0].name}` : null,
+  ].filter(Boolean) as string[];
+  const opportunityLabels = Array.from(
+    new Set([
+      ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
+      ...(dataProfile?.statisticalReadiness.ready ? ["Top-performing categories"] : []),
+      ...(businessEntityHints.length > 0 ? ["Customer or entity patterns"] : []),
+      ...recommendations.slice(0, 2).map((recommendation) => recommendation.label),
+      ...kpiOpportunities.slice(0, 2).map((opportunity) => opportunity.label),
+      ...interpretedQuestions.slice(0, 2).map((question) => question.questionText),
+    ]),
+  ).slice(0, 5);
   const closeDrillIn = () => {
     setActiveDrillInView("overview");
     setActiveFocusedWorkflow(null);
@@ -801,7 +829,7 @@ function DatasetSummaryPanel({
         </div>
 
         {dataset ? (
-          <div className="data-profile-surface">
+            <div className="data-profile-surface">
             <div className="data-context-card" aria-label="Dataset context">
               <span className="data-context-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -828,6 +856,36 @@ function DatasetSummaryPanel({
                 <strong>{dataset.column_count.toLocaleString()}</strong>
               </div>
             </div>
+            <section className="human-understanding-panel" aria-label="What FiltraQueri noticed">
+              <div>
+                <p className="section-label">What FiltraQueri noticed</p>
+                <h3>{datasetPurposeLabel}</h3>
+                <p>
+                  FiltraQueri is looking for business opportunities in this dataset, not just field names.
+                </p>
+              </div>
+              <div className="human-understanding-grid">
+                {understandingSignals.map((signal) => (
+                  <span key={signal}>{signal}</span>
+                ))}
+              </div>
+              {opportunityLabels.length > 0 && (
+                <div className="human-opportunity-row">
+                  <strong>You may be able to investigate</strong>
+                  <div>
+                    {opportunityLabels.map((label) => (
+                      <button
+                        type="button"
+                        key={label}
+                        onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
             <div className="data-stat-row" aria-label="Dataset profile">
               <article className="data-stat data-stat--rows">
                 <div className="data-stat-top">
@@ -960,7 +1018,7 @@ function DatasetSummaryPanel({
                       )
                     }
                   >
-                    Intelligence
+                    Explore
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -974,18 +1032,18 @@ function DatasetSummaryPanel({
                     </svg>
                   </button>
                   {activeWorkflowMenu === "intelligence" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Intelligence workflows">
+                    <div className="data-workflow-menu" role="menu" aria-label="Investigation opportunities">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
-                        <strong>Data intelligence</strong>
-                        <span>Review shape, metrics, dimensions, dates, and readiness.</span>
+                        <strong>What FiltraQueri noticed</strong>
+                        <span>Review business signals, useful fields, and investigation fit.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}>
-                        <strong>Suggested analysis paths</strong>
-                        <span>Open recommended next analysis paths for this dataset.</span>
+                        <strong>Suggested investigations</strong>
+                        <span>See promising questions and opportunities for this dataset.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                        <strong>Guided analytics tasks</strong>
-                        <span>Open task-oriented analysis guidance.</span>
+                        <strong>Explore opportunities</strong>
+                        <span>Choose a business goal and let FiltraQueri guide setup.</span>
                       </button>
                     </div>
                   )}
@@ -1002,7 +1060,7 @@ function DatasetSummaryPanel({
                       )
                     }
                   >
-                    Semantic
+                    Questions
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -1016,22 +1074,22 @@ function DatasetSummaryPanel({
                     </svg>
                   </button>
                   {activeWorkflowMenu === "semantic" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Semantic workflows">
+                    <div className="data-workflow-menu" role="menu" aria-label="Business questions">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
-                        <strong>Business semantics</strong>
-                        <span>Open detected business context and entity signals.</span>
+                        <strong>Business meaning</strong>
+                        <span>See what FiltraQueri thinks these fields represent.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
-                        <strong>KPI intelligence</strong>
-                        <span>Open detected KPI and insight opportunities.</span>
+                        <strong>Possible KPIs</strong>
+                        <span>Review business measurements and insight opportunities.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessQuestions")}>
                         <strong>Business questions</strong>
-                        <span>Open suggested business question mappings.</span>
+                        <span>See questions this dataset may help answer.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
-                        <strong>Human Mode guidance</strong>
-                        <span>Open simple continuation actions for Human Mode.</span>
+                        <strong>Next steps</strong>
+                        <span>Choose a simple business investigation move.</span>
                       </button>
                     </div>
                   )}
@@ -1148,46 +1206,46 @@ function DatasetSummaryPanel({
 
       {dataset && dataProfile && activeFocusedWorkflow === "dataIntelligence" && (
         <DrillInDetailPanel
-          eyebrow="Data detail"
-          title="Data intelligence"
+          eyebrow="Business understanding"
+          title="What FiltraQueri noticed"
           summary={humanSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <section className="data-intelligence-panel" aria-label="Data intelligence profile">
+        <section className="data-intelligence-panel" aria-label="Dataset understanding">
           <div className="summary-header">
             <div>
-              <p className="section-label">Data intelligence</p>
-              <h2>Profile and analysis fit</h2>
+              <p className="section-label">Dataset understanding</p>
+              <h2>Business signals FiltraQueri can use</h2>
               <p>{humanSummary}</p>
             </div>
             <span className="dataset-count-pill">
-              {dialectRecommendation?.recommendedFutureEngine?.label || "Review only"}
+              {dialectRecommendation?.recommendedFutureEngine?.label || "Suggested only"}
             </span>
           </div>
           <div className="data-intelligence-grid">
             <span>
-              Shape
+              Dataset shape
               <strong>{dataProfile.shape.shapeLabel.replace(/_/g, " ")}</strong>
             </span>
             <span>
-              Metrics
+              Possible metrics
               <strong>{dataProfile.possibleMetrics.length}</strong>
             </span>
             <span>
-              Dimensions
+              Possible segments
               <strong>{dataProfile.possibleDimensions.length}</strong>
             </span>
             <span>
-              Dates
+              Timeline fields
               <strong>{dataProfile.dateTimeFields.length}</strong>
             </span>
             <span>
-              Time-series
+              Trend potential
               <strong>{dataProfile.timeSeriesReadiness.ready ? "Possible" : "Needs fields"}</strong>
             </span>
             <span>
-              Statistics
+              Comparison potential
               <strong>{dataProfile.statisticalReadiness.ready ? "Possible" : "Needs metrics"}</strong>
             </span>
           </div>
@@ -1197,17 +1255,17 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "suggestedAnalysisPaths" && (
         <DrillInDetailPanel
-          eyebrow="Data detail"
-          title="Suggested analysis paths"
+          eyebrow="Explore opportunities"
+          title="Suggested investigations"
           summary={workflowSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <section className="workflow-recommendation-panel" aria-label="Suggested analysis paths">
+        <section className="workflow-recommendation-panel" aria-label="Suggested investigations">
           <div className="summary-header">
             <div>
-              <p className="section-label">Analysis paths</p>
-              <h2>Likely analysis paths</h2>
+              <p className="section-label">Investigation ideas</p>
+              <h2>Promising questions to explore</h2>
               <p>{workflowSummary}</p>
             </div>
             <span className="dataset-count-pill">{recommendations.length}</span>
@@ -1219,13 +1277,13 @@ function DatasetSummaryPanel({
                 <p>{recommendation.humanSummary}</p>
                 <div>
                   <small>{recommendation.confidence} confidence</small>
-                  <small>{recommendation.recommendedFutureEnginePath[0]?.replace(/_/g, " ") || "review only"}</small>
+                  <small>{recommendation.possibleFutureResultShapes[0]?.replace(/_/g, " ") || "preview idea"}</small>
                 </div>
               </article>
             ))}
           </div>
           {recommendations.length === 0 && (
-            <p className="compact-empty">No suggested analysis paths are available for this dataset yet.</p>
+            <p className="compact-empty">No suggested investigations are available for this dataset yet.</p>
           )}
         </section>
         </DrillInDetailPanel>
@@ -1233,17 +1291,17 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "businessSemantics" && (
         <DrillInDetailPanel
-          eyebrow="Business detail"
-          title="Business semantics"
+          eyebrow="Business meaning"
+          title="Business meaning"
           summary={semanticSummary || "Business context is derived from the available data profile."}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
         {businessSemanticReport && (
-        <section className="business-semantics-panel" aria-label="Business semantic intelligence">
+        <section className="business-semantics-panel" aria-label="Business meaning">
           <div className="summary-header">
             <div>
-              <p className="section-label">Business semantics</p>
+              <p className="section-label">Business meaning</p>
               <h2>Detected business context</h2>
               <p>{semanticSummary}</p>
             </div>
@@ -1276,16 +1334,16 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "kpiIntelligence" && (
         <DrillInDetailPanel
-          eyebrow="Business detail"
-          title="KPI intelligence"
+          eyebrow="Business opportunities"
+          title="Possible KPIs"
           summary={kpiSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <section className="kpi-intelligence-panel" aria-label="KPI intelligence opportunities">
+        <section className="kpi-intelligence-panel" aria-label="Possible KPI opportunities">
           <div className="summary-header">
             <div>
-              <p className="section-label">KPI intelligence</p>
+              <p className="section-label">Possible KPIs</p>
               <h2>Insight opportunities</h2>
               <p>{kpiSummary}</p>
             </div>
@@ -1348,9 +1406,9 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "guidedAnalyticsTasks" && (
         <DrillInDetailPanel
-          eyebrow="Data detail"
-          title="Guided analytics tasks"
-          summary="Preview task inputs and planning context."
+          eyebrow="Explore opportunities"
+          title="Suggested investigations"
+          summary="Choose a business goal and let FiltraQueri guide the setup."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
@@ -1364,16 +1422,16 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "humanGuidance" && (
         <DrillInDetailPanel
-          eyebrow="Business detail"
-          title="Human Mode guidance"
-          summary="Choose a simple continuation into the existing Human Mode workflow."
+          eyebrow="Next steps"
+          title="Next investigation move"
+          summary="Choose a simple business direction to continue."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
-            <p className="section-label">Guided analysis</p>
-            <h2>Choose an insight</h2>
+            <p className="section-label">Investigation guidance</p>
+            <h2>Choose what to explore next</h2>
           </div>
           <div className="human-suggestion-grid">
             {humanGuidanceCards.map((suggestion) => (

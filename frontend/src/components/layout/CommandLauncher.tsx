@@ -140,7 +140,7 @@ function CommandLauncher({ open, commands, onClose }: CommandLauncherProps) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={handleInputKeyDown}
-            placeholder="Search workflows, pages, and actions"
+            placeholder="Search investigations, pages, and actions"
             aria-label="Search commands"
           />
           <kbd>Esc</kbd>
@@ -149,7 +149,7 @@ function CommandLauncher({ open, commands, onClose }: CommandLauncherProps) {
         <div className="command-launcher-body">
           {groupedCommands.length === 0 ? (
             <div className="command-launcher-empty">
-              <strong>No matching workflows</strong>
+              <strong>No matching actions</strong>
               <span>Try Data, SQL, preview, export, or drafts.</span>
             </div>
           ) : (

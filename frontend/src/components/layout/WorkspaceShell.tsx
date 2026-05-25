@@ -82,7 +82,7 @@ const productDestinations: ProductDestination[] = [
   },
   {
     id: "analyze",
-    label: "Analyze",
+    label: "Investigate",
     icon: "analyze",
     defaultView: "queryBuilder",
     mode: "human",
@@ -243,9 +243,9 @@ function WorkspaceShell({
   const workflowLabel = isLoadedHome
     ? "Continue"
     : activeView === "filters"
-      ? "Choose question"
+      ? "Choose business question"
       : activeView === "queryBuilder"
-        ? "Build query"
+        ? "Explore question"
         : activeView === "results"
           ? "Review result"
           : activeView === "sqlWorkspace"
@@ -258,7 +258,7 @@ function WorkspaceShell({
       : activeView === "filters"
         ? "Start with a business question, then narrow the rows that matter."
         : activeView === "queryBuilder"
-          ? "Choose fields, shape the result, and run only when ready."
+          ? "Choose business fields and shape the result only when it helps the investigation."
           : activeView === "results"
             ? "Review what the result means, then choose the next investigation move."
             : activeView === "sqlWorkspace"
@@ -267,7 +267,7 @@ function WorkspaceShell({
                 ? "Manage preferences and system choices away from the investigation workspace."
       : workspaceMode === "analyst"
       ? `SQL and technical context stay inspectable across ${analystToolCount.toLocaleString()} tool surfaces.`
-      : "Business flow, results, and next steps stay connected.";
+      : "Business questions, findings, and next steps stay connected.";
   const activeWorksheetLabel =
     runtimeContext.snapshot.workbook.activeWorksheetName ||
     (runtimeContext.snapshot.workbook.hasWorkbook ? "Workbook worksheet" : "Dataset table");
@@ -385,7 +385,7 @@ function WorkspaceShell({
               <path d="m16 16 4 4" />
             </svg>
           </span>
-          <strong>Search workflows</strong>
+          <strong>Search actions</strong>
           <kbd>Ctrl K</kbd>
         </button>
         <div className="mode-switcher" aria-label="Workspace mode">
@@ -538,7 +538,7 @@ function WorkspaceShell({
             </>
           )}
 
-          <section className="workspace-active-flow" aria-label="Active workflow">
+          <section className="workspace-active-flow" aria-label="Active investigation">
             {errorMessage && activeView !== "welcome" && (
               <p className="error-message workspace-error">{errorMessage}</p>
             )}
@@ -594,7 +594,7 @@ function WorkspaceShell({
                               ? "Follow-up suggestion"
                               : activeDestination.id === "analyst"
                                 ? "Execution context"
-                                : "Next step"}
+                            : "Suggested next step"}
                         </span>
                         <small>
                           {activeDestination.id === "analyst"

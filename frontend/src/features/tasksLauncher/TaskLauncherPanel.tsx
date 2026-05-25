@@ -219,16 +219,16 @@ function TaskDetail({
   const planReadinessLabel = getAnalysisPlanReadinessLabel(analysisPlan);
   const primaryReadinessSummary =
     planningReadiness.status === "ready_for_future_execution"
-      ? "This workflow has the inputs needed to prepare an analysis plan."
+      ? "FiltraQueri has enough context to guide this investigation."
       : missingInputs.length > 0
-        ? "Additional inputs are needed before this workflow can be prepared."
+        ? "A little more business context is needed before this investigation is ready."
         : planningReadiness.status === "unsupported"
-          ? "This workflow is not supported for the current data context."
+          ? "This investigation does not fit the current dataset yet."
           : planningReadiness.status === "engine_limited"
-            ? "This workflow can be planned, but analysis support is limited."
+            ? "This investigation is possible, but FiltraQueri has limited confidence."
             : planningReadiness.status === "relationship_dependent"
-              ? "Workbook relationships need review before this workflow can be prepared."
-              : "This workflow is partly prepared and needs a little more context.";
+              ? "Related worksheet context may help this investigation."
+              : "This investigation is partly prepared and needs a little more context.";
   const visibleNotes = [
     ...planningReadiness.futureExecutionBlockers,
     ...planningReadiness.futureExecutionNotes,
@@ -377,7 +377,7 @@ function TaskDetail({
         }
       : {
           title: "Needs business metric",
-          detail: "Pick a numeric field before preparing this workflow.",
+          detail: "Pick a numeric field before continuing this investigation.",
           confidence: "Medium" as const,
         },
     primaryDate
@@ -444,15 +444,15 @@ function TaskDetail({
   return (
     <aside className="task-detail-panel" aria-label="Task details">
       <div className="builder-block-header">
-        <span>Selected workflow</span>
+        <span>Selected investigation</span>
         {onClose && (
           <button type="button" className="text-button" onClick={onClose}>
-            Back to workflows
+            Back to investigations
           </button>
         )}
       </div>
 
-      <section className="task-focus-section task-summary-section" aria-label="Workflow Summary">
+      <section className="task-focus-section task-summary-section" aria-label="Investigation Summary">
         <p className="section-label">Investigation</p>
         <h3>{task.label}</h3>
         <p>{task.description}</p>
@@ -620,7 +620,7 @@ function TaskDetail({
           })}
         </div>
       ) : (
-        <p>No required inputs for this workflow.</p>
+          <p>No required inputs for this investigation.</p>
       )}
       </section>
 
@@ -697,7 +697,7 @@ function TaskDetail({
                 ))}
               </div>
             ) : (
-              <p>Nothing runs from this preview. Review the prepared workflow context before moving forward.</p>
+              <p>Nothing runs from this preview. Review the suggested investigation context before moving forward.</p>
             )}
           </section>
         </>
@@ -1118,7 +1118,7 @@ function TaskDetail({
       )}
       </details>
       <p className="task-safe-note">
-        This is a preview only. Nothing runs, and no SQL is created from this view.
+        This is guidance only. Nothing runs, and no SQL is created from this view.
       </p>
     </aside>
   );
@@ -1168,10 +1168,10 @@ function TaskLauncherPanel({
     <section className="task-launcher-panel task-launcher-panel--focused" aria-label="Human mode analytics task launcher">
       <div className="summary-header task-investigation-heading">
         <div>
-          <p className="section-label">Tasks & Utilities</p>
-          <h2>Guided analytics investigation</h2>
+          <p className="section-label">Explore opportunities</p>
+          <h2>Suggested investigations</h2>
           <p>
-            Start with a goal, choose one workflow, then prepare only the context that workflow needs.
+            Start with a business goal, choose one investigation, then confirm only the context that matters.
           </p>
         </div>
         <span className="dataset-count-pill">
@@ -1181,7 +1181,7 @@ function TaskLauncherPanel({
 
       <div className="task-investigation-progress" aria-label="Investigation progress">
         <span className={!selectedCategoryGroup && !selectedTask ? "is-active" : "is-complete"}>Goal</span>
-        <span className={selectedCategoryGroup && !selectedTask ? "is-active" : selectedTask ? "is-complete" : ""}>Workflow</span>
+        <span className={selectedCategoryGroup && !selectedTask ? "is-active" : selectedTask ? "is-complete" : ""}>Investigation</span>
         <span className={selectedTask ? "is-active" : ""}>Prepare</span>
       </div>
 
@@ -1190,7 +1190,7 @@ function TaskLauncherPanel({
           <div className="task-step-header">
             <span>Step 1</span>
             <strong>Choose investigation goal</strong>
-            <p>Select the area you want to investigate. Workflows stay hidden until a goal is selected.</p>
+            <p>Select the business area you want to explore. Investigation ideas appear after a goal is selected.</p>
           </div>
           <div className="task-goal-grid">
           {taskGroups.map((group) => (
@@ -1200,7 +1200,7 @@ function TaskLauncherPanel({
               key={group.category.id}
               onClick={() => chooseCategory(group.category.id)}
             >
-              <span>{group.tasks.length} workflows</span>
+              <span>{group.tasks.length} ideas</span>
               <strong>{group.category.label}</strong>
               <small>{group.category.description}</small>
             </button>
@@ -1210,7 +1210,7 @@ function TaskLauncherPanel({
       )}
 
       {selectedCategoryGroup && !selectedTask && (
-        <div className="task-investigation-step" aria-label="Choose Workflow">
+        <div className="task-investigation-step" aria-label="Choose Investigation">
           <div className="task-flow-nav">
             <button type="button" className="text-button" onClick={returnToGoals}>
               Back to goals
@@ -1238,7 +1238,7 @@ function TaskLauncherPanel({
       )}
 
       {selectedTask && (
-        <div className="task-investigation-step task-workspace-stage" aria-label="Focused Workflow Workspace">
+        <div className="task-investigation-step task-workspace-stage" aria-label="Focused Investigation Workspace">
           <TaskDetail
             task={selectedTask}
             dataset={dataset}
