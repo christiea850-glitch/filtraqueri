@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import SqlEditorHost from "./SqlEditorHost";
 import type {
   SqlEditorInterface,
@@ -38,29 +38,97 @@ function SqlHelpersPopup({
   onInsertSql: (sql: string) => void;
   onClose: () => void;
 }) {
+  type SqlHelperItem = {
+    id: string;
+    label: string;
+    helper: string;
+    category: string;
+    sql: string;
+    kind: "template" | "keyword";
+  };
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredTemplates = useMemo(
+  const helperItems = useMemo<SqlHelperItem[]>(
     () =>
-      editor.templates.filter((template) =>
-        [template.label, template.description, template.category, template.sql]
+      [
+        ...editor.templates.map((template) => ({
+          id: `template:${template.id}`,
+          label: template.label,
+          helper: template.description,
+          category: template.category,
+          sql: template.sql,
+          kind: "template" as const,
+        })),
+        ...editor.keywordSuggestions.map((keyword) => ({
+          id: `keyword:${keyword}`,
+          label: keyword,
+          helper: "Insert SQL keyword",
+          category: "keyword",
+          sql: keyword,
+          kind: "keyword" as const,
+        })),
+      ].filter((item) =>
+        [item.label, item.helper, item.category, item.sql, item.kind]
           .join(" ")
           .toLowerCase()
           .includes(normalizedQuery),
       ),
-    [editor.templates, normalizedQuery],
+    [editor.keywordSuggestions, editor.templates, normalizedQuery],
   );
-  const filteredKeywords = useMemo(
-    () =>
-      editor.keywordSuggestions.filter((keyword) =>
-        keyword.toLowerCase().includes(normalizedQuery),
-      ),
-    [editor.keywordSuggestions, normalizedQuery],
+  const groupedItems = useMemo(
+    () => ({
+      templates: helperItems.filter((item) => item.kind === "template"),
+      keywords: helperItems.filter((item) => item.kind === "keyword"),
+    }),
+    [helperItems],
   );
   const insertSql = (sql: string) => {
     onInsertSql(sql);
     onClose();
   };
+  const insertActiveItem = () => {
+    const activeItem = helperItems[activeIndex];
+    if (activeItem) insertSql(activeItem.sql);
+  };
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    setActiveIndex((currentIndex) =>
+      Math.min(currentIndex, Math.max(helperItems.length - 1, 0)),
+    );
+  }, [helperItems.length]);
+
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((currentIndex) =>
+        helperItems.length === 0 ? 0 : Math.min(currentIndex + 1, helperItems.length - 1),
+      );
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((currentIndex) => Math.max(currentIndex - 1, 0));
+    }
+
+    if (event.key === "Enter") {
+      event.preventDefault();
+      insertActiveItem();
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+    }
+  };
+
+  let itemIndex = -1;
 
   return (
     <div className="sql-helper-popover" role="dialog" aria-label="SQL helpers">
@@ -76,48 +144,81 @@ function SqlHelpersPopup({
       <label className="sql-helper-search">
         <span>Search helpers</span>
         <input
+          ref={inputRef}
           type="search"
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
+          onKeyDown={handleSearchKeyDown}
           placeholder="Template, keyword, or SQL pattern"
-          autoFocus
         />
       </label>
       <div className="sql-helper-popover-body">
-        <section className="sql-helper-picker-section">
-          <div className="builder-block-header">
-            <span>Templates</span>
-            <small>{filteredTemplates.length} shown</small>
-          </div>
-          <div className="sql-template-list sql-helper-picker-list">
-            {filteredTemplates.map((template) => (
-              <button type="button" key={template.id} onClick={() => insertSql(template.sql)}>
-                <strong>{template.label}</strong>
-                <span>{template.description}</span>
-                <small>{template.category}</small>
-              </button>
-            ))}
-            {filteredTemplates.length === 0 && (
-              <p className="sql-helper-empty">No templates match your search.</p>
+        {helperItems.length === 0 ? (
+          <p className="sql-helper-empty">No helpers match your search.</p>
+        ) : (
+          <>
+            {groupedItems.templates.length > 0 && (
+              <section className="sql-helper-picker-section">
+                <div className="sql-helper-section-label">
+                  <span>Templates</span>
+                </div>
+                <div className="sql-helper-command-list">
+                  {groupedItems.templates.map((item) => {
+                    itemIndex += 1;
+                    const currentIndex = itemIndex;
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={currentIndex === activeIndex ? "is-active" : ""}
+                        onMouseEnter={() => setActiveIndex(currentIndex)}
+                        onClick={() => insertSql(item.sql)}
+                      >
+                        <span>
+                          <strong>{item.label}</strong>
+                          <small>{item.helper}</small>
+                        </span>
+                        <em>{item.category}</em>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             )}
-          </div>
-        </section>
-        <section className="sql-helper-picker-section">
-          <div className="builder-block-header">
-            <span>Keywords</span>
-            <small>{filteredKeywords.length} shown</small>
-          </div>
-          <div className="sql-keyword-list sql-helper-keyword-list">
-            {filteredKeywords.map((keyword) => (
-              <button type="button" key={keyword} onClick={() => insertSql(keyword)}>
-                {keyword}
-              </button>
-            ))}
-            {filteredKeywords.length === 0 && (
-              <p className="sql-helper-empty">No keywords match your search.</p>
+            {groupedItems.keywords.length > 0 && (
+              <section className="sql-helper-picker-section">
+                <div className="sql-helper-section-label">
+                  <span>Keywords</span>
+                </div>
+                <div className="sql-helper-command-list is-keyword-list">
+                  {groupedItems.keywords.map((item) => {
+                    itemIndex += 1;
+                    const currentIndex = itemIndex;
+                    return (
+                      <button
+                        type="button"
+                        key={item.id}
+                        className={currentIndex === activeIndex ? "is-active" : ""}
+                        onMouseEnter={() => setActiveIndex(currentIndex)}
+                        onClick={() => insertSql(item.sql)}
+                      >
+                        <span>
+                          <strong>{item.label}</strong>
+                          <small>{item.helper}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
             )}
-          </div>
-        </section>
+          </>
+        )}
+      </div>
+      <div className="sql-helper-popover-foot" aria-hidden="true">
+        <span>Up/down navigate</span>
+        <span>Enter insert</span>
+        <span>Esc close</span>
       </div>
     </div>
   );
