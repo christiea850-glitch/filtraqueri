@@ -51,6 +51,7 @@ type FieldSuggestion = {
   value: string;
   inputType: "metric" | "dateField" | "entityField" | "groupingField" | "dimension";
   helper: string;
+  confidence: "High" | "Medium" | "Low";
 };
 
 const uniqueSuggestionValues = (suggestions: FieldSuggestion[]) => {
@@ -235,19 +236,14 @@ function TaskDetail({
   const visibleInputs = [...task.requiredInputs, ...task.optionalInputs];
   const requiredInputs = task.requiredInputs;
   const optionalInputs = task.optionalInputs;
-  const recommendedPathLabel = engineCompatibility.recommendedEngine?.label || "Guided planning";
-  const recommendedPathSummary =
-    recommendations[0]?.humanSummary ||
-    businessExplanation?.metadataAwareSummary ||
-    businessExplanation?.businessMeaning ||
-    "Choose the required inputs to prepare this workflow preview.";
   const canShowPreparationContext = missingInputs.length === 0;
   const metricSuggestions = uniqueSuggestionValues([
     ...(dataProfile?.possibleMetrics.slice(0, 4).map((field) => ({
       label: field.name,
       value: field.name,
       inputType: "metric" as const,
-      helper: "Likely business metric",
+      helper: "Possible revenue or transaction metric",
+      confidence: field.confidence === "high" ? "High" as const : "Medium" as const,
     })) || []),
     ...displayProfiles
       .filter((profile) => profile.role === "amount" || profile.role === "quantity")
@@ -256,7 +252,8 @@ function TaskDetail({
         label: profile.sourceName,
         value: profile.sourceName,
         inputType: "metric" as const,
-        helper: getBusinessRoleLabel(profile.role),
+        helper: profile.role === "amount" ? "Possible revenue field" : getBusinessRoleLabel(profile.role),
+        confidence: profile.confidence === "high" ? "High" as const : "Medium" as const,
       })),
   ]).slice(0, 4);
   const dateSuggestions = uniqueSuggestionValues([
@@ -264,7 +261,8 @@ function TaskDetail({
       label: field.name,
       value: field.name,
       inputType: "dateField" as const,
-      helper: "Likely timeline field",
+      helper: "Possible timeline field",
+      confidence: field.confidence === "high" ? "High" as const : "Medium" as const,
     })) || []),
     ...displayProfiles
       .filter((profile) => profile.role === "date")
@@ -273,7 +271,8 @@ function TaskDetail({
         label: profile.sourceName,
         value: profile.sourceName,
         inputType: "dateField" as const,
-        helper: getBusinessRoleLabel(profile.role),
+        helper: "Possible date field",
+        confidence: profile.confidence === "high" ? "High" as const : "Medium" as const,
       })),
   ]).slice(0, 3);
   const entitySuggestions = uniqueSuggestionValues(
@@ -284,7 +283,13 @@ function TaskDetail({
         label: profile.sourceName,
         value: profile.sourceName,
         inputType: "entityField" as const,
-        helper: getBusinessRoleLabel(profile.role),
+        helper:
+          profile.role === "customer"
+            ? "Possible customer field"
+            : profile.role === "description"
+              ? "Possible product or item field"
+              : getBusinessRoleLabel(profile.role),
+        confidence: profile.confidence === "high" ? "High" as const : "Medium" as const,
       })),
   ).slice(0, 3);
   const dimensionSuggestions = uniqueSuggestionValues([
@@ -292,7 +297,8 @@ function TaskDetail({
       label: field.name,
       value: field.name,
       inputType: "groupingField" as const,
-      helper: "Likely grouping dimension",
+      helper: "Possible category or segment",
+      confidence: field.confidence === "high" ? "High" as const : "Medium" as const,
     })) || []),
     ...displayProfiles
       .filter((profile) => profile.role === "location" || profile.role === "status")
@@ -301,7 +307,8 @@ function TaskDetail({
         label: profile.sourceName,
         value: profile.sourceName,
         inputType: "groupingField" as const,
-        helper: getBusinessRoleLabel(profile.role),
+        helper: profile.role === "location" ? "Possible region or location field" : getBusinessRoleLabel(profile.role),
+        confidence: profile.confidence === "high" ? "High" as const : "Medium" as const,
       })),
   ]).slice(0, 4);
   const primaryMetric = metricSuggestions[0] || null;
@@ -313,6 +320,12 @@ function TaskDetail({
     { id: "entity", title: "Suggested entity", suggestions: entitySuggestions },
     { id: "dimension", title: "Suggested dimension", suggestions: dimensionSuggestions },
   ].filter((group) => group.suggestions.length > 0);
+  const allFieldSuggestions = [
+    ...metricSuggestions,
+    ...dateSuggestions,
+    ...entitySuggestions,
+    ...dimensionSuggestions,
+  ];
   const getInputForSuggestion = (suggestion: FieldSuggestion) =>
     visibleInputs.find((input) => input.type === suggestion.inputType) ||
     (suggestion.inputType === "groupingField"
@@ -339,6 +352,94 @@ function TaskDetail({
         : suggestionGroups.length > 0
           ? "Suggested setup available"
           : "Needs required input";
+  const noticedSignals = [
+    primaryMetric
+      ? `transaction-like numeric fields such as ${primaryMetric.label}`
+      : "no obvious business metric yet",
+    primaryDate ? `timeline data such as ${primaryDate.label}` : "no clean timeline field yet",
+    entitySuggestions.length > 0
+      ? `business entities such as ${entitySuggestions[0].label}`
+      : "limited entity detection",
+    dimensionSuggestions.length > 0
+      ? `categories or segments such as ${dimensionSuggestions[0].label}`
+      : null,
+    (dataProfile?.workbookRelationshipContext.worksheetCount || 0) > 1
+      ? "multiple sheets that may support relationship analysis"
+      : null,
+  ].filter(Boolean) as string[];
+  const insightCards = [
+    primaryMetric
+      ? {
+          title: "Possible revenue field detected",
+          detail: primaryMetric.label,
+          confidence: primaryMetric.confidence,
+          suggestion: primaryMetric,
+        }
+      : {
+          title: "Needs business metric",
+          detail: "Pick a numeric field before preparing this workflow.",
+          confidence: "Medium" as const,
+        },
+    primaryDate
+      ? {
+          title: "Timeline field available",
+          detail: primaryDate.label,
+          confidence: primaryDate.confidence,
+          suggestion: primaryDate,
+        }
+      : {
+          title: "Missing clean date field",
+          detail: "Trend and forecasting previews need a timeline.",
+          confidence: "High" as const,
+        },
+    primaryDimension
+      ? {
+          title: primaryDimension.inputType === "entityField" ? "Entity field detected" : "Category field detected",
+          detail: primaryDimension.label,
+          confidence: primaryDimension.confidence,
+          suggestion: primaryDimension,
+        }
+      : {
+          title: "Low confidence entity detection",
+          detail: "Add a product, customer, or category field if relevant.",
+          confidence: "Low" as const,
+        },
+    dataProfile?.timeSeriesReadiness.ready
+      ? {
+          title: "Good dataset for trend analysis",
+          detail: "Metric and timeline signals are both present.",
+          confidence: "High" as const,
+        }
+      : null,
+    dataProfile?.statisticalReadiness.ready
+      ? {
+          title: "Suitable for comparison analysis",
+          detail: "Numeric and grouping fields are available.",
+          confidence: "Medium" as const,
+        }
+      : null,
+  ].filter(Boolean).slice(0, 5) as Array<{
+    title: string;
+    detail: string;
+    confidence: "High" | "Medium" | "Low";
+    suggestion?: FieldSuggestion;
+  }>;
+  const possiblePreviewLabels = Array.from(
+    new Set([
+      task.label,
+      ...(primaryMetric && primaryDimension ? ["Top performing products", "Lowest-performing categories"] : []),
+      ...(primaryMetric && primaryDate ? ["Monthly revenue trends"] : []),
+      ...(entitySuggestions.length > 0 && primaryDate ? ["Customer inactivity candidates"] : []),
+      ...recommendations.slice(0, 2).map((recommendation) => recommendation.label),
+      ...kpiOpportunities.slice(0, 2).map((opportunity) => opportunity.label),
+    ]),
+  ).slice(0, 5);
+  const getSuggestionsForInput = (input: AnalyticsTask["requiredInputs"][number]) =>
+    allFieldSuggestions.filter((suggestion) => getInputForSuggestion(suggestion)?.id === input.id);
+  const getSmartOptionLabel = (input: AnalyticsTask["requiredInputs"][number], value: string, label: string) => {
+    const suggestion = getSuggestionsForInput(input).find((item) => item.value === value);
+    return suggestion ? `Recommended - ${suggestion.helper}: ${label}` : label;
+  };
 
   return (
     <aside className="task-detail-panel" aria-label="Task details">
@@ -352,12 +453,9 @@ function TaskDetail({
       </div>
 
       <section className="task-focus-section task-summary-section" aria-label="Workflow Summary">
-        <p className="section-label">Task Summary</p>
+        <p className="section-label">Investigation</p>
         <h3>{task.label}</h3>
-        <p>{businessExplanation?.summary || task.description}</p>
-        {businessExplanation?.businessMeaning && (
-          <strong>{businessExplanation.businessMeaning}</strong>
-        )}
+        <p>{task.description}</p>
         <div className="task-light-pill-row" aria-label="Expected outputs">
           {task.supportedResultTypes.slice(0, 3).map((resultType) => (
             <small key={resultType}>{resultType.replace(/_/g, " ")}</small>
@@ -365,9 +463,66 @@ function TaskDetail({
         </div>
       </section>
 
+      <section className="task-focus-section task-noticed-section" aria-label="What FiltraQueri noticed">
+        <div className="task-assistant-panel">
+          <span>What FiltraQueri noticed</span>
+          <strong>This dataset appears to contain:</strong>
+          <ul>
+            {noticedSignals.slice(0, 5).map((signal) => (
+              <li key={signal}>{signal}</li>
+            ))}
+          </ul>
+          {possiblePreviewLabels.length > 0 && (
+            <div>
+              <span>May work well for</span>
+              {possiblePreviewLabels.slice(0, 3).map((label) => (
+                <small key={label}>{label}</small>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="task-focus-section task-actionable-insights" aria-label="Actionable data findings">
+        <div className="task-focus-section-heading">
+          <span>Data findings</span>
+          <small>{insightCards.length} noticed</small>
+        </div>
+        <div className="task-insight-card-grid">
+          {insightCards.map((card) => (
+            <article className="task-insight-card" key={card.title}>
+              <div>
+                <strong>{card.title}</strong>
+                <small>{card.confidence} confidence</small>
+              </div>
+              <p>{card.detail}</p>
+              {card.suggestion && getInputForSuggestion(card.suggestion) && (
+                <button type="button" onClick={() => applySuggestion(card.suggestion!)}>
+                  Use this
+                </button>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {possiblePreviewLabels.length > 0 && (
+        <section className="task-focus-section task-preview-suggestions" aria-label="Possible analysis previews">
+          <div className="task-focus-section-heading">
+            <span>Possible analysis previews</span>
+            <small>Preview only</small>
+          </div>
+          <div>
+            {possiblePreviewLabels.map((label) => (
+              <small key={label}>{label}</small>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="task-focus-section task-ai-suggestion-section" aria-label="AI Suggestions">
         <div className="task-ai-guidance-banner">
-          <span>AI Suggestions</span>
+          <span>Suggested setup</span>
           <strong>{guidanceSummary}</strong>
           <div>
             {primaryMetric && <small>Metric: {primaryMetric.label}</small>}
@@ -396,7 +551,8 @@ function TaskDetail({
                         disabled={!input}
                         title={suggestion.helper}
                       >
-                        {suggestion.label}
+                        {suggestion.helper}
+                        <small>{suggestion.label}</small>
                       </button>
                     );
                   })}
@@ -432,6 +588,20 @@ function TaskDetail({
                 {input.required ? " *" : ""}
               </small>
               <span>{getGuidedInputPrompt(input)}</span>
+              {getSuggestionsForInput(input).length > 0 && (
+                <div className="task-input-recommendations">
+                  {getSuggestionsForInput(input).slice(0, 3).map((suggestion) => (
+                    <button
+                      type="button"
+                      key={`${input.id}:${suggestion.value}`}
+                      onClick={() => applySuggestion(suggestion)}
+                    >
+                      Recommended
+                      <small>{suggestion.helper}</small>
+                    </button>
+                  ))}
+                </div>
+              )}
               <select
                 value={selection?.value || ""}
                 onChange={(event) => guidedInputs.selectInputValue(input, event.target.value)}
@@ -440,7 +610,7 @@ function TaskDetail({
                 <option value="">{input.placeholder || "Choose an option"}</option>
                 {options.map((option) => (
                   <option key={option.id} value={option.value}>
-                    {option.label}
+                    {getSmartOptionLabel(input, option.value, option.label)}
                   </option>
                 ))}
               </select>
@@ -467,6 +637,20 @@ function TaskDetail({
                 <label key={input.id}>
                   <small>{input.label}</small>
                   <span>{getGuidedInputPrompt(input)}</span>
+                  {getSuggestionsForInput(input).length > 0 && (
+                    <div className="task-input-recommendations">
+                      {getSuggestionsForInput(input).slice(0, 3).map((suggestion) => (
+                        <button
+                          type="button"
+                          key={`${input.id}:${suggestion.value}`}
+                          onClick={() => applySuggestion(suggestion)}
+                        >
+                          Recommended
+                          <small>{suggestion.helper}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <select
                     value={selection?.value || ""}
                     onChange={(event) => guidedInputs.selectInputValue(input, event.target.value)}
@@ -475,7 +659,7 @@ function TaskDetail({
                     <option value="">{input.placeholder || "Choose an option"}</option>
                     {options.map((option) => (
                       <option key={option.id} value={option.value}>
-                        {option.label}
+                        {getSmartOptionLabel(input, option.value, option.label)}
                       </option>
                     ))}
                   </select>
@@ -491,19 +675,14 @@ function TaskDetail({
         <>
           <section className={`task-focus-section task-readiness-summary ${getPlanningReadinessTone(planningReadiness.status)}`} aria-label="Readiness">
             <div className="task-focus-section-heading">
-              <span>Ready State</span>
+              <span>Readiness confidence</span>
               <small>{readinessStateLabel}</small>
             </div>
-            <p>{primaryReadinessSummary}</p>
-          </section>
-
-          <section className="task-focus-section" aria-label="Recommended Path">
-            <div className="task-focus-section-heading">
-              <span>Recommended Path</span>
-              <small>{planningReadiness.confidenceLevel} confidence</small>
+            <div className="task-confidence-row">
+              <small>{primaryDate ? "Ready for trend analysis" : "Missing timeline information"}</small>
+              <small>{primaryDimension ? "Strong category detection" : "Weak entity mapping"}</small>
+              <small>Forecasting confidence: {dataProfile?.timeSeriesReadiness.ready ? "Medium" : "Low"}</small>
             </div>
-            <strong>{recommendedPathLabel}</strong>
-            <p>{recommendedPathSummary}</p>
           </section>
 
           <section className="task-focus-section" aria-label="Notes and Guidance">

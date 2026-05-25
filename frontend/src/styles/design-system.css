@@ -4605,6 +4605,127 @@ body {
   gap: 10px;
 }
 
+.app .task-assistant-panel {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+
+.app .task-assistant-panel > span,
+.app .task-assistant-panel div > span {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.app .task-assistant-panel strong {
+  color: #172033;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.app .task-assistant-panel ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 540;
+  line-height: 1.4;
+}
+
+.app .task-assistant-panel div,
+.app .task-preview-suggestions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.app .task-assistant-panel small,
+.app .task-preview-suggestions small,
+.app .task-confidence-row small {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #526071;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app .task-insight-card-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  min-width: 0;
+}
+
+.app .task-insight-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fbfcfd;
+}
+
+.app .task-insight-card div {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.app .task-insight-card strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.3;
+}
+
+.app .task-insight-card small {
+  flex: none;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f3f6f8;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app .task-insight-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 540;
+  line-height: 1.35;
+}
+
+.app .task-insight-card button {
+  justify-self: start;
+  min-height: 25px;
+  padding: 4px 8px;
+  border: 1px solid #dbe3ea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f6575;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app .task-preview-suggestions small,
+.app .task-confidence-row small {
+  background: #f6f8fa;
+}
+
 .app .task-ai-guidance-banner {
   display: grid;
   gap: 6px;
@@ -4664,9 +4785,11 @@ body {
 }
 
 .app .task-suggestion-group button {
+  display: grid;
+  gap: 1px;
   min-height: 25px;
   max-width: 100%;
-  padding: 4px 8px;
+  padding: 5px 8px;
   border: 1px solid #e1e8ef;
   border-radius: 999px;
   background: #ffffff;
@@ -4676,8 +4799,17 @@ body {
   font-weight: 680;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   cursor: pointer;
+}
+
+.app .task-suggestion-group button small {
+  display: block;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app .task-suggestion-group button:hover,
@@ -4714,6 +4846,45 @@ body {
 
 .app .task-prep-disclosure > .guided-input-list {
   padding-bottom: 12px;
+}
+
+.app .task-input-recommendations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.app .task-input-recommendations button {
+  display: grid;
+  gap: 1px;
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #0f6575;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 760;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app .task-input-recommendations button small {
+  overflow: hidden;
+  color: #526071;
+  font-size: 11px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .task-confidence-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
 }
 
 .app .guided-input-list {
