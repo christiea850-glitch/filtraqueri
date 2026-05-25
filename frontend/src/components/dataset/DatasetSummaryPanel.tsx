@@ -167,11 +167,11 @@ function WorksheetSelector({
   if (worksheets.length === 0) return null;
 
   return (
-    <div className="worksheet-selector" aria-label="Workbook worksheets">
+    <div className="worksheet-selector" aria-label="Workbook business areas">
       <div className="worksheet-selector-header">
         <div>
-          <p className="section-label">Workbook sheets</p>
-          <h4>Worksheets</h4>
+          <p className="section-label">Business areas</p>
+          <h4>Available sources</h4>
         </div>
         <span className="dataset-count-pill">{worksheets.length}</span>
       </div>
@@ -220,6 +220,59 @@ const workbookRoleLabels: Record<WorkbookEntityRole, string> = {
   unknown: "Worksheet",
 };
 
+const workbookRoleActivityLabels: Record<WorkbookEntityRole, string> = {
+  customers: "customer behavior",
+  orders: "order activity",
+  invoices: "billing activity",
+  products: "product movement",
+  employees: "workforce activity",
+  managers: "management operations",
+  transactions: "transaction activity",
+  inventory: "inventory movement",
+  payments: "payment activity",
+  regions: "regional performance",
+  unknown: "business activity",
+};
+
+const toBusinessConnectionGuidance = (connection: {
+  sourceWorksheetName: string;
+  targetWorksheetName: string;
+  sourceColumn: string;
+  targetColumn: string;
+  guidance: string;
+}) => {
+  const source = connection.sourceWorksheetName || "One business area";
+  const target = connection.targetWorksheetName || "another business area";
+  const combined = `${source} ${target} ${connection.sourceColumn} ${connection.targetColumn} ${connection.guidance}`.toLowerCase();
+
+  if (combined.includes("tenant") && combined.includes("lease")) {
+    return "Tenant activity may relate to lease timelines.";
+  }
+  if (combined.includes("payment") && (combined.includes("tenant") || combined.includes("lease"))) {
+    return "Payments appear connected to tenant or lease operations.";
+  }
+  if (combined.includes("property") && combined.includes("manager")) {
+    return "Properties and managers likely interact operationally.";
+  }
+  if (combined.includes("lease") && combined.includes("payment")) {
+    return "Lease activity may influence payment workflows.";
+  }
+  if (combined.includes("customer") && (combined.includes("order") || combined.includes("transaction"))) {
+    return "Customer activity may connect to purchasing behavior.";
+  }
+  if (combined.includes("product") && (combined.includes("order") || combined.includes("transaction") || combined.includes("invoice"))) {
+    return "Product movement may connect to sales or billing activity.";
+  }
+  if (combined.includes("inventory") && combined.includes("product")) {
+    return "Inventory movement may relate to product performance.";
+  }
+  if (combined.includes("invoice") && combined.includes("payment")) {
+    return "Billing activity may connect to payment movement.";
+  }
+
+  return `${source} may relate to ${target} in this operation.`;
+};
+
 function WorkbookRelationshipSummaryPanel({
   intelligence,
 }: {
@@ -232,35 +285,39 @@ function WorkbookRelationshipSummaryPanel({
   const detectedEntityCount = intelligence.entityRoles.filter(
     (role) => role.role !== "unknown",
   ).length;
+  const workbookNarrativeSummary =
+    allConnections.length > 0
+      ? "FiltraQueri found business areas that may describe the same operation from different angles."
+      : intelligence.humanSummary;
   const formatConfidence = (value: string) =>
     value ? `${value.charAt(0).toUpperCase()}${value.slice(1)} confidence` : "Confidence";
 
   return (
-    <section className="workbook-intelligence-panel" aria-label="Workbook relationship guidance">
+    <section className="workbook-intelligence-panel" aria-label="Connected business operations">
       <div className="workbook-intelligence-heading">
         <div>
-          <p className="section-label">Workbook connections</p>
-          <h3>Connected business sheets</h3>
-          <p>{intelligence.humanSummary}</p>
+          <p className="section-label">Connected operations</p>
+          <h3>Business areas that may work together</h3>
+          <p>{workbookNarrativeSummary}</p>
         </div>
         <span>{intelligence.complexity}</span>
       </div>
-      <div className="workbook-intelligence-strip" aria-label="Workbook connection summary">
+      <div className="workbook-intelligence-strip" aria-label="Business connection summary">
         <span>
-          Related sheets
+          Operational links
           <strong>{intelligence.joinSuggestions.length.toLocaleString()}</strong>
         </span>
         <span>
-          Business entities
+          Business areas
           <strong>{detectedEntityCount.toLocaleString()}</strong>
         </span>
         <span>
-          Start with
+          Suggested start
           <strong>{intelligence.recommendedStartingWorksheetName || "Current sheet"}</strong>
         </span>
       </div>
       {visibleConnections.length > 0 && (
-        <div className="workbook-connection-list" aria-label="Likely worksheet connections">
+        <div className="workbook-connection-list" aria-label="Likely business connections">
           {visibleConnections.map((connection) => (
             <article key={connection.id}>
               <span className="workbook-connection-icon" aria-hidden="true">
@@ -277,7 +334,7 @@ function WorkbookRelationshipSummaryPanel({
                   <path d="M13 18l-1 1a3.5 3.5 0 0 1-5-5l1-1" />
                 </svg>
               </span>
-              <p className="workbook-connection-text">{connection.guidance}</p>
+              <p className="workbook-connection-text">{toBusinessConnectionGuidance(connection)}</p>
               <span className={`workbook-connection-confidence is-${connection.confidence}`}>
                 {formatConfidence(connection.confidence)}
               </span>
@@ -298,7 +355,7 @@ function WorkbookRelationshipSummaryPanel({
         </div>
       )}
       <div className="workbook-intelligence-footer">
-        <div className="workbook-entity-list" aria-label="Detected workbook entities">
+        <div className="workbook-entity-list" aria-label="Detected business areas">
           {visibleRoles.map((role) => (
             <span key={role.worksheetId} title={role.reasons.join(" ")}>
               {workbookRoleLabels[role.role]}
@@ -312,7 +369,7 @@ function WorkbookRelationshipSummaryPanel({
             className="workbook-view-all"
             onClick={() => setShowAllConnections((current) => !current)}
           >
-            {showAllConnections ? "Show fewer" : "View all connections"}
+            {showAllConnections ? "Show fewer" : "View all business links"}
           </button>
         )}
       </div>
@@ -610,6 +667,61 @@ function DatasetSummaryPanel({
     dataProfile?.dateTimeFields[0] ? `Timeline signal: ${dataProfile.dateTimeFields[0].name}` : "Timeline signal needs review",
     dataProfile?.possibleDimensions[0] ? `Possible segment: ${dataProfile.possibleDimensions[0].name}` : null,
   ].filter(Boolean) as string[];
+  const workbookActivityLabels = Array.from(
+    new Set(
+      (workbookRelationshipIntelligence?.entityRoles || [])
+        .filter((role) => role.role !== "unknown")
+        .map((role) => workbookRoleActivityLabels[role.role]),
+    ),
+  ).slice(0, 4);
+  const businessActivityLabels = Array.from(
+    new Set([
+      ...(dataProfile?.possibleMetrics.length ? ["measurable business movement"] : []),
+      ...(dataProfile?.dateTimeFields.length ? ["activity over time"] : []),
+      ...(businessEntityHints.length ? ["customer or entity behavior"] : []),
+      ...(dataProfile?.possibleDimensions.length ? ["segment and category patterns"] : []),
+      ...workbookActivityLabels,
+    ]),
+  ).slice(0, 6);
+  const businessNarrative =
+    businessActivityLabels.length > 0
+      ? `FiltraQueri sees signals of ${businessActivityLabels.slice(0, 3).join(", ")}. These patterns can help frame what to investigate before anyone has to inspect the raw sheet.`
+      : "FiltraQueri is building a business picture from this dataset so you can decide what is worth investigating first.";
+  const businessSignals = [
+    dataProfile?.possibleMetrics.length
+      ? {
+          title: "Financial or measurable activity detected",
+          detail: `${dataProfile.possibleMetrics[0].name} may help explain business movement.`,
+        }
+      : null,
+    dataProfile?.dateTimeFields.length
+      ? {
+          title: "Timeline available for trend questions",
+          detail: `${dataProfile.dateTimeFields[0].name} can help organize activity over time.`,
+        }
+      : {
+          title: "Timeline needs review",
+          detail: "Trend investigations may need a clearer date field.",
+        },
+    businessEntityHints.length
+      ? {
+          title: "Entity behavior patterns detected",
+          detail: `${businessEntityHints[0].displayName} may represent who or what the activity is about.`,
+        }
+      : null,
+    (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
+      ? {
+          title: "Connected operations likely present",
+          detail: "Multiple sheets may describe related parts of the same business flow.",
+        }
+      : null,
+    dataProfile?.possibleDimensions.length
+      ? {
+          title: "Useful comparison groups found",
+          detail: `${dataProfile.possibleDimensions[0].name} may help compare segments or categories.`,
+        }
+      : null,
+  ].filter(Boolean) as Array<{ title: string; detail: string }>;
   const opportunityLabels = Array.from(
     new Set([
       ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
@@ -627,7 +739,7 @@ function DatasetSummaryPanel({
   const dataTabs = [
     { id: "overview", label: "Overview" },
     { id: "columns", label: "Fields" },
-    { id: "worksheets", label: "Worksheets" },
+    { id: "worksheets", label: "Sources" },
   ] satisfies Array<{ id: DataDrillInView; label: string }>;
   const datasetIntelligencePreview = createDatasetIntelligencePreviewViewModel({
     sourceDescriptorVersion: "dataset-summary-panel-v1",
@@ -812,7 +924,7 @@ function DatasetSummaryPanel({
           <div>
             <p className="section-label">Data</p>
             <h2>Data</h2>
-            <p>Explore your dataset, understand connections, and prepare for analysis.</p>
+            <p>Understand what this data may represent and choose what to investigate next.</p>
           </div>
           {dataset && (
             <div className="data-page-head-actions">
@@ -842,7 +954,7 @@ function DatasetSummaryPanel({
                 <strong title={dataset.original_filename}>{dataset.original_filename}</strong>
               </div>
               <div className="data-context-item">
-                <small>Worksheet</small>
+                <small>Active area</small>
                 <strong>
                   {activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
                 </strong>
@@ -885,6 +997,34 @@ function DatasetSummaryPanel({
                   </div>
                 </div>
               )}
+            </section>
+            <section className="business-narrative-panel" aria-label="Business understanding">
+              <div>
+                <p className="section-label">Business context</p>
+                <h3>What may matter operationally</h3>
+                <p>{businessNarrative}</p>
+              </div>
+              {businessActivityLabels.length > 0 && (
+                <div className="business-activity-list" aria-label="Possible business activities detected">
+                  {businessActivityLabels.map((activity) => (
+                    <span key={activity}>{activity}</span>
+                  ))}
+                </div>
+              )}
+            </section>
+            <section className="business-signals-panel" aria-label="Business signals found">
+              <div className="business-signals-heading">
+                <p className="section-label">Business signals found</p>
+                <strong>Useful patterns to investigate</strong>
+              </div>
+              <div className="business-signal-grid">
+                {businessSignals.map((signal) => (
+                  <span key={signal.title}>
+                    <strong>{signal.title}</strong>
+                    <small>{signal.detail}</small>
+                  </span>
+                ))}
+              </div>
             </section>
             <div className="data-stat-row" aria-label="Dataset profile">
               <article className="data-stat data-stat--rows">
@@ -947,12 +1087,12 @@ function DatasetSummaryPanel({
                       <path d="M8 8V4h12v12h-4" />
                     </svg>
                   </span>
-                  <span className="data-stat-lbl">Worksheets</span>
+                  <span className="data-stat-lbl">Sources</span>
                 </div>
                 <strong className="data-stat-num">
                   <CountUp value={workbookWorksheets.length} />
                 </strong>
-                <span className="data-stat-sub">Total worksheets available</span>
+                <span className="data-stat-sub">Available source areas</span>
                 <svg
                   className="data-stat-spark"
                   viewBox="0 0 64 24"
@@ -975,12 +1115,12 @@ function DatasetSummaryPanel({
                       <path d="M8 14l5 6H3z" />
                     </svg>
                   </span>
-                  <span className="data-stat-lbl">Field types</span>
+                  <span className="data-stat-lbl">Field mix</span>
                 </div>
                 <strong className="data-stat-num">
                   <CountUp value={Object.keys(schemaTypeSummary).length} />
                 </strong>
-                <span className="data-stat-sub">Unique field types</span>
+                <span className="data-stat-sub">Supporting structure</span>
                 <svg
                   className="data-stat-spark"
                   viewBox="0 0 64 24"
@@ -1139,9 +1279,9 @@ function DatasetSummaryPanel({
           </div>
         ) : (
           <div className="dataset-empty-guidance">
-            <p>No dataset open. Choose a CSV or Excel workbook to inspect its profile.</p>
+            <p>No dataset open. Choose a CSV or Excel workbook so FiltraQueri can start finding the business story.</p>
             <button type="button" className="primary-button" onClick={onOpenDataset}>
-              Choose CSV
+              Choose file
             </button>
           </div>
         )}
@@ -1190,8 +1330,8 @@ function DatasetSummaryPanel({
 
       {dataset && activeDrillInView === "worksheets" && (
         <DrillInDetailPanel
-          eyebrow="Workbook detail"
-          title="Worksheets"
+          eyebrow="Data detail"
+          title="Available sources"
           summary="Switch worksheets without leaving the Data workspace."
           onBack={closeDrillIn}
         >

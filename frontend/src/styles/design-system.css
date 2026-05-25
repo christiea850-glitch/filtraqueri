@@ -3898,6 +3898,94 @@ body {
   background: #f4fbfc;
 }
 
+.app .business-narrative-panel,
+.app .business-signals-panel {
+  display: grid;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid #e6edf4;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.app .business-narrative-panel h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 16px;
+  font-weight: 660;
+  line-height: 1.3;
+}
+
+.app .business-narrative-panel p:not(.section-label) {
+  margin: 4px 0 0;
+  max-width: 760px;
+  color: #526071;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.5;
+}
+
+.app .business-activity-list,
+.app .business-signal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+
+.app .business-activity-list span {
+  min-height: 24px;
+  padding: 5px 8px;
+  border: 1px solid #e1e8ef;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #526071;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.app .business-signals-panel {
+  background: #fbfcfd;
+}
+
+.app .business-signals-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app .business-signals-heading strong {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.app .business-signal-grid span {
+  display: grid;
+  flex: 1 1 210px;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border-left: 2px solid #c9d8e4;
+  background: #ffffff;
+}
+
+.app .business-signal-grid strong {
+  color: #172033;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.app .business-signal-grid small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 @media (max-width: 720px) {
   .app .data-stat-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4070,53 +4158,51 @@ body {
 
 /* --- D2: Workbook Connections — clearer, livelier identity -- */
 .app .workbook-intelligence-panel {
-  border: 1px solid #bfe3e9;
-  border-radius: 16px;
+  border: 1px solid #e6edf4;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow: inset 4px 0 0 #0e7490;
-  animation: dataStatRise 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  box-shadow: none;
+  animation: none;
 }
 
 .app .workbook-intelligence-heading .section-label {
-  color: #0e7490;
+  color: #64748b;
   font-weight: 600;
   letter-spacing: 0.06em;
 }
 
 .app .workbook-intelligence-heading h3 {
-  color: #0c4a55;
+  color: #172033;
 }
 
 .app .workbook-intelligence-heading > span {
-  border-color: #bfe3e9;
-  background: #e2f4f7;
-  color: #0c4a55;
+  border-color: #e1e8ef;
+  background: #f8fafc;
+  color: #64748b;
   font-weight: 600;
 }
 
 .app .workbook-intelligence-strip span {
-  border-color: #d6e1e8;
-  background: #f3fafb;
+  border-color: #e6edf4;
+  background: #fbfcfd;
 }
 
 .app .workbook-intelligence-strip strong {
-  color: #0c4a55;
+  color: #334155;
 }
 
 .app .workbook-connection-list article {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: inset 3px 0 0 #67b8c4;
+  border: 1px solid #e6edf4;
+  border-radius: 10px;
+  box-shadow: none;
   transition:
     border-color 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    background-color 150ms ease;
 }
 
 .app .workbook-connection-list article:hover {
-  border-color: #bfe3e9;
-  box-shadow: inset 3px 0 0 #0e7490;
-  transform: translateX(3px);
+  border-color: #d8e3ec;
+  background: #fbfcfd;
 }
 
 /* --- D-image: Data page header, context card, tabs row ----- */
@@ -5395,14 +5481,25 @@ body {
 
 /* --- R1: stat cards — solid icons + decorative sparkline --- */
 .app .data-stat {
-  min-height: 92px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  min-height: 72px;
+  padding: 9px 10px;
+  border-color: #edf2f7;
+  border-radius: 9px;
+  background: #fbfcfd;
+  box-shadow: none;
+  animation: none;
+  transition: border-color 150ms ease, background-color 150ms ease;
 }
 
 .app .data-stat::before {
   display: none;
+}
+
+.app .data-stat:hover {
+  transform: none;
+  border-color: #dfe7ef;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .app .data-stat-top {
@@ -5412,38 +5509,33 @@ body {
 }
 
 .app .data-stat-ic {
-  width: 27px;
-  height: 27px;
-  border-radius: 8px;
-  background: var(--data-accent, #0e7490);
-  color: #ffffff;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: #eef4f7;
+  color: #667789;
 }
 
 .app .data-stat-ic svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .app .data-stat-num {
-  margin-top: 5px;
-  font-size: 19px;
+  margin-top: 2px;
+  color: #334155;
+  font-size: 16px;
   line-height: 1.05;
 }
 
 .app .data-stat-sub {
-  padding-right: 48px;
+  padding-right: 0;
   font-size: 10px;
   line-height: 1.25;
 }
 
 .app .data-stat-spark {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 42px;
-  height: 16px;
-  color: var(--data-accent, #0e7490);
-  opacity: 0.42;
+  display: none;
 }
 
 /* --- R2: Data shell/sidebar exact-match refinement ---------- */
