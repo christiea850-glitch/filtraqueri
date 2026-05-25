@@ -4712,3 +4712,337 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* UX-F18: compact enterprise density layer
+   These tokens intentionally tune sizing only. They do not alter routing,
+   execution, persistence, or component ownership. */
+:root {
+  --fq-density-control-height: 28px;
+  --fq-density-control-height-lg: 32px;
+  --fq-density-control-pad-x: 10px;
+  --fq-density-control-pad-y: 5px;
+  --fq-density-chip-pad-x: 8px;
+  --fq-density-chip-pad-y: 4px;
+  --fq-density-gap: 6px;
+  --fq-density-gap-lg: 8px;
+  --fq-density-radius-control: 8px;
+  --fq-density-radius-chip: 999px;
+  --fq-density-font-control: 12px;
+  --fq-density-font-meta: 11px;
+}
+
+.app .primary-button,
+.app .secondary-button,
+.app .text-button,
+.app .icon-button,
+.app .panel-collapse-button,
+.app .collapsed-panel-bar,
+.app .semantic-hint-action,
+.app .workbook-view-all,
+.app .relationship-detail-button,
+.app .dataset-preview-sheet,
+.app .sqlw-pill,
+.app .sqlw-dock-x {
+  min-height: var(--fq-density-control-height);
+  padding: var(--fq-density-control-pad-y) var(--fq-density-control-pad-x);
+  border-radius: var(--fq-density-radius-control);
+  font-size: var(--fq-density-font-control);
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.app .primary-button,
+.app .secondary-button,
+.app .text-button,
+.app .panel-collapse-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.app .sql-actions,
+.app .sqlw-dockbar,
+.app .sql-result-page-actions,
+.app .sql-draft-actions,
+.app .data-page-head-actions,
+.app .data-profile-actions,
+.app .data-tabs-row .data-profile-actions,
+.app .workspace-actions,
+.app .filter-actions,
+.app .query-bulk-actions,
+.app .relationship-review-actions {
+  gap: var(--fq-density-gap);
+}
+
+.app .mode-switcher,
+.app.destination-data .mode-switcher {
+  min-height: var(--fq-density-control-height-lg);
+  padding: 2px;
+  border-radius: 999px;
+}
+
+.app .mode-switcher button,
+.app.destination-data .mode-switcher button {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: var(--fq-density-font-control);
+  font-weight: 650;
+}
+
+.app .workspace-switcher,
+.app.destination-data .workspace-switcher,
+.app .command-launcher-trigger {
+  min-height: var(--fq-density-control-height-lg);
+  padding: 0 9px;
+  border-radius: var(--fq-density-radius-control);
+}
+
+.app.destination-data .workspace-switcher {
+  height: 32px;
+}
+
+.app.destination-data .settings-button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+
+.app .workspace-tabs {
+  gap: 3px;
+  padding: 2px;
+  border-radius: 10px;
+}
+
+.app .workspace-tabs button {
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.app .schema-pill,
+.app .sql-schema-chip,
+.app .field-chip,
+.app .dataset-count-pill,
+.app .semantic-hint-strip small,
+.app .workbook-entity-list span,
+.app .workbook-connection-confidence,
+.app .relationship-confidence,
+.app .relationship-validation,
+.app .workbook-type-badge,
+.app .worksheet-status,
+.app .active-filter-summary strong,
+.app .recent-dataset-meta span,
+.app .diagnostic-action-chip,
+.app .sql-helper-command-list em,
+.app .command-item em {
+  padding: var(--fq-density-chip-pad-y) var(--fq-density-chip-pad-x);
+  border-radius: var(--fq-density-radius-chip);
+  font-size: var(--fq-density-font-meta);
+  line-height: 1.15;
+}
+
+.app .schema-list,
+.app .field-chip-grid,
+.app .semantic-hint-chips,
+.app .relationship-planning-chips,
+.app .workbook-status-grid,
+.app .recent-dataset-meta,
+.app .dataset-preview-sheets {
+  gap: var(--fq-density-gap);
+}
+
+.app .field-chip {
+  min-height: 30px;
+}
+
+.app .schema-pill,
+.app .sql-schema-chip {
+  gap: 6px;
+  min-height: 28px;
+  font-size: 12px;
+}
+
+.app .sql-editor-toolbar {
+  gap: var(--fq-density-gap-lg);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+}
+
+.app .sql-actions {
+  align-items: center;
+}
+
+.app .sql-dialect-selector {
+  min-height: var(--fq-density-control-height);
+  gap: 5px;
+  font-size: 10px;
+}
+
+.app .sql-dialect-selector select {
+  min-height: var(--fq-density-control-height);
+  max-width: 122px;
+  padding: 4px 24px 4px 8px;
+  border-radius: var(--fq-density-radius-control);
+  font-size: 12px;
+}
+
+.app .sql-helper-popover {
+  width: min(390px, calc(100vw - 56px));
+  max-height: min(430px, calc(100vh - 178px));
+  padding: 8px;
+  border-radius: 10px;
+}
+
+.app .sql-helper-search input {
+  min-height: 30px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.app .sql-helper-command-list button,
+.app .command-item {
+  min-height: 42px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.app .sql-helper-command-list strong,
+.app .command-item strong {
+  font-size: 12px;
+}
+
+.app .sql-helper-command-list small,
+.app .command-item small {
+  font-size: 11px;
+}
+
+.app .command-launcher {
+  width: min(660px, 100%);
+  border-radius: 12px;
+}
+
+.app .command-launcher-search {
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.app .command-launcher-search input {
+  font-size: 13px;
+}
+
+.app .command-launcher-body {
+  gap: 10px;
+  padding: 8px;
+}
+
+.app .command-group > div {
+  gap: 2px;
+}
+
+.app .command-launcher-footer {
+  padding: 7px 12px 9px;
+  font-size: 10px;
+}
+
+.app .data-context-card {
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.app .data-context-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.app .data-context-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.app .data-context-item {
+  gap: 2px;
+}
+
+.app .data-context-item small {
+  font-size: 10px;
+}
+
+.app .data-context-item strong {
+  font-size: 12px;
+}
+
+.app .semantic-hint-strip {
+  gap: 8px 10px;
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border-radius: 10px;
+}
+
+.app .semantic-hint-label {
+  font-size: 10px;
+}
+
+.app .data-page-head {
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.app .data-page-head h2 {
+  margin: 2px 0 3px;
+  font-size: clamp(18px, 1.35vw, 22px);
+}
+
+.app .data-updated {
+  gap: 5px;
+  font-size: 11px;
+}
+
+.app .data-tabs-row {
+  gap: 10px;
+  margin: 6px 0 12px;
+  padding-bottom: 5px;
+}
+
+.app .data-action-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.app .metadata-row,
+.app .compact-stat-grid > span,
+.app .query-approval-facts span,
+.app .results-review-facts span,
+.app .results-insight-row > span,
+.app .workbook-summary-grid span,
+.app .workbook-profile-list span {
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.app .metadata-row small,
+.app .compact-stat-grid small,
+.app .query-approval-facts span,
+.app .results-review-facts small,
+.app .results-insight-row small,
+.app .workbook-summary-grid span,
+.app .workbook-profile-list span {
+  font-size: 10px;
+}
+
+.app .metadata-row strong,
+.app .compact-stat-grid strong,
+.app .query-approval-facts strong,
+.app .results-review-facts strong,
+.app .results-insight-row strong,
+.app .workbook-summary-grid strong,
+.app .workbook-profile-list strong {
+  font-size: 12px;
+}
