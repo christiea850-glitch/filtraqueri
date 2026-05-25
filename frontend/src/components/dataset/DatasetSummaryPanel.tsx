@@ -33,6 +33,22 @@ import { TaskLauncherPanel } from "../../features/tasksLauncher";
 import DrillInDetailPanel from "../layout/DrillInDetailPanel";
 import FocusedWorkspaceShell from "../layout/FocusedWorkspaceShell";
 import WorkspaceTabs from "../layout/WorkspaceTabs";
+import {
+  ActionRail,
+  ContextRail,
+  ContextRailHeader,
+  ContextRailSection,
+  EvidenceRow,
+  EvidenceRows,
+  InlineDisclosure,
+  InvestigationThread,
+  InvestigationThreadStage,
+  MetadataFooter,
+  OperationalList,
+  OperationalTag,
+  PrimaryFocusBlock,
+  WorkspaceHeader,
+} from "../workspace";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
 
 export type HumanIntent =
@@ -1131,18 +1147,14 @@ function DatasetSummaryPanel({
         {dataset ? (
             <div className="data-profile-surface">
             <div className="operational-workspace-layout">
-              <main className="investigation-thread" aria-label="Investigation thread">
-                <header className="workspace-header-primitive" aria-label="Workspace header">
-                  <div>
-                    <p className="section-label">Active case</p>
-                    <h3 title={dataset.original_filename}>{dataset.original_filename}</h3>
-                  </div>
-                  <span>
-                    {activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
-                  </span>
-                </header>
+              <InvestigationThread>
+                <WorkspaceHeader
+                  eyebrow="Active case"
+                  title={<span title={dataset.original_filename}>{dataset.original_filename}</span>}
+                  meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
+                />
 
-                <section className="investigation-thread-stage is-understand" aria-label="Understand">
+                <InvestigationThreadStage ariaLabel="Understand" className="is-understand">
                   <div className="investigation-stage-strip" aria-label="Investigation stages">
                     <span className="is-complete">Understand</span>
                     <span className="is-active">Prioritize</span>
@@ -1154,90 +1166,74 @@ function DatasetSummaryPanel({
                   <p>Early read of the business shape behind the data.</p>
                   <div className="evidence-chip-row" aria-label="Initial evidence">
                     {understandingSignals.map((signal) => (
-                      <span key={signal}>{signal}</span>
+                      <OperationalTag key={signal}>{signal}</OperationalTag>
                     ))}
                   </div>
-                </section>
+                </InvestigationThreadStage>
 
-                <section className="primary-focus-block" aria-label="Primary investigation focus">
-                  <div>
-                    <p className="section-label">Primary focus</p>
-                    <h3>{primaryNextStep?.label || "Choose a business question"}</h3>
-                    <p>{primaryNextStep?.detail || businessNarrative}</p>
-                  </div>
-                  {primaryNextStep && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (primaryNextStep.target === "overview") {
-                          setActiveDrillInView("overview");
-                          return;
-                        }
-                        openFocusedWorkflow(primaryNextStep.target);
-                      }}
-                    >
-                      Start
-                    </button>
-                  )}
-                </section>
+                <PrimaryFocusBlock
+                  eyebrow="Primary focus"
+                  title={primaryNextStep?.label || "Choose a business question"}
+                  description={primaryNextStep?.detail || businessNarrative}
+                  action={
+                    primaryNextStep ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (primaryNextStep.target === "overview") {
+                            setActiveDrillInView("overview");
+                            return;
+                          }
+                          openFocusedWorkflow(primaryNextStep.target);
+                        }}
+                      >
+                        Start
+                      </button>
+                    ) : null
+                  }
+                />
 
-                <section className="evidence-rows" aria-label="Evidence rows">
+                <EvidenceRows>
                   <div className="thread-section-heading">
                     <p className="section-label">Evidence</p>
                     <strong>{businessNarrative}</strong>
                   </div>
                   {businessSignals.slice(0, 4).map((signal, index) => (
+                    <EvidenceRow
+                      key={signal.title}
+                      tone={signal.tone}
+                      selected={selectedEvidence?.title === signal.title}
+                      primary={index === 0}
+                      icon={<HumanSignalIcon name={signal.icon} />}
+                      title={signal.title}
+                      description={signal.detail}
+                      onClick={() => setSelectedEvidenceTitle(signal.title)}
+                    />
+                  ))}
+                </EvidenceRows>
+
+                <ActionRail eyebrow="Investigate" title="Choose the next operational move">
+                  {investigationNextSteps.slice(0, 3).map((step, index) => (
                     <button
                       type="button"
-                      key={signal.title}
-                      className={[
-                        "evidence-row",
-                        `is-${signal.tone}`,
-                        selectedEvidence?.title === signal.title ? "is-selected" : "",
-                        index === 0 ? "is-primary" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => setSelectedEvidenceTitle(signal.title)}
+                      key={step.label}
+                      className={index === 0 ? "is-primary" : undefined}
+                      onClick={() => {
+                        if (step.target === "overview") {
+                          setActiveDrillInView("overview");
+                          return;
+                        }
+                        openFocusedWorkflow(step.target);
+                      }}
                     >
-                      <HumanSignalIcon name={signal.icon} />
-                      <span>
-                        <strong>{signal.title}</strong>
-                        <small>{signal.detail}</small>
-                      </span>
+                      <HumanSignalIcon name={step.icon} />
+                      <span>{step.label}</span>
                     </button>
                   ))}
-                </section>
+                </ActionRail>
 
-                <section className="action-rail" aria-label="Next investigation actions">
-                  <div className="thread-section-heading">
-                    <p className="section-label">Investigate</p>
-                    <strong>Choose the next operational move</strong>
-                  </div>
-                  <div>
-                    {investigationNextSteps.slice(0, 3).map((step, index) => (
-                      <button
-                        type="button"
-                        key={step.label}
-                        className={index === 0 ? "is-primary" : undefined}
-                        onClick={() => {
-                          if (step.target === "overview") {
-                            setActiveDrillInView("overview");
-                            return;
-                          }
-                          openFocusedWorkflow(step.target);
-                        }}
-                      >
-                        <HumanSignalIcon name={step.icon} />
-                        <span>{step.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <details className="inline-disclosure" open>
-                  <summary>Follow-up questions</summary>
-                  <div className="operational-list">
+                <InlineDisclosure summary="Follow-up questions" open>
+                  <OperationalList>
                     {smartBusinessQuestions.map((question, index) => (
                       <button
                         type="button"
@@ -1248,10 +1244,10 @@ function DatasetSummaryPanel({
                         {question}
                       </button>
                     ))}
-                  </div>
-                </details>
+                  </OperationalList>
+                </InlineDisclosure>
 
-                <footer className="metadata-footer" aria-label="Dataset metadata">
+                <MetadataFooter>
                   <span>
                     Rows
                     <strong><CountUp value={dataset.row_count} /></strong>
@@ -1268,26 +1264,24 @@ function DatasetSummaryPanel({
                     Field mix
                     <strong><CountUp value={Object.keys(schemaTypeSummary).length} /></strong>
                   </span>
-                </footer>
-              </main>
+                </MetadataFooter>
+              </InvestigationThread>
 
-              <aside className="context-rail" aria-label="Contextual evidence">
-                <div className="context-rail-header">
-                  <p className="section-label">Context</p>
-                  <h3>{selectedEvidence?.title || "Evidence"}</h3>
-                  <p>{selectedEvidence?.detail || "Select an evidence row to see why it matters."}</p>
-                </div>
-                <div className="context-rail-section">
-                  <strong>Why this matters</strong>
+              <ContextRail>
+                <ContextRailHeader
+                  eyebrow="Context"
+                  title={selectedEvidence?.title || "Evidence"}
+                  description={selectedEvidence?.detail || "Select an evidence row to see why it matters."}
+                />
+                <ContextRailSection title="Why this matters">
                   <p>
                     {selectedEvidence
                       ? "This signal helps FiltraQueri keep the investigation focused before exposing deeper setup details."
                       : "FiltraQueri uses the available signals to recommend the next useful question."}
                   </p>
-                </div>
+                </ContextRailSection>
                 {opportunityLabels.length > 0 && (
-                  <div className="context-rail-section">
-                    <strong>Related opportunities</strong>
+                  <ContextRailSection title="Related opportunities">
                     <div className="context-rail-actions">
                       {opportunityLabels.map((label) => (
                         <button
@@ -1299,18 +1293,17 @@ function DatasetSummaryPanel({
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </ContextRailSection>
                 )}
-                <details className="inline-disclosure context-disclosure">
-                  <summary>Advanced context</summary>
+                <InlineDisclosure summary="Advanced context" className="context-disclosure">
                   <p>
                     Field names, worksheet links, and profile metadata remain available without leading the Human Mode flow.
                   </p>
-                </details>
+                </InlineDisclosure>
                 {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
                   <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
                 )}
-              </aside>
+              </ContextRail>
             </div>
             <div className="data-tabs-row">
               <WorkspaceTabs
