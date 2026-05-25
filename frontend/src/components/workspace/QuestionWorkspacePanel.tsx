@@ -22,6 +22,10 @@ type QuestionReviewHints = {
   possibleDimensions: string[];
   possibleMeasures: string[];
   detectedIntents: string[];
+  confidence: "high" | "medium" | "low";
+  detectedEntities: string[];
+  potentialStrategies: string[];
+  plannedOutputs: string[];
   starterSuggestions: string[];
 };
 
@@ -65,6 +69,22 @@ const timeTerms = ["recent", "recently", "change", "changed", "trend", "monthly"
 const comparisonTerms = ["compare", "versus", "vs", "by", "between", "best", "worst", "underperforming"];
 const rankingTerms = ["most", "least", "top", "bottom", "best", "worst", "highest", "lowest"];
 const trendTerms = ["trend", "changed", "change", "over time", "monthly", "weekly", "recently"];
+const distributionTerms = ["distribution", "spread", "range", "mix", "share", "breakdown"];
+const aggregationTerms = ["total", "sum", "average", "avg", "count", "how many", "how much"];
+const anomalyTerms = ["unusual", "outlier", "anomaly", "unexpected", "spike", "drop", "underperforming"];
+const segmentationTerms = ["segment", "cohort", "group", "type", "category", "department"];
+const businessEntityTerms = [
+  "realtor",
+  "customer",
+  "property",
+  "department",
+  "product",
+  "supplier",
+  "manager",
+  "tenant",
+  "employee",
+  "location",
+];
 
 const createInitialDraft = (): WorkspaceQuestionDraft => ({
   rawQuestion: "",
@@ -83,14 +103,24 @@ const createQuestionReviewHints = (question: string): QuestionReviewHints => {
   const normalizedQuestion = question.toLowerCase();
   const measures = findMatchingTerms(normalizedQuestion, measureTerms);
   const dimensions = findMatchingTerms(normalizedQuestion, groupingTerms);
+  const detectedEntities = findMatchingTerms(normalizedQuestion, businessEntityTerms);
   const hasTimeIntent = findMatchingTerms(normalizedQuestion, timeTerms).length > 0;
   const hasComparisonIntent = findMatchingTerms(normalizedQuestion, comparisonTerms).length > 0;
   const hasRankingIntent = findMatchingTerms(normalizedQuestion, rankingTerms).length > 0;
   const hasTrendIntent = findMatchingTerms(normalizedQuestion, trendTerms).length > 0;
+  const hasDistributionIntent = findMatchingTerms(normalizedQuestion, distributionTerms).length > 0;
+  const hasAggregationIntent = findMatchingTerms(normalizedQuestion, aggregationTerms).length > 0;
+  const hasAnomalyIntent = findMatchingTerms(normalizedQuestion, anomalyTerms).length > 0;
+  const hasSegmentationIntent = findMatchingTerms(normalizedQuestion, segmentationTerms).length > 0;
   const detectedIntents = [
     hasRankingIntent ? "ranking" : "",
-    hasTrendIntent || hasTimeIntent ? "time review" : "",
     hasComparisonIntent ? "comparison" : "",
+    hasTrendIntent || hasTimeIntent ? "time review" : "",
+    hasTrendIntent ? "trend" : "",
+    hasDistributionIntent ? "distribution" : "",
+    hasAggregationIntent ? "aggregation" : "",
+    hasAnomalyIntent ? "anomaly review" : "",
+    hasSegmentationIntent ? "segmentation" : "",
   ].filter(Boolean);
   const possibleAnalysisType = hasTrendIntent || hasTimeIntent
     ? "Change over time"
@@ -106,6 +136,27 @@ const createQuestionReviewHints = (question: string): QuestionReviewHints => {
     hasTrendIntent || hasTimeIntent ? "Analyze changes over time" : "",
     measures[0] ? `Review ${measures[0]} movement` : "",
   ].filter(Boolean);
+  const confidenceScore = [
+    detectedIntents.length > 0,
+    detectedEntities.length > 0 || dimensions.length > 0,
+    measures.length > 0,
+    question.trim().split(/\s+/).length >= 4,
+  ].filter(Boolean).length;
+  const confidence = confidenceScore >= 3 ? "high" : confidenceScore === 2 ? "medium" : "low";
+  const potentialStrategies = [
+    dimensions.length > 0 || detectedEntities.length > 0 ? "Group entities" : "",
+    measures.length > 0 || hasAggregationIntent ? "Compare totals" : "",
+    hasTrendIntent || hasTimeIntent ? "Review changes over time" : "",
+    hasRankingIntent ? "Rank highest performers" : "",
+    hasAnomalyIntent ? "Detect unusual values" : "",
+  ].filter(Boolean);
+  const plannedOutputs = [
+    "Table",
+    hasAggregationIntent || measures.length > 0 ? "KPI card" : "",
+    hasTrendIntent || hasTimeIntent ? "Trend chart" : "",
+    hasRankingIntent ? "Ranking list" : "",
+    hasDistributionIntent ? "Distribution view" : "",
+  ].filter(Boolean);
 
   return {
     possibleFocus,
@@ -113,6 +164,14 @@ const createQuestionReviewHints = (question: string): QuestionReviewHints => {
     possibleDimensions: dimensions.length > 0 ? Array.from(new Set(dimensions)) : ["Not identified yet"],
     possibleMeasures: measures.length > 0 ? Array.from(new Set(measures)) : ["Not identified yet"],
     detectedIntents: detectedIntents.length > 0 ? detectedIntents : ["question review"],
+    confidence,
+    detectedEntities: detectedEntities.length > 0
+      ? Array.from(new Set(detectedEntities))
+      : ["Not identified yet"],
+    potentialStrategies: potentialStrategies.length > 0
+      ? Array.from(new Set(potentialStrategies))
+      : ["Clarify business focus"],
+    plannedOutputs: plannedOutputs.length > 0 ? Array.from(new Set(plannedOutputs)) : ["Table"],
     starterSuggestions: Array.from(new Set(starterSuggestions)).slice(0, 4),
   };
 };
@@ -235,7 +294,7 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
             No query has been generated yet.
           </div>
 
-          <dl>
+          <dl className="question-workspace-review-card">
             <div>
               <dt>Question</dt>
               <dd>{draft.rawQuestion}</dd>
@@ -270,6 +329,45 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
             </div>
           </dl>
 
+          <section className="question-workspace-intent" aria-label="Investigation intent">
+            <div className="question-workspace-section-heading">
+              <p className="section-label">Investigation Intent</p>
+              <h4>Planning-only understanding</h4>
+            </div>
+            <div className="question-workspace-intent-grid">
+              <article>
+                <span>Primary intent</span>
+                <strong>{reviewHints.detectedIntents[0]}</strong>
+                <small>{reviewHints.confidence} confidence</small>
+              </article>
+              <article>
+                <span>Detected business entities</span>
+                <strong>{reviewHints.detectedEntities.join(", ")}</strong>
+                <small>Frontend text match only</small>
+              </article>
+              <article>
+                <span>Planned outputs</span>
+                <strong>{reviewHints.plannedOutputs.join(", ")}</strong>
+                <small>Non-executable preview</small>
+              </article>
+            </div>
+          </section>
+
+          <section className="question-workspace-strategy" aria-label="Potential investigation strategy">
+            <div className="question-workspace-section-heading">
+              <p className="section-label">Potential Investigation Strategy</p>
+              <h4>Future execution stages</h4>
+            </div>
+            <div className="question-workspace-strategy-grid">
+              {reviewHints.potentialStrategies.map((strategy) => (
+                <article key={strategy}>
+                  <strong>{strategy}</strong>
+                  <span>Planning only</span>
+                </article>
+              ))}
+            </div>
+          </section>
+
           <div className="question-workspace-timeline" aria-label="Planned investigation steps">
             {plannedSteps.map((step, index) => (
               <span key={step.label}>
@@ -295,6 +393,15 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
               </div>
             </div>
           )}
+
+          <section className="question-workspace-boundary" aria-label="Execution boundary">
+            <p className="section-label">Execution Boundary</p>
+            <ul>
+              <li>No SQL has been generated.</li>
+              <li>No backend query has executed.</li>
+              <li>This is a planning-only review layer.</li>
+            </ul>
+          </section>
 
           <p>
             <strong>No query has run yet.</strong>
