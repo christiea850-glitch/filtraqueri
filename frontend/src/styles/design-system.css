@@ -7762,8 +7762,39 @@ body {
   top: 0;
 }
 
+.app .query-operational-shell,
+.app .results-operational-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.3fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.app .query-operational-shell .context-rail,
+.app .results-operational-shell .context-rail {
+  top: 0;
+}
+
+.app.mode-human .query-builder-hero,
+.app.mode-human .query-builder-workflow-strip {
+  display: none;
+}
+
+.app.mode-human .query-approval-strip,
+.app.mode-human .query-workflow-tabs {
+  margin-top: 10px;
+}
+
+.app.mode-human .results-insight-row,
+.app.mode-human .results-review-facts {
+  display: none;
+}
+
 @media (max-width: 920px) {
-  .app .focused-operational-workspace {
+  .app .focused-operational-workspace,
+  .app .query-operational-shell,
+  .app .results-operational-shell {
     grid-template-columns: 1fr;
   }
 }

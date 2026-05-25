@@ -9,6 +9,21 @@ import {
 import type { AnalysisPackagePlan } from "../../features/analysisPackages";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
 import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
+import {
+  ActionRail,
+  ContextRail,
+  ContextRailHeader,
+  ContextRailSection,
+  EvidenceRow,
+  EvidenceRows,
+  InlineDisclosure,
+  InvestigationThread,
+  InvestigationThreadStage,
+  MetadataFooter,
+  OperationalList,
+  PrimaryFocusBlock,
+  WorkspaceHeader,
+} from "../workspace";
 
 type VisualQueryBuilderPanelProps = {
   schema: SchemaColumn[];
@@ -55,12 +70,6 @@ const builderSteps: Array<{
   { id: "execute", label: "Review & run", helper: "Approve" },
 ];
 
-const toBusinessStatusLabel = (value: string) =>
-  value
-    .replace(/ready_now/g, "ready")
-    .replace(/readiness/g, "fit")
-    .replace(/_/g, " ");
-
 function VisualQueryBuilderPanel({
   schema,
   activeFilterCount,
@@ -94,7 +103,6 @@ function VisualQueryBuilderPanel({
   const displayColumnProfiles = useMemo(() => createSchemaDisplayProfiles(schema), [schema]);
   const investigationSuggestions = investigationReport?.suggestions.slice(0, 4) || [];
   const primaryInvestigation = investigationSuggestions[0] || null;
-  const packageRecommendations = analysisPackagePlan?.recommendations.slice(0, 3) || [];
   const workspaceRecommendations = investigationWorkspacePlan?.recommendations.slice(0, 2) || [];
   const visibleSchema = useMemo(
     () =>
@@ -183,6 +191,7 @@ function VisualQueryBuilderPanel({
           detail: expectedResultType,
         },
       ];
+  void analysisPackagePlan;
   const approvalSummary = isAnalystMode
     ? [
         { label: "Data source", value: "Current workspace" },
@@ -208,36 +217,128 @@ function VisualQueryBuilderPanel({
         { label: "Filters active", value: activeFilterCount.toLocaleString() },
         { label: "Row limit", value: rowLimit || "No limit" },
       ];
+  const questionEvidenceRows = [
+    primaryInvestigation
+      ? {
+          title: primaryInvestigation.title,
+          description: primaryInvestigation.question,
+        }
+      : null,
+    {
+      title: expectedResultType,
+      description: "Current result shape based on selected fields and grouping.",
+    },
+    selectedColumns.length > 0
+      ? {
+          title: `${selectedColumns.length.toLocaleString()} fields selected`,
+          description: "The question has an initial field scope.",
+        }
+      : null,
+  ].filter(Boolean) as Array<{ title: string; description: string }>;
 
   return (
     <section className="query-builder-panel" aria-label="Business question investigation">
-      <section className="query-builder-hero" aria-label="Business question introduction">
-        <div>
-          <p className="section-label">Business questions</p>
-          <h2>What should FiltraQueri help you explore?</h2>
-          <span>Start with curiosity about the business. Fields and filters stay available only as support for the investigation.</span>
+      {!isAnalystMode && (
+        <div className="query-operational-shell">
+          <InvestigationThread>
+            <WorkspaceHeader
+              eyebrow="Explore question"
+              title="Shape the next business question"
+              meta={expectedResultType}
+            />
+            <InvestigationThreadStage ariaLabel="Question setup">
+              <p className="section-label">Orient</p>
+              <h3>Start with the question, then choose only the fields that support it.</h3>
+              <p>Technical query details stay available below, but they no longer lead the Human Mode experience.</p>
+            </InvestigationThreadStage>
+            <PrimaryFocusBlock
+              eyebrow="Primary direction"
+              title={primaryInvestigation?.title || "Choose fields for a reviewable result"}
+              description={primaryInvestigation?.question || "Select the smallest useful field set, then review before running."}
+            />
+            <EvidenceRows>
+              <div className="thread-section-heading">
+                <p className="section-label">Evidence</p>
+                <strong>Question shape</strong>
+              </div>
+              {questionEvidenceRows.map((item) => (
+                <EvidenceRow
+                  key={item.title}
+                  title={item.title}
+                  description={item.description}
+                />
+              ))}
+            </EvidenceRows>
+            <ActionRail eyebrow="Next move" title="Continue shaping the question">
+              <button type="button" className="is-primary" onClick={() => setActiveStep("data")}>
+                Review fields
+              </button>
+              <button type="button" onClick={() => setActiveStep("group")}>
+                Compare groups
+              </button>
+              <button type="button" onClick={() => setActiveStep("execute")}>
+                Review run
+              </button>
+            </ActionRail>
+            <MetadataFooter>
+              {approvalSummary.map((item) => (
+                <span key={item.label}>
+                  {item.label}
+                  <strong>{item.value}</strong>
+                </span>
+              ))}
+            </MetadataFooter>
+          </InvestigationThread>
+          <ContextRail>
+            <ContextRailHeader
+              eyebrow="Context"
+              title="Question workspace"
+              description="Fields, filters, grouping, and preview are still available below as controlled setup steps."
+            />
+            {primaryInvestigation && (
+              <ContextRailSection title="Suggested comparisons">
+                <OperationalList>
+                  {primaryInvestigation.compareBy.slice(0, 3).map((item) => (
+                    <button type="button" key={item} onClick={() => setActiveStep("group")}>
+                      {item}
+                    </button>
+                  ))}
+                </OperationalList>
+              </ContextRailSection>
+            )}
+            <InlineDisclosure summary="Workspace recommendations" className="context-disclosure">
+              <OperationalList>
+                {workspaceRecommendations.map((recommendation) => (
+                  <button
+                    type="button"
+                    key={recommendation.recommendationId}
+                    onClick={() => setActiveStep("question")}
+                  >
+                    {recommendation.label}
+                  </button>
+                ))}
+              </OperationalList>
+            </InlineDisclosure>
+          </ContextRail>
         </div>
-        <div className="query-builder-hero-focus">
-          <span>Investigation direction</span>
-          <strong>{primaryInvestigation?.title || expectedResultType}</strong>
-          <small>{primaryInvestigation?.question || "Choose a question, compare useful groups, and keep the result reviewable."}</small>
-        </div>
-      </section>
+      )}
 
-      <div className="query-builder-workflow-strip" aria-label="Query workflow status">
-        <div>
-          <span>{isAnalystMode ? "Prepared result" : "Expected result"}</span>
-          <strong>{expectedResultType}</strong>
+      {isAnalystMode && (
+        <div className="query-builder-workflow-strip" aria-label="Query workflow status">
+          <div>
+            <span>Prepared result</span>
+            <strong>{expectedResultType}</strong>
+          </div>
+          <div className="query-progress-rail" aria-label="Query workflow progress">
+            {progressItems.map((item) => (
+              <span key={item.label} className={item.complete ? "is-complete" : ""}>
+                <strong>{item.label}</strong>
+                <small>{item.detail}</small>
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="query-progress-rail" aria-label="Query workflow progress">
-          {progressItems.map((item) => (
-            <span key={item.label} className={item.complete ? "is-complete" : ""}>
-              <strong>{item.label}</strong>
-              <small>{item.detail}</small>
-            </span>
-          ))}
-        </div>
-      </div>
+      )}
 
       <div className="query-builder-header">
         <div>
@@ -245,91 +346,6 @@ function VisualQueryBuilderPanel({
           <h2>{builderSteps.find((step) => step.id === activeStep)?.label || "Build query"}</h2>
         </div>
       </div>
-
-      {!isAnalystMode && primaryInvestigation && (
-        <section className="investigation-guidance-panel compact" aria-label="Build investigation guidance">
-          <div>
-            <p className="section-label">Investigation goal</p>
-            <h3>{primaryInvestigation.title}</h3>
-            <p>{primaryInvestigation.question}</p>
-          </div>
-          <div className="investigation-prompt-row" aria-label="Recommended comparisons">
-            <span>Compare by</span>
-            {primaryInvestigation.compareBy.slice(0, 3).map((item) => (
-              <small key={item}>{item}</small>
-            ))}
-          </div>
-          <div className="investigation-prompt-row" aria-label="Possible next steps">
-            <span>Next steps</span>
-            {primaryInvestigation.nextSteps.slice(0, 3).map((item) => (
-              <small key={item}>{item}</small>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {!isAnalystMode && (
-        <section className="filtraqueri-will-panel" aria-label="What FiltraQueri will do">
-          <div>
-            <p className="section-label">FiltraQueri will</p>
-            <h3>Shape the question before running the result</h3>
-          </div>
-          <div>
-            <span>Understand the fields</span>
-            <span>Suggest a useful comparison</span>
-            <span>Keep the result reviewable</span>
-          </div>
-        </section>
-      )}
-
-      {!isAnalystMode && analysisPackagePlan && (
-        <section className="analysis-package-panel compact" aria-label="Suggested insight package">
-          <div>
-            <p className="section-label">Insight package</p>
-            <h3>{toBusinessStatusLabel(analysisPackagePlan.readinessSummary.label)}</h3>
-            <p>{analysisPackagePlan.humanSummary}</p>
-          </div>
-          <div className="analysis-package-artifacts" aria-label="Recommended insight contents">
-            {packageRecommendations.map((recommendation) => (
-              <span key={recommendation.recommendationId}>
-                {recommendation.label}
-                <strong>{toBusinessStatusLabel(recommendation.readiness)}</strong>
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {!isAnalystMode && investigationWorkspacePlan && (
-        <section className="workspace-hub-panel compact" aria-label="Investigation workspace summary">
-          <div>
-            <p className="section-label">Investigation workspace</p>
-            <h3>{toBusinessStatusLabel(investigationWorkspacePlan.readinessSummary.label)}</h3>
-            <p>{investigationWorkspacePlan.humanSummary}</p>
-          </div>
-          <div className="workspace-hub-metrics" aria-label="Investigation session summary">
-            <span>
-              Insight sets
-              <strong>{investigationWorkspacePlan.readinessSummary.packageCount.toLocaleString()}</strong>
-            </span>
-            <span>
-              Stages
-              <strong>{investigationWorkspacePlan.readinessSummary.stageCount.toLocaleString()}</strong>
-            </span>
-            <span>
-              Outputs
-              <strong>{investigationWorkspacePlan.readinessSummary.deliverableCount.toLocaleString()}</strong>
-            </span>
-          </div>
-          {workspaceRecommendations.length > 0 && (
-            <div className="workspace-hub-prompts" aria-label="Workspace recommendations">
-              {workspaceRecommendations.map((recommendation) => (
-                <small key={recommendation.recommendationId}>{recommendation.label}</small>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
 
       <section className="query-approval-strip" aria-label="Review before running query">
         <div>

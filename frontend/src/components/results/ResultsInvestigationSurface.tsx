@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AnalysisPackagePlan } from "../../features/analysisPackages";
-import {
-  InvestigationWorkspaceSurface,
-  type InvestigationWorkspacePlan,
-} from "../../features/investigationWorkspace";
+import type { InvestigationWorkspacePlan } from "../../features/investigationWorkspace";
 import type { InvestigationReport } from "../../features/investigationIntelligence";
 import type { NarrativeReport } from "../../features/narrativeIntelligence";
 import type { ActiveResultModel } from "../../features/results/activeResultModel";
@@ -30,6 +27,20 @@ import {
   subscribeControlledHashDetailRoute,
   type ControlledHashDetailRouteId,
 } from "../../features/navigation";
+import {
+  ActionRail,
+  ContextRail,
+  ContextRailHeader,
+  ContextRailSection,
+  EvidenceRow,
+  EvidenceRows,
+  InlineDisclosure,
+  InvestigationThread,
+  MetadataFooter,
+  OperationalList,
+  PrimaryFocusBlock,
+  WorkspaceHeader,
+} from "../workspace";
 
 type ResultsInvestigationSurfaceProps = {
   activeResultModel: ActiveResultModel;
@@ -70,11 +81,8 @@ function ResultsInvestigationSurface({
   const highlightLabel = getHighlightLabel(activeResultModel);
   const chartSupportLabel = getChartSupportLabel(activeResultModel);
   const resultFollowUps = investigationReport.nextSteps.slice(0, 3);
-  const packageArtifacts = analysisPackagePlan.packageManifest.artifactManifest;
-  const readyPackageArtifacts = packageArtifacts.filter((artifact) => artifact.readiness === "ready_now");
-  const packageRecommendations = analysisPackagePlan.recommendations.slice(0, 4);
-  const latestTimelineEvent = investigationWorkspacePlan.session.timeline.at(-1);
-  const workspaceRecommendations = investigationWorkspacePlan.recommendations.slice(0, 3);
+  void analysisPackagePlan;
+  void investigationWorkspacePlan;
   const executiveInsights = narrativeReport.visibleInsights.slice(0, 4);
   const narrativeReadiness = narrativeReport.readiness;
   const primaryExecutiveInsight = executiveInsights[0] || null;
@@ -178,6 +186,81 @@ function ResultsInvestigationSurface({
         .join(" ")}
       aria-label="Results review context"
     >
+      {!isAnalystMode && (
+        <div className="results-operational-shell">
+          <InvestigationThread>
+            <WorkspaceHeader eyebrow="Review result" title="What did FiltraQueri find?" meta={sourceLabel} />
+            <PrimaryFocusBlock
+              eyebrow="Finding"
+              title={explainabilityPreview.takeawaySentence}
+              description={`${explainabilityPreview.confidenceLabel} / ${explainabilityPreview.whyItMattersPreview}`}
+              action={
+                <button type="button" onClick={openResultsInsightDetail}>
+                  Open detail
+                </button>
+              }
+            />
+            <EvidenceRows>
+              <div className="thread-section-heading">
+                <p className="section-label">Evidence</p>
+                <strong>Result context</strong>
+              </div>
+              <EvidenceRow title="Top contributor" description={topContributorLabel} />
+              <EvidenceRow title="Highlight" description={highlightLabel} />
+              <EvidenceRow title="Supporting view" description={chartSupportLabel} />
+            </EvidenceRows>
+            <ActionRail eyebrow="Next move" title={continuationSuggestion}>
+              <button type="button" className="is-primary" onClick={openResultsInsightDetail}>
+                Inspect finding
+              </button>
+              <button type="button" onClick={openResultsInsightDetail}>
+                Compare groups
+              </button>
+              <button type="button" onClick={openResultsInsightDetail}>
+                Continue investigation
+              </button>
+            </ActionRail>
+            <MetadataFooter>
+              <span>
+                Rows
+                <strong>{activeResultModel.totalCount.toLocaleString()}</strong>
+              </span>
+              <span>
+                Filters / sort
+                <strong>{filterSortLabel}</strong>
+              </span>
+              <span>
+                Export
+                <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows"}</strong>
+              </span>
+            </MetadataFooter>
+          </InvestigationThread>
+          <ContextRail>
+            <ContextRailHeader
+              eyebrow="Context"
+              title="Finding review"
+              description="Heavy interpretation and technical details stay behind focused detail or disclosure."
+            />
+            <ContextRailSection title="Follow-up">
+              <OperationalList>
+                {resultFollowUps.map((suggestion) => (
+                  <button type="button" key={suggestion.id} onClick={openResultsInsightDetail}>
+                    {suggestion.question}
+                  </button>
+                ))}
+              </OperationalList>
+            </ContextRailSection>
+            <InlineDisclosure summary="Result details" className="context-disclosure">
+              <p>
+                {activeResultTab} / {activeResultModel.sourceType} / {hiddenColumnCount.toLocaleString()} hidden columns
+              </p>
+            </InlineDisclosure>
+          </ContextRail>
+        </div>
+      )}
+
+      {isAnalystMode && (
+        <>
       <div className="results-investigation-header">
         <div>
           <p className="section-label">Insights</p>
@@ -199,36 +282,7 @@ function ResultsInvestigationSurface({
           View details
         </button>
       </div>
-
-      {!isAnalystMode && (
-        <div className="executive-insights-panel" aria-label="Executive insights">
-          <div className="executive-insights-header">
-            <span>Executive insights</span>
-            <strong>{toBusinessStatusLabel(narrativeReadiness.label)}</strong>
-            <small>
-              {narrativeReadiness.insightCount.toLocaleString()} deterministic insight
-              {narrativeReadiness.insightCount === 1 ? "" : "s"}
-            </small>
-          </div>
-          {executiveInsights.length > 0 ? (
-            <div className="executive-insight-list">
-              {executiveInsights.map((insight) => (
-                <article key={insight.id} className={`is-${insight.severity}`}>
-                  <div>
-                    <span>{insight.category}</span>
-                    <strong>{insight.title}</strong>
-                  </div>
-                  <p>{insight.narrative}</p>
-                  <small>
-                    {insight.evidence[0]?.label}: {insight.evidence[0]?.value}
-                  </small>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p>{narrativeReadiness.detail}</p>
-          )}
-        </div>
+        </>
       )}
 
       <div className="results-insight-row" aria-label="Lightweight result insights">
@@ -270,88 +324,6 @@ function ResultsInvestigationSurface({
           <strong>{activeResultModel.export.rowCount > 0 ? "Ready" : "No rows yet"}</strong>
         </span>
       </div>
-
-      {!isAnalystMode && resultFollowUps.length > 0 && (
-        <div className="investigation-prompt-row results-follow-up-row" aria-label="Follow-up investigations">
-          <span>Follow up</span>
-          {resultFollowUps.map((suggestion) => (
-            <small key={suggestion.id}>{suggestion.question}</small>
-          ))}
-        </div>
-      )}
-
-      {!isAnalystMode && (
-        <div className="workspace-hub-panel results-workspace-hub" aria-label="Workspace hub summary">
-          <div>
-            <span>Investigation thread</span>
-            <strong>{toBusinessStatusLabel(investigationWorkspacePlan.readinessSummary.label)}</strong>
-            <small>
-              {latestTimelineEvent
-                ? latestTimelineEvent.label
-                : "No checkpoint recorded yet."}
-            </small>
-          </div>
-          <div className="workspace-hub-metrics" aria-label="Workspace hub metrics">
-            <span>
-              Insight sets
-              <strong>{investigationWorkspacePlan.readinessSummary.packageCount.toLocaleString()}</strong>
-            </span>
-            <span>
-              Stages
-              <strong>{investigationWorkspacePlan.readinessSummary.stageCount.toLocaleString()}</strong>
-            </span>
-            <span>
-              Outputs
-              <strong>{investigationWorkspacePlan.readinessSummary.deliverableCount.toLocaleString()}</strong>
-            </span>
-          </div>
-          {workspaceRecommendations.length > 0 && (
-            <div className="workspace-hub-prompts" aria-label="Workspace continuation guidance">
-              {workspaceRecommendations.map((recommendation) => (
-                <small key={recommendation.recommendationId}>{recommendation.label}</small>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {!isAnalystMode && (
-        <InvestigationWorkspaceSurface
-          investigationWorkspacePlan={investigationWorkspacePlan}
-          investigationReport={investigationReport}
-          narrativeReport={narrativeReport}
-          explainabilityPreview={explainabilityPreview}
-          resultsContext={{
-            sourceLabel,
-            activeResultTab,
-            sourceType: activeResultModel.sourceType,
-            rowCountLabel: resultRowsLabel,
-            filterSortLabel,
-          }}
-        />
-      )}
-
-      {!isAnalystMode && (
-        <div className="analysis-package-panel results-package-panel" aria-label="Suggested insight package">
-          <div>
-            <span>Insight package</span>
-            <strong>{toBusinessStatusLabel(analysisPackagePlan.readinessSummary.label)}</strong>
-            <small>{analysisPackagePlan.humanSummary}</small>
-          </div>
-          <div className="analysis-package-artifacts" aria-label="Suggested insight contents">
-            <span>
-              Ready outputs
-              <strong>{readyPackageArtifacts.length.toLocaleString()}</strong>
-            </span>
-            {packageRecommendations.slice(0, 3).map((recommendation) => (
-              <span key={recommendation.recommendationId}>
-                {recommendation.label}
-                <strong>{toBusinessStatusLabel(recommendation.readiness)}</strong>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       <details className="results-technical-disclosure">
         <summary>
