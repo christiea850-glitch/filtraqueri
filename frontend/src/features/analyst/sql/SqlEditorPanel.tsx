@@ -20,7 +20,9 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   idle: "Ready",
   "draft-saved": "Draft saved",
   "explain-ready": "Explain placeholder ready",
-  "execution-pending": "Execution not connected yet",
+  running: "Running query",
+  success: "Query complete",
+  error: "Query failed",
 };
 
 function SqlEditorPanel({

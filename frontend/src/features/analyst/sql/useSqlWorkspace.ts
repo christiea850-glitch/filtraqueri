@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
-import { wrapWorkspaceExecutionOutput } from "../../execution/executeWorkspaceQuery";
+import { executeWorkspaceQuery } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import {
   MAX_SQL_DRAFT_SNAPSHOTS,
@@ -31,8 +31,16 @@ FROM ${tableName || "uploaded_dataset"}
 LIMIT 100;`;
 
 const createPreviewMessage = (status: SqlExecutionStatus) => {
-  if (status === "execution-pending") {
-    return "Execution not connected yet.";
+  if (status === "running") {
+    return "Running query...";
+  }
+
+  if (status === "success") {
+    return "Query completed.";
+  }
+
+  if (status === "error") {
+    return "Query failed.";
   }
 
   if (status === "explain-ready") {
@@ -162,34 +170,6 @@ function useSqlWorkspace(
   const updateStatus = (status: SqlExecutionStatus) => {
     const message = createPreviewMessage(status);
     setEditorStatus(status);
-
-    if (dataset) {
-      const executionResult = wrapWorkspaceExecutionOutput({
-        source: "sql",
-        dataset,
-        inputRows: [],
-        inputColumns: [],
-        sql: {
-          sql: sqlDraft,
-          message,
-        },
-        pagination: {
-          page: 1,
-          rowsPerPage: 100,
-        },
-      });
-
-      setPreviewResult({
-        columns: executionResult.outputVisibleColumns,
-        rows: executionResult.outputRows,
-        message: executionResult.sql?.message || message,
-      });
-      if (status === "execution-pending") {
-        onExecutionResult?.(executionResult);
-      }
-      return;
-    }
-
     setPreviewResult({
       columns: [],
       rows: [],
@@ -258,8 +238,65 @@ function useSqlWorkspace(
     updateStatus("explain-ready");
   };
 
-  const runDraft = () => {
-    updateStatus("execution-pending");
+  const runDraft = async () => {
+    const trimmedSql = sqlDraft.trim();
+
+    if (!dataset) {
+      setEditorStatus("idle");
+      setPreviewResult({
+        columns: [],
+        rows: [],
+        message: "Open a dataset before running SQL.",
+      });
+      return;
+    }
+
+    if (!trimmedSql) {
+      setEditorStatus("idle");
+      setPreviewResult({
+        columns: [],
+        rows: [],
+        message: "Write a SELECT query before running SQL.",
+      });
+      return;
+    }
+
+    setEditorStatus("running");
+    setPreviewResult({
+      columns: [],
+      rows: [],
+      message: createPreviewMessage("running"),
+    });
+
+    try {
+      const executionResult = await executeWorkspaceQuery({
+        source: "sql",
+        dataset,
+        sql: {
+          sql: trimmedSql,
+          message: createPreviewMessage("running"),
+        },
+        pagination: {
+          page: 1,
+          rowsPerPage: 100,
+        },
+      });
+
+      setEditorStatus("success");
+      setPreviewResult({
+        columns: executionResult.outputVisibleColumns,
+        rows: executionResult.outputRows,
+        message: executionResult.sql?.message || createPreviewMessage("success"),
+      });
+      onExecutionResult?.(executionResult);
+    } catch (error) {
+      setEditorStatus("error");
+      setPreviewResult({
+        columns: [],
+        rows: [],
+        message: error instanceof Error ? error.message : createPreviewMessage("error"),
+      });
+    }
   };
 
   const loadDraft = (draft: SqlQueryDraft) => {

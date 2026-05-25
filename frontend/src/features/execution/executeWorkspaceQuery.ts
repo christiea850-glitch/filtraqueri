@@ -1,4 +1,4 @@
-import { filterDataset, runQueryBuilder } from "../../services/api";
+import { filterDataset, queryDataset, runQueryBuilder } from "../../services/api";
 import type { FilterResponse } from "../filters/filterTypes";
 import type {
   WorkspaceDatasetIdentity,
@@ -110,6 +110,28 @@ export async function executeWorkspaceQuery(
       columns: response.columns,
       rows: response.rows,
       totalCount: getResponseTotalCount(response, request.source),
+    });
+  }
+
+  if (request.source === "sql" && request.sql?.sql) {
+    const response = await queryDataset(request.dataset.dataset_id, {
+      sql: request.sql.sql,
+      limit: request.pagination.rowsPerPage,
+    });
+
+    return createExecutionResult({
+      request: {
+        ...request,
+        sql: {
+          ...request.sql,
+          message: `Query returned ${response.row_count.toLocaleString()} row${
+            response.row_count === 1 ? "" : "s"
+          }.`,
+        },
+      },
+      columns: response.columns,
+      rows: response.rows,
+      totalCount: response.row_count,
     });
   }
 

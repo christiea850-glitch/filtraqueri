@@ -27,6 +27,19 @@ export type ExportRequest = {
   query_builder?: QueryBuilderRequest;
 };
 
+export type SqlQueryRequest = {
+  sql: string;
+  limit: number;
+};
+
+export type SqlQueryResponse = {
+  dataset_id: string;
+  columns: string[];
+  rows: Record<string, unknown>[];
+  row_count: number;
+  limit: number;
+};
+
 export type RelationshipReviewRequest = {
   candidate_id: string;
   review_status: "pending" | "accepted" | "dismissed";
@@ -262,6 +275,20 @@ export async function runQueryBuilder(datasetId: string, request: QueryBuilderRe
       body: JSON.stringify(request),
     },
     "The visual query could not be run.",
+  );
+}
+
+export async function queryDataset(datasetId: string, request: SqlQueryRequest) {
+  return requestJson<SqlQueryResponse>(
+    `${API_BASE_URL}/datasets/${datasetId}/query`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+    "The SQL query could not be run.",
   );
 }
 

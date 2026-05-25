@@ -7,7 +7,13 @@ import type {
   SqlWorkspaceAnalysis,
 } from "../../sqlIntelligence";
 
-export type SqlExecutionStatus = "idle" | "draft-saved" | "explain-ready" | "execution-pending";
+export type SqlExecutionStatus =
+  | "idle"
+  | "draft-saved"
+  | "explain-ready"
+  | "running"
+  | "success"
+  | "error";
 
 export type SqlQueryDraft = {
   id: string;
