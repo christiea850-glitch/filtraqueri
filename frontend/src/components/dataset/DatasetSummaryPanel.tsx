@@ -698,6 +698,7 @@ function DatasetSummaryPanel({
   const [activeFocusedWorkflow, setActiveFocusedWorkflow] = useState<DataFocusedWorkflow | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
+  const [selectedEvidenceTitle, setSelectedEvidenceTitle] = useState<string | null>(null);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -904,6 +905,11 @@ function DatasetSummaryPanel({
       "Where might unusual activity appear?",
     ]),
   ).slice(0, 4);
+  const selectedEvidence =
+    businessSignals.find((signal) => signal.title === selectedEvidenceTitle) ||
+    businessSignals[0] ||
+    null;
+  const primaryNextStep = investigationNextSteps[0] || null;
   const opportunityLabels = Array.from(
     new Set([
       ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
@@ -1124,250 +1130,187 @@ function DatasetSummaryPanel({
 
         {dataset ? (
             <div className="data-profile-surface">
-            <div className="data-context-card" aria-label="Dataset context">
-              <span className="data-context-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <path d="M3 9h18M3 15h18M9 3v18" />
-                </svg>
-              </span>
-              <div className="data-context-item data-context-item--name">
-                <small>Dataset</small>
-                <strong title={dataset.original_filename}>{dataset.original_filename}</strong>
-              </div>
-              <div className="data-context-item">
-                <small>Active area</small>
-                <strong>
-                  {activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
-                </strong>
-              </div>
-              <div className="data-context-item">
-                <small>Rows</small>
-                <strong>{dataset.row_count.toLocaleString()}</strong>
-              </div>
-              <div className="data-context-item">
-                <small>Columns</small>
-                <strong>{dataset.column_count.toLocaleString()}</strong>
-              </div>
-            </div>
-            <section className="human-understanding-panel" aria-label="What FiltraQueri noticed">
-              <div className="investigation-stage-strip" aria-label="Investigation stages">
-                <span className="is-complete">Understand</span>
-                <span className="is-active">Prioritize</span>
-                <span>Investigate</span>
-                <span>Act</span>
-              </div>
-              <div>
-                <p className="section-label">What FiltraQueri noticed</p>
-                <h3>{datasetPurposeLabel}</h3>
-                <p>Early read of the business shape behind the data.</p>
-              </div>
-              <div className="human-understanding-grid">
-                {understandingSignals.map((signal) => (
-                  <span key={signal}>{signal}</span>
-                ))}
-              </div>
-              {opportunityLabels.length > 0 && (
-                <div className="human-opportunity-row">
-                  <strong>You may be able to investigate</strong>
+            <div className="operational-workspace-layout">
+              <main className="investigation-thread" aria-label="Investigation thread">
+                <header className="workspace-header-primitive" aria-label="Workspace header">
                   <div>
-                    {opportunityLabels.map((label) => (
+                    <p className="section-label">Active case</p>
+                    <h3 title={dataset.original_filename}>{dataset.original_filename}</h3>
+                  </div>
+                  <span>
+                    {activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
+                  </span>
+                </header>
+
+                <section className="investigation-thread-stage is-understand" aria-label="Understand">
+                  <div className="investigation-stage-strip" aria-label="Investigation stages">
+                    <span className="is-complete">Understand</span>
+                    <span className="is-active">Prioritize</span>
+                    <span>Investigate</span>
+                    <span>Next action</span>
+                  </div>
+                  <p className="section-label">Understand</p>
+                  <h3>{datasetPurposeLabel}</h3>
+                  <p>Early read of the business shape behind the data.</p>
+                  <div className="evidence-chip-row" aria-label="Initial evidence">
+                    {understandingSignals.map((signal) => (
+                      <span key={signal}>{signal}</span>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="primary-focus-block" aria-label="Primary investigation focus">
+                  <div>
+                    <p className="section-label">Primary focus</p>
+                    <h3>{primaryNextStep?.label || "Choose a business question"}</h3>
+                    <p>{primaryNextStep?.detail || businessNarrative}</p>
+                  </div>
+                  {primaryNextStep && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (primaryNextStep.target === "overview") {
+                          setActiveDrillInView("overview");
+                          return;
+                        }
+                        openFocusedWorkflow(primaryNextStep.target);
+                      }}
+                    >
+                      Start
+                    </button>
+                  )}
+                </section>
+
+                <section className="evidence-rows" aria-label="Evidence rows">
+                  <div className="thread-section-heading">
+                    <p className="section-label">Evidence</p>
+                    <strong>{businessNarrative}</strong>
+                  </div>
+                  {businessSignals.slice(0, 4).map((signal, index) => (
+                    <button
+                      type="button"
+                      key={signal.title}
+                      className={[
+                        "evidence-row",
+                        `is-${signal.tone}`,
+                        selectedEvidence?.title === signal.title ? "is-selected" : "",
+                        index === 0 ? "is-primary" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => setSelectedEvidenceTitle(signal.title)}
+                    >
+                      <HumanSignalIcon name={signal.icon} />
+                      <span>
+                        <strong>{signal.title}</strong>
+                        <small>{signal.detail}</small>
+                      </span>
+                    </button>
+                  ))}
+                </section>
+
+                <section className="action-rail" aria-label="Next investigation actions">
+                  <div className="thread-section-heading">
+                    <p className="section-label">Investigate</p>
+                    <strong>Choose the next operational move</strong>
+                  </div>
+                  <div>
+                    {investigationNextSteps.slice(0, 3).map((step, index) => (
                       <button
                         type="button"
-                        key={label}
-                        onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}
+                        key={step.label}
+                        className={index === 0 ? "is-primary" : undefined}
+                        onClick={() => {
+                          if (step.target === "overview") {
+                            setActiveDrillInView("overview");
+                            return;
+                          }
+                          openFocusedWorkflow(step.target);
+                        }}
                       >
-                        {label}
+                        <HumanSignalIcon name={step.icon} />
+                        <span>{step.label}</span>
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-            </section>
-            <section className="business-priority-panel" aria-label="Prioritized business signals">
-              <div className="business-priority-copy">
-                <p className="section-label">Prioritize</p>
-                <h3>Best starting points</h3>
-                <p>{businessNarrative}</p>
-                {businessActivityLabels.length > 0 && (
-                  <div className="business-activity-list" aria-label="Useful business cues">
-                    {businessActivityLabels.slice(0, 4).map((activity) => (
-                      <span key={activity}>{activity}</span>
+                </section>
+
+                <details className="inline-disclosure" open>
+                  <summary>Follow-up questions</summary>
+                  <div className="operational-list">
+                    {smartBusinessQuestions.map((question, index) => (
+                      <button
+                        type="button"
+                        key={question}
+                        className={index === 0 ? "is-recommended" : undefined}
+                        onClick={() => openFocusedWorkflow("businessQuestions")}
+                      >
+                        {question}
+                      </button>
                     ))}
                   </div>
+                </details>
+
+                <footer className="metadata-footer" aria-label="Dataset metadata">
+                  <span>
+                    Rows
+                    <strong><CountUp value={dataset.row_count} /></strong>
+                  </span>
+                  <span>
+                    Columns
+                    <strong><CountUp value={dataset.column_count} /></strong>
+                  </span>
+                  <span>
+                    Sources
+                    <strong><CountUp value={workbookWorksheets.length} /></strong>
+                  </span>
+                  <span>
+                    Field mix
+                    <strong><CountUp value={Object.keys(schemaTypeSummary).length} /></strong>
+                  </span>
+                </footer>
+              </main>
+
+              <aside className="context-rail" aria-label="Contextual evidence">
+                <div className="context-rail-header">
+                  <p className="section-label">Context</p>
+                  <h3>{selectedEvidence?.title || "Evidence"}</h3>
+                  <p>{selectedEvidence?.detail || "Select an evidence row to see why it matters."}</p>
+                </div>
+                <div className="context-rail-section">
+                  <strong>Why this matters</strong>
+                  <p>
+                    {selectedEvidence
+                      ? "This signal helps FiltraQueri keep the investigation focused before exposing deeper setup details."
+                      : "FiltraQueri uses the available signals to recommend the next useful question."}
+                  </p>
+                </div>
+                {opportunityLabels.length > 0 && (
+                  <div className="context-rail-section">
+                    <strong>Related opportunities</strong>
+                    <div className="context-rail-actions">
+                      {opportunityLabels.map((label) => (
+                        <button
+                          type="button"
+                          key={label}
+                          onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </div>
-              <div className="business-signal-grid">
-                {businessSignals.slice(0, 4).map((signal, index) => (
-                  <span
-                    key={signal.title}
-                    className={`human-signal-card is-${signal.tone}${index === 0 ? " is-primary" : ""}`}
-                  >
-                    <HumanSignalIcon name={signal.icon} />
-                    <span>
-                      <strong>{signal.title}</strong>
-                      <small>{signal.detail}</small>
-                    </span>
-                  </span>
-                ))}
-              </div>
-            </section>
-            <section className="investigation-next-step-panel" aria-label="Suggested next steps">
-              <div className="investigation-next-step-copy">
-                <p className="section-label">Investigate</p>
-                <h3>{investigationNextSteps[0]?.label || "Choose a business question to explore"}</h3>
-                <p>
-                  {investigationNextSteps[0]?.detail ||
-                    "FiltraQueri can help turn this dataset into a focused investigation path."}
-                </p>
-              </div>
-              <div className="investigation-next-step-actions">
-                {investigationNextSteps.slice(0, 3).map((step, index) => (
-                  <button
-                    type="button"
-                    key={step.label}
-                    className={index === 0 ? "is-primary" : undefined}
-                    onClick={() => {
-                      if (step.target === "overview") {
-                        setActiveDrillInView("overview");
-                        return;
-                      }
-                      openFocusedWorkflow(step.target);
-                    }}
-                  >
-                    <HumanSignalIcon name={step.icon} />
-                    <span>
-                      <strong>{step.label}</strong>
-                      <small>{step.detail}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="smart-question-layer" aria-label="Business questions you can explore">
-                <strong>Follow-up questions</strong>
-                <div>
-                  {smartBusinessQuestions.map((question, index) => (
-                    <button
-                      type="button"
-                      key={question}
-                      className={index === 0 ? "is-recommended" : undefined}
-                      onClick={() => openFocusedWorkflow("businessQuestions")}
-                    >
-                      {index === 0 && <HumanSignalIcon name="opportunity" />}
-                      {question}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-            <div className="data-stat-row" aria-label="Dataset profile">
-              <article className="data-stat data-stat--rows">
-                <div className="data-stat-top">
-                  <span className="data-stat-ic" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M4 6h16M4 12h16M4 18h16" />
-                    </svg>
-                  </span>
-                  <span className="data-stat-lbl">Rows</span>
-                </div>
-                <strong className="data-stat-num">
-                  <CountUp value={dataset.row_count} />
-                </strong>
-                <span className="data-stat-sub">Total rows of data</span>
-                <svg
-                  className="data-stat-spark"
-                  viewBox="0 0 64 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="2,17 13,11 24,14 35,7 46,12 62,4" />
-                </svg>
-              </article>
-              <article className="data-stat data-stat--columns">
-                <div className="data-stat-top">
-                  <span className="data-stat-ic" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M6 4v16M12 4v16M18 4v16" />
-                    </svg>
-                  </span>
-                  <span className="data-stat-lbl">Columns</span>
-                </div>
-                <strong className="data-stat-num">
-                  <CountUp value={dataset.column_count} />
-                </strong>
-                <span className="data-stat-sub">Total columns in dataset</span>
-                <svg
-                  className="data-stat-spark"
-                  viewBox="0 0 64 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="2,14 13,16 24,8 35,12 46,5 62,9" />
-                </svg>
-              </article>
-              <article className="data-stat data-stat--worksheets">
-                <div className="data-stat-top">
-                  <span className="data-stat-ic" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="4" y="8" width="12" height="12" rx="2" />
-                      <path d="M8 8V4h12v12h-4" />
-                    </svg>
-                  </span>
-                  <span className="data-stat-lbl">Sources</span>
-                </div>
-                <strong className="data-stat-num">
-                  <CountUp value={workbookWorksheets.length} />
-                </strong>
-                <span className="data-stat-sub">Available source areas</span>
-                <svg
-                  className="data-stat-spark"
-                  viewBox="0 0 64 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="2,8 13,14 24,10 35,16 46,9 62,13" />
-                </svg>
-              </article>
-              <article className="data-stat data-stat--types">
-                <div className="data-stat-top">
-                  <span className="data-stat-ic" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="8" cy="8" r="4" />
-                      <rect x="13" y="4" width="7" height="7" rx="1.5" />
-                      <path d="M8 14l5 6H3z" />
-                    </svg>
-                  </span>
-                  <span className="data-stat-lbl">Field mix</span>
-                </div>
-                <strong className="data-stat-num">
-                  <CountUp value={Object.keys(schemaTypeSummary).length} />
-                </strong>
-                <span className="data-stat-sub">Supporting structure</span>
-                <svg
-                  className="data-stat-spark"
-                  viewBox="0 0 64 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <polyline points="2,18 13,9 24,13 35,6 46,11 62,5" />
-                </svg>
-              </article>
+                <details className="inline-disclosure context-disclosure">
+                  <summary>Advanced context</summary>
+                  <p>
+                    Field names, worksheet links, and profile metadata remain available without leading the Human Mode flow.
+                  </p>
+                </details>
+                {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
+                  <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
+                )}
+              </aside>
             </div>
             <div className="data-tabs-row">
               <WorkspaceTabs
@@ -1507,9 +1450,6 @@ function DatasetSummaryPanel({
                 </button>
               </div>
             </div>
-            {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
-              <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
-            )}
           </div>
         ) : (
           <div className="dataset-empty-guidance">
