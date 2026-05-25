@@ -10,10 +10,10 @@
   "filter_metadata": {},
   "query_builder_metadata": {
     "selected_columns": [
-      "manager_id",
-      "first_name",
-      "last_name",
-      "manager_phone"
+      "realtor_id",
+      "realtor_agent",
+      "company",
+      "phone"
     ],
     "group_by": [],
     "aggregations": [
@@ -54,7 +54,7 @@
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-24T23:49:59.022Z"
+    "updatedAt": "2026-05-25T00:00:44.021Z"
   },
   "datasets": [
     {
@@ -65,111 +65,56 @@
       "duckdb_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\sessions\\d9846836ff374a09a6e59494256dbdd6.duckdb",
       "schema": [
         {
-          "name": "manager_id",
+          "name": "realtor_id",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 3,
           "sample_values": [
-            "MGT001",
-            "MGT002",
-            "MGT003",
-            "MGT005",
-            "MGT006",
-            "MGT004"
+            "RLTR0002",
+            "RLTR0001",
+            "RLTR0003"
           ]
         },
         {
-          "name": "first_name",
+          "name": "realtor_agent",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 3,
           "sample_values": [
-            "Ethan",
-            "Liam",
-            "Noah",
-            "Sophia",
-            "Emma",
-            "Ava"
+            "Shawn Taylor",
+            "Divya Kataria",
+            "Jacek Mikolajczyk"
           ]
         },
         {
-          "name": "last_name",
+          "name": "company",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 3,
           "sample_values": [
-            "Nguyen",
-            "Johnson",
-            "Ross",
-            "Patel",
-            "Silva",
-            "Kim"
+            "OctFest LLC",
+            "Valley Fine Homes, LLC",
+            "LevelUp Realty"
           ]
         },
         {
-          "name": "manager_phone",
+          "name": "phone",
           "type": "VARCHAR",
           "inferred_type": "text",
           "null_count": 0,
-          "unique_count": 6,
+          "unique_count": 3,
           "sample_values": [
-            "617-555-0104",
-            "617-555-0101",
-            "617-555-0103",
-            "617-555-0106",
-            "617-555-0105",
-            "617-555-0102"
-          ]
-        },
-        {
-          "name": "email",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 6,
-          "sample_values": [
-            "ava.kim@pmco.com",
-            "sophia.nguyen@pmco.com",
-            "ethan.ross@pmco.com",
-            "liam.patel@pmco.com",
-            "emma.silva@pmco.com",
-            "noah.johnson@pmco.com"
-          ]
-        },
-        {
-          "name": "hire_date",
-          "type": "VARCHAR",
-          "inferred_type": "text",
-          "null_count": 0,
-          "unique_count": 6,
-          "sample_values": [
-            "43013",
-            "44298",
-            "42581",
-            "43631",
-            "43160",
-            "43850"
-          ]
-        },
-        {
-          "name": "manager_type",
-          "type": "VARCHAR",
-          "inferred_type": "categorical",
-          "null_count": 0,
-          "unique_count": 4,
-          "sample_values": [
-            "Property Manager",
-            "Regional Manager",
-            "Assistant Manager",
-            "General Manager"
+            "860-713-5501",
+            "860-713-5506",
+            "860-713-5502"
           ]
         }
       ],
-      "row_count": 6,
-      "column_count": 7,
+      "row_count": 3,
+      "column_count": 4,
       "created_at": "2026-05-24T22:48:12.481877+00:00",
       "workbook_metadata": {
         "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
@@ -203,7 +148,7 @@
           "d9846836ff374a09a6e59494256dbdd6:worksheet:17",
           "d9846836ff374a09a6e59494256dbdd6:worksheet:18"
         ],
-        "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:1",
+        "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:2",
         "worksheets": [
           {
             "worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:1",
@@ -4407,13 +4352,13 @@
           "warnings": []
         },
         "created_at": "2026-05-24T22:48:12.481877+00:00",
-        "updated_at": "2026-05-24T22:48:19.095860+00:00"
+        "updated_at": "2026-05-25T00:01:48.908239+00:00"
       }
     }
   ],
   "created_at": "2026-05-24T22:48:12.481877+00:00",
-  "last_opened_at": "2026-05-24T23:50:43.232147+00:00",
-  "updated_at": "2026-05-24T23:50:43.255994+00:00",
+  "last_opened_at": "2026-05-25T00:01:50.428756+00:00",
+  "updated_at": "2026-05-25T00:01:50.463972+00:00",
   "workbook_metadata": {
     "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
     "workspace_id": "d9846836ff374a09a6e59494256dbdd6",
@@ -4446,7 +4391,7 @@
       "d9846836ff374a09a6e59494256dbdd6:worksheet:17",
       "d9846836ff374a09a6e59494256dbdd6:worksheet:18"
     ],
-    "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:1",
+    "active_worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:2",
     "worksheets": [
       {
         "worksheet_id": "d9846836ff374a09a6e59494256dbdd6:worksheet:1",
@@ -8650,6 +8595,6 @@
       "warnings": []
     },
     "created_at": "2026-05-24T22:48:12.481877+00:00",
-    "updated_at": "2026-05-24T22:48:19.095860+00:00"
+    "updated_at": "2026-05-25T00:01:48.908239+00:00"
   }
 }

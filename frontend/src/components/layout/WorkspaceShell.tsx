@@ -444,22 +444,17 @@ function WorkspaceShell({
             </section>
           </nav>
           {activeDestination.id === "data" && (
-            <div className="sidebar-bottom-stack" aria-label="Account and plan">
-              <section className="sidebar-plan-card" aria-label="Pro plan storage">
-                <div>
-                  <span>Pro Plan</span>
-                  <strong>18.2 GB used</strong>
-                </div>
-                <div className="sidebar-storage-meter" aria-hidden="true">
-                  <span />
-                </div>
-                <small>72% of 25 GB</small>
+            <div className="sidebar-bottom-stack" aria-label="Workspace and account">
+              <section className="sidebar-workspace-status-card" aria-label="Current workspace">
+                <span>Current workspace</span>
+                <strong>{dataset ? workspaceIdentityLabel : "No dataset open"}</strong>
+                <small>{dataset ? datasetShapeLabel : "Choose a file to begin"}</small>
               </section>
-              <section className="sidebar-profile-card" aria-label="Signed in user">
-                <span className="sidebar-profile-avatar" aria-hidden="true">CR</span>
+              <section className="sidebar-profile-card" aria-label="Account status">
+                <span className="sidebar-profile-avatar" aria-hidden="true">LW</span>
                 <div>
-                  <strong>Christie R.</strong>
-                  <span>christie@filtraqueri.com</span>
+                  <strong>Local workspace</strong>
+                  <span>No account connected</span>
                 </div>
               </section>
             </div>

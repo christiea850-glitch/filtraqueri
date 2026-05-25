@@ -4621,7 +4621,7 @@ body {
   margin-top: auto;
 }
 
-.app.destination-data .sidebar-plan-card,
+.app.destination-data .sidebar-workspace-status-card,
 .app.destination-data .sidebar-profile-card {
   min-width: 0;
   border: 1px solid var(--data-shell-border);
@@ -4630,20 +4630,15 @@ body {
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
 
-.app.destination-data .sidebar-plan-card {
+.app.destination-data .sidebar-workspace-status-card {
   display: grid;
-  gap: 10px;
+  gap: 5px;
   padding: 13px;
 }
 
-.app.destination-data .sidebar-plan-card div:first-child {
-  display: grid;
-  gap: 3px;
-}
-
-.app.destination-data .sidebar-plan-card span,
+.app.destination-data .sidebar-workspace-status-card span,
 .app.destination-data .sidebar-profile-card span,
-.app.destination-data .sidebar-plan-card small {
+.app.destination-data .sidebar-workspace-status-card small {
   min-width: 0;
   overflow: hidden;
   color: var(--data-shell-muted);
@@ -4653,13 +4648,13 @@ body {
   white-space: nowrap;
 }
 
-.app.destination-data .sidebar-plan-card div:first-child > span {
+.app.destination-data .sidebar-workspace-status-card > span {
   color: var(--data-shell-accent);
   font-size: 12px;
   font-weight: 700;
 }
 
-.app.destination-data .sidebar-plan-card strong,
+.app.destination-data .sidebar-workspace-status-card strong,
 .app.destination-data .sidebar-profile-card strong {
   min-width: 0;
   overflow: hidden;
@@ -4668,21 +4663,6 @@ body {
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.app.destination-data .sidebar-storage-meter {
-  height: 7px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: #eef2f6;
-}
-
-.app.destination-data .sidebar-storage-meter span {
-  display: block;
-  width: 72%;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #0e7490, #22a6b3);
 }
 
 .app.destination-data .sidebar-profile-card {
