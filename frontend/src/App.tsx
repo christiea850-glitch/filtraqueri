@@ -11,6 +11,7 @@ import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import ResultsInvestigationSurface from "./components/results/ResultsInvestigationSurface";
 import UploadPanel from "./components/upload/UploadPanel";
+import QuestionWorkspacePanel from "./components/workspace/QuestionWorkspacePanel";
 import {
   createAnalystNavItems,
   createAnalystWorkspaceRenderers,
@@ -660,6 +661,14 @@ function App() {
         <>
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
+          <QuestionWorkspacePanel
+            dataset={dataset}
+            sourceName={
+              activeWorkbookWorksheet?.displayName ||
+              activeWorkbookWorksheet?.sheetName ||
+              dataset.table_name
+            }
+          />
           <VisualQueryBuilderPanel
             schema={dataset.schema}
             datasetName={dataset.original_filename}
