@@ -6,6 +6,7 @@ import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPa
 import SqlEditorPanel, { SqlDraftPanel, SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlPreviewGrid from "./SqlPreviewGrid";
 import SqlSchemaPanel from "./SqlSchemaPanel";
+import type { SqlPreviewResult } from "./sqlTypes";
 import useSqlWorkspace from "./useSqlWorkspace";
 
 type SqlWorkspaceProps = {
@@ -25,9 +26,111 @@ const bottomTabLabels: Record<BottomTab, string> = {
 
 const bottomTabOrder: BottomTab[] = ["result", "guidance", "drafts"];
 
+function SqlFocusedResultPreview({
+  dataset,
+  sql,
+  previewResult,
+  onBack,
+}: {
+  dataset: DatasetMetadata | null;
+  sql: string;
+  previewResult: SqlPreviewResult;
+  onBack: () => void;
+}) {
+  const hasColumns = previewResult.columns.length > 0;
+  const hasRows = previewResult.rows.length > 0;
+
+  return (
+    <section className="sql-result-page" aria-label="SQL result preview">
+      <div className="sql-result-page-header">
+        <button type="button" className="secondary-button" onClick={onBack}>
+          Back to Analyst
+        </button>
+        <div>
+          <p className="section-label">Analyst SQL</p>
+          <h2>Result Preview</h2>
+          <p>{previewResult.message}</p>
+        </div>
+        <div className="sql-result-page-actions" aria-label="Future result actions">
+          <button type="button" className="secondary-button" disabled title="Export for SQL results is planned.">
+            Export
+          </button>
+          <button type="button" className="secondary-button" disabled title="Print for SQL results is planned.">
+            Print
+          </button>
+        </div>
+      </div>
+
+      <div className="sql-result-summary" aria-label="SQL result summary">
+        <span>
+          <strong>{previewResult.rows.length.toLocaleString()}</strong>
+          Rows
+        </span>
+        <span>
+          <strong>{previewResult.columns.length.toLocaleString()}</strong>
+          Columns
+        </span>
+        <span title={dataset?.original_filename || "No dataset"}>
+          <strong>{dataset?.table_name || "data"}</strong>
+          Source
+        </span>
+      </div>
+
+      <div className="sql-result-query-card">
+        <span>Query</span>
+        <pre>{sql}</pre>
+      </div>
+
+      {hasColumns ? (
+        <div className="sql-result-table-shell">
+          <table aria-label="SQL result data grid">
+            <thead>
+              <tr>
+                <th className="row-number-cell" scope="col">
+                  Row
+                </th>
+                {previewResult.columns.map((column) => (
+                  <th key={column} scope="col">
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {hasRows ? (
+                previewResult.rows.map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    <th className="row-number-cell" scope="row">
+                      {rowIndex + 1}
+                    </th>
+                    {previewResult.columns.map((column) => (
+                      <td key={column}>{String(row[column] ?? "")}</td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={previewResult.columns.length + 1}>The query returned no rows.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="empty-state compact-empty">
+          <p className="section-label">No result</p>
+          <h2>No SQL result to preview</h2>
+          <p>Run a SELECT query to open a focused result preview.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
+  const [isFocusedPreviewOpen, setIsFocusedPreviewOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
@@ -46,7 +149,9 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     editor,
     insertSql,
     loadDraft,
+    sqlDraft,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
+  const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
@@ -76,6 +181,19 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onRelease);
   };
+
+  if (isFocusedPreviewOpen) {
+    return (
+      <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
+        <SqlFocusedResultPreview
+          dataset={dataset}
+          sql={sqlDraft}
+          previewResult={previewResult}
+          onBack={() => setIsFocusedPreviewOpen(false)}
+        />
+      </section>
+    );
+  }
 
   return (
     <section
@@ -133,6 +251,8 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
           executionStatus={editorStatus}
           characterCount={characterCount}
           canRunQuery={Boolean(dataset)}
+          canOpenResultPreview={canOpenResultPreview}
+          onOpenResultPreview={() => setIsFocusedPreviewOpen(true)}
           dialectContext={{
             selectedDialect,
             selectedDialectProfile,

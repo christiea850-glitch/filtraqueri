@@ -658,6 +658,10 @@
   grid-template-columns: minmax(0, 1fr) 52px;
 }
 
+.sql-workspace-v2.sql-workspace-preview-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sqlw-main {
   display: flex;
   flex-direction: column;
@@ -814,6 +818,156 @@
   overflow: auto;
 }
 
+.sql-result-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: min(760px, calc(100vh - 150px));
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
+}
+
+.sql-result-page-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.sql-result-page-header h2 {
+  margin: 2px 0 4px;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.1;
+}
+
+.sql-result-page-header p:last-child {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sql-result-page-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sql-result-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sql-result-summary span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sql-result-summary strong {
+  overflow: hidden;
+  color: #111827;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.sql-result-query-card {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.sql-result-query-card span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sql-result-query-card pre {
+  max-height: 112px;
+  margin: 0;
+  overflow: auto;
+  color: #172033;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.sql-result-table-shell {
+  flex: 1;
+  min-height: 320px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.sql-result-table-shell table {
+  min-width: max-content;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.sql-result-table-shell th,
+.sql-result-table-shell td {
+  max-width: 280px;
+  padding: 10px 12px;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.sql-result-table-shell th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #111827;
+  font-weight: 700;
+}
+
+.sql-result-table-shell .row-number-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 68px;
+  max-width: 68px;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: right;
+}
+
+.sql-result-table-shell thead .row-number-cell {
+  z-index: 3;
+}
+
 .sql-workspace-v2 .sql-context-panel {
   position: sticky;
   top: 0;
@@ -840,5 +994,13 @@
   .sql-workspace-v2.is-rail-collapsed {
     grid-template-columns: 1fr;
   }
-}
 
+  .sql-result-page-header,
+  .sql-result-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-result-page-actions {
+    justify-content: flex-start;
+  }
+}

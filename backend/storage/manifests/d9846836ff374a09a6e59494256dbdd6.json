@@ -30,18 +30,18 @@
   },
   "sql_workspace_metadata": {
     "version": 1,
-    "selectedDialect": "duckdb",
+    "selectedDialect": "mariadb",
     "activeSqlTab": "editor",
     "activeDraftId": "active-draft",
-    "activeSnippetId": null,
+    "activeSnippetId": "1779673034923",
     "lastOpenedContext": "sqlWorkspace",
     "draftMetadata": {
-      "draftCount": 1,
-      "lastDraftSavedAt": "2026-05-25T01:34:34.362Z"
+      "draftCount": 3,
+      "lastDraftSavedAt": "2026-05-25T01:50:33.207Z"
     },
     "snippetMetadata": {
-      "snippetCount": 0,
-      "lastSnippetSavedAt": null
+      "snippetCount": 2,
+      "lastSnippetSavedAt": "2026-05-25T01:37:14.924Z"
     },
     "drafts": [
       {
@@ -49,12 +49,55 @@
         "id": "active-draft",
         "label": "Query draft",
         "sql": "",
-        "selectedDialect": "duckdb",
-        "updatedAt": "2026-05-25T01:34:34.362Z"
+        "selectedDialect": "mariadb",
+        "updatedAt": "2026-05-25T01:50:33.207Z"
+      },
+      {
+        "version": 1,
+        "id": "1779673034923",
+        "label": "Draft 3",
+        "sql": "SELECT\n  \"realtor_id\",\n  \"realtor_agent\",\n  \"company\",\n  \"phone\"\nFROM \"data\"\nLIMIT 100;",
+        "selectedDialect": "mariadb",
+        "updatedAt": "2026-05-25T01:37:14.924Z"
+      },
+      {
+        "version": 1,
+        "id": "1779673024008",
+        "label": "Draft 2",
+        "sql": "SELECT\n  \"realtor_id\",\n  \"realtor_agent\",\n  \"company\",\n  \"phone\"\nFROM \"data\"\nLIMIT 100;",
+        "selectedDialect": "mariadb",
+        "updatedAt": "2026-05-25T01:37:04.009Z"
       }
     ],
-    "snippets": [],
-    "updatedAt": "2026-05-25T01:34:34.362Z"
+    "snippets": [
+      {
+        "version": 1,
+        "id": "1779673034923",
+        "name": "Draft 3",
+        "sql": "SELECT\n  \"realtor_id\",\n  \"realtor_agent\",\n  \"company\",\n  \"phone\"\nFROM \"data\"\nLIMIT 100;",
+        "dialect": "mariadb",
+        "createdAt": "2026-05-25T01:37:14.924Z",
+        "updatedAt": "2026-05-25T01:37:14.924Z",
+        "tags": [
+          "draft"
+        ],
+        "description": "Saved from the SQL Workspace draft action."
+      },
+      {
+        "version": 1,
+        "id": "1779673024008",
+        "name": "Draft 2",
+        "sql": "SELECT\n  \"realtor_id\",\n  \"realtor_agent\",\n  \"company\",\n  \"phone\"\nFROM \"data\"\nLIMIT 100;",
+        "dialect": "mariadb",
+        "createdAt": "2026-05-25T01:37:04.009Z",
+        "updatedAt": "2026-05-25T01:37:04.009Z",
+        "tags": [
+          "draft"
+        ],
+        "description": "Saved from the SQL Workspace draft action."
+      }
+    ],
+    "updatedAt": "2026-05-25T01:50:33.207Z"
   },
   "datasets": [
     {
@@ -4357,8 +4400,8 @@
     }
   ],
   "created_at": "2026-05-24T22:48:12.481877+00:00",
-  "last_opened_at": "2026-05-25T01:34:34.871605+00:00",
-  "updated_at": "2026-05-25T01:34:34.889632+00:00",
+  "last_opened_at": "2026-05-25T01:55:19.120528+00:00",
+  "updated_at": "2026-05-25T01:55:19.136529+00:00",
   "workbook_metadata": {
     "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
     "workspace_id": "d9846836ff374a09a6e59494256dbdd6",

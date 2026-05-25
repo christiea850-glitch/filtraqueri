@@ -13,6 +13,8 @@ type SqlEditorPanelProps = {
   executionStatus: SqlExecutionStatus;
   characterCount: number;
   canRunQuery: boolean;
+  canOpenResultPreview: boolean;
+  onOpenResultPreview: () => void;
   dialectContext: SqlDialectContext;
 };
 
@@ -30,6 +32,8 @@ function SqlEditorPanel({
   executionStatus,
   characterCount,
   canRunQuery,
+  canOpenResultPreview,
+  onOpenResultPreview,
   dialectContext,
 }: SqlEditorPanelProps) {
   return (
@@ -58,6 +62,14 @@ function SqlEditorPanel({
           </label>
           <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
             Run query
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onOpenResultPreview}
+            disabled={!canOpenResultPreview}
+          >
+            Result Preview
           </button>
           <button type="button" className="secondary-button" onClick={editor.onExplain}>
             Explain query
