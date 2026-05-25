@@ -768,7 +768,15 @@ Suggested type:
 ```ts
 type QuestionAnswerDraft = {
   question: string;
-  intent: "ranking" | "aggregation" | "trend" | "comparison" | "recent_change" | "underperformance" | "quality_review" | "unknown";
+  intent:
+    | "ranking"
+    | "aggregation"
+    | "trend"
+    | "comparison"
+    | "recent_change"
+    | "underperformance"
+    | "quality_review"
+    | "unknown";
   fieldMappings: {
     measure?: string;
     entity?: string;
