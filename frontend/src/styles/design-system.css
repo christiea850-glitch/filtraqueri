@@ -545,45 +545,88 @@ h1 span:last-child {
   white-space: nowrap;
 }
 
+.focused-workspace-shell,
 .drill-in-detail-panel {
   display: grid;
-  gap: var(--fq-space-4);
+  gap: 14px;
   min-width: 0;
-  padding: var(--fq-space-4);
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
   border: 1px solid var(--fq-border);
-  border-radius: var(--fq-radius-md);
+  border-radius: 10px;
   background: var(--fq-surface);
+  box-shadow: none;
 }
 
+.focused-workspace-header,
 .drill-in-detail-header {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--fq-space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: start;
+  min-width: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.focused-workspace-title {
+  display: grid;
+  gap: 3px;
   min-width: 0;
 }
 
+.focused-workspace-title h2,
 .drill-in-detail-header h3 {
   margin: 0;
   color: var(--fq-text);
   font-size: 18px;
   font-weight: var(--fq-font-heading);
+  line-height: 1.22;
 }
 
+.focused-workspace-title p:not(.section-label),
 .drill-in-detail-header p:not(.section-label) {
-  margin: 4px 0 0;
+  margin: 0;
   color: var(--fq-text-muted);
   font-size: 13px;
   line-height: 1.45;
 }
 
+.focused-workspace-back,
 .drill-in-back-button {
+  min-height: 30px;
+  padding-inline: 10px;
   white-space: nowrap;
+}
+
+.focused-workspace-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.focused-workspace-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.focused-workspace-body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-height: min(72vh, 780px);
+  overflow: auto;
 }
 
 .drill-in-detail-body {
   display: grid;
-  gap: var(--fq-space-3);
+  gap: 12px;
   min-width: 0;
 }
 
@@ -752,8 +795,13 @@ h1 span:last-child {
     min-width: 0;
   }
 
+  .focused-workspace-header,
   .drill-in-detail-header {
     grid-template-columns: 1fr;
+  }
+
+  .focused-workspace-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -4473,6 +4521,141 @@ body {
   border-radius: 0;
   background: transparent;
   color: #64748b;
+}
+
+/* Focused workspace unification */
+.app .focused-workspace-shell,
+.app .focused-workspace-shell.dataset-preview-page,
+.app .focused-workspace-shell.standalone-panel,
+.app .drill-in-detail-panel {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 16px;
+  border: 1px solid #dbe3ea;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: none;
+  animation: none;
+}
+
+.app .focused-workspace-body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-height: min(72vh, 780px);
+  overflow: auto;
+}
+
+.app .drill-in-detail-body {
+  gap: 12px;
+}
+
+.app .focused-workspace-body > .drill-in-detail-body {
+  min-height: 0;
+}
+
+.app .data-intelligence-panel,
+.app .workflow-recommendation-panel,
+.app .business-semantics-panel,
+.app .kpi-intelligence-panel,
+.app .business-question-panel,
+.app .human-guidance-panel {
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app .focused-workspace-body .summary-header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.app .focused-workspace-body .summary-header h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.app .focused-workspace-body .summary-header p:not(.section-label) {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.45;
+}
+
+.app .data-intelligence-grid,
+.app .workflow-recommendation-list,
+.app .business-semantics-grid,
+.app .kpi-opportunity-list,
+.app .business-question-list,
+.app .human-suggestion-grid {
+  gap: 8px;
+}
+
+.app .data-intelligence-grid span,
+.app .workflow-recommendation-card,
+.app .business-semantic-card,
+.app .kpi-opportunity-card,
+.app .business-question-card,
+.app .human-suggestion-grid button {
+  border-color: #e7edf3;
+  border-radius: 8px;
+  background: #fbfcfd;
+  box-shadow: none;
+}
+
+.app .dataset-preview-sheets,
+.app .task-pill-row,
+.app .business-kpi-list,
+.app .workflow-recommendation-card div,
+.app .kpi-opportunity-card div,
+.app .business-question-card div {
+  gap: 5px;
+}
+
+.app .dataset-preview-sheet,
+.app .task-workflow-pill,
+.app .dataset-count-pill,
+.app .workflow-recommendation-card small,
+.app .business-semantic-card span,
+.app .business-kpi-list small,
+.app .kpi-opportunity-card small,
+.app .business-question-card small {
+  min-height: 24px;
+  padding: 4px 8px;
+  border-color: #e1e8ef;
+  border-radius: 999px;
+  background: #f6f8fa;
+  color: #526071;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app .dataset-preview-sheet.active,
+.app .task-workflow-pill.is-selected {
+  border-color: #a7d3dc;
+  background: #edf8fa;
+  color: #0f6575;
+}
+
+.app .dataset-preview-table-wrap {
+  border-color: #e7edf3;
+  border-radius: 10px;
+}
+
+.app .results-review-facts,
+.app .investigation-prompt-row {
+  border-color: #e7edf3;
+  background: #fbfcfd;
+  box-shadow: none;
 }
 
 @media (max-width: 980px) {

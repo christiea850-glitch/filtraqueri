@@ -1,4 +1,5 @@
 import type { ExplainabilityPreviewViewModel } from "../runtimeBridgeConsumers";
+import FocusedWorkspaceShell from "../../components/layout/FocusedWorkspaceShell";
 
 export type ResultsInsightDetailPageProps = {
   readonly explainabilityPreview: ExplainabilityPreviewViewModel;
@@ -20,19 +21,14 @@ function ResultsInsightDetailPage({
   onBack,
 }: ResultsInsightDetailPageProps) {
   return (
-    <section className="standalone-panel" aria-label="Results insight detail">
-      <div>
-        <p className="section-label">Results insight</p>
-        <h2>Business takeaway detail</h2>
-        <p>{sourceContext}</p>
-      </div>
-
-      <div className="workspace-actions">
-        <button type="button" className="secondary-button" onClick={onBack}>
-          Back to {backTargetLabel}
-        </button>
-      </div>
-
+    <FocusedWorkspaceShell
+      className="standalone-panel"
+      eyebrow="Results insight"
+      title="Business takeaway detail"
+      summary={sourceContext}
+      backLabel={`Back to ${backTargetLabel}`}
+      onBack={onBack}
+    >
       <div className="results-review-facts" aria-label="Results insight key facts">
         <span>
           <small>Confidence</small>
@@ -67,7 +63,7 @@ function ResultsInsightDetailPage({
         {preservedContextLabel}: Back behavior preserves the current dataset, session, mode, filters, pagination,
         export state, result context, and expanded panels.
       </p>
-    </section>
+    </FocusedWorkspaceShell>
   );
 }
 

@@ -1,4 +1,5 @@
 import type { DatasetIntelligencePreviewViewModel } from "../runtimeBridgeConsumers";
+import FocusedWorkspaceShell from "../../components/layout/FocusedWorkspaceShell";
 
 export type DatasetIntelligenceDetailPageProps = {
   readonly datasetIntelligencePreview: DatasetIntelligencePreviewViewModel;
@@ -20,19 +21,14 @@ function DatasetIntelligenceDetailPage({
   onBack,
 }: DatasetIntelligenceDetailPageProps) {
   return (
-    <section className="standalone-panel" aria-label="Dataset intelligence detail">
-      <div>
-        <p className="section-label">Dataset intelligence</p>
-        <h2>Data profile detail</h2>
-        <p>{sourceContext}</p>
-      </div>
-
-      <div className="workspace-actions">
-        <button type="button" className="secondary-button" onClick={onBack}>
-          Back to {backTargetLabel}
-        </button>
-      </div>
-
+    <FocusedWorkspaceShell
+      className="standalone-panel"
+      eyebrow="Dataset intelligence"
+      title="Data profile detail"
+      summary={sourceContext}
+      backLabel={`Back to ${backTargetLabel}`}
+      onBack={onBack}
+    >
       <div className="results-review-facts" aria-label="Dataset intelligence key facts">
         <span>
           <small>Dataset</small>
@@ -70,9 +66,8 @@ function DatasetIntelligenceDetailPage({
         {preservedContextLabel}: Back behavior preserves the current dataset, session, mode,
         workbook, worksheet, filters, pagination, result context, and expanded panels.
       </p>
-    </section>
+    </FocusedWorkspaceShell>
   );
 }
 
 export default DatasetIntelligenceDetailPage;
-

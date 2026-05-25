@@ -5,7 +5,6 @@ import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
-import { RuntimeDisclosureSlot } from "../../features/workspaceRuntime";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { DatasetIntelligenceDetailPage } from "../../features/detailPages";
 import {
@@ -32,6 +31,7 @@ import {
 } from "../../features/workbookIntelligence";
 import { TaskLauncherPanel } from "../../features/tasksLauncher";
 import DrillInDetailPanel from "../layout/DrillInDetailPanel";
+import FocusedWorkspaceShell from "../layout/FocusedWorkspaceShell";
 import WorkspaceTabs from "../layout/WorkspaceTabs";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
 
@@ -425,19 +425,14 @@ function DatasetPreviewPage({
   };
 
   return (
-    <div className="dataset-preview-page">
-      <div className="dataset-preview-head">
-        <button type="button" className="secondary-button" onClick={onBack}>
-          Back to Data
-        </button>
-        <div>
-          <p className="section-label">Preview dataset</p>
-          <h2>{previewLabel}</h2>
-          <p>
-            {previewRowTotal.toLocaleString()} rows &middot;{" "}
-            {previewColumns.length.toLocaleString()} columns &middot; showing a sample
-          </p>
-        </div>
+    <FocusedWorkspaceShell
+      className="dataset-preview-page"
+      eyebrow="Preview dataset"
+      title={previewLabel}
+      summary={`${previewRowTotal.toLocaleString()} rows / ${previewColumns.length.toLocaleString()} columns / showing a sample`}
+      backLabel="Back to Data"
+      onBack={onBack}
+      actions={
         <button
           type="button"
           className="secondary-button dataset-preview-wrap-toggle"
@@ -445,7 +440,8 @@ function DatasetPreviewPage({
         >
           {isWrapped ? "Compact cells" : "Expand cells"}
         </button>
-      </div>
+      }
+    >
 
       {hasWorkbook && (
         <div className="dataset-preview-sheets" aria-label="Worksheets">
@@ -520,7 +516,7 @@ function DatasetPreviewPage({
           </table>
         )}
       </div>
-    </div>
+    </FocusedWorkspaceShell>
   );
 }
 
@@ -1158,13 +1154,6 @@ function DatasetSummaryPanel({
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <RuntimeDisclosureSlot
-          id="runtime-slot-data-intelligence"
-          label="Details"
-          title="Data intelligence"
-          summary={humanSummary}
-          badge={dialectRecommendation?.recommendedFutureEngine?.label || "Review only"}
-        >
         <section className="data-intelligence-panel" aria-label="Data intelligence profile">
           <div className="summary-header">
             <div>
@@ -1203,7 +1192,6 @@ function DatasetSummaryPanel({
             </span>
           </div>
         </section>
-        </RuntimeDisclosureSlot>
         </DrillInDetailPanel>
       )}
 
@@ -1214,13 +1202,6 @@ function DatasetSummaryPanel({
           summary={workflowSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
-        >
-        <RuntimeDisclosureSlot
-          id="runtime-slot-workflow-recommendations"
-          label="Details"
-          title="Suggested analysis paths"
-          summary={workflowSummary}
-          badge={`${recommendations.length}`}
         >
         <section className="workflow-recommendation-panel" aria-label="Suggested analysis paths">
           <div className="summary-header">
@@ -1247,7 +1228,6 @@ function DatasetSummaryPanel({
             <p className="compact-empty">No suggested analysis paths are available for this dataset yet.</p>
           )}
         </section>
-        </RuntimeDisclosureSlot>
         </DrillInDetailPanel>
       )}
 
@@ -1260,13 +1240,6 @@ function DatasetSummaryPanel({
           backLabel="Back to Data"
         >
         {businessSemanticReport && (
-        <RuntimeDisclosureSlot
-          id="runtime-slot-business-semantics"
-          label="Details"
-          title="Business semantics"
-          summary={semanticSummary}
-          badge={`${detectedSemanticEntities.length}`}
-        >
         <section className="business-semantics-panel" aria-label="Business semantic intelligence">
           <div className="summary-header">
             <div>
@@ -1294,7 +1267,6 @@ function DatasetSummaryPanel({
             </div>
           )}
         </section>
-        </RuntimeDisclosureSlot>
         )}
         {!businessSemanticReport && (
           <p className="compact-empty">No business context is available for this dataset yet.</p>
@@ -1309,13 +1281,6 @@ function DatasetSummaryPanel({
           summary={kpiSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
-        >
-        <RuntimeDisclosureSlot
-          id="runtime-slot-kpi-intelligence"
-          label="Details"
-          title="KPI intelligence"
-          summary={kpiSummary}
-          badge={`${kpiOpportunities.length}`}
         >
         <section className="kpi-intelligence-panel" aria-label="KPI intelligence opportunities">
           <div className="summary-header">
@@ -1342,7 +1307,6 @@ function DatasetSummaryPanel({
             <p className="compact-empty">No KPI opportunities are available for this dataset yet.</p>
           )}
         </section>
-        </RuntimeDisclosureSlot>
         </DrillInDetailPanel>
       )}
 
@@ -1353,13 +1317,6 @@ function DatasetSummaryPanel({
           summary={questionSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
-        >
-        <RuntimeDisclosureSlot
-          id="runtime-slot-business-questions"
-          label="Details"
-          title="Business questions"
-          summary={questionSummary}
-          badge={`${interpretedQuestions.length}`}
         >
         <section className="business-question-panel" aria-label="Business question intelligence">
           <div className="summary-header">
@@ -1386,7 +1343,6 @@ function DatasetSummaryPanel({
             <p className="compact-empty">No business questions are available for this dataset yet.</p>
           )}
         </section>
-        </RuntimeDisclosureSlot>
         </DrillInDetailPanel>
       )}
 
@@ -1398,19 +1354,11 @@ function DatasetSummaryPanel({
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <RuntimeDisclosureSlot
-          id="runtime-slot-task-launcher"
-          label="Details"
-          title="Guided analytics tasks"
-          summary="Preview task inputs and planning context."
-          badge="Tasks"
-        >
         <TaskLauncherPanel
           dataset={dataset}
           selectedTaskId={selectedTaskId}
           onSelectedTaskIdChange={onSelectedTaskIdChange}
         />
-        </RuntimeDisclosureSlot>
         </DrillInDetailPanel>
       )}
 
@@ -1421,13 +1369,6 @@ function DatasetSummaryPanel({
           summary="Choose a simple continuation into the existing Human Mode workflow."
           onBack={closeDrillIn}
           backLabel="Back to Data"
-        >
-        <RuntimeDisclosureSlot
-          id="runtime-slot-human-guidance"
-          label="Details"
-          title="Human Mode guidance"
-          summary="Choose a simple continuation into the existing Human Mode workflow."
-          badge="Human Mode"
         >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
@@ -1447,7 +1388,6 @@ function DatasetSummaryPanel({
             ))}
           </div>
         </section>
-        </RuntimeDisclosureSlot>
         </DrillInDetailPanel>
       )}
     </div>
