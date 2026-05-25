@@ -786,7 +786,7 @@ function DatasetSummaryPanel({
       : (dataProfile?.possibleMetrics.length || 0) > 0 && (dataProfile?.dateTimeFields.length || 0) > 0
         ? "This looks like business activity data with values over time."
         : (dataProfile?.possibleMetrics.length || 0) > 0
-          ? "This looks like operational data with measurable business values."
+          ? "This looks like business data with measurable values."
           : "FiltraQueri found structure it can help you investigate.";
   const understandingSignals = [
     businessEntityHints[0] ? `Business entity: ${businessEntityHints[0].displayName}` : null,
@@ -847,7 +847,7 @@ function DatasetSummaryPanel({
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
           title: "Connected sources",
-          detail: "Multiple sheets may describe one shared workflow.",
+          detail: "Multiple sheets may describe the same business activity.",
           tone: "connected" as HumanSignalTone,
           icon: "connected" as HumanSignalIcon,
         }
@@ -894,7 +894,7 @@ function DatasetSummaryPanel({
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
           label: "Review connected sources",
-          detail: "See how multiple sheets may describe one workflow.",
+          detail: "See how multiple sheets may describe one business activity.",
           target: "overview" as const,
           icon: "connected" as HumanSignalIcon,
         }
@@ -1160,19 +1160,18 @@ function DatasetSummaryPanel({
           : activeOperationalWorkspace === "kpis"
             ? "KPI Workspace"
             : "Trend Workspace";
-    const workspaceRoute = `/workspace/${activeOperationalWorkspace}`;
     const workspaceSummary =
       activeOperationalWorkspace === "connections"
-        ? "Inspect source relationships, lineage cues, and operational mappings without crowding the main Data page."
+        ? "Review source relationships and connected business areas without crowding the main Data page."
         : activeOperationalWorkspace === "entities"
-          ? "Review entity, segment, and behavior cues as a focused operational investigation."
+          ? "Review entity and segment cues as dataset context."
           : activeOperationalWorkspace === "kpis"
-            ? "Review metric candidates and business measures before preparing a deeper investigation."
-            : "Review timeline readiness, date signals, and trend-oriented investigation paths.";
+            ? "Review metric candidates and business measures found in the dataset."
+            : "Review timeline fields and date signals found in the dataset.";
 
     return (
       <FocusedWorkspaceShell
-        eyebrow={workspaceRoute}
+        eyebrow="Data detail"
         title={workspaceTitle}
         summary={workspaceSummary}
         onBack={closeOperationalWorkspace}
@@ -1272,7 +1271,7 @@ function DatasetSummaryPanel({
                       tone="ready"
                       icon={<HumanSignalIcon name="timeline" />}
                       title={field.name}
-                      description="Timeline candidate for trend-oriented investigation."
+                      description="Timeline candidate for reviewing change over time."
                     />
                   ))
                 ) : (
@@ -1284,24 +1283,21 @@ function DatasetSummaryPanel({
                   />
                 ))}
             </EvidenceRows>
-            <ActionRail eyebrow="Continue" title="Move deeper only when the evidence is useful">
+            <ActionRail eyebrow="Next" title="Use this context when you are ready">
               <button type="button" className="is-primary" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                Continue investigation
+                Continue in Workspace
               </button>
               <button type="button" onClick={() => setIsDatasetPreviewOpen(true)}>
-                Inspect source preview
+                Preview source
               </button>
             </ActionRail>
           </InvestigationThread>
           <ContextRail>
             <ContextRailHeader
               eyebrow="Context"
-              title="Operational workspace"
-              description="This focused surface keeps detailed inspection out of the main Data page while preserving the same dataset context."
+              title="Data detail"
+              description="This focused surface keeps detailed dataset review out of the main Data page."
             />
-            <ContextRailSection title="Route">
-              <p>{workspaceRoute}</p>
-            </ContextRailSection>
             <InlineDisclosure summary="Advanced context" className="context-disclosure">
               <p>
                 This workspace reuses existing profile, workbook, and recommendation metadata. No execution or SQL is triggered here.
@@ -1321,7 +1317,7 @@ function DatasetSummaryPanel({
           <div>
             <p className="section-label">Data</p>
             <h2>Data</h2>
-            <p>Understand what this data may represent and choose what to investigate next.</p>
+            <p>Understand what this data may represent and where it may be useful.</p>
           </div>
           {dataset && (
             <div className="data-page-head-actions">
@@ -1377,23 +1373,24 @@ function DatasetSummaryPanel({
                   ))}
                 </EvidenceRows>
 
-                <ActionRail eyebrow="Investigate" title="Choose the next operational move">
-                  {investigationNextSteps.slice(0, 3).map((step, index) => (
-                    <button
-                      type="button"
-                      key={step.label}
-                        className={index === 0 ? "is-primary" : undefined}
+                <InlineDisclosure summary="Possible follow-up">
+                  <OperationalList>
+                    {investigationNextSteps.slice(0, 3).map((step, index) => (
+                      <button
+                        type="button"
+                        key={step.label}
+                        className={index === 0 ? "is-recommended" : undefined}
                         onClick={() => {
                           openOperationalWorkspace(getWorkspaceForStep(step));
                         }}
                       >
-                      <HumanSignalIcon name={step.icon} />
-                      <span>{step.label}</span>
-                    </button>
-                  ))}
-                </ActionRail>
+                        {step.label}
+                      </button>
+                    ))}
+                  </OperationalList>
+                </InlineDisclosure>
 
-                <InlineDisclosure summary="Follow-up questions">
+                <InlineDisclosure summary="Questions this data may support">
                   <OperationalList>
                     {smartBusinessQuestions.map((question, index) => (
                       <button
@@ -1434,20 +1431,20 @@ function DatasetSummaryPanel({
                   title={selectedEvidence?.title || "Evidence"}
                   description={selectedEvidence?.detail || "Select an evidence row to see why it matters."}
                 />
-                <ContextRailSection title="Why this matters">
+                <ContextRailSection title="Dataset meaning">
                   <p>
                     {selectedEvidence
-                      ? "This signal helps FiltraQueri keep the investigation focused before exposing deeper setup details."
-                      : "FiltraQueri uses the available signals to recommend the next useful question."}
+                      ? "This signal helps explain what the dataset appears to contain."
+                      : "FiltraQueri uses these signals to summarize the dataset before deeper work begins."}
                   </p>
                   <div className="context-rail-actions">
                     <button type="button" onClick={() => openOperationalWorkspace(selectedEvidenceWorkspace)}>
-                      Open workspace
+                      Review detail
                     </button>
                   </div>
                 </ContextRailSection>
                 {opportunityLabels.length > 0 && (
-                  <ContextRailSection title="Related opportunities">
+                  <InlineDisclosure summary="Explore opportunities" className="context-disclosure">
                     <div className="context-rail-actions">
                       {opportunityLabels.slice(0, 2).map((label) => (
                         <button
@@ -1459,7 +1456,7 @@ function DatasetSummaryPanel({
                         </button>
                       ))}
                     </div>
-                  </ContextRailSection>
+                  </InlineDisclosure>
                 )}
                 <InlineDisclosure summary="Advanced context" className="context-disclosure">
                   <p>
@@ -1510,18 +1507,18 @@ function DatasetSummaryPanel({
                     </svg>
                   </button>
                   {activeWorkflowMenu === "intelligence" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Investigation opportunities">
+                    <div className="data-workflow-menu" role="menu" aria-label="Dataset follow-up options">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
                         <strong>What FiltraQueri noticed</strong>
-                        <span>Review business signals, useful fields, and investigation fit.</span>
+                        <span>Review business signals and useful fields.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}>
-                        <strong>Suggested investigations</strong>
-                        <span>See promising questions and opportunities for this dataset.</span>
+                        <strong>Possible questions</strong>
+                        <span>See examples this dataset may support.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                        <strong>Explore opportunities</strong>
-                        <span>Choose a business goal and let FiltraQueri guide setup.</span>
+                        <strong>Continue in Workspace</strong>
+                        <span>Use this dataset context when you are ready to shape the question.</span>
                       </button>
                     </div>
                   )}
@@ -1538,7 +1535,7 @@ function DatasetSummaryPanel({
                       )
                     }
                   >
-                    Questions
+                    Details
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -1558,16 +1555,16 @@ function DatasetSummaryPanel({
                         <span>See what FiltraQueri thinks these fields represent.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
-                        <strong>Possible KPIs</strong>
-                        <span>Review business measurements and insight opportunities.</span>
+                        <strong>Possible measures</strong>
+                        <span>Review business measurements found in the data.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessQuestions")}>
                         <strong>Business questions</strong>
                         <span>See questions this dataset may help answer.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
-                        <strong>Next steps</strong>
-                        <span>Choose a simple business investigation move.</span>
+                        <strong>Continue in Workspace</strong>
+                        <span>Use the current dataset context for a guided next step.</span>
                       </button>
                     </div>
                   )}
@@ -1731,16 +1728,16 @@ function DatasetSummaryPanel({
       {dataset && activeFocusedWorkflow === "suggestedAnalysisPaths" && (
         <DrillInDetailPanel
           eyebrow="Explore opportunities"
-          title="Suggested investigations"
+          title="Possible questions"
           summary={workflowSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <section className="workflow-recommendation-panel" aria-label="Suggested investigations">
+        <section className="workflow-recommendation-panel" aria-label="Possible dataset questions">
           <div className="summary-header">
             <div>
-              <p className="section-label">Investigation ideas</p>
-              <h2>Promising questions to explore</h2>
+              <p className="section-label">Dataset possibilities</p>
+              <h2>Questions this data may support</h2>
               <p>{workflowSummary}</p>
             </div>
             <span className="dataset-count-pill">{recommendations.length}</span>
@@ -1758,7 +1755,7 @@ function DatasetSummaryPanel({
             ))}
           </div>
           {recommendations.length === 0 && (
-            <p className="compact-empty">No suggested investigations are available for this dataset yet.</p>
+            <p className="compact-empty">No suggested questions are available for this dataset yet.</p>
           )}
         </section>
         </DrillInDetailPanel>
@@ -1793,7 +1790,7 @@ function DatasetSummaryPanel({
           </div>
           {possibleBusinessKpis.length > 0 && (
             <div className="business-kpi-list">
-              <span>Possible KPIs</span>
+              <span>Possible measures</span>
               {possibleBusinessKpis.slice(0, 5).map((kpi) => (
                 <small key={kpi.id}>{kpi.label}</small>
               ))}
@@ -1809,17 +1806,17 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "kpiIntelligence" && (
         <DrillInDetailPanel
-          eyebrow="Business opportunities"
-          title="Possible KPIs"
+          eyebrow="Business measures"
+          title="Possible measures"
           summary={kpiSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <section className="kpi-intelligence-panel" aria-label="Possible KPI opportunities">
+        <section className="kpi-intelligence-panel" aria-label="Possible business measures">
           <div className="summary-header">
             <div>
-              <p className="section-label">Possible KPIs</p>
-              <h2>Insight opportunities</h2>
+              <p className="section-label">Possible measures</p>
+              <h2>Business values found in the data</h2>
               <p>{kpiSummary}</p>
             </div>
             <span className="dataset-count-pill">{kpiOpportunities.length}</span>
@@ -1837,7 +1834,7 @@ function DatasetSummaryPanel({
             ))}
           </div>
           {kpiOpportunities.length === 0 && (
-            <p className="compact-empty">No KPI opportunities are available for this dataset yet.</p>
+            <p className="compact-empty">No business measures are available for this dataset yet.</p>
           )}
         </section>
         </DrillInDetailPanel>
@@ -1846,7 +1843,7 @@ function DatasetSummaryPanel({
       {dataset && activeFocusedWorkflow === "businessQuestions" && (
         <DrillInDetailPanel
           eyebrow="Business detail"
-          title="Business questions"
+          title="Questions this data may support"
           summary={questionSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
@@ -1855,7 +1852,7 @@ function DatasetSummaryPanel({
           <div className="summary-header">
             <div>
               <p className="section-label">Business questions</p>
-              <h2>Question intent mapping</h2>
+              <h2>Question examples</h2>
               <p>{questionSummary}</p>
             </div>
             <span className="dataset-count-pill">{interpretedQuestions.length}</span>
@@ -1882,8 +1879,8 @@ function DatasetSummaryPanel({
       {dataset && activeFocusedWorkflow === "guidedAnalyticsTasks" && (
         <DrillInDetailPanel
           eyebrow="Explore opportunities"
-          title="Suggested investigations"
-          summary="Choose a business goal and let FiltraQueri guide the setup."
+          title="Continue in Workspace"
+          summary="Use this dataset context when you are ready to shape the question."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
@@ -1897,16 +1894,16 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "humanGuidance" && (
         <DrillInDetailPanel
-          eyebrow="Next steps"
-          title="Next investigation move"
-          summary="Choose a simple business direction to continue."
+          eyebrow="Workspace bridge"
+          title="Continue with this dataset"
+          summary="Use the current dataset context for a guided next step."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
-            <p className="section-label">Investigation guidance</p>
-            <h2>Choose what to explore next</h2>
+            <p className="section-label">Workspace bridge</p>
+            <h2>Choose a simple follow-up</h2>
           </div>
           <div className="human-suggestion-grid">
             {humanGuidanceCards.map((suggestion) => (
