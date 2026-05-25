@@ -181,11 +181,7 @@ function CommandLauncher({ open, commands, onClose }: CommandLauncherProps) {
                           <strong>{command.title}</strong>
                           <small>{command.description}</small>
                         </span>
-                        {command.disabled ? (
-                          <em>{command.disabledReason || "Unavailable"}</em>
-                        ) : (
-                          <kbd>Enter</kbd>
-                        )}
+                        {command.disabled && <em>{command.disabledReason || "Unavailable"}</em>}
                       </button>
                     );
                   })}
@@ -193,6 +189,11 @@ function CommandLauncher({ open, commands, onClose }: CommandLauncherProps) {
               </section>
             ))
           )}
+        </div>
+        <div className="command-launcher-footer" aria-hidden="true">
+          <span>↑↓ navigate</span>
+          <span>Enter select</span>
+          <span>Esc close</span>
         </div>
       </section>
     </div>
