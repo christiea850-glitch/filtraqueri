@@ -48,7 +48,7 @@ const createPreviewMessage = (status: SqlExecutionStatus) => {
   }
 
   if (status === "draft-saved") {
-    return "Draft saved.";
+    return "Query saved to Saved Drafts.";
   }
 
   return "No results yet.";
@@ -193,7 +193,7 @@ function useSqlWorkspace(
     if (!trimmedSql) return;
 
     const fallbackName = `Draft ${savedDrafts.length + 1}`;
-    const requestedName = window.prompt("Name this SQL draft", fallbackName);
+    const requestedName = window.prompt("Name this query for Saved Drafts", fallbackName);
     if (requestedName === null) return;
     const draftName = requestedName.trim() || fallbackName;
     const timestamp = new Date().toISOString();
@@ -224,7 +224,7 @@ function useSqlWorkspace(
             sql: draft.sql,
             dialect: selectedDialect,
             tags: ["draft"],
-            description: "Saved from the SQL Workspace draft action.",
+            description: "Saved from the SQL Workspace Save Query action.",
           },
         ),
         {
@@ -256,7 +256,7 @@ function useSqlWorkspace(
         sql: draft.sql,
         dialect: draft.dialect,
         tags: ["draft"],
-        description: "Saved from the SQL Workspace draft action.",
+        description: "Saved from the SQL Workspace Save Query action.",
       }),
     );
   };

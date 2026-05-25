@@ -37,7 +37,7 @@
     "lastOpenedContext": "sqlWorkspace",
     "draftMetadata": {
       "draftCount": 6,
-      "lastDraftSavedAt": "2026-05-25T02:39:31.094Z"
+      "lastDraftSavedAt": "2026-05-25T02:49:42.408Z"
     },
     "snippetMetadata": {
       "snippetCount": 0,
@@ -48,9 +48,9 @@
         "version": 1,
         "id": "1779676686428",
         "label": "Draft 7",
-        "sql": "SELECT\n  \"realtor_id\",\n  COUNT(*) AS row_count\nFROM \"data\"\nGROUP BY \"realtor_id\"\nORDER BY row_count DESC\nLIMIT 100;",
+        "sql": "",
         "selectedDialect": "mariadb",
-        "updatedAt": "2026-05-25T02:39:31.094Z"
+        "updatedAt": "2026-05-25T02:49:42.408Z"
       },
       {
         "version": 1,
@@ -94,7 +94,7 @@
       }
     ],
     "snippets": [],
-    "updatedAt": "2026-05-25T02:39:58.185Z"
+    "updatedAt": "2026-05-25T02:50:10.697Z"
   },
   "datasets": [
     {
@@ -4397,8 +4397,8 @@
     }
   ],
   "created_at": "2026-05-24T22:48:12.481877+00:00",
-  "last_opened_at": "2026-05-25T02:39:58.705081+00:00",
-  "updated_at": "2026-05-25T02:39:58.761283+00:00",
+  "last_opened_at": "2026-05-25T02:50:11.239304+00:00",
+  "updated_at": "2026-05-25T02:50:11.290039+00:00",
   "workbook_metadata": {
     "workbook_id": "d9846836ff374a09a6e59494256dbdd6",
     "workspace_id": "d9846836ff374a09a6e59494256dbdd6",

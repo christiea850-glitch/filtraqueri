@@ -209,7 +209,7 @@ function SavedDraftsPage({
   };
 
   return (
-    <section className="sql-drafts-page" aria-label="Saved SQL drafts">
+    <section className="sql-drafts-page" aria-label="Saved Drafts">
       <div className="sql-result-page-header">
         <button type="button" className="secondary-button" onClick={onBack}>
           Back to Analyst
@@ -217,7 +217,7 @@ function SavedDraftsPage({
         <div>
           <p className="section-label">Analyst SQL</p>
           <h2>Saved Drafts</h2>
-          <p>{drafts.length.toLocaleString()} saved draft{drafts.length === 1 ? "" : "s"}</p>
+          <p>{drafts.length.toLocaleString()} Saved Draft{drafts.length === 1 ? "" : "s"}</p>
         </div>
         <div className="sql-result-page-actions">
           <button
@@ -234,16 +234,16 @@ function SavedDraftsPage({
             onClick={onBulkDelete}
             disabled={selectedDraftIds.length === 0}
           >
-            Delete selected
+            Delete selected Saved Drafts
           </button>
         </div>
       </div>
 
       {drafts.length === 0 ? (
         <div className="empty-state compact-empty">
-          <p className="section-label">No drafts</p>
-          <h2>No saved drafts yet</h2>
-          <p>Save a SQL draft from the editor to manage it here.</p>
+          <p className="section-label">No Saved Drafts</p>
+          <h2>No Saved Drafts yet</h2>
+          <p>Save a query from the editor to manage it in Saved Drafts.</p>
         </div>
       ) : (
         <div className="sql-drafts-list">
@@ -269,7 +269,7 @@ function SavedDraftsPage({
                   Rename
                 </button>
                 <button type="button" className="text-button" onClick={() => onDeleteDraft(draft)}>
-                  Delete
+                  Delete Saved Draft
                 </button>
               </div>
             </article>
@@ -296,7 +296,7 @@ function DraftDetailPage({
   onDeleteDraft: (draft: SqlQueryDraft) => void;
 }) {
   return (
-    <section className="sql-draft-detail-page" aria-label="Saved SQL draft detail">
+    <section className="sql-draft-detail-page" aria-label="Saved Draft detail">
       <div className="sql-result-page-header">
         <div className="sql-draft-detail-nav">
           <button type="button" className="secondary-button" onClick={onBackToDrafts}>
@@ -307,7 +307,7 @@ function DraftDetailPage({
           </button>
         </div>
         <div>
-          <p className="section-label">Saved draft</p>
+          <p className="section-label">Saved Draft</p>
           <h2>{draft.name}</h2>
           <p>
             {draft.dialect.toUpperCase()} | Saved {formatDraftTimestamp(draft.savedAt)}
@@ -315,13 +315,13 @@ function DraftDetailPage({
         </div>
         <div className="sql-result-page-actions">
           <button type="button" className="primary-button" onClick={() => onLoadDraft(draft)}>
-            Open in editor
+            Open Saved Draft
           </button>
           <button type="button" className="secondary-button" onClick={() => onRenameDraft(draft)}>
             Rename
           </button>
           <button type="button" className="text-button" onClick={() => onDeleteDraft(draft)}>
-            Delete
+            Delete Saved Draft
           </button>
         </div>
       </div>
@@ -370,13 +370,13 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
     setFocusedView("draft-detail");
   };
   const requestRenameDraft = (draft: SqlQueryDraft) => {
-    const nextName = window.prompt("Rename saved draft", draft.name);
+    const nextName = window.prompt("Rename Saved Draft", draft.name);
     if (nextName === null) return;
     renameDraft(draft.id, nextName);
   };
   const requestDeleteDraft = (draft: SqlQueryDraft) => {
     const shouldDelete = window.confirm(
-      "Deleting saved draft will permanently erase this information.",
+      "Deleting Saved Draft will permanently erase this information.",
     );
     if (!shouldDelete) return;
 
@@ -389,7 +389,7 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
   };
   const requestBulkDelete = () => {
     const shouldDelete = window.confirm(
-      "Deleting selected saved drafts will permanently erase all selected draft information.",
+      "Deleting selected Saved Drafts will permanently erase all selected draft information.",
     );
     if (!shouldDelete) return;
 

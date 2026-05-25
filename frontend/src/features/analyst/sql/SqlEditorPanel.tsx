@@ -20,7 +20,7 @@ type SqlEditorPanelProps = {
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
   idle: "Ready",
-  "draft-saved": "Draft saved",
+  "draft-saved": "Query saved to Saved Drafts",
   "explain-ready": "Explain placeholder ready",
   running: "Running query",
   success: "Query complete",
@@ -76,7 +76,7 @@ function SqlEditorPanel({
             Explain query
           </button>
           <button type="button" className="secondary-button" onClick={editor.onSaveDraft}>
-            Save draft
+            Save Query
           </button>
           <button type="button" className="secondary-button" onClick={onOpenSavedDrafts}>
             Saved Drafts
