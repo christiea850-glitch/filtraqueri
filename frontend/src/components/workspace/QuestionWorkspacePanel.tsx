@@ -183,6 +183,8 @@ const createQuestionReviewHints = (question: string): QuestionReviewHints => {
   };
 };
 
+const formatPlanLabel = (value: string) => value.replace(/_/g, " ");
+
 function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
@@ -291,6 +293,78 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
       <small>{candidate.matchReason.replace(/_/g, " ")}</small>
     </button>
   );
+
+  const investigationBlueprint = useMemo(() => {
+    if (!schemaDraftPlan || draft.draftStatus !== "drafted") return null;
+
+    const primaryDimension = selectedDimension || schemaDraftPlan.candidateDimensions[0]?.columnName || null;
+    const primaryMeasure = selectedMeasure || schemaDraftPlan.candidateMeasures[0]?.columnName || null;
+    const primaryDateField = selectedDateField || schemaDraftPlan.candidateDateFields[0]?.columnName || null;
+    const fieldsToInspect = [primaryDimension, primaryMeasure, primaryDateField].filter(Boolean) as string[];
+    const missingSelections = [
+      schemaDraftPlan.candidateDimensions.length > 0 && !selectedDimension
+        ? "choose the grouping or comparison field"
+        : "",
+      schemaDraftPlan.candidateMeasures.length > 0 && !selectedMeasure
+        ? "choose the measure to evaluate"
+        : "",
+      schemaDraftPlan.candidateDateFields.length > 0 &&
+      ["trend", "timeline_review"].includes(schemaDraftPlan.detectedIntent) &&
+      !selectedDateField
+        ? "choose the timeline field"
+        : "",
+    ].filter(Boolean);
+    const missingRequirements = [
+      ...schemaDraftPlan.missingRequirements.map((requirement) => formatPlanLabel(requirement)),
+      ...missingSelections,
+    ];
+
+    const groupingDirection = primaryDimension
+      ? `Compare or group by ${primaryDimension}`
+      : "Clarify which business entity or group should anchor the review";
+    const measureDirection = primaryMeasure
+      ? `Use ${primaryMeasure} as the business measure`
+      : "Use record counts or clarify the business metric";
+    const timeDirection = primaryDateField
+      ? `Review timing with ${primaryDateField}`
+      : "Timeline review is optional unless the question asks for change over time";
+
+    const calculationApproachByIntent: Record<string, string> = {
+      ranking: `${groupingDirection}; rank results using ${primaryMeasure || "a confirmed metric or count"}.`,
+      comparison: `${groupingDirection}; compare differences using ${primaryMeasure || "a confirmed metric or count"}.`,
+      trend: `${timeDirection}; summarize movement across time.`,
+      timeline_review: `${timeDirection}; inspect the most recent activity sequence.`,
+      aggregation: `${measureDirection}; summarize the selected business value.`,
+      distribution: `${groupingDirection}; review spread and concentration.`,
+      anomaly_review: `Inspect ${fieldsToInspect.join(", ") || "matched fields"} for unusual values before any result is trusted.`,
+      segmentation: `${groupingDirection}; organize records into meaningful business segments.`,
+      unknown: "Clarify the business outcome before preparing executable logic.",
+    };
+
+    const whyThisApproach = primaryDimension || primaryMeasure || primaryDateField
+      ? "The matched fields give FiltraQueri a practical way to connect the question to the dataset without guessing. The next safe step is to confirm the field choices before executable logic exists."
+      : "The question needs a clearer connection to dataset fields before FiltraQueri can prepare reliable logic.";
+
+    return {
+      fieldsToInspect: fieldsToInspect.length > 0 ? fieldsToInspect.join(", ") : "Needs field clarification",
+      groupingDirection,
+      calculationApproach: calculationApproachByIntent[schemaDraftPlan.detectedIntent],
+      expectedOutputShape: formatPlanLabel(schemaDraftPlan.plannedOutputType),
+      validationChecks: [
+        "Confirm selected fields match the business meaning",
+        "Check missing requirements and ambiguity",
+        "Keep generated logic reviewable before execution",
+      ],
+      whyThisApproach,
+      missingRequirements: Array.from(new Set(missingRequirements)),
+    };
+  }, [
+    draft.draftStatus,
+    schemaDraftPlan,
+    selectedDateField,
+    selectedDimension,
+    selectedMeasure,
+  ]);
 
   const prepareDraft = () => {
     const nextQuestion = rawQuestion.trim();
@@ -561,6 +635,74 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
                   </div>
                 </div>
               )}
+            </section>
+          )}
+
+          {investigationBlueprint && (
+            <section className="question-workspace-blueprint" aria-label="Investigation blueprint">
+              <div className="question-workspace-section-heading">
+                <p className="section-label">Investigation Blueprint</p>
+                <h4>Planning only - no query has run.</h4>
+              </div>
+
+              <div className="question-workspace-blueprint-grid">
+                <article>
+                  <span>Business question</span>
+                  <strong>{draft.rawQuestion}</strong>
+                </article>
+                <article>
+                  <span>Fields FiltraQueri would inspect</span>
+                  <strong>{investigationBlueprint.fieldsToInspect}</strong>
+                </article>
+                <article>
+                  <span>Grouping / comparison direction</span>
+                  <strong>{investigationBlueprint.groupingDirection}</strong>
+                </article>
+                <article>
+                  <span>Possible calculation approach</span>
+                  <strong>{investigationBlueprint.calculationApproach}</strong>
+                </article>
+                <article>
+                  <span>Expected output shape</span>
+                  <strong>{investigationBlueprint.expectedOutputShape}</strong>
+                </article>
+                <article>
+                  <span>Validation checks before execution</span>
+                  <ul>
+                    {investigationBlueprint.validationChecks.map((check) => (
+                      <li key={check}>{check}</li>
+                    ))}
+                  </ul>
+                </article>
+              </div>
+
+              <div className="question-workspace-blueprint-note">
+                <span>Why this approach?</span>
+                <p>{investigationBlueprint.whyThisApproach}</p>
+              </div>
+
+              <div className="question-workspace-blueprint-note">
+                <span>Before execution, FiltraQueri would still need...</span>
+                {investigationBlueprint.missingRequirements.length > 0 ? (
+                  <ul>
+                    {investigationBlueprint.missingRequirements.map((requirement) => (
+                      <li key={requirement}>{requirement}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Field choices look ready for future logic generation, but no executable plan exists yet.</p>
+                )}
+              </div>
+
+              <div className="question-workspace-future-path">
+                <span>Future execution path</span>
+                <ol>
+                  <li>Prepare Query Builder request</li>
+                  <li>Review generated logic</li>
+                  <li>Run through existing execution engine</li>
+                  <li>Show real result in ResultsGrid</li>
+                </ol>
+              </div>
             </section>
           )}
 
