@@ -189,6 +189,19 @@ const formatPlanLabel = (value: string) => value.replace(/_/g, " ");
 const formatNullablePlanValue = (value: string | number | null) =>
   value === null ? "null" : String(value);
 
+const formatFutureOutputPreview = (value: string) => {
+  if (value === "ranking_list") return "ranking table";
+  if (value === "comparison_table") return "comparison table";
+  return formatPlanLabel(value);
+};
+
+const formatAggregationPreview = (idea: string, field: string | null) => {
+  if (idea === "none") return "No measure preview";
+  if (idea === "count_records") return "COUNT records";
+  if (idea === "count_distinct") return field ? `COUNT DISTINCT ${field}` : "COUNT DISTINCT reviewed field";
+  return field ? `${idea.toUpperCase()} ${field}` : `${idea.toUpperCase()} reviewed measure`;
+};
+
 function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
@@ -401,6 +414,40 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
           : "",
       ].filter(Boolean).join(" ")
     : "";
+
+  const futureExecutionPreview = controlledLogicDraft
+    ? {
+        groupingPreview: controlledLogicDraft.grouping.fields.join(", ") || "No grouping preview",
+        measurePreview: formatAggregationPreview(
+          controlledLogicDraft.aggregation.idea,
+          controlledLogicDraft.aggregation.field,
+        ),
+        sortPreview: controlledLogicDraft.sorting
+          ? `${controlledLogicDraft.sorting.direction?.toUpperCase() || "REVIEW"} ${
+              controlledLogicDraft.sorting.field || "draft value"
+            }`
+          : "No sort preview",
+        plannedOutput: formatFutureOutputPreview(controlledLogicDraft.plannedOutputType),
+        limitPreview: controlledLogicDraft.limit.value
+          ? `Top ${controlledLogicDraft.limit.value} rows`
+          : "No limit preview",
+        narrativeItems: [
+          controlledLogicDraft.grouping.fields.length > 0
+            ? `Future execution would likely group by ${controlledLogicDraft.grouping.fields.join(", ")}.`
+            : "Future execution would not add grouping until the needed field is confirmed.",
+          controlledLogicDraft.aggregation.field
+            ? `Future execution would likely aggregate ${controlledLogicDraft.aggregation.field}.`
+            : "Future execution would likely use record count or wait for a reviewed measure.",
+          controlledLogicDraft.sorting?.direction
+            ? `Future execution would likely sort ${controlledLogicDraft.sorting.direction === "desc" ? "descending" : "ascending"}.`
+            : "Future execution would not add sorting unless the reviewed logic needs it.",
+          `Future execution would likely display a ${formatFutureOutputPreview(controlledLogicDraft.plannedOutputType)}.`,
+          controlledLogicDraft.limit.value
+            ? `Future execution would likely limit to top ${controlledLogicDraft.limit.value} rows.`
+            : "Future execution would not add a row limit for this draft.",
+        ],
+      }
+    : null;
 
   const prepareDraft = () => {
     const nextQuestion = rawQuestion.trim();
@@ -855,6 +902,74 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
                   )}
                 </div>
               </div>
+
+              {futureExecutionPreview && (
+                <section
+                  className="question-workspace-execution-preview"
+                  aria-label="Future Query Builder planning preview"
+                >
+                  <div className="question-workspace-section-heading">
+                    <p className="section-label">Future execution preview</p>
+                    <h4>Future Query Builder Planning Preview</h4>
+                  </div>
+
+                  <p className="question-workspace-preview-explainer">
+                    This preview helps explain how FiltraQueri may structure the investigation later before any real execution occurs.
+                  </p>
+
+                  <ul className="question-workspace-preview-list">
+                    {futureExecutionPreview.narrativeItems.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+
+                  <div className="question-workspace-preview-grid">
+                    <article>
+                      <span>Grouping Preview</span>
+                      <strong>{futureExecutionPreview.groupingPreview}</strong>
+                      <small>Text preview only</small>
+                    </article>
+                    <article>
+                      <span>Measure Preview</span>
+                      <strong>{futureExecutionPreview.measurePreview}</strong>
+                      <small>Text preview only</small>
+                    </article>
+                    <article>
+                      <span>Sort Preview</span>
+                      <strong>{futureExecutionPreview.sortPreview}</strong>
+                      <small>Text preview only</small>
+                    </article>
+                    <article>
+                      <span>Planned Output</span>
+                      <strong>{futureExecutionPreview.plannedOutput}</strong>
+                      <small>Display expectation only</small>
+                    </article>
+                    <article>
+                      <span>Limit Preview</span>
+                      <strong>{futureExecutionPreview.limitPreview}</strong>
+                      <small>Text preview only</small>
+                    </article>
+                  </div>
+
+                  <div className="question-workspace-governance-panel">
+                    <span>Protected governance state</span>
+                    <dl>
+                      <div>
+                        <dt>executionStatus</dt>
+                        <dd>{controlledLogicDraft.executionStatus}</dd>
+                      </div>
+                      <div>
+                        <dt>generatedSql</dt>
+                        <dd>{formatNullablePlanValue(controlledLogicDraft.generatedSql)}</dd>
+                      </div>
+                      <div>
+                        <dt>generatedQueryBuilderRequest</dt>
+                        <dd>{formatNullablePlanValue(controlledLogicDraft.generatedQueryBuilderRequest)}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </section>
+              )}
             </section>
           )}
 

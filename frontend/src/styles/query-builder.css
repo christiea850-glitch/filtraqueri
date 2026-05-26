@@ -339,6 +339,110 @@
   gap: 8px;
 }
 
+.question-workspace-execution-preview {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #dbe5ef;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.question-workspace-preview-explainer {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.question-workspace-preview-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.question-workspace-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.question-workspace-preview-grid article {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.question-workspace-preview-grid span,
+.question-workspace-governance-panel > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.question-workspace-preview-grid strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.question-workspace-preview-grid small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.question-workspace-governance-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #fecdd3;
+  border-radius: 12px;
+  background: #fff1f2;
+}
+
+.question-workspace-governance-panel dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.question-workspace-governance-panel dl div {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.5fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.question-workspace-governance-panel dt,
+.question-workspace-governance-panel dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.question-workspace-governance-panel dt {
+  color: #9f1239;
+  font-weight: 700;
+}
+
+.question-workspace-governance-panel dd {
+  overflow: hidden;
+  color: #172033;
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
 .question-workspace-blueprint-grid ul,
 .question-workspace-blueprint-note ul,
 .question-workspace-future-path ol {
@@ -577,6 +681,7 @@
   .question-workspace-schema-grid,
   .question-workspace-blueprint-grid,
   .question-workspace-logic-columns,
+  .question-workspace-governance-panel dl div,
   .question-workspace-timeline {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -588,6 +693,7 @@
   .question-workspace-schema-grid,
   .question-workspace-blueprint-grid,
   .question-workspace-logic-columns,
+  .question-workspace-governance-panel dl div,
   .question-workspace-timeline {
     grid-template-columns: 1fr;
   }
