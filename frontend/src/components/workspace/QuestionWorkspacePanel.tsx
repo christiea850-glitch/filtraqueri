@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
+import { buildControlledLogicDraft } from "../../features/questionWorkspace/questionLogicDraftBuilder";
 import { createSchemaAwareDraftPlan } from "../../features/questionWorkspace/schemaQuestionTranslator";
 import type {
   CandidateFieldMatch,
@@ -185,6 +186,9 @@ const createQuestionReviewHints = (question: string): QuestionReviewHints => {
 
 const formatPlanLabel = (value: string) => value.replace(/_/g, " ");
 
+const formatNullablePlanValue = (value: string | number | null) =>
+  value === null ? "null" : String(value);
+
 function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
@@ -365,6 +369,38 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
     selectedDimension,
     selectedMeasure,
   ]);
+
+  const controlledLogicDraft = useMemo(() => {
+    if (!schemaDraftPlan || draft.draftStatus !== "drafted") return null;
+
+    return buildControlledLogicDraft({
+      draftPlan: schemaDraftPlan,
+      schema: dataset.schema,
+      selectedFields: {
+        dimension: selectedDimension,
+        measure: selectedMeasure,
+        dateField: selectedDateField,
+      },
+    });
+  }, [
+    dataset.schema,
+    draft.draftStatus,
+    schemaDraftPlan,
+    selectedDateField,
+    selectedDimension,
+    selectedMeasure,
+  ]);
+
+  const controlledLogicSummary = controlledLogicDraft
+    ? [
+        controlledLogicDraft.grouping.summary,
+        controlledLogicDraft.aggregation.summary,
+        controlledLogicDraft.sorting?.reason || "",
+        controlledLogicDraft.limit.value
+          ? `Use a ${controlledLogicDraft.limit.value}-row limit idea for review only.`
+          : "",
+      ].filter(Boolean).join(" ")
+    : "";
 
   const prepareDraft = () => {
     const nextQuestion = rawQuestion.trim();
@@ -702,6 +738,122 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
                   <li>Run through existing execution engine</li>
                   <li>Show real result in ResultsGrid</li>
                 </ol>
+              </div>
+            </section>
+          )}
+
+          {controlledLogicDraft && (
+            <section className="question-workspace-logic-draft" aria-label="Controlled logic draft">
+              <div className="question-workspace-section-heading">
+                <p className="section-label">Draft logic only</p>
+                <h4>No executable request exists.</h4>
+              </div>
+
+              <div className="question-workspace-protection-copy">
+                <span>No query has been generated.</span>
+                <span>No SQL has been generated.</span>
+                <span>No backend query has executed.</span>
+                <span>Future Query Builder request has not been created yet.</span>
+              </div>
+
+              {controlledLogicDraft.blockingRequirements.length > 0 && (
+                <p className="question-workspace-fallback">
+                  More clarification is needed before future logic generation.
+                </p>
+              )}
+
+              <div className="question-workspace-logic-summary">
+                <span>Logic summary</span>
+                <p>{controlledLogicSummary}</p>
+              </div>
+
+              <div className="question-workspace-logic-grid">
+                <article>
+                  <span>Selected fields</span>
+                  <strong>
+                    Dimension: {controlledLogicDraft.selectedFields.dimension || "not selected"}
+                  </strong>
+                  <small>Measure: {controlledLogicDraft.selectedFields.measure || "not selected"}</small>
+                  <small>Date field: {controlledLogicDraft.selectedFields.dateField || "not selected"}</small>
+                </article>
+                <article>
+                  <span>Grouping idea</span>
+                  <strong>
+                    {controlledLogicDraft.grouping.fields.length > 0
+                      ? controlledLogicDraft.grouping.fields.join(", ")
+                      : "No grouping prepared"}
+                  </strong>
+                  <small>{controlledLogicDraft.grouping.summary}</small>
+                </article>
+                <article>
+                  <span>Aggregation idea</span>
+                  <strong>{formatPlanLabel(controlledLogicDraft.aggregation.idea)}</strong>
+                  <small>
+                    Field: {controlledLogicDraft.aggregation.field || "record count or none"}
+                  </small>
+                </article>
+                <article>
+                  <span>Sorting idea</span>
+                  <strong>
+                    {controlledLogicDraft.sorting
+                      ? `${controlledLogicDraft.sorting.direction || "review"} ${controlledLogicDraft.sorting.field || "draft value"}`
+                      : "No sorting prepared"}
+                  </strong>
+                  <small>{controlledLogicDraft.sorting?.reason || "No sort idea is needed for this draft."}</small>
+                </article>
+                <article>
+                  <span>Limit idea</span>
+                  <strong>{formatNullablePlanValue(controlledLogicDraft.limit.value)}</strong>
+                  <small>{controlledLogicDraft.limit.reason}</small>
+                </article>
+                <article>
+                  <span>Planned output type</span>
+                  <strong>{formatPlanLabel(controlledLogicDraft.plannedOutputType)}</strong>
+                  <small>Business-readable draft shape only</small>
+                </article>
+                <article>
+                  <span>Execution status</span>
+                  <strong>{controlledLogicDraft.executionStatus}</strong>
+                  <small>Draft status: {formatPlanLabel(controlledLogicDraft.draftStatus)}</small>
+                </article>
+                <article>
+                  <span>generatedSql</span>
+                  <strong>{formatNullablePlanValue(controlledLogicDraft.generatedSql)}</strong>
+                  <small>No SQL has been generated.</small>
+                </article>
+                <article>
+                  <span>generatedQueryBuilderRequest</span>
+                  <strong>{formatNullablePlanValue(controlledLogicDraft.generatedQueryBuilderRequest)}</strong>
+                  <small>Future Query Builder request has not been created yet.</small>
+                </article>
+              </div>
+
+              <div className="question-workspace-logic-columns">
+                <div className="question-workspace-blueprint-note">
+                  <span>Validation warnings</span>
+                  {controlledLogicDraft.validationWarnings.length > 0 ? (
+                    <ul>
+                      {controlledLogicDraft.validationWarnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No validation warnings for this draft.</p>
+                  )}
+                </div>
+
+                <div className="question-workspace-blueprint-note">
+                  <span>Blocking requirements</span>
+                  {controlledLogicDraft.blockingRequirements.length > 0 ? (
+                    <ul>
+                      {controlledLogicDraft.blockingRequirements.map((requirement) => (
+                        <li key={requirement}>{formatPlanLabel(requirement)}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>No blocking requirements remain for this advisory draft.</p>
+                  )}
+                </div>
               </div>
             </section>
           )}
