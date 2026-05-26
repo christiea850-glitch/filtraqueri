@@ -17,7 +17,8 @@ import type {
 } from "../features/workspace/workspaceManifestTypes";
 import type { WorkspaceManifestSummary } from "../features/workspace/workspaceManagerTypes";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL;
 
 export type ExportRequest = {
   source: "filter" | "preview" | "query_builder";
@@ -80,13 +81,17 @@ async function parseError(response: Response, fallbackMessage: string) {
   }
 }
 
+function backendReachabilityMessage() {
+  return `Could not reach FiltraQueri backend at ${API_BASE_URL}. Confirm the backend is running and reachable.`;
+}
+
 async function requestJson<T>(url: string, init: RequestInit, fallbackMessage: string): Promise<T> {
   let response: Response;
 
   try {
     response = await fetch(url, init);
   } catch {
-    throw new Error("Backend is not running. Start it with: python -m uvicorn app.main:app --reload");
+    throw new Error(backendReachabilityMessage());
   }
 
   if (!response.ok) {
@@ -94,6 +99,18 @@ async function requestJson<T>(url: string, init: RequestInit, fallbackMessage: s
   }
 
   return response.json() as Promise<T>;
+}
+
+export async function checkBackendHealth() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      method: "GET",
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function uploadDataset(file: File) {
@@ -304,7 +321,7 @@ export async function exportDataset(datasetId: string, request: ExportRequest) {
       body: JSON.stringify(request),
     });
   } catch {
-    throw new Error("Backend is not running. Start it with: python -m uvicorn app.main:app --reload");
+    throw new Error(backendReachabilityMessage());
   }
 
   if (!response.ok) {
