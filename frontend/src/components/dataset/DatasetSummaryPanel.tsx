@@ -257,10 +257,10 @@ function WorksheetSelector({
   if (worksheets.length === 0) return null;
 
   return (
-    <div className="worksheet-selector" aria-label="Workbook business areas">
+    <div className="worksheet-selector" aria-label="Workbook sources">
       <div className="worksheet-selector-header">
         <div>
-          <p className="section-label">Business areas</p>
+          <p className="section-label">Sources</p>
           <h4>Available sources</h4>
         </div>
         <span className="dataset-count-pill">{worksheets.length}</span>
@@ -311,17 +311,17 @@ const workbookRoleLabels: Record<WorkbookEntityRole, string> = {
 };
 
 const workbookRoleActivityLabels: Record<WorkbookEntityRole, string> = {
-  customers: "customer behavior",
-  orders: "order activity",
-  invoices: "billing activity",
-  products: "product movement",
-  employees: "workforce activity",
-  managers: "management operations",
-  transactions: "transaction activity",
-  inventory: "inventory movement",
-  payments: "payment activity",
-  regions: "regional performance",
-  unknown: "business activity",
+  customers: "customer fields",
+  orders: "order fields",
+  invoices: "invoice fields",
+  products: "product fields",
+  employees: "employee fields",
+  managers: "manager fields",
+  transactions: "transaction fields",
+  inventory: "inventory fields",
+  payments: "payment fields",
+  regions: "regional fields",
+  unknown: "dataset fields",
 };
 
 const toBusinessConnectionGuidance = (connection: {
@@ -331,36 +331,36 @@ const toBusinessConnectionGuidance = (connection: {
   targetColumn: string;
   guidance: string;
 }) => {
-  const source = connection.sourceWorksheetName || "One business area";
-  const target = connection.targetWorksheetName || "another business area";
+  const source = connection.sourceWorksheetName || "One source";
+  const target = connection.targetWorksheetName || "another source";
   const combined = `${source} ${target} ${connection.sourceColumn} ${connection.targetColumn} ${connection.guidance}`.toLowerCase();
 
   if (combined.includes("tenant") && combined.includes("lease")) {
-    return "Tenant activity may relate to lease timelines.";
+    return "Tenant fields may relate to lease timeline fields.";
   }
   if (combined.includes("payment") && (combined.includes("tenant") || combined.includes("lease"))) {
-    return "Payments appear connected to tenant or lease operations.";
+    return "Payment fields appear connected to tenant or lease records.";
   }
   if (combined.includes("property") && combined.includes("manager")) {
-    return "Properties and managers likely interact operationally.";
+    return "Property and manager fields may describe related records.";
   }
   if (combined.includes("lease") && combined.includes("payment")) {
-    return "Lease activity may influence payment workflows.";
+    return "Lease fields may connect to payment records.";
   }
   if (combined.includes("customer") && (combined.includes("order") || combined.includes("transaction"))) {
-    return "Customer activity may connect to purchasing behavior.";
+    return "Customer fields may connect to order or transaction records.";
   }
   if (combined.includes("product") && (combined.includes("order") || combined.includes("transaction") || combined.includes("invoice"))) {
-    return "Product movement may connect to sales or billing activity.";
+    return "Product fields may connect to order, transaction, or invoice records.";
   }
   if (combined.includes("inventory") && combined.includes("product")) {
-    return "Inventory movement may relate to product performance.";
+    return "Inventory fields may relate to product records.";
   }
   if (combined.includes("invoice") && combined.includes("payment")) {
-    return "Billing activity may connect to payment movement.";
+    return "Invoice fields may connect to payment records.";
   }
 
-  return `${source} may relate to ${target} in this operation.`;
+  return `${source} may relate to ${target} in this dataset.`;
 };
 
 function WorkbookRelationshipSummaryPanel({
@@ -377,7 +377,7 @@ function WorkbookRelationshipSummaryPanel({
   ).length;
   const workbookNarrativeSummary =
     allConnections.length > 0
-      ? "Related business areas may describe the same operation from different angles."
+      ? "Related sources may describe the same records from different angles."
       : intelligence.humanSummary;
   const formatConfidence = (value: string) =>
     value ? `${value.charAt(0).toUpperCase()}${value.slice(1)} confidence` : "Confidence";
@@ -388,22 +388,22 @@ function WorkbookRelationshipSummaryPanel({
   };
 
   return (
-    <section className="workbook-intelligence-panel" aria-label="Connected business operations">
+    <section className="workbook-intelligence-panel" aria-label="Connected sources">
       <div className="workbook-intelligence-heading">
         <div>
-          <p className="section-label">Connected operations</p>
-          <h3>Business areas that may work together</h3>
+          <p className="section-label">Connected sources</p>
+          <h3>Sources that may share fields</h3>
           <p>{workbookNarrativeSummary}</p>
         </div>
         <span>{intelligence.complexity}</span>
       </div>
-      <div className="workbook-intelligence-strip" aria-label="Business connection summary">
+      <div className="workbook-intelligence-strip" aria-label="Source connection summary">
         <span>
-          Operational links
+          Linked fields
           <strong>{intelligence.joinSuggestions.length.toLocaleString()}</strong>
         </span>
         <span>
-          Business areas
+          Source areas
           <strong>{detectedEntityCount.toLocaleString()}</strong>
         </span>
         <span>
@@ -412,7 +412,7 @@ function WorkbookRelationshipSummaryPanel({
         </span>
       </div>
       {visibleConnections.length > 0 && (
-        <div className="workbook-connection-list" aria-label="Likely business connections">
+        <div className="workbook-connection-list" aria-label="Likely source connections">
           {visibleConnections.map((connection) => (
             <article key={connection.id} className={`is-${connection.confidence}`}>
               <span className="workbook-connection-icon" aria-hidden="true">
@@ -458,7 +458,7 @@ function WorkbookRelationshipSummaryPanel({
         </div>
       )}
       <div className="workbook-intelligence-footer">
-        <div className="workbook-entity-list" aria-label="Detected business areas">
+        <div className="workbook-entity-list" aria-label="Detected source roles">
           {visibleRoles.map((role) => (
             <span key={role.worksheetId} title={role.reasons.join(" ")}>
               {workbookRoleLabels[role.role]}
@@ -739,14 +739,14 @@ function DatasetSummaryPanel({
   const datasetPurposeLabel =
     semanticHints.some((profile) => profile.role === "customer") &&
     (dataProfile?.possibleMetrics.length || 0) > 0
-      ? "This looks like customer transaction and sales data."
+      ? "This dataset includes entity fields and measurable values."
       : (dataProfile?.possibleMetrics.length || 0) > 0 && (dataProfile?.dateTimeFields.length || 0) > 0
-        ? "This looks like business activity data with values over time."
+        ? "This dataset includes measurable values over time."
         : (dataProfile?.possibleMetrics.length || 0) > 0
-          ? "This looks like business data with measurable values."
+          ? "This dataset includes measurable values."
           : "This dataset has structure available for investigation.";
   const understandingSignals = [
-    businessEntityHints[0] ? `Business entity: ${businessEntityHints[0].displayName}` : null,
+    businessEntityHints[0] ? `Entity field: ${businessEntityHints[0].displayName}` : null,
     dataProfile?.possibleMetrics[0] ? `Possible metric: ${dataProfile.possibleMetrics[0].name}` : null,
     dataProfile?.dateTimeFields[0] ? `Timeline signal: ${dataProfile.dateTimeFields[0].name}` : "Timeline signal needs review",
     dataProfile?.possibleDimensions[0] ? `Possible segment: ${dataProfile.possibleDimensions[0].name}` : null,
@@ -760,21 +760,21 @@ function DatasetSummaryPanel({
   ).slice(0, 4);
   const businessActivityLabels = Array.from(
     new Set([
-      ...(dataProfile?.possibleMetrics.length ? ["measurable activity"] : []),
-      ...(dataProfile?.dateTimeFields.length ? ["time-based activity"] : []),
-      ...(businessEntityHints.length ? ["entity behavior"] : []),
-      ...(dataProfile?.possibleDimensions.length ? ["comparison dimensions"] : []),
+      ...(dataProfile?.possibleMetrics.length ? ["measurable fields"] : []),
+      ...(dataProfile?.dateTimeFields.length ? ["date/time fields"] : []),
+      ...(businessEntityHints.length ? ["entity fields"] : []),
+      ...(dataProfile?.possibleDimensions.length ? ["comparison fields"] : []),
       ...workbookActivityLabels,
     ]),
   ).slice(0, 6);
   const businessNarrative =
     businessActivityLabels.length > 0
-      ? `Start with ${businessActivityLabels.slice(0, 3).join(", ")}. These cues help narrow the first useful question.`
+      ? `Start with ${businessActivityLabels.slice(0, 3).join(", ")}. These cues describe the dataset structure.`
       : "A first read is being prepared so you can choose a useful question sooner.";
   const businessSignals = [
     dataProfile?.possibleMetrics.length
       ? {
-          title: "Measurable activity",
+          title: "Measurable field",
           detail: `${dataProfile.possibleMetrics[0].name} may anchor the first review.`,
           tone: "opportunity" as HumanSignalTone,
           icon: "opportunity" as HumanSignalIcon,
@@ -789,7 +789,7 @@ function DatasetSummaryPanel({
         }
       : {
           title: "Timeline unclear",
-          detail: "Trend investigations may need a clearer date field.",
+          detail: "Time-based review may need a clearer date field.",
           tone: "attention" as HumanSignalTone,
           icon: "warning" as HumanSignalIcon,
         },
@@ -804,7 +804,7 @@ function DatasetSummaryPanel({
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
           title: "Connected sources",
-          detail: "Multiple sheets may describe the same business activity.",
+          detail: "Multiple sheets may describe related records.",
           tone: "connected" as HumanSignalTone,
           icon: "connected" as HumanSignalIcon,
         }
@@ -812,7 +812,7 @@ function DatasetSummaryPanel({
     dataProfile?.possibleDimensions.length
       ? {
           title: "Comparison field",
-          detail: `${dataProfile.possibleDimensions[0].name} may separate performance views.`,
+          detail: `${dataProfile.possibleDimensions[0].name} may separate records into groups.`,
           tone: "opportunity" as HumanSignalTone,
           icon: "comparison" as HumanSignalIcon,
         }
@@ -833,29 +833,29 @@ function DatasetSummaryPanel({
       : null,
     dataProfile?.possibleMetrics.length
       ? {
-          label: "Start with the key metric",
-          detail: "Use the strongest measurable field to frame a business question.",
+          label: "Review the key measure",
+          detail: "Review the strongest measurable field in the dataset.",
           icon: "opportunity" as HumanSignalIcon,
         }
       : null,
     businessEntityHints.length
       ? {
-          label: "Review entity behavior",
-          detail: "See whether customers, products, tenants, or similar records need attention.",
+          label: "Review entity fields",
+          detail: "Review the record groups or segments detected in the fields.",
           icon: "entity" as HumanSignalIcon,
         }
       : null,
     (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
       ? {
           label: "Review connected sources",
-          detail: "See how multiple sheets may describe one business activity.",
+          detail: "See how multiple sheets may describe related records.",
           icon: "connected" as HumanSignalIcon,
         }
       : null,
     dataProfile?.possibleDimensions.length
       ? {
           label: "Compare segments",
-          detail: "Check which categories, regions, or segments differ most.",
+          detail: "Review categories, regions, or segments detected in the data.",
           icon: "comparison" as HumanSignalIcon,
         }
       : null,
@@ -1081,19 +1081,19 @@ function DatasetSummaryPanel({
   if (dataset && activeOperationalWorkspace) {
     const workspaceTitle =
       activeOperationalWorkspace === "connections"
-        ? "Connected Sources Workspace"
+        ? "Connected sources"
         : activeOperationalWorkspace === "entities"
-          ? "Entity Workspace"
+          ? "Possible segments"
           : activeOperationalWorkspace === "kpis"
-            ? "KPI Workspace"
-            : "Trend Workspace";
+            ? "Possible measures"
+            : "Date/time fields";
     const workspaceSummary =
       activeOperationalWorkspace === "connections"
-        ? "Review source relationships and connected business areas without crowding the main Data page."
+        ? "Review source relationships and related worksheet fields."
         : activeOperationalWorkspace === "entities"
-          ? "Review entity and segment cues as dataset context."
+          ? "Review entity and segment fields detected in the dataset."
           : activeOperationalWorkspace === "kpis"
-            ? "Review metric candidates and business measures found in the dataset."
+            ? "Review measurable fields detected in the dataset."
             : "Review timeline fields and date signals found in the dataset.";
 
     return (
@@ -1106,14 +1106,14 @@ function DatasetSummaryPanel({
         <div className="focused-operational-workspace">
           <InvestigationThread>
             <WorkspaceHeader
-              eyebrow="Focused workspace"
+              eyebrow="Dataset detail"
               title={workspaceTitle}
               meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
             />
             <EvidenceRows>
               <div className="thread-section-heading">
-                <p className="section-label">Operational evidence</p>
-                <strong>Existing intelligence, focused for this workspace.</strong>
+                <p className="section-label">Available signals</p>
+                <strong>Detected fields and source context.</strong>
               </div>
               {activeOperationalWorkspace === "connections" &&
                 (workbookRelationshipIntelligence?.joinSuggestions.slice(0, 5).map((connection) => (
@@ -1149,8 +1149,8 @@ function DatasetSummaryPanel({
                   <EvidenceRow
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
-                    title="Entity signal needs review"
-                    description="No strong customer, product, tenant, or segment cue is available yet."
+                    title="Segment signal needs review"
+                    description="No strong entity or segment field is available yet."
                   />
                 ))}
               {activeOperationalWorkspace === "kpis" &&
@@ -1166,7 +1166,7 @@ function DatasetSummaryPanel({
                         tone="opportunity"
                         icon={<HumanSignalIcon name="opportunity" />}
                         title={label}
-                        description="Potential business measure for a focused review."
+                        description="Possible measurable field for dataset review."
                       />
                     ))
                 ) : (
@@ -1174,7 +1174,7 @@ function DatasetSummaryPanel({
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
                     title="Metric signal needs review"
-                    description="A stronger measurable field is needed before KPI review will be useful."
+                    description="A stronger measurable field is needed for measure review."
                   />
                 ))}
               {activeOperationalWorkspace === "trends" &&
@@ -1193,7 +1193,7 @@ function DatasetSummaryPanel({
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
                     title="Timeline signal needs review"
-                    description="Trend workspaces need a clearer date or time field."
+                    description="Time review needs a clearer date or time field."
                   />
                 ))}
             </EvidenceRows>
@@ -1206,7 +1206,7 @@ function DatasetSummaryPanel({
             />
             <InlineDisclosure summary="Advanced context" className="context-disclosure">
               <p>
-                This workspace reuses existing profile, workbook, and recommendation metadata. No execution or SQL is triggered here.
+                This detail view uses existing profile and workbook metadata. No execution or SQL is triggered here.
               </p>
             </InlineDisclosure>
           </ContextRail>
@@ -1252,7 +1252,7 @@ function DatasetSummaryPanel({
                 <InvestigationThreadStage ariaLabel="Understand" className="is-understand">
                   <p className="section-label">Understand</p>
                   <h3>{datasetPurposeLabel}</h3>
-                  <p>Early read of the business shape behind the data.</p>
+                  <p>Early read of the structure behind the data.</p>
                   <div className="evidence-chip-row" aria-label="Initial evidence">
                     {understandingSignals.map((signal) => (
                       <OperationalTag key={signal}>{signal}</OperationalTag>
@@ -1386,7 +1386,7 @@ function DatasetSummaryPanel({
                     <div className="data-workflow-menu" role="menu" aria-label="Dataset follow-up options">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
                         <strong>What the data suggests</strong>
-                        <span>Review business signals and useful fields.</span>
+                        <span>Review dataset signals and useful fields.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
                         <strong>Investigation readiness</strong>
@@ -1423,12 +1423,12 @@ function DatasetSummaryPanel({
                   {activeWorkflowMenu === "semantic" && (
                     <div className="data-workflow-menu" role="menu" aria-label="Dataset details">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
-                        <strong>Business meaning</strong>
+                        <strong>Dataset meaning</strong>
                         <span>Review what these fields may represent.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
                         <strong>Possible measures</strong>
-                        <span>Review business measurements found in the data.</span>
+                        <span>Review measurable fields found in the data.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
                         <strong>Exploration guidance</strong>
@@ -1479,7 +1479,7 @@ function DatasetSummaryPanel({
           </div>
         ) : (
           <div className="dataset-empty-guidance">
-            <p>No dataset open. Choose a CSV or Excel workbook to start finding the business story.</p>
+            <p>No dataset open. Choose a CSV or Excel workbook to review its structure.</p>
             <button type="button" className="primary-button" onClick={onOpenDataset}>
               Choose file
             </button>
@@ -1532,7 +1532,7 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Data detail"
           title="Available sources"
-          summary="Switch worksheets without leaving the Data workspace."
+          summary="Switch worksheets without leaving the Data tab."
           onBack={closeDrillIn}
         >
           <WorksheetSelector
@@ -1546,7 +1546,7 @@ function DatasetSummaryPanel({
 
       {dataset && dataProfile && activeFocusedWorkflow === "dataIntelligence" && (
         <DrillInDetailPanel
-          eyebrow="Business understanding"
+          eyebrow="Dataset detail"
           title="What the data suggests"
           summary={humanSummary}
           onBack={closeDrillIn}
@@ -1556,7 +1556,7 @@ function DatasetSummaryPanel({
           <div className="summary-header">
             <div>
               <p className="section-label">Dataset understanding</p>
-              <h2>Business signals available in this dataset</h2>
+              <h2>Dataset signals available in this file</h2>
               <p>{humanSummary}</p>
             </div>
             <span className="dataset-count-pill">
@@ -1595,18 +1595,18 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "businessSemantics" && (
         <DrillInDetailPanel
-          eyebrow="Business meaning"
-          title="Business meaning"
-          summary={semanticSummary || "Business context is derived from the available data profile."}
+          eyebrow="Dataset detail"
+          title="Dataset meaning"
+          summary={semanticSummary || "Dataset context is derived from the available data profile."}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
         {businessSemanticReport && (
-        <section className="business-semantics-panel" aria-label="Business meaning">
+        <section className="business-semantics-panel" aria-label="Dataset meaning">
           <div className="summary-header">
             <div>
-              <p className="section-label">Business meaning</p>
-              <h2>Detected business context</h2>
+              <p className="section-label">Dataset meaning</p>
+              <h2>Detected field context</h2>
               <p>{semanticSummary}</p>
             </div>
             <span className="dataset-count-pill">{detectedSemanticEntities.length}</span>
@@ -1631,24 +1631,24 @@ function DatasetSummaryPanel({
         </section>
         )}
         {!businessSemanticReport && (
-          <p className="compact-empty">No business context is available for this dataset yet.</p>
+          <p className="compact-empty">No dataset context is available for this dataset yet.</p>
         )}
         </DrillInDetailPanel>
       )}
 
       {dataset && activeFocusedWorkflow === "kpiIntelligence" && (
         <DrillInDetailPanel
-          eyebrow="Business measures"
+          eyebrow="Dataset detail"
           title="Possible measures"
           summary={kpiSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <section className="kpi-intelligence-panel" aria-label="Possible business measures">
+        <section className="kpi-intelligence-panel" aria-label="Possible measures">
           <div className="summary-header">
             <div>
               <p className="section-label">Possible measures</p>
-              <h2>Business values found in the data</h2>
+              <h2>Measure fields found in the data</h2>
               <p>{kpiSummary}</p>
             </div>
             <span className="dataset-count-pill">{kpiOpportunities.length}</span>
@@ -1666,7 +1666,7 @@ function DatasetSummaryPanel({
             ))}
           </div>
           {kpiOpportunities.length === 0 && (
-            <p className="compact-empty">No business measures are available for this dataset yet.</p>
+            <p className="compact-empty">No measure fields are available for this dataset yet.</p>
           )}
         </section>
         </DrillInDetailPanel>
@@ -1676,7 +1676,7 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Data context"
           title="Ready for investigation"
-          summary="This dataset context is available when you move to Investigate or Analyst Mode."
+          summary="This dataset context is available in Investigate or Analyst Mode."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
@@ -1685,7 +1685,7 @@ function DatasetSummaryPanel({
             <p className="section-label">Dataset context</p>
             <h2>Ready for investigation</h2>
             <p>
-              The dataset profile is available for the next workspace. Use Investigate to ask business questions, or Analyst Mode for SQL.
+              The dataset profile is available in Investigate for business questions, or in Analyst Mode for SQL.
             </p>
           </div>
         </section>
@@ -1694,15 +1694,15 @@ function DatasetSummaryPanel({
 
       {dataset && activeFocusedWorkflow === "humanGuidance" && (
         <DrillInDetailPanel
-          eyebrow="Workspace bridge"
-          title="Continue with this dataset"
+          eyebrow="Data context"
+          title="Ready for exploration"
           summary="This dataset is ready for exploration. Use Investigate to ask business questions, or Analyst Mode for SQL."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
-            <p className="section-label">Workspace bridge</p>
+            <p className="section-label">Data context</p>
             <h2>Ready for exploration</h2>
             <p>
               This dataset is ready for exploration. Use Investigate to ask business questions, or Analyst Mode for SQL.
