@@ -68,23 +68,23 @@ restoreQueryBuilder({
   querySortDirection,
   queryLimit,
   hasRunQuery,
-})
+});
 ```
 
 This is the safest existing handoff point for populating the Query Builder UI because it mutates only Query Builder controller state.
 
 Important mapping from `QueryBuilderRequest`:
 
-| QueryBuilderRequest field | Query Builder controller state |
-| --- | --- |
-| `selected_columns` | `querySelectedColumns` |
-| `group_by` | `queryGroupBy` |
-| `aggregations` | `queryAggregations` with generated local `id` values and `null` columns converted to `""` |
-| `order_by?.column` | `querySortColumn` |
-| `order_by?.direction` | `querySortDirection` |
-| `limit` | `queryLimit` as string |
-| `page` | not represented in setup state; review starts at future page 1 |
-| `filters` | not owned by Query Builder UI state |
+| QueryBuilderRequest field | Query Builder controller state                                                            |
+| ------------------------- | ----------------------------------------------------------------------------------------- |
+| `selected_columns`        | `querySelectedColumns`                                                                    |
+| `group_by`                | `queryGroupBy`                                                                            |
+| `aggregations`            | `queryAggregations` with generated local `id` values and `null` columns converted to `""` |
+| `order_by?.column`        | `querySortColumn`                                                                         |
+| `order_by?.direction`     | `querySortDirection`                                                                      |
+| `limit`                   | `queryLimit` as string                                                                    |
+| `page`                    | not represented in setup state; review starts at future page 1                            |
+| `filters`                 | not owned by Query Builder UI state                                                       |
 
 ### 3. Existing Query Builder Entry Path
 
@@ -163,7 +163,18 @@ This is not a new persistence system, but it is still a backend/API side effect 
 
 The cleanest product behavior is likely option 1, because Query Builder manual edits already persist through the same path. The strictest governance behavior is option 2, because the Phase F request candidate itself has been local-only so far.
 
-This audit recommends option 1 only if the implementation checkpoint explicitly allows existing Query Builder session persistence. If the checkpoint says "no backend/API calls" literally, then implementation must add suppression or defer applying to Query Builder state.
+Checkpoint D persistence rule:
+
+- Apply to Query Builder for Review may save the Query Builder setup as normal workspace/session continuity.
+- This save is allowed.
+- This is not analytics execution.
+- Apply must not run a query.
+- Apply must not call `runVisualQuery`, `executeWorkspaceQuery`, or `runQueryBuilder`.
+- Apply must not create ResultsGrid data.
+- Apply must not change ActiveResultModel.
+- The existing Run query button remains the only execution action.
+
+This audit therefore accepts option 1 for Checkpoint D: existing Query Builder session persistence may occur as a consequence of populating reviewed Query Builder state. The allowed persistence is limited to normal workspace/session continuity and must not be treated as execution, result creation, backend query validation, or answer generation.
 
 ## Safest Handoff Function
 
