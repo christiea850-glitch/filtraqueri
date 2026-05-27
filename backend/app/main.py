@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 import csv
 import io
 import json
+import math
 import re
 import shutil
 
@@ -65,6 +66,71 @@ dataset_sessions: dict[str, dict[str, Any]] = {}
 def workspace_manifest_path(workspace_id: str) -> Path:
     safe_workspace_id = re.sub(r"[^A-Za-z0-9_-]", "_", workspace_id)
     return MANIFESTS_DIR / f"{safe_workspace_id}.json"
+
+
+def json_safe_value(value: Any) -> Any:
+    if value is None:
+        return None
+
+    value_type_name = type(value).__name__.lower()
+    if value_type_name in {"nattype"}:
+        return None
+
+    try:
+        if value != value:
+            return None
+    except (TypeError, ValueError):
+        pass
+
+    if isinstance(value, datetime):
+        return value.isoformat()
+
+    if isinstance(value, date):
+        return value.isoformat()
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, dict):
+        return {str(key): json_safe_value(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [json_safe_value(item) for item in value]
+
+    item = getattr(value, "item", None)
+    if callable(item):
+        try:
+            primitive_value = item()
+            if primitive_value is not value:
+                return json_safe_value(primitive_value)
+        except (TypeError, ValueError, AttributeError):
+            pass
+
+    to_pydatetime = getattr(value, "to_pydatetime", None)
+    if callable(to_pydatetime):
+        try:
+            return json_safe_value(to_pydatetime())
+        except (TypeError, ValueError, AttributeError):
+            pass
+
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def json_safe_payload(payload: Any) -> Any:
+    return json_safe_value(payload)
 
 
 def dataset_manifest_entry(metadata: dict[str, Any], source_type: str = "uploaded") -> dict[str, Any]:
@@ -366,10 +432,18 @@ def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def save_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
-    manifest = normalize_workspace_manifest(manifest)
+    manifest = normalize_workspace_manifest(json_safe_payload(manifest))
     manifest["updated_at"] = datetime.now(timezone.utc).isoformat()
+    manifest = json_safe_payload(manifest)
     path = workspace_manifest_path(manifest["workspace_id"])
-    path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    try:
+        manifest_json = json.dumps(manifest, indent=2)
+    except TypeError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Workspace manifest could not be serialized safely.",
+        ) from error
+    path.write_text(manifest_json, encoding="utf-8")
     return manifest
 
 
@@ -1131,6 +1205,10 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
         raise
     finally:
         await file.close()
+
+    schema = json_safe_payload(schema)
+    preview = json_safe_payload(preview)
+    workbook_metadata = json_safe_payload(workbook_metadata) if workbook_metadata else None
 
     metadata = {
         "dataset_id": dataset_id,
