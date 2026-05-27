@@ -47,7 +47,6 @@ import {
   OperationalList,
   OperationalTag,
   OperationalWorkspaceLayout,
-  PrimaryFocusBlock,
   WorkspaceHeader,
 } from "../workspace";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
@@ -1182,19 +1181,6 @@ function DatasetSummaryPanel({
               eyebrow="Focused workspace"
               title={workspaceTitle}
               meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
-            />
-            <PrimaryFocusBlock
-              eyebrow="Current focus"
-              title={
-                activeOperationalWorkspace === "connections"
-                  ? "Review how sources may work together"
-                  : activeOperationalWorkspace === "entities"
-                    ? "Review who or what the activity is about"
-                    : activeOperationalWorkspace === "kpis"
-                      ? "Review measurable business activity"
-                      : "Review how activity changes over time"
-              }
-              description={workspaceSummary}
             />
             <EvidenceRows>
               <div className="thread-section-heading">
