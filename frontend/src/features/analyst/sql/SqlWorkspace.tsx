@@ -3,6 +3,7 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
+import SqlAssistantPanel from "./SqlAssistantPanel";
 import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
@@ -335,11 +336,13 @@ function DraftDetailPage({
 
 function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const [focusedView, setFocusedView] = useState<FocusedSqlView>("editor");
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
+  const [assistantHeight, setAssistantHeight] = useState(320);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
   const {
@@ -431,16 +434,22 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
 
   const startDockResize = (
     event: ReactPointerEvent<HTMLDivElement>,
-    dock: "context" | "bottom",
+    dock: "assistant" | "context" | "bottom",
   ) => {
     event.preventDefault();
     const handle = event.currentTarget;
     handle.setPointerCapture(event.pointerId);
     handle.classList.add("is-dragging");
     const startY = event.clientY;
-    const direction = dock === "context" ? 1 : -1;
-    const startHeight = dock === "context" ? contextHeight : bottomHeight;
-    const applyHeight = dock === "context" ? setContextHeight : setBottomHeight;
+    const direction = dock === "bottom" ? -1 : 1;
+    const startHeight =
+      dock === "assistant" ? assistantHeight : dock === "context" ? contextHeight : bottomHeight;
+    const applyHeight =
+      dock === "assistant"
+        ? setAssistantHeight
+        : dock === "context"
+          ? setContextHeight
+          : setBottomHeight;
 
     const onMove = (moveEvent: PointerEvent) => {
       const next = startHeight + (moveEvent.clientY - startY) * direction;
@@ -509,6 +518,14 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
         <div className="sqlw-dockbar">
           <button
             type="button"
+            className={["sqlw-pill", isAssistantOpen ? "is-on" : ""].filter(Boolean).join(" ")}
+            aria-expanded={isAssistantOpen}
+            onClick={() => setIsAssistantOpen((current) => !current)}
+          >
+            Assistant
+          </button>
+          <button
+            type="button"
             className={["sqlw-pill", isContextOpen ? "is-on" : ""].filter(Boolean).join(" ")}
             aria-expanded={isContextOpen}
             onClick={() => setIsContextOpen((current) => !current)}
@@ -516,6 +533,43 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
             SQL context
           </button>
         </div>
+
+        {isAssistantOpen && (
+          <>
+            <section
+              className="sqlw-dock sqlw-dock-top"
+              aria-label="SQL Assistant"
+              style={{ height: assistantHeight }}
+            >
+              <div className="sqlw-dock-head">
+                <span>SQL Assistant</span>
+                <button
+                  type="button"
+                  className="sqlw-dock-x"
+                  onClick={() => setIsAssistantOpen(false)}
+                  aria-label="Close SQL Assistant"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="sqlw-dock-body">
+                <SqlAssistantPanel
+                  dataset={dataset}
+                  selectedDialect={selectedDialect}
+                  selectedDialectProfile={selectedDialectProfile}
+                  onInsertSql={insertSql}
+                />
+              </div>
+            </section>
+            <div
+              className="sqlw-split"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Resize SQL Assistant panel"
+              onPointerDown={(event) => startDockResize(event, "assistant")}
+            />
+          </>
+        )}
 
         {isContextOpen && (
           <>

@@ -1016,6 +1016,217 @@
   overflow: auto;
 }
 
+.sql-assistant-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sql-assistant-intro {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sql-assistant-intro h3,
+.sql-assistant-intro p {
+  margin: 0;
+}
+
+.sql-assistant-intro h3 {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.sql-assistant-intro p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.sql-assistant-intro > span {
+  flex: none;
+  padding: 5px 9px;
+  border: 1px solid #dbe4ef;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sql-assistant-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.36fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.sql-assistant-search {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sql-assistant-search span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sql-assistant-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+}
+
+.sql-assistant-category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sql-assistant-category-tabs button {
+  padding: 6px 9px;
+  border: 1px solid #dbe4ef;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sql-assistant-category-tabs button:hover,
+.sql-assistant-category-tabs button.is-active {
+  border-color: var(--fq-accent, #4338ca);
+  background: var(--fq-accent-soft, #ebeafb);
+  color: var(--fq-accent-ink, #312a8f);
+}
+
+.sql-assistant-results {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sql-assistant-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sql-assistant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.sql-assistant-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.sql-assistant-card:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.sql-assistant-card-head,
+.sql-assistant-card-foot {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sql-assistant-card-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sql-assistant-card strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.sql-assistant-card span,
+.sql-assistant-card-foot small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sql-assistant-card em {
+  flex: none;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.sql-assistant-card em.is-dialect-note {
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.sql-assistant-card pre {
+  max-height: 164px;
+  margin: 0;
+  overflow: auto;
+  padding: 10px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #dbeafe;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.sql-assistant-card-foot {
+  align-items: center;
+}
+
+.sql-assistant-card-foot .secondary-button {
+  flex: none;
+}
+
+@media (max-width: 860px) {
+  .sql-assistant-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-assistant-card-head,
+  .sql-assistant-card-foot,
+  .sql-assistant-intro {
+    flex-direction: column;
+  }
+}
+
 .sql-result-page,
 .sql-drafts-page,
 .sql-draft-detail-page {
