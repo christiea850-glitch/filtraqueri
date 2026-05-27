@@ -1,6 +1,5 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
-import { useBusinessQuestions } from "../../features/businessQuestionIntelligence";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { useKpiIntelligence } from "../../features/kpiIntelligence";
@@ -78,11 +77,9 @@ type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence
 type DataWorkflowMenu = "intelligence" | "semantic";
 type DataFocusedWorkflow =
   | "dataIntelligence"
-  | "suggestedAnalysisPaths"
   | "guidedAnalyticsTasks"
   | "businessSemantics"
   | "kpiIntelligence"
-  | "businessQuestions"
   | "humanGuidance";
 type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
 type DataWorkspaceCommandTarget =
@@ -709,8 +706,6 @@ function DatasetSummaryPanel({
   const workbookRelationshipIntelligence = buildWorkbookRelationshipIntelligence(dataset?.workbook_metadata);
   const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
   const {
-    recommendations,
-    humanSummary: workflowSummary,
     workflowRecommendationReport,
   } = useWorkflowRecommendations({
     dataProfile,
@@ -728,27 +723,10 @@ function DatasetSummaryPanel({
   });
   const {
     opportunities: kpiOpportunities,
-    kpiIntelligenceReport,
     humanSummary: kpiSummary,
   } = useKpiIntelligence({
     dataProfile,
     businessSemanticReport,
-    workflowRecommendationReport,
-  });
-  const {
-    interpretedQuestions,
-    humanSummary: questionSummary,
-  } = useBusinessQuestions({
-    datasetId: dataset?.dataset_id || null,
-    questions: [
-      "Which products sell the most?",
-      "Are sales increasing?",
-      "Which regions perform best?",
-      "Can this data support forecasting?",
-      "Which customers generate the most revenue?",
-    ],
-    businessSemanticReport,
-    kpiIntelligenceReport,
     workflowRecommendationReport,
   });
   const schemaTypeSummary = dataset ? createSchemaTypeSummary(dataset) : {};
@@ -850,7 +828,6 @@ function DatasetSummaryPanel({
       ? {
           label: "Review change over time",
           detail: "Look for shifts, seasonality, or timing effects.",
-          target: "suggestedAnalysisPaths" as const,
           icon: "trend" as HumanSignalIcon,
         }
       : null,
@@ -858,7 +835,6 @@ function DatasetSummaryPanel({
       ? {
           label: "Start with the key metric",
           detail: "Use the strongest measurable field to frame a business question.",
-          target: "guidedAnalyticsTasks" as const,
           icon: "opportunity" as HumanSignalIcon,
         }
       : null,
@@ -866,7 +842,6 @@ function DatasetSummaryPanel({
       ? {
           label: "Review entity behavior",
           detail: "See whether customers, products, tenants, or similar records need attention.",
-          target: "businessQuestions" as const,
           icon: "entity" as HumanSignalIcon,
         }
       : null,
@@ -874,7 +849,6 @@ function DatasetSummaryPanel({
       ? {
           label: "Review connected sources",
           detail: "See how multiple sheets may describe one business activity.",
-          target: "overview" as const,
           icon: "connected" as HumanSignalIcon,
         }
       : null,
@@ -882,42 +856,18 @@ function DatasetSummaryPanel({
       ? {
           label: "Compare segments",
           detail: "Check which categories, regions, or segments differ most.",
-          target: "businessQuestions" as const,
           icon: "comparison" as HumanSignalIcon,
         }
       : null,
   ].filter(Boolean) as Array<{
     label: string;
     detail: string;
-    target: "suggestedAnalysisPaths" | "guidedAnalyticsTasks" | "businessQuestions" | "overview";
     icon: HumanSignalIcon;
   }>;
-  const smartBusinessQuestions = Array.from(
-    new Set([
-      ...(dataProfile?.possibleMetrics.length ? ["Where is value concentrated?"] : []),
-      ...(dataProfile?.dateTimeFields.length ? ["What changed over time?"] : []),
-      ...(dataProfile?.possibleDimensions.length ? ["Which segments differ most?"] : []),
-      ...(businessEntityHints.length ? ["Which entities may need attention?"] : []),
-      ...((workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
-        ? ["How do connected sources relate?"]
-        : []),
-      "Where might unusual activity appear?",
-    ]),
-  ).slice(0, 4);
   const selectedEvidence =
     businessSignals.find((signal) => signal.title === selectedEvidenceTitle) ||
     businessSignals[0] ||
     null;
-  const opportunityLabels = Array.from(
-    new Set([
-      ...(dataProfile?.timeSeriesReadiness.ready ? ["Revenue trends"] : []),
-      ...(dataProfile?.statisticalReadiness.ready ? ["Top-performing categories"] : []),
-      ...(businessEntityHints.length > 0 ? ["Customer or entity patterns"] : []),
-      ...recommendations.slice(0, 2).map((recommendation) => recommendation.label),
-      ...kpiOpportunities.slice(0, 2).map((opportunity) => opportunity.label),
-      ...interpretedQuestions.slice(0, 2).map((question) => question.questionText),
-    ]),
-  ).slice(0, 3);
   const closeDrillIn = () => {
     setActiveDrillInView("overview");
     setActiveFocusedWorkflow(null);
@@ -1009,9 +959,7 @@ function DatasetSummaryPanel({
     setActiveWorkflowMenu(null);
     setActiveFocusedWorkflow(workflow);
     setActiveDrillInView(
-      workflow === "dataIntelligence" ||
-        workflow === "suggestedAnalysisPaths" ||
-        workflow === "guidedAnalyticsTasks"
+      workflow === "dataIntelligence" || workflow === "guidedAnalyticsTasks"
         ? "dataIntelligence"
         : "businessSemantics",
     );
@@ -1029,8 +977,8 @@ function DatasetSummaryPanel({
     setActiveDrillInView("overview");
   };
   const getWorkspaceForStep = (step: (typeof investigationNextSteps)[number]) => {
-    if (step.icon === "trend" || step.target === "suggestedAnalysisPaths") return "trends";
-    if (step.icon === "connected" || step.target === "overview") return "connections";
+    if (step.icon === "trend") return "trends";
+    if (step.icon === "connected") return "connections";
     if (step.icon === "entity" || step.icon === "comparison") return "entities";
     return "kpis";
   };
@@ -1331,7 +1279,7 @@ function DatasetSummaryPanel({
                   ))}
                 </EvidenceRows>
 
-                <InlineDisclosure summary="Possible follow-up">
+                <InlineDisclosure summary="Suggested next steps">
                   <OperationalList>
                     {investigationNextSteps.slice(0, 3).map((step, index) => (
                       <button
@@ -1343,21 +1291,6 @@ function DatasetSummaryPanel({
                         }}
                       >
                         {step.label}
-                      </button>
-                    ))}
-                  </OperationalList>
-                </InlineDisclosure>
-
-                <InlineDisclosure summary="Questions this data may support">
-                  <OperationalList>
-                    {smartBusinessQuestions.map((question, index) => (
-                      <button
-                        type="button"
-                        key={question}
-                        className={index === 0 ? "is-recommended" : undefined}
-                        onClick={() => openFocusedWorkflow("businessQuestions")}
-                      >
-                        {question}
                       </button>
                     ))}
                   </OperationalList>
@@ -1401,21 +1334,6 @@ function DatasetSummaryPanel({
                     </button>
                   </div>
                 </ContextRailSection>
-                {opportunityLabels.length > 0 && (
-                  <InlineDisclosure summary="Explore opportunities" className="context-disclosure">
-                    <div className="context-rail-actions">
-                      {opportunityLabels.slice(0, 2).map((label) => (
-                        <button
-                          type="button"
-                          key={label}
-                          onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </InlineDisclosure>
-                )}
                 <InlineDisclosure summary="Advanced context" className="context-disclosure">
                   <p>
                     Field names, worksheet links, and profile metadata remain available without leading the Human Mode flow.
@@ -1470,13 +1388,9 @@ function DatasetSummaryPanel({
                         <strong>What the data suggests</strong>
                         <span>Review business signals and useful fields.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}>
-                        <strong>Possible questions</strong>
-                        <span>See examples this dataset may support.</span>
-                      </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                        <strong>Continue in Workspace</strong>
-                        <span>Use this dataset context when you are ready to shape the question.</span>
+                        <strong>Investigation readiness</strong>
+                        <span>See how this dataset can be used outside Data.</span>
                       </button>
                     </div>
                   )}
@@ -1507,7 +1421,7 @@ function DatasetSummaryPanel({
                     </svg>
                   </button>
                   {activeWorkflowMenu === "semantic" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Business questions">
+                    <div className="data-workflow-menu" role="menu" aria-label="Dataset details">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
                         <strong>Business meaning</strong>
                         <span>Review what these fields may represent.</span>
@@ -1516,13 +1430,9 @@ function DatasetSummaryPanel({
                         <strong>Possible measures</strong>
                         <span>Review business measurements found in the data.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessQuestions")}>
-                        <strong>Business questions</strong>
-                        <span>See questions this dataset may help answer.</span>
-                      </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
-                        <strong>Continue in Workspace</strong>
-                        <span>Use the current dataset context for a guided next step.</span>
+                        <strong>Exploration guidance</strong>
+                        <span>See where question asking and SQL belong.</span>
                       </button>
                     </div>
                   )}
@@ -1683,42 +1593,6 @@ function DatasetSummaryPanel({
         </DrillInDetailPanel>
       )}
 
-      {dataset && activeFocusedWorkflow === "suggestedAnalysisPaths" && (
-        <DrillInDetailPanel
-          eyebrow="Explore opportunities"
-          title="Possible questions"
-          summary={workflowSummary}
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        <section className="workflow-recommendation-panel" aria-label="Possible dataset questions">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Dataset possibilities</p>
-              <h2>Questions this data may support</h2>
-              <p>{workflowSummary}</p>
-            </div>
-            <span className="dataset-count-pill">{recommendations.length}</span>
-          </div>
-          <div className="workflow-recommendation-list">
-            {recommendations.slice(0, 4).map((recommendation) => (
-              <article className="workflow-recommendation-card" key={recommendation.id}>
-                <strong>{recommendation.label}</strong>
-                <p>{recommendation.humanSummary}</p>
-                <div>
-                  <small>{recommendation.confidence} confidence</small>
-                  <small>{recommendation.possibleFutureResultShapes[0]?.replace(/_/g, " ") || "preview idea"}</small>
-                </div>
-              </article>
-            ))}
-          </div>
-          {recommendations.length === 0 && (
-            <p className="compact-empty">No suggested questions are available for this dataset yet.</p>
-          )}
-        </section>
-        </DrillInDetailPanel>
-      )}
-
       {dataset && activeFocusedWorkflow === "businessSemantics" && (
         <DrillInDetailPanel
           eyebrow="Business meaning"
@@ -1798,45 +1672,9 @@ function DatasetSummaryPanel({
         </DrillInDetailPanel>
       )}
 
-      {dataset && activeFocusedWorkflow === "businessQuestions" && (
-        <DrillInDetailPanel
-          eyebrow="Business detail"
-          title="Questions this data may support"
-          summary={questionSummary}
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        <section className="business-question-panel" aria-label="Business question intelligence">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Business questions</p>
-              <h2>Question examples</h2>
-              <p>{questionSummary}</p>
-            </div>
-            <span className="dataset-count-pill">{interpretedQuestions.length}</span>
-          </div>
-          <div className="business-question-list">
-            {interpretedQuestions.slice(0, 4).map((interpretation) => (
-              <article className="business-question-card" key={interpretation.id}>
-                <strong>{interpretation.questionText}</strong>
-                <p>{interpretation.humanSummary}</p>
-                <div>
-                  <small>{interpretation.confidence} confidence</small>
-                  <small>{interpretation.detectedIntentCategory.replace(/_/g, " ")}</small>
-                </div>
-              </article>
-            ))}
-          </div>
-          {interpretedQuestions.length === 0 && (
-            <p className="compact-empty">No business questions are available for this dataset yet.</p>
-          )}
-        </section>
-        </DrillInDetailPanel>
-      )}
-
       {dataset && activeFocusedWorkflow === "guidedAnalyticsTasks" && (
         <DrillInDetailPanel
-          eyebrow="Explore opportunities"
+          eyebrow="Data context"
           title="Ready for investigation"
           summary="This dataset context is available when you move to Investigate or Analyst Mode."
           onBack={closeDrillIn}
