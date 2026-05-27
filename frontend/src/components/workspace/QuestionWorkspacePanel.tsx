@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 import { buildControlledLogicDraft } from "../../features/questionWorkspace/questionLogicDraftBuilder";
+import { buildGovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestBuilder";
 import { createSchemaAwareDraftPlan } from "../../features/questionWorkspace/schemaQuestionTranslator";
+import type { FilterDefinition } from "../../features/filters/filterTypes";
 import type {
   CandidateFieldMatch,
   SchemaAwareQuestionDraftPlan,
@@ -200,6 +202,23 @@ const formatAggregationPreview = (idea: string, field: string | null) => {
   if (idea === "count_records") return "COUNT records";
   if (idea === "count_distinct") return field ? `COUNT DISTINCT ${field}` : "COUNT DISTINCT reviewed field";
   return field ? `${idea.toUpperCase()} ${field}` : `${idea.toUpperCase()} reviewed measure`;
+};
+
+const formatRequestList = (items: string[]) => (items.length > 0 ? items.join(", ") : "None");
+
+const formatRequestAggregation = (aggregation: { function: string; column: string | null }) =>
+  aggregation.column ? `${aggregation.function} ${aggregation.column}` : `${aggregation.function} records`;
+
+const formatRequestFilter = (filter: FilterDefinition) => {
+  if (filter.values && filter.values.length > 0) return `${filter.column}: ${filter.values.join(", ")}`;
+  if (filter.value !== undefined && filter.value !== null) return `${filter.column}: ${String(filter.value)}`;
+  if (filter.min !== undefined || filter.max !== undefined) {
+    return `${filter.column}: ${formatNullablePlanValue(filter.min ?? null)} to ${formatNullablePlanValue(filter.max ?? null)}`;
+  }
+  if (filter.start || filter.end) {
+    return `${filter.column}: ${filter.start || "start"} to ${filter.end || "end"}`;
+  }
+  return `${filter.column}: reviewed filter`;
 };
 
 function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
@@ -403,6 +422,12 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
     selectedDimension,
     selectedMeasure,
   ]);
+
+  const governedQueryBuilderRequestDraft = useMemo(() => {
+    if (!controlledLogicDraft) return null;
+
+    return buildGovernedQueryBuilderRequestDraft(controlledLogicDraft, dataset.schema);
+  }, [controlledLogicDraft, dataset.schema]);
 
   const controlledLogicSummary = controlledLogicDraft
     ? [
@@ -965,6 +990,172 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
                       <div>
                         <dt>generatedQueryBuilderRequest</dt>
                         <dd>{formatNullablePlanValue(controlledLogicDraft.generatedQueryBuilderRequest)}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </section>
+              )}
+
+              {governedQueryBuilderRequestDraft && (
+                <section
+                  className="question-workspace-execution-preview"
+                  aria-label="Query Builder request draft"
+                >
+                  <div className="question-workspace-section-heading">
+                    <p className="section-label">Query Builder request draft</p>
+                    <h4>Review draft only - not sent to Query Builder yet.</h4>
+                  </div>
+
+                  <div className="question-workspace-protection-copy">
+                    <span>No SQL has been generated.</span>
+                    <span>No backend query has executed.</span>
+                    <span>No Query Builder state has changed.</span>
+                    <span>No result has been created.</span>
+                  </div>
+
+                  <p className="question-workspace-preview-explainer">
+                    This request exists only as local review state. It has not been sent to Query Builder or the backend.
+                  </p>
+
+                  <div className="question-workspace-preview-grid">
+                    <article>
+                      <span>Status</span>
+                      <strong>{governedQueryBuilderRequestDraft.status}</strong>
+                      <small>Local eligibility state only</small>
+                    </article>
+                    <article>
+                      <span>executionStatus</span>
+                      <strong>{governedQueryBuilderRequestDraft.executionStatus}</strong>
+                      <small>Nothing has executed.</small>
+                    </article>
+                    <article>
+                      <span>generatedSql</span>
+                      <strong>{formatNullablePlanValue(governedQueryBuilderRequestDraft.generatedSql)}</strong>
+                      <small>No SQL has been generated.</small>
+                    </article>
+                    <article>
+                      <span>Request scope</span>
+                      <strong>
+                        {governedQueryBuilderRequestDraft.request
+                          ? "Local review candidate"
+                          : "No request candidate"}
+                      </strong>
+                      <small>No Query Builder state has changed.</small>
+                    </article>
+                  </div>
+
+                  {governedQueryBuilderRequestDraft.status === "blocked" && (
+                    <p className="question-workspace-fallback">
+                      FiltraQueri needs more clarification before it can prepare a reviewable request.
+                    </p>
+                  )}
+
+                  {governedQueryBuilderRequestDraft.request && (
+                    <>
+                      <div className="question-workspace-logic-summary">
+                        <span>Review draft only</span>
+                        <p>
+                          This structured candidate shows how a future Query Builder request may be prepared after review. It has not run and has not changed the Query Builder.
+                        </p>
+                      </div>
+
+                      <div className="question-workspace-preview-grid">
+                        <article>
+                          <span>Selected columns</span>
+                          <strong>
+                            {formatRequestList(governedQueryBuilderRequestDraft.request.selected_columns)}
+                          </strong>
+                          <small>Reviewed field projection</small>
+                        </article>
+                        <article>
+                          <span>Group by</span>
+                          <strong>
+                            {formatRequestList(governedQueryBuilderRequestDraft.request.group_by)}
+                          </strong>
+                          <small>Future grouping preview</small>
+                        </article>
+                        <article>
+                          <span>Aggregations</span>
+                          <strong>
+                            {governedQueryBuilderRequestDraft.request.aggregations.length > 0
+                              ? governedQueryBuilderRequestDraft.request.aggregations
+                                  .map(formatRequestAggregation)
+                                  .join(", ")
+                              : "None"}
+                          </strong>
+                          <small>Structured candidate only</small>
+                        </article>
+                        <article>
+                          <span>Filters</span>
+                          <strong>
+                            {governedQueryBuilderRequestDraft.request.filters.length > 0
+                              ? governedQueryBuilderRequestDraft.request.filters
+                                  .map(formatRequestFilter)
+                                  .join("; ")
+                              : "None"}
+                          </strong>
+                          <small>Only complete reviewed filters are included</small>
+                        </article>
+                        <article>
+                          <span>Order by</span>
+                          <strong>
+                            {governedQueryBuilderRequestDraft.request.order_by
+                              ? `${governedQueryBuilderRequestDraft.request.order_by.direction} ${governedQueryBuilderRequestDraft.request.order_by.column}`
+                              : "None"}
+                          </strong>
+                          <small>Sort candidate preview</small>
+                        </article>
+                        <article>
+                          <span>Limit</span>
+                          <strong>{governedQueryBuilderRequestDraft.request.limit}</strong>
+                          <small>Page {governedQueryBuilderRequestDraft.request.page}</small>
+                        </article>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="question-workspace-logic-columns">
+                    <div className="question-workspace-blueprint-note">
+                      <span>Blocking requirements</span>
+                      {governedQueryBuilderRequestDraft.blockingRequirements.length > 0 ? (
+                        <ul>
+                          {governedQueryBuilderRequestDraft.blockingRequirements.map((requirement) => (
+                            <li key={requirement}>{formatPlanLabel(requirement)}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No blocking requirements are attached to this request draft.</p>
+                      )}
+                    </div>
+
+                    <div className="question-workspace-blueprint-note">
+                      <span>Validation warnings</span>
+                      {governedQueryBuilderRequestDraft.validationWarnings.length > 0 ? (
+                        <ul>
+                          {governedQueryBuilderRequestDraft.validationWarnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p>No validation warnings are attached to this request draft.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="question-workspace-governance-panel">
+                    <span>Protected request state</span>
+                    <dl>
+                      <div>
+                        <dt>generatedSql</dt>
+                        <dd>{formatNullablePlanValue(governedQueryBuilderRequestDraft.generatedSql)}</dd>
+                      </div>
+                      <div>
+                        <dt>executionStatus</dt>
+                        <dd>{governedQueryBuilderRequestDraft.executionStatus}</dd>
+                      </div>
+                      <div>
+                        <dt>request locality</dt>
+                        <dd>local review state only</dd>
                       </div>
                     </dl>
                   </div>
