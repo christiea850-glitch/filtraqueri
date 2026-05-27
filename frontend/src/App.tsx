@@ -53,6 +53,8 @@ type PreparedQuestionContext = {
   status: "applied_for_review" | "executed";
 };
 
+type HumanAnalyzeStage = "investigate" | "review";
+
 // S5-P3: App.tsx remains the current composition root. The S5 navigation
 // skeleton is intentionally inactive here; routing, mode switching, dataset
 // restore, SQL, results, export, and runtime wiring stay behaviorally unchanged.
@@ -74,6 +76,8 @@ function App() {
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
   const [queryBuilderReviewNotice, setQueryBuilderReviewNotice] = useState("");
+  const [humanAnalyzeStage, setHumanAnalyzeStage] =
+    useState<HumanAnalyzeStage>("investigate");
   const [preparedQuestionContext, setPreparedQuestionContext] =
     useState<PreparedQuestionContext | null>(null);
   const [executedPreparedQuestionContext, setExecutedPreparedQuestionContext] =
@@ -261,6 +265,7 @@ function App() {
     setPreparedQuestionContext(null);
     setExecutedPreparedQuestionContext(null);
     setQueryBuilderReviewNotice("");
+    setHumanAnalyzeStage("investigate");
   }, [dataset?.dataset_id]);
 
   const {
@@ -321,7 +326,22 @@ function App() {
 
   const openHumanView = (view: ActiveView) => {
     setWorkspaceMode("human");
+    if (view === "queryBuilder") setHumanAnalyzeStage("investigate");
     updateDatasetSessionView(view);
+  };
+
+  const handleWorkspaceViewChange = (view: ActiveView) => {
+    if (view === "queryBuilder") setHumanAnalyzeStage("investigate");
+    updateDatasetSessionView(view);
+  };
+
+  const handleRuntimeTrailSelect = (
+    trailItemId: string,
+    targetView: ActiveView,
+    targetMode: "human" | "analyst",
+  ) => {
+    if (targetView === "queryBuilder") setHumanAnalyzeStage("investigate");
+    onRuntimeTrailSelect(trailItemId, targetView, targetMode);
   };
 
   const applyGovernedQueryBuilderRequestForReview = (
@@ -338,6 +358,7 @@ function App() {
     });
     setExecutedPreparedQuestionContext(null);
     setWorkspaceMode("human");
+    setHumanAnalyzeStage("review");
     updateDatasetSessionView("queryBuilder");
     setQueryBuilderReviewNotice(
       "Request draft applied for review. Nothing has run yet. Review the Query Builder setup before running.",
@@ -389,6 +410,7 @@ function App() {
       handleResultTabChange("preview");
     }
 
+    if (guidance.route === "queryBuilder") setHumanAnalyzeStage("investigate");
     updateDatasetSessionView(guidance.route);
   };
 
@@ -397,6 +419,7 @@ function App() {
       setHumanInsightBackTarget({ view: activeView, tab: activeResultTab });
     }
     if (tab) handleResultTabChange(tab);
+    if (view === "queryBuilder") setHumanAnalyzeStage("investigate");
     setRuntimePersistence((currentState) =>
       createRuntimeNavigationSelection({
         runtimeContext: workspaceRuntimeContext,
@@ -580,6 +603,27 @@ function App() {
       </button>
     ) : null;
 
+  const renderHumanAnalyzeStageHeader = () => {
+    if (humanAnalyzeStage !== "review") return null;
+
+    return (
+      <section className="human-analyze-stage-header" aria-label="Query Builder review stage">
+        <div>
+          <p className="section-label">Query Builder Review</p>
+          <h2>Review query setup</h2>
+          <p>Review the setup before running. Nothing runs until you click Run query.</p>
+        </div>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => setHumanAnalyzeStage("investigate")}
+        >
+          Back to question
+        </button>
+      </section>
+    );
+  };
+
   const renderHumanIntentGuidance = () => {
     if (!humanIntent) return null;
 
@@ -727,51 +771,56 @@ function App() {
         <>
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
-          <QuestionWorkspacePanel
-            dataset={dataset}
-            sourceName={
-              activeWorkbookWorksheet?.displayName ||
-              activeWorkbookWorksheet?.sheetName ||
-              dataset.table_name
-            }
-            onApplyQueryBuilderRequestDraft={applyGovernedQueryBuilderRequestForReview}
-          />
-          <VisualQueryBuilderPanel
-            schema={dataset.schema}
-            datasetName={dataset.original_filename}
-            worksheetName={
-              activeWorkbookWorksheet?.displayName ||
-              activeWorkbookWorksheet?.sheetName ||
-              dataset.table_name
-            }
-            activeFilterCount={activeFilterLabels.length}
-            workspaceMode={workspaceMode}
-            investigationReport={investigationReport}
-            analysisPackagePlan={analysisPackagePlan}
-            investigationWorkspacePlan={investigationWorkspacePlan}
-            selectedColumns={querySelectedColumns}
-            groupBy={queryGroupBy}
-            aggregations={queryAggregations}
-            sortOptions={querySortOptions}
-            sortColumn={querySortColumn}
-            sortDirection={querySortDirection}
-            rowLimit={queryLimit}
-            running={isRunningQuery}
-            errorMessage={errorMessage}
-            reviewNotice={queryBuilderReviewNotice}
-            onToggleSelectedColumn={(column) =>
-              setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
-            }
-            onSelectedColumnsChange={setQuerySelectedColumns}
-            onGroupByChange={setQueryGroupBy}
-            onAddAggregation={addAggregation}
-            onUpdateAggregation={updateAggregation}
-            onRemoveAggregation={removeAggregation}
-            onSortColumnChange={setQuerySortColumn}
-            onSortDirectionChange={setQuerySortDirection}
-            onRowLimitChange={setQueryLimit}
-            onRunQuery={runReviewedQueryBuilder}
-          />
+          <div hidden={humanAnalyzeStage !== "investigate"}>
+            <QuestionWorkspacePanel
+              dataset={dataset}
+              sourceName={
+                activeWorkbookWorksheet?.displayName ||
+                activeWorkbookWorksheet?.sheetName ||
+                dataset.table_name
+              }
+              onApplyQueryBuilderRequestDraft={applyGovernedQueryBuilderRequestForReview}
+            />
+          </div>
+          <div hidden={humanAnalyzeStage !== "review"}>
+            {renderHumanAnalyzeStageHeader()}
+            <VisualQueryBuilderPanel
+              schema={dataset.schema}
+              datasetName={dataset.original_filename}
+              worksheetName={
+                activeWorkbookWorksheet?.displayName ||
+                activeWorkbookWorksheet?.sheetName ||
+                dataset.table_name
+              }
+              activeFilterCount={activeFilterLabels.length}
+              workspaceMode={workspaceMode}
+              investigationReport={investigationReport}
+              analysisPackagePlan={analysisPackagePlan}
+              investigationWorkspacePlan={investigationWorkspacePlan}
+              selectedColumns={querySelectedColumns}
+              groupBy={queryGroupBy}
+              aggregations={queryAggregations}
+              sortOptions={querySortOptions}
+              sortColumn={querySortColumn}
+              sortDirection={querySortDirection}
+              rowLimit={queryLimit}
+              running={isRunningQuery}
+              errorMessage={errorMessage}
+              reviewNotice={queryBuilderReviewNotice}
+              onToggleSelectedColumn={(column) =>
+                setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
+              }
+              onSelectedColumnsChange={setQuerySelectedColumns}
+              onGroupByChange={setQueryGroupBy}
+              onAddAggregation={addAggregation}
+              onUpdateAggregation={updateAggregation}
+              onRemoveAggregation={removeAggregation}
+              onSortColumnChange={setQuerySortColumn}
+              onSortDirectionChange={setQuerySortDirection}
+              onRowLimitChange={setQueryLimit}
+              onRunQuery={runReviewedQueryBuilder}
+            />
+          </div>
         </>
       ) : null,
     results: () =>
@@ -1094,14 +1143,15 @@ function App() {
       onOpenFile={() => {
         openDatasetPicker();
       }}
-      onViewChange={updateDatasetSessionView}
+      onViewChange={handleWorkspaceViewChange}
       onModeChange={(mode) => {
         setWorkspaceMode(mode);
+        if (mode === "human") setHumanAnalyzeStage("investigate");
         updateDatasetSessionView(mode === "human" ? (dataset ? "results" : "welcome") : "sqlWorkspace");
       }}
       onRecentDatasetClick={activateRecentDataset}
       onRuntimePanelToggle={onRuntimePanelToggle}
-      onRuntimeTrailSelect={onRuntimeTrailSelect}
+      onRuntimeTrailSelect={handleRuntimeTrailSelect}
     >
       {renderWorkspaceView()}
     </WorkspaceShell>
