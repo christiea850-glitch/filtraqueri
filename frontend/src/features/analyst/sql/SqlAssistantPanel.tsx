@@ -38,11 +38,9 @@ function SqlTemplateCard({
   selectedDialect: SqlDialectId;
   onInsertSql: (sql: string) => void;
 }) {
-  const isFutureDialect = template.dialects?.includes("postgresql") || false;
   const isDifferentDialect =
     Boolean(template.dialects?.length) &&
-    !template.dialects?.includes(selectedDialect) &&
-    !isFutureDialect;
+    !template.dialects?.includes(selectedDialect);
 
   return (
     <article className="sql-assistant-card">
@@ -53,19 +51,13 @@ function SqlTemplateCard({
         </div>
         <div className="sql-assistant-card-badges">
           <em>{template.category}</em>
-          <em className={isFutureDialect || isDifferentDialect ? "is-dialect-note" : ""}>
+          <em className={isDifferentDialect ? "is-dialect-note" : ""}>
             {template.dialectLabel}
           </em>
         </div>
       </div>
       <div className="sql-assistant-card-foot">
-        {(isFutureDialect || isDifferentDialect) && (
-          <small>
-            {isFutureDialect
-              ? "Future dialect example. Review syntax before running."
-              : "Different dialect example. Review syntax before running."}
-          </small>
-        )}
+        {isDifferentDialect && <small>Different dialect example. Review syntax before running.</small>}
         <button
           type="button"
           className="secondary-button"
@@ -257,14 +249,6 @@ function SqlAssistantPanel({
               disabled={taskRequest.trim().length === 0}
             >
               Generate SQL
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={generateDraft}
-              disabled={taskRequest.trim().length === 0}
-            >
-              Find matching SQL
             </button>
             <small>Generated SQL inserts into Monaco for review. Run query remains manual.</small>
           </div>

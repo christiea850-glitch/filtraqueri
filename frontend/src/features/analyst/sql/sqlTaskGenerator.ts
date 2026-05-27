@@ -123,6 +123,16 @@ const parseHumanNumber = (value: string, unit = "") => {
   return numericValue;
 };
 
+const dialectDisplayNames: Record<string, string> = {
+  duckdb: "DuckDB",
+  mariadb: "MariaDB",
+  oracle: "Oracle SQL",
+  postgresql: "PostgreSQL",
+  mysql: "MySQL",
+  sqlserver: "SQL Server",
+  sqlite: "SQLite",
+};
+
 const findThreshold = (request: string, words: string[]) => {
   const thresholdPattern =
     /(?:more than|greater than|above|over|at least)\s+([\d,.]+)\s*(billion|million|thousand|bn|mn|[bmk])?/;
@@ -198,7 +208,11 @@ LIMIT 100;`,
   }
 
   if (selectedDialect !== "duckdb") {
-    warnings.push("Generated SQL is DuckDB-safe by default. Review dialect-specific syntax before running.");
+    warnings.push(
+      `Dialect-specific generation is limited today. This draft may need manual adjustment for ${
+        dialectDisplayNames[selectedDialect] || selectedDialect
+      }.`,
+    );
   }
 
   const categoryColumn = pickCategoryColumn(request, context.categoricalColumns) || context.categoricalColumns[0] || context.schema[0];

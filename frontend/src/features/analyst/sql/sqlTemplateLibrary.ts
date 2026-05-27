@@ -614,7 +614,7 @@ FETCH FIRST 10 ROWS ONLY;`,
       id: "postgresql-filtered-aggregate",
       title: "PostgreSQL FILTER aggregate",
       category: "Dialect examples",
-      explanation: "PostgreSQL-style filtered aggregate. Future dialect example only.",
+      explanation: "PostgreSQL-style filtered aggregate. Review dialect support before running.",
       dialectLabel: "PostgreSQL example",
       dialects: ["postgresql"],
       sql: `SELECT
