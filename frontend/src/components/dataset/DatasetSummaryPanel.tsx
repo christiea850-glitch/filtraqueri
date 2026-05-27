@@ -34,7 +34,6 @@ import DrillInDetailPanel from "../layout/DrillInDetailPanel";
 import FocusedWorkspaceShell from "../layout/FocusedWorkspaceShell";
 import WorkspaceTabs from "../layout/WorkspaceTabs";
 import {
-  ActionRail,
   ContextRail,
   ContextRailHeader,
   ContextRailSection,
@@ -1269,14 +1268,6 @@ function DatasetSummaryPanel({
                   />
                 ))}
             </EvidenceRows>
-            <ActionRail eyebrow="Next" title="Use this context when you are ready">
-              <button type="button" className="is-primary" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                Continue in Workspace
-              </button>
-              <button type="button" onClick={() => setIsDatasetPreviewOpen(true)}>
-                Preview source
-              </button>
-            </ActionRail>
           </InvestigationThread>
           <ContextRail>
             <ContextRailHeader
