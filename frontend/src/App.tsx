@@ -47,6 +47,12 @@ import "./App.css";
 
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
 
+type PreparedQuestionContext = {
+  questionText: string;
+  sourceLabel: "Query Builder review";
+  status: "applied_for_review" | "executed";
+};
+
 // S5-P3: App.tsx remains the current composition root. The S5 navigation
 // skeleton is intentionally inactive here; routing, mode switching, dataset
 // restore, SQL, results, export, and runtime wiring stay behaviorally unchanged.
@@ -68,6 +74,10 @@ function App() {
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
   const [queryBuilderReviewNotice, setQueryBuilderReviewNotice] = useState("");
+  const [preparedQuestionContext, setPreparedQuestionContext] =
+    useState<PreparedQuestionContext | null>(null);
+  const [executedPreparedQuestionContext, setExecutedPreparedQuestionContext] =
+    useState<PreparedQuestionContext | null>(null);
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
   const [humanInsightBackTarget, setHumanInsightBackTarget] = useState<{
     view: ActiveView;
@@ -246,6 +256,13 @@ function App() {
   });
 
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
+
+  useEffect(() => {
+    setPreparedQuestionContext(null);
+    setExecutedPreparedQuestionContext(null);
+    setQueryBuilderReviewNotice("");
+  }, [dataset?.dataset_id]);
+
   const {
     isFiltering,
     isRunningQuery,
@@ -314,11 +331,38 @@ function App() {
     if (draft.request.filters.length > 0) return;
 
     restoreQueryBuilder(mapQueryBuilderRequestToReviewState(draft.request));
+    setPreparedQuestionContext({
+      questionText: draft.sourceDraft.rawQuestion,
+      sourceLabel: "Query Builder review",
+      status: "applied_for_review",
+    });
+    setExecutedPreparedQuestionContext(null);
     setWorkspaceMode("human");
     updateDatasetSessionView("queryBuilder");
     setQueryBuilderReviewNotice(
       "Request draft applied for review. Nothing has run yet. Review the Query Builder setup before running.",
     );
+  };
+
+  const runReviewedQueryBuilder = async () => {
+    const activePreparedQuestionContext = preparedQuestionContext;
+    const didRun = await runVisualQuery();
+
+    if (!didRun) return;
+
+    if (activePreparedQuestionContext) {
+      setExecutedPreparedQuestionContext({
+        ...activePreparedQuestionContext,
+        status: "executed",
+      });
+      setPreparedQuestionContext(null);
+      setQueryBuilderReviewNotice(
+        "Request draft ran through the existing Query Builder path. Review the result before taking the next step.",
+      );
+      return;
+    }
+
+    setExecutedPreparedQuestionContext(null);
   };
 
   const openDataCommand = (target?: string) => {
@@ -606,6 +650,11 @@ function App() {
         analysisPackagePlan={analysisPackagePlan}
         investigationWorkspacePlan={investigationWorkspacePlan}
         narrativeReport={narrativeReport}
+        preparedQuestionContext={
+          activeResultTab === "queried" && activeResultModel.sourceType === "query"
+            ? executedPreparedQuestionContext
+            : null
+        }
       />
     );
   };
@@ -721,7 +770,7 @@ function App() {
             onSortColumnChange={setQuerySortColumn}
             onSortDirectionChange={setQuerySortDirection}
             onRowLimitChange={setQueryLimit}
-            onRunQuery={runVisualQuery}
+            onRunQuery={runReviewedQueryBuilder}
           />
         </>
       ) : null,

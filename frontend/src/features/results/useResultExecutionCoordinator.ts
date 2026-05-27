@@ -251,7 +251,7 @@ function useResultExecutionCoordinator({
   };
 
   const runVisualQuery = async () => {
-    if (!dataset) return;
+    if (!dataset) return false;
 
     setIsRunningQuery(true);
     setErrorMessage("");
@@ -292,6 +292,7 @@ function useResultExecutionCoordinator({
           : `${querySelectedColumns.length} visible columns`,
         executionResult.pagination.totalCount,
       );
+      return true;
     } catch (error) {
       const message =
         error instanceof Error
@@ -299,6 +300,7 @@ function useResultExecutionCoordinator({
           : "We could not run that query. Please adjust the builder and try again.";
 
       setErrorMessage(message);
+      return false;
     } finally {
       setIsRunningQuery(false);
     }

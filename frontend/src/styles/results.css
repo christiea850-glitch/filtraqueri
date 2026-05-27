@@ -89,6 +89,29 @@
   line-height: 1.4;
 }
 
+.results-prepared-question-note {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.results-prepared-question-note span,
+.results-prepared-question-note small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.results-prepared-question-note strong {
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .results-investigation-focus {
   display: grid;
   gap: 5px;

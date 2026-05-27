@@ -46,6 +46,11 @@ type ResultsInvestigationSurfaceProps = {
   analysisPackagePlan: AnalysisPackagePlan;
   investigationWorkspacePlan: InvestigationWorkspacePlan;
   narrativeReport: NarrativeReport;
+  preparedQuestionContext?: {
+    questionText: string;
+    sourceLabel: string;
+    status: "applied_for_review" | "executed";
+  } | null;
 };
 
 const resultsInsightDetailRouteId: ControlledHashDetailRouteId = "detail:results-insight";
@@ -64,6 +69,7 @@ function ResultsInvestigationSurface({
   analysisPackagePlan,
   investigationWorkspacePlan,
   narrativeReport,
+  preparedQuestionContext = null,
 }: ResultsInvestigationSurfaceProps) {
   const [isInsightDetailOpen, setIsInsightDetailOpen] = useState(false);
   const isAnalystMode = workspaceMode === "analyst";
@@ -186,6 +192,15 @@ function ResultsInvestigationSurface({
         <div className="results-operational-shell is-stage-only">
           <InvestigationThread>
             <WorkspaceHeader eyebrow="Review result" title="What the data shows" meta={sourceLabel} />
+            {preparedQuestionContext && (
+              <div className="results-prepared-question-note" aria-label="Prepared question traceability">
+                <span>Answered question</span>
+                <strong>{preparedQuestionContext.questionText}</strong>
+                <small>
+                  Logic source: {preparedQuestionContext.sourceLabel}. Run with the existing Query Builder path.
+                </small>
+              </div>
+            )}
             <PrimaryFocusBlock
               eyebrow="Finding"
               title={explainabilityPreview.takeawaySentence}
