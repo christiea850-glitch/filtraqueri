@@ -901,6 +901,27 @@
   font-weight: 850;
 }
 
+.query-review-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 13px;
+}
+
+.query-review-notice strong {
+  font-weight: 800;
+}
+
+.query-review-notice span {
+  color: #475569;
+}
+
 .query-approval-facts {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

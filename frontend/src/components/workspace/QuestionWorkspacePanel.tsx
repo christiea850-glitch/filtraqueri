@@ -4,6 +4,7 @@ import { buildControlledLogicDraft } from "../../features/questionWorkspace/ques
 import { buildGovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestBuilder";
 import { createSchemaAwareDraftPlan } from "../../features/questionWorkspace/schemaQuestionTranslator";
 import type { FilterDefinition } from "../../features/filters/filterTypes";
+import type { GovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestTypes";
 import type {
   CandidateFieldMatch,
   SchemaAwareQuestionDraftPlan,
@@ -22,6 +23,7 @@ type WorkspaceQuestionDraft = {
 type QuestionWorkspacePanelProps = {
   dataset: DatasetMetadata;
   sourceName: string;
+  onApplyQueryBuilderRequestDraft?: (draft: GovernedQueryBuilderRequestDraft) => void;
 };
 
 type PlanningSelectionRole = "dimension" | "measure" | "date";
@@ -221,7 +223,11 @@ const formatRequestFilter = (filter: FilterDefinition) => {
   return `${filter.column}: reviewed filter`;
 };
 
-function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelProps) {
+function QuestionWorkspacePanel({
+  dataset,
+  sourceName,
+  onApplyQueryBuilderRequestDraft,
+}: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
   const [schemaDraftPlan, setSchemaDraftPlan] = useState<SchemaAwareQuestionDraftPlan | null>(null);
@@ -428,6 +434,12 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
 
     return buildGovernedQueryBuilderRequestDraft(controlledLogicDraft, dataset.schema);
   }, [controlledLogicDraft, dataset.schema]);
+  const governedRequestHasFilters =
+    (governedQueryBuilderRequestDraft?.request?.filters.length || 0) > 0;
+  const canApplyGovernedRequest =
+    governedQueryBuilderRequestDraft?.status === "created_for_review" &&
+    Boolean(governedQueryBuilderRequestDraft.request) &&
+    !governedRequestHasFilters;
 
   const controlledLogicSummary = controlledLogicDraft
     ? [
@@ -1009,13 +1021,33 @@ function QuestionWorkspacePanel({ dataset, sourceName }: QuestionWorkspacePanelP
                   <div className="question-workspace-protection-copy">
                     <span>No SQL has been generated.</span>
                     <span>No backend query has executed.</span>
-                    <span>No Query Builder state has changed.</span>
-                    <span>No result has been created.</span>
+                    <span>No Query Builder result has been created.</span>
+                    <span>User must run separately from Query Builder.</span>
                   </div>
 
                   <p className="question-workspace-preview-explainer">
                     This request exists only as local review state. It has not been sent to Query Builder or the backend.
                   </p>
+
+                  {governedRequestHasFilters && (
+                    <p className="question-workspace-fallback">
+                      This draft includes filters. Filter handoff needs a later governed checkpoint before applying it to Query Builder.
+                    </p>
+                  )}
+
+                  {canApplyGovernedRequest && onApplyQueryBuilderRequestDraft && (
+                    <div className="question-workspace-actions">
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={() =>
+                          onApplyQueryBuilderRequestDraft(governedQueryBuilderRequestDraft)
+                        }
+                      >
+                        Apply to Query Builder for Review
+                      </button>
+                    </div>
+                  )}
 
                   <div className="question-workspace-preview-grid">
                     <article>

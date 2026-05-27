@@ -25,6 +25,8 @@ import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatase
 import useExportController from "./features/export/useExportController";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
+import type { GovernedQueryBuilderRequestDraft } from "./features/questionWorkspace/questionQueryBuilderRequestTypes";
+import { mapQueryBuilderRequestToReviewState } from "./features/questionWorkspace/questionQueryBuilderReviewMapper";
 import useQueryBuilderController from "./features/query-builder/useQueryBuilderController";
 import type { ResultTabKey } from "./features/results/resultTypes";
 import {
@@ -65,6 +67,7 @@ function App() {
   } = useResults();
   const { queryHistory, setQueryHistory, addHistory, clearHistory } = useQueryHistory();
   const [errorMessage, setErrorMessage] = useState("");
+  const [queryBuilderReviewNotice, setQueryBuilderReviewNotice] = useState("");
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
   const [humanInsightBackTarget, setHumanInsightBackTarget] = useState<{
     view: ActiveView;
@@ -302,6 +305,20 @@ function App() {
   const openHumanView = (view: ActiveView) => {
     setWorkspaceMode("human");
     updateDatasetSessionView(view);
+  };
+
+  const applyGovernedQueryBuilderRequestForReview = (
+    draft: GovernedQueryBuilderRequestDraft,
+  ) => {
+    if (draft.status !== "created_for_review" || !draft.request) return;
+    if (draft.request.filters.length > 0) return;
+
+    restoreQueryBuilder(mapQueryBuilderRequestToReviewState(draft.request));
+    setWorkspaceMode("human");
+    updateDatasetSessionView("queryBuilder");
+    setQueryBuilderReviewNotice(
+      "Request draft applied for review. Nothing has run yet. Review the Query Builder setup before running.",
+    );
   };
 
   const openDataCommand = (target?: string) => {
@@ -668,6 +685,7 @@ function App() {
               activeWorkbookWorksheet?.sheetName ||
               dataset.table_name
             }
+            onApplyQueryBuilderRequestDraft={applyGovernedQueryBuilderRequestForReview}
           />
           <VisualQueryBuilderPanel
             schema={dataset.schema}
@@ -691,6 +709,7 @@ function App() {
             rowLimit={queryLimit}
             running={isRunningQuery}
             errorMessage={errorMessage}
+            reviewNotice={queryBuilderReviewNotice}
             onToggleSelectedColumn={(column) =>
               setQuerySelectedColumns((currentColumns) => toggleListValue(currentColumns, column))
             }

@@ -35,6 +35,7 @@ type VisualQueryBuilderPanelProps = {
   rowLimit: string;
   running: boolean;
   errorMessage?: string;
+  reviewNotice?: string;
   onToggleSelectedColumn: (column: string) => void;
   onSelectedColumnsChange: (columns: string[]) => void;
   onGroupByChange: (columns: string[]) => void;
@@ -78,6 +79,7 @@ function VisualQueryBuilderPanel({
   rowLimit,
   running,
   errorMessage,
+  reviewNotice,
   onToggleSelectedColumn,
   onSelectedColumnsChange,
   onGroupByChange,
@@ -285,6 +287,13 @@ function VisualQueryBuilderPanel({
           {running ? "Running..." : "Run query"}
         </button>
       </section>
+
+      {reviewNotice && (
+        <div className="query-review-notice" role="status">
+          <strong>Request draft applied for review.</strong>
+          <span>{reviewNotice}</span>
+        </div>
+      )}
 
       <div className="query-workflow-tabs" aria-label="Query builder workflow">
         {builderSteps.map((step, index) => (
