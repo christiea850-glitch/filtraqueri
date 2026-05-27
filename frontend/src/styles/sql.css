@@ -922,6 +922,12 @@
   color: var(--fq-accent-ink, #312a8f);
 }
 
+.sql-assistant-mode-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
 .sql-assistant-search {
   display: grid;
   gap: 5px;
@@ -1123,7 +1129,13 @@
   font-weight: 650;
 }
 
-.sql-assistant-draft-summary {
+.sql-assistant-generated-list {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sql-assistant-generated-card {
   display: grid;
   gap: 10px;
   min-width: 0;
@@ -1133,20 +1145,56 @@
   background: #ffffff;
 }
 
-.sql-assistant-draft-summary dl {
+.sql-assistant-generated-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sql-assistant-generated-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sql-assistant-generated-head strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.sql-assistant-generated-head span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sql-assistant-generated-head em {
+  flex: none;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.sql-assistant-generated-card dl {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
 }
 
-.sql-assistant-draft-summary dl > div {
+.sql-assistant-generated-card dl > div {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-.sql-assistant-draft-summary dt {
+.sql-assistant-generated-card dt {
   color: #94a3b8;
   font-size: 10px;
   font-weight: 850;
@@ -1154,7 +1202,7 @@
   text-transform: uppercase;
 }
 
-.sql-assistant-draft-summary dd {
+.sql-assistant-generated-card dd {
   margin: 0;
   color: #334155;
   font-size: 12px;
@@ -1163,7 +1211,22 @@
   overflow-wrap: anywhere;
 }
 
-.sql-assistant-draft-summary > .secondary-button {
+.sql-assistant-logic-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sql-assistant-logic-list span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sql-assistant-generated-card > .secondary-button {
   justify-self: start;
 }
 
@@ -1178,7 +1241,11 @@
     flex-direction: column;
   }
 
-  .sql-assistant-draft-summary dl {
+  .sql-assistant-generated-head {
+    flex-direction: column;
+  }
+
+  .sql-assistant-generated-card dl {
     grid-template-columns: 1fr;
   }
 }

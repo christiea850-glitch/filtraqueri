@@ -88,7 +88,7 @@ function SqlAssistantPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<SqlTemplateCategory | "All">("All");
   const [taskRequest, setTaskRequest] = useState("");
-  const [generatedDraft, setGeneratedDraft] = useState<SqlTaskGenerationResult | null>(null);
+  const [generatedDrafts, setGeneratedDrafts] = useState<SqlTaskGenerationResult[]>([]);
   const templates = useMemo(
     () => createSqlAssistantTemplates(dataset, selectedDialect),
     [dataset, selectedDialect],
@@ -128,7 +128,7 @@ function SqlAssistantPanel({
       selectedDialect,
       requestText: taskRequest,
     });
-    setGeneratedDraft(nextDraft);
+    setGeneratedDrafts([nextDraft]);
   };
 
   const handleTaskKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -173,7 +173,7 @@ function SqlAssistantPanel({
       </div>
 
       {assistantMode === "templates" ? (
-        <>
+        <section className="sql-assistant-mode-panel" aria-label="Template Library">
           <div className="sql-assistant-controls">
             <label className="sql-assistant-search">
               <span>Search templates</span>
@@ -224,16 +224,16 @@ function SqlAssistantPanel({
               ))
             )}
           </div>
-        </>
+        </section>
       ) : (
-        <div className="sql-assistant-complex">
+        <section className="sql-assistant-mode-panel sql-assistant-complex" aria-label="Complex SQL Assist">
           <label className="sql-assistant-task-input">
             <span>Describe the task you want SQL to perform</span>
             <textarea
               value={taskRequest}
               onChange={(event) => {
                 setTaskRequest(event.target.value);
-                setGeneratedDraft(null);
+                setGeneratedDrafts([]);
               }}
               onKeyDown={handleTaskKeyDown}
               rows={4}
@@ -258,51 +258,74 @@ function SqlAssistantPanel({
             >
               Generate SQL
             </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={generateDraft}
+              disabled={taskRequest.trim().length === 0}
+            >
+              Find matching SQL
+            </button>
             <small>Nothing runs here. Generated SQL inserts into Monaco for review.</small>
           </div>
 
-          {generatedDraft && (
-            <article className="sql-assistant-draft-summary" aria-label="Generated SQL summary">
+          {generatedDrafts.length > 0 && (
+            <div className="sql-assistant-generated-list" aria-label="Generated SQL drafts">
               <div className="sql-helper-section-label">
-                <span>Generated draft</span>
-                <small>{selectedDialectProfile.displayName}</small>
+                <span>Matching generated SQL</span>
+                <small>{generatedDrafts.length.toLocaleString()}</small>
               </div>
-              <dl>
-                <div>
-                  <dt>Detected task</dt>
-                  <dd>{generatedDraft.taskLabel}</dd>
-                </div>
-                <div>
-                  <dt>Fields used</dt>
-                  <dd>
-                    {generatedDraft.fieldsUsed.length > 0
-                      ? generatedDraft.fieldsUsed.join(", ")
-                      : "No fields selected"}
-                  </dd>
-                </div>
-                <div>
-                  <dt>SQL logic used</dt>
-                  <dd>{generatedDraft.logicUsed.join(", ")}</dd>
-                </div>
-                <div>
-                  <dt>Uncertainty</dt>
-                  <dd>
-                    {generatedDraft.warnings.length > 0
-                      ? generatedDraft.warnings.join(" ")
-                      : "No major uncertainty detected. Review before running."}
-                  </dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => onInsertSql(generatedDraft.sql)}
-              >
-                Insert into Monaco
-              </button>
-            </article>
+              {generatedDrafts.map((draft) => (
+                <article className="sql-assistant-generated-card" key={draft.id}>
+                  <div className="sql-assistant-generated-head">
+                    <div>
+                      <strong>{draft.title}</strong>
+                      <span>{draft.explanation}</span>
+                    </div>
+                    <em>{selectedDialectProfile.displayName}</em>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>Detected task</dt>
+                      <dd>{draft.taskLabel}</dd>
+                    </div>
+                    <div>
+                      <dt>Fields used</dt>
+                      <dd>
+                        {draft.fieldsUsed.length > 0
+                          ? draft.fieldsUsed.join(", ")
+                          : "No fields selected"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>SQL logic used</dt>
+                      <dd className="sql-assistant-logic-list">
+                        {draft.logicUsed.map((logicItem) => (
+                          <span key={logicItem}>{logicItem}</span>
+                        ))}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Warnings / uncertainty</dt>
+                      <dd>
+                        {draft.warnings.length > 0
+                          ? draft.warnings.join(" ")
+                          : "No major uncertainty detected. Review in Monaco before running."}
+                      </dd>
+                    </div>
+                  </dl>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => onInsertSql(draft.sql)}
+                  >
+                    Insert into Monaco
+                  </button>
+                </article>
+              ))}
+            </div>
           )}
-        </div>
+        </section>
       )}
     </section>
   );

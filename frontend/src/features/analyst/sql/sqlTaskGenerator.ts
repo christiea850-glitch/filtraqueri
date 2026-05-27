@@ -9,7 +9,10 @@ import {
 } from "./sqlTemplateLibrary";
 
 export type SqlTaskGenerationResult = {
+  id: string;
+  title: string;
   taskLabel: string;
+  explanation: string;
   fieldsUsed: string[];
   logicUsed: string[];
   warnings: string[];
@@ -181,7 +184,10 @@ export const generateSqlTaskDraft = ({
   if (!dataset || context.schema.length === 0) {
     warnings.push("No active schema was available, so placeholder SQL was generated.");
     return {
+      id: "preview-placeholder",
+      title: "Preview rows",
       taskLabel: "Preview rows",
+      explanation: "Creates a safe starter query because no active dataset schema is available.",
       fieldsUsed: [],
       logicUsed: ["SELECT", "LIMIT"],
       warnings,
@@ -229,7 +235,10 @@ LIMIT 100;`,
     logicUsed.push("CASE WHEN", "SUM", "missing-value counts");
 
     return {
+      id: "missing-values",
+      title: "Missing values by column",
       taskLabel: "Show missing values",
+      explanation: "Counts missing values in likely relevant columns from the active dataset.",
       fieldsUsed: [...fieldSet],
       logicUsed,
       warnings,
@@ -243,7 +252,10 @@ LIMIT 100;`,
     logicUsed.push("GROUP BY", "COUNT", "HAVING", "ORDER BY");
 
     return {
+      id: "duplicate-records",
+      title: "Find duplicate records",
       taskLabel: "Find duplicate records",
+      explanation: `Groups by ${duplicateColumn.name} and returns values that appear more than once.`,
       fieldsUsed: [...fieldSet],
       logicUsed,
       warnings,
@@ -264,7 +276,10 @@ ORDER BY duplicate_count DESC;`,
     logicUsed.push("RANK window function", "ORDER BY");
 
     return {
+      id: "rank-by-metric",
+      title: "Rank records by metric",
       taskLabel: "Rank records by metric",
+      explanation: `Ranks ${rankColumn.name} values by ${metricColumn.name} using a window function.`,
       fieldsUsed: [...fieldSet],
       logicUsed,
       warnings,
@@ -291,7 +306,10 @@ LIMIT ${limit};`,
     logicUsed.push("WHERE", "ORDER BY", "LIMIT");
 
     return {
+      id: "filter-by-date",
+      title: "Filter rows by date or year",
       taskLabel: "Filter rows by date or year",
+      explanation: `Returns rows where ${dateColumn.name} is ${wantsBefore ? "before" : "after"} ${comparisonValue}.`,
       fieldsUsed: [...fieldSet],
       logicUsed,
       warnings,
@@ -312,7 +330,10 @@ LIMIT 100;`,
     const alias = requestedAverage ? aliasFrom("average", metricColumn) : aliasFrom("total", metricColumn);
 
     return {
+      id: "date-metric-summary",
+      title: requestedAverage ? "Average metric by date" : "Total metric by date",
       taskLabel: "Summarize metric by date field",
+      explanation: `Summarizes ${metricColumn.name} by ${dateColumn.name}.`,
       fieldsUsed: [...fieldSet],
       logicUsed,
       warnings,
@@ -366,7 +387,13 @@ ORDER BY ${formatSqlColumn(dateColumn.name)};`,
     const orderAlias = aggregateColumns[aggregateColumns.length - 1].match(/\bAS\s+([a-zA-Z0-9_]+)/)?.[1] || "row_count";
 
     return {
+      id: havingClauses.length > 0 ? "grouped-threshold-summary" : "category-summary",
+      title: havingClauses.length > 0 ? "Grouped summary with thresholds" : "Summary by category",
       taskLabel: havingClauses.length > 0 ? "Group records with thresholds" : "Summarize by category",
+      explanation:
+        havingClauses.length > 0
+          ? `Groups by ${categoryColumn.name}, calculates requested metrics, and keeps groups that meet the thresholds.`
+          : `Groups by ${categoryColumn.name} and orders by the selected metric.`,
       fieldsUsed: [...fieldSet],
       logicUsed: [...new Set(logicUsed)],
       warnings,
@@ -387,7 +414,10 @@ ORDER BY ${orderAlias} DESC${havingClauses.length > 0 ? "" : `\nLIMIT ${limit}`}
   warnings.push("The request was broad, so a safe row preview was generated.");
 
   return {
+    id: "safe-preview",
+    title: "Safe row preview",
     taskLabel: "Preview rows",
+    explanation: "Creates a compact SELECT query because the request was broad.",
     fieldsUsed: [...fieldSet],
     logicUsed,
     warnings,
