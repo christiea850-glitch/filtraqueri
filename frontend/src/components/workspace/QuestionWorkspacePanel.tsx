@@ -140,6 +140,42 @@ const formatColumnLabel = (columnName: string) =>
     .trim()
     .toLowerCase();
 
+const friendlyQuestionLabels: Record<string, string> = {
+  "artist(s) name": "artist",
+  "artists name": "artist",
+  "artist name": "artist",
+  "track name": "track",
+  "song name": "song",
+  "released year": "release year",
+  "release year": "release year",
+  streams: "streams",
+  "in spotify playlists": "Spotify playlists",
+  "in apple playlists": "Apple playlists",
+  "in deezer playlists": "Deezer playlists",
+  bpm: "BPM",
+  "danceability %": "danceability",
+  "valence %": "valence",
+  "energy %": "energy",
+  "acousticness %": "acousticness",
+  "instrumentalness %": "instrumentalness",
+  "liveness %": "liveness",
+  "speechiness %": "speechiness",
+  "body temperature c": "body temperature",
+  "milk yield l": "milk yield",
+  "management system": "management system",
+  "climate zone": "climate zone",
+  "disease risk": "disease risk",
+  "monthly charges": "monthly charges",
+  "total charges": "total charges",
+  "internet service": "internet service",
+  "payment method": "payment method",
+};
+
+const formatQuestionDisplayLabel = (columnName: string) => {
+  const normalizedLabel = formatColumnLabel(columnName).replace(/[()]/g, "").trim();
+  return friendlyQuestionLabels[normalizedLabel] || normalizedLabel;
+};
+
 const getSchemaSearchText = (dataset: DatasetMetadata) =>
   [
     dataset.original_filename,
@@ -220,7 +256,7 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
   const dateColumns = dataset.schema.filter((column) => column.inferred_type === "date");
   const firstCategory = findBestCategoryColumn(categoricalColumns);
   const firstNumeric = findBestMeasureColumn(numericColumns);
-  const firstMeasureLabel = firstNumeric ? formatColumnLabel(firstNumeric.name) : "record count";
+  const firstMeasureLabel = firstNumeric ? formatQuestionDisplayLabel(firstNumeric.name) : "record count";
   const hasMusicSignal = hasSignal(searchText, domainSignalTerms.music);
   const hasCattleSignal = hasSignal(searchText, domainSignalTerms.cattle);
   const hasHealthSignal = hasSignal(searchText, domainSignalTerms.health);
@@ -253,20 +289,20 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
     ]);
 
     if (artistField && streamsField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(artistField.name)} has the highest total ${formatColumnLabel(streamsField.name)}?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(artistField.name)} has the highest total ${formatQuestionDisplayLabel(streamsField.name)}?`);
     }
     if (trackField && streamsField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(trackField.name)} has the highest ${formatColumnLabel(streamsField.name)}?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(trackField.name)} has the highest ${formatQuestionDisplayLabel(streamsField.name)}?`);
     }
     if (releaseYearField && streamsField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(releaseYearField.name)} has the strongest streaming performance?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(releaseYearField.name)} has the strongest streaming performance?`);
     }
     if (streamsField) addSuggestion(suggestions, "Which songs appear unusually popular?");
     if (playlistOrChartField && streamsField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(playlistOrChartField.name)} is linked to higher ${formatColumnLabel(streamsField.name)}?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(playlistOrChartField.name)} is linked to higher ${formatQuestionDisplayLabel(streamsField.name)}?`);
     }
     if (characteristicField && streamsField) {
-      addSuggestion(suggestions, `Which track characteristics are linked to higher ${formatColumnLabel(streamsField.name)}?`);
+      addSuggestion(suggestions, `Which track characteristics are linked to higher ${formatQuestionDisplayLabel(streamsField.name)}?`);
     }
   }
 
@@ -279,22 +315,22 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
     const bodyTemperatureField = findColumnByTerms(numericColumns, ["body temperature", "temperature", "temp"]);
     const diseaseRiskField = findColumnByTerms([...numericColumns, ...categoricalColumns], ["disease risk", "risk"]);
 
-    if (breedField) addSuggestion(suggestions, `Which ${formatColumnLabel(breedField.name)} appears most often?`);
-    if (countryField) addSuggestion(suggestions, `Which ${formatColumnLabel(countryField.name)} has the most cattle records?`);
+    if (breedField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(breedField.name)} appears most often?`);
+    if (countryField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(countryField.name)} has the most cattle records?`);
     if (managementField && milkYieldField) {
       addSuggestion(
         suggestions,
-        `Which ${formatColumnLabel(managementField.name)} has the highest average ${formatColumnLabel(milkYieldField.name)}?`,
+        `Which ${formatQuestionDisplayLabel(managementField.name)} has the highest average ${formatQuestionDisplayLabel(milkYieldField.name)}?`,
       );
     }
     if (climateField && bodyTemperatureField) {
       addSuggestion(
         suggestions,
-        `Which ${formatColumnLabel(climateField.name)} has the highest average ${formatColumnLabel(bodyTemperatureField.name)}?`,
+        `Which ${formatQuestionDisplayLabel(climateField.name)} has the highest average ${formatQuestionDisplayLabel(bodyTemperatureField.name)}?`,
       );
     }
     if (breedField && diseaseRiskField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(breedField.name)} shows higher disease-risk indicators?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(breedField.name)} shows higher disease-risk indicators?`);
     }
   }
 
@@ -320,11 +356,11 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
       findColumnByTerms(categoricalColumns, ["breed", "country", "region", "contract", "service", "group"]) ||
       firstCategory;
 
-    if (healthCategory) addSuggestion(suggestions, `Which ${formatColumnLabel(healthCategory.name)} is most common?`);
+    if (healthCategory) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(healthCategory.name)} is most common?`);
     if (groupField && healthMeasure) {
       addSuggestion(
         suggestions,
-        `Which ${formatColumnLabel(groupField.name)} has the highest average ${formatColumnLabel(healthMeasure.name)}?`,
+        `Which ${formatQuestionDisplayLabel(groupField.name)} has the highest average ${formatQuestionDisplayLabel(healthMeasure.name)}?`,
       );
     }
     if (groupField) addSuggestion(suggestions, `Which groups show unusual health patterns?`);
@@ -341,20 +377,20 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
       firstCategory;
     const paymentField = findColumnByTerms(categoricalColumns, ["payment method", "payment"]);
 
-    if (churnField && customerGroupField) addSuggestion(suggestions, `Which customer groups have the highest ${formatColumnLabel(churnField.name)}?`);
-    if (tenureField && churnField) addSuggestion(suggestions, `How does ${formatColumnLabel(tenureField.name)} relate to ${formatColumnLabel(churnField.name)}?`);
+    if (churnField && customerGroupField) addSuggestion(suggestions, `Which customer groups have the highest ${formatQuestionDisplayLabel(churnField.name)}?`);
+    if (tenureField && churnField) addSuggestion(suggestions, `How does ${formatQuestionDisplayLabel(tenureField.name)} relate to ${formatQuestionDisplayLabel(churnField.name)}?`);
     if (contractField && monthlyChargeField) {
       addSuggestion(
         suggestions,
-        `Which ${formatColumnLabel(contractField.name)} has the highest average ${formatColumnLabel(monthlyChargeField.name)}?`,
+        `Which ${formatQuestionDisplayLabel(contractField.name)} has the highest average ${formatQuestionDisplayLabel(monthlyChargeField.name)}?`,
       );
     }
-    if (serviceField && churnField) addSuggestion(suggestions, `Which ${formatColumnLabel(serviceField.name)} is linked to higher ${formatColumnLabel(churnField.name)}?`);
-    if (paymentField && churnField) addSuggestion(suggestions, `Which ${formatColumnLabel(paymentField.name)} has the most churned customers?`);
+    if (serviceField && churnField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(serviceField.name)} is linked to higher ${formatQuestionDisplayLabel(churnField.name)}?`);
+    if (paymentField && churnField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(paymentField.name)} has the most churned customers?`);
     if (contractField && tenureField) {
       addSuggestion(
         suggestions,
-        `Which ${formatColumnLabel(contractField.name)} has the highest average ${formatColumnLabel(tenureField.name)}?`,
+        `Which ${formatQuestionDisplayLabel(contractField.name)} has the highest average ${formatQuestionDisplayLabel(tenureField.name)}?`,
       );
     }
   }
@@ -366,13 +402,13 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
     const revenueField = findColumnByTerms(numericColumns, ["revenue", "sales", "amount", "profit"]);
 
     if (productField && revenueField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(productField.name)} generates the most ${formatColumnLabel(revenueField.name)}?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(productField.name)} generates the most ${formatQuestionDisplayLabel(revenueField.name)}?`);
     }
-    if (customerField) addSuggestion(suggestions, `Which ${formatColumnLabel(customerField.name)} performs best?`);
+    if (customerField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(customerField.name)} performs best?`);
     if (regionField && revenueField) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(regionField.name)} has the highest ${formatColumnLabel(revenueField.name)}?`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(regionField.name)} has the highest ${formatQuestionDisplayLabel(revenueField.name)}?`);
     }
-    if (productField) addSuggestion(suggestions, `Which ${formatColumnLabel(productField.name)} has declining performance?`);
+    if (productField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(productField.name)} has declining performance?`);
   }
 
   if (hasOperationsSignal) {
@@ -380,14 +416,14 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
     const equipmentField = findColumnByTerms(categoricalColumns, ["equipment", "machine"]);
     const shiftField = findColumnByTerms(categoricalColumns, ["shift"]);
 
-    if (departmentField) addSuggestion(suggestions, `Which ${formatColumnLabel(departmentField.name)} has the highest activity?`);
-    if (equipmentField) addSuggestion(suggestions, `Which ${formatColumnLabel(equipmentField.name)} appears most often?`);
-    if (shiftField) addSuggestion(suggestions, `Which ${formatColumnLabel(shiftField.name)} has the most records?`);
+    if (departmentField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(departmentField.name)} has the highest activity?`);
+    if (equipmentField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(equipmentField.name)} appears most often?`);
+    if (shiftField) addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(shiftField.name)} has the most records?`);
   }
 
   if (firstCategory && suggestions.length < 3) {
-    addSuggestion(suggestions, `Which ${formatColumnLabel(firstCategory.name)} appears most often?`);
-    addSuggestion(suggestions, `Compare records by ${formatColumnLabel(firstCategory.name)}.`);
+    addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(firstCategory.name)} appears most often?`);
+    addSuggestion(suggestions, `Compare records by ${formatQuestionDisplayLabel(firstCategory.name)}.`);
   }
 
   if (firstNumeric && suggestions.length < 4) addSuggestion(suggestions, `What is the average ${firstMeasureLabel}?`);
@@ -395,7 +431,7 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
   if (firstCategory && firstNumeric) {
     addSuggestion(
       suggestions,
-      `Which ${formatColumnLabel(firstCategory.name)} has the highest average ${firstMeasureLabel}?`,
+      `Which ${formatQuestionDisplayLabel(firstCategory.name)} has the highest average ${firstMeasureLabel}?`,
     );
   }
 
@@ -407,8 +443,8 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
   if (suggestions.length === 0 && allTextLikeColumns.length > 0) {
     const fallbackCategory = findBestCategoryColumn(allTextLikeColumns);
     if (fallbackCategory) {
-      addSuggestion(suggestions, `Which ${formatColumnLabel(fallbackCategory.name)} appears most often?`);
-      addSuggestion(suggestions, `Compare records by ${formatColumnLabel(fallbackCategory.name)}.`);
+      addSuggestion(suggestions, `Which ${formatQuestionDisplayLabel(fallbackCategory.name)} appears most often?`);
+      addSuggestion(suggestions, `Compare records by ${formatQuestionDisplayLabel(fallbackCategory.name)}.`);
     }
   }
 
