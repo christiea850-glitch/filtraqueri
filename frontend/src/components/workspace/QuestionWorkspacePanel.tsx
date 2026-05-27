@@ -48,6 +48,25 @@ const fallbackStarterPrompts = [
 ];
 
 const domainSignalTerms = {
+  music: [
+    "track",
+    "song",
+    "artist",
+    "streams",
+    "playlist",
+    "chart",
+    "release",
+    "year",
+    "danceability",
+    "energy",
+    "valence",
+    "tempo",
+    "acousticness",
+    "spotify",
+    "apple",
+    "deezer",
+    "shazam",
+  ],
   cattle: [
     "cattle",
     "cow",
@@ -76,6 +95,42 @@ const domainSignalTerms = {
   operations: ["department", "equipment", "shift", "activity", "machine", "operator", "facility"],
   telco: ["churn", "tenure", "contract", "monthly charge", "service", "internet", "phone", "customer"],
 };
+
+const priorityCategoryTerms = [
+  "artist",
+  "product",
+  "category",
+  "region",
+  "country",
+  "breed",
+  "contract",
+  "department",
+  "service",
+  "segment",
+  "management",
+  "climate",
+  "shift",
+  "status",
+];
+
+const priorityMeasureTerms = [
+  "streams",
+  "revenue",
+  "sales",
+  "profit",
+  "charge",
+  "charges",
+  "yield",
+  "temperature",
+  "risk",
+  "score",
+  "tenure",
+  "quantity",
+  "price",
+  "cost",
+  "usage",
+  "activity",
+];
 
 const formatColumnLabel = (columnName: string) =>
   columnName
@@ -106,6 +161,11 @@ const columnMatches = (column: SchemaColumn, terms: string[]) => {
 
 const findColumnByTerms = (columns: SchemaColumn[], terms: string[]) =>
   columns.find((column) => columnMatches(column, terms)) || null;
+
+const getColumnsByInferredType = (
+  dataset: DatasetMetadata,
+  types: SchemaColumn["inferred_type"][],
+) => dataset.schema.filter((column) => types.includes(column.inferred_type));
 
 const isLikelyIdentifier = (column: SchemaColumn, rowCount: number) => {
   const label = formatColumnLabel(column.name);
@@ -138,6 +198,15 @@ const getNumericColumns = (dataset: DatasetMetadata) =>
     (column) => column.inferred_type === "numeric" && !isLikelyIdentifier(column, dataset.row_count),
   );
 
+const findAnyColumnByTerms = (dataset: DatasetMetadata, terms: string[]) =>
+  findColumnByTerms(dataset.schema, terms);
+
+const findBestCategoryColumn = (columns: SchemaColumn[]) =>
+  findColumnByTerms(columns, priorityCategoryTerms) || columns[0] || null;
+
+const findBestMeasureColumn = (columns: SchemaColumn[]) =>
+  findColumnByTerms(columns, priorityMeasureTerms) || columns[0] || null;
+
 const addSuggestion = (suggestions: string[], suggestion: string) => {
   if (!suggestions.includes(suggestion)) suggestions.push(suggestion);
 };
@@ -146,16 +215,60 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
   const suggestions: string[] = [];
   const searchText = getSchemaSearchText(dataset);
   const categoricalColumns = getCategoricalColumns(dataset);
+  const allTextLikeColumns = getColumnsByInferredType(dataset, ["categorical", "text", "boolean"]);
   const numericColumns = getNumericColumns(dataset);
   const dateColumns = dataset.schema.filter((column) => column.inferred_type === "date");
-  const firstCategory = categoricalColumns[0] || null;
-  const firstNumeric = numericColumns[0] || null;
+  const firstCategory = findBestCategoryColumn(categoricalColumns);
+  const firstNumeric = findBestMeasureColumn(numericColumns);
   const firstMeasureLabel = firstNumeric ? formatColumnLabel(firstNumeric.name) : "record count";
+  const hasMusicSignal = hasSignal(searchText, domainSignalTerms.music);
   const hasCattleSignal = hasSignal(searchText, domainSignalTerms.cattle);
   const hasHealthSignal = hasSignal(searchText, domainSignalTerms.health);
   const hasSalesSignal = hasSignal(searchText, domainSignalTerms.sales);
   const hasOperationsSignal = hasSignal(searchText, domainSignalTerms.operations);
   const hasTelcoSignal = hasSignal(searchText, domainSignalTerms.telco);
+
+  if (hasMusicSignal) {
+    const artistField = findColumnByTerms(categoricalColumns, ["artist"]);
+    const trackField = findAnyColumnByTerms(dataset, ["track", "song"]);
+    const streamsField = findColumnByTerms(numericColumns, ["streams", "stream"]);
+    const releaseYearField = findAnyColumnByTerms(dataset, ["release year", "released year", "year"]);
+    const playlistOrChartField = findColumnByTerms(categoricalColumns, [
+      "playlist",
+      "chart",
+      "spotify",
+      "apple",
+      "deezer",
+      "shazam",
+    ]);
+    const characteristicField = findColumnByTerms(numericColumns, [
+      "danceability",
+      "energy",
+      "valence",
+      "tempo",
+      "acousticness",
+      "instrumentalness",
+      "liveness",
+      "speechiness",
+    ]);
+
+    if (artistField && streamsField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(artistField.name)} has the highest total ${formatColumnLabel(streamsField.name)}?`);
+    }
+    if (trackField && streamsField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(trackField.name)} has the highest ${formatColumnLabel(streamsField.name)}?`);
+    }
+    if (releaseYearField && streamsField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(releaseYearField.name)} has the strongest streaming performance?`);
+    }
+    if (streamsField) addSuggestion(suggestions, "Which songs appear unusually popular?");
+    if (playlistOrChartField && streamsField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(playlistOrChartField.name)} is linked to higher ${formatColumnLabel(streamsField.name)}?`);
+    }
+    if (characteristicField && streamsField) {
+      addSuggestion(suggestions, `Which track characteristics are linked to higher ${formatColumnLabel(streamsField.name)}?`);
+    }
+  }
 
   if (hasCattleSignal) {
     const breedField = findColumnByTerms(categoricalColumns, ["breed"]);
@@ -223,15 +336,21 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
     const serviceField = findColumnByTerms(categoricalColumns, ["service", "internet", "phone"]);
     const tenureField = findColumnByTerms(numericColumns, ["tenure"]);
     const monthlyChargeField = findColumnByTerms(numericColumns, ["monthly charge", "monthly", "charge"]);
+    const customerGroupField =
+      findColumnByTerms(categoricalColumns, ["contract", "internet service", "payment method", "service", "gender"]) ||
+      firstCategory;
+    const paymentField = findColumnByTerms(categoricalColumns, ["payment method", "payment"]);
 
-    if (churnField) addSuggestion(suggestions, `Which ${formatColumnLabel(churnField.name)} outcome is most common?`);
+    if (churnField && customerGroupField) addSuggestion(suggestions, `Which customer groups have the highest ${formatColumnLabel(churnField.name)}?`);
+    if (tenureField && churnField) addSuggestion(suggestions, `How does ${formatColumnLabel(tenureField.name)} relate to ${formatColumnLabel(churnField.name)}?`);
     if (contractField && monthlyChargeField) {
       addSuggestion(
         suggestions,
         `Which ${formatColumnLabel(contractField.name)} has the highest average ${formatColumnLabel(monthlyChargeField.name)}?`,
       );
     }
-    if (serviceField && churnField) addSuggestion(suggestions, `Compare ${formatColumnLabel(churnField.name)} by ${formatColumnLabel(serviceField.name)}.`);
+    if (serviceField && churnField) addSuggestion(suggestions, `Which ${formatColumnLabel(serviceField.name)} is linked to higher ${formatColumnLabel(churnField.name)}?`);
+    if (paymentField && churnField) addSuggestion(suggestions, `Which ${formatColumnLabel(paymentField.name)} has the most churned customers?`);
     if (contractField && tenureField) {
       addSuggestion(
         suggestions,
@@ -266,12 +385,12 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
     if (shiftField) addSuggestion(suggestions, `Which ${formatColumnLabel(shiftField.name)} has the most records?`);
   }
 
-  if (firstCategory) {
+  if (firstCategory && suggestions.length < 3) {
     addSuggestion(suggestions, `Which ${formatColumnLabel(firstCategory.name)} appears most often?`);
     addSuggestion(suggestions, `Compare records by ${formatColumnLabel(firstCategory.name)}.`);
   }
 
-  if (firstNumeric) addSuggestion(suggestions, `What is the average ${firstMeasureLabel}?`);
+  if (firstNumeric && suggestions.length < 4) addSuggestion(suggestions, `What is the average ${firstMeasureLabel}?`);
 
   if (firstCategory && firstNumeric) {
     addSuggestion(
@@ -283,6 +402,14 @@ const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
   if (dateColumns.length > 0) {
     addSuggestion(suggestions, `How does ${firstMeasureLabel} change over time?`);
     addSuggestion(suggestions, "What changed most recently?");
+  }
+
+  if (suggestions.length === 0 && allTextLikeColumns.length > 0) {
+    const fallbackCategory = findBestCategoryColumn(allTextLikeColumns);
+    if (fallbackCategory) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(fallbackCategory.name)} appears most often?`);
+      addSuggestion(suggestions, `Compare records by ${formatColumnLabel(fallbackCategory.name)}.`);
+    }
   }
 
   return (suggestions.length > 0 ? suggestions : fallbackStarterPrompts).slice(0, 5);
