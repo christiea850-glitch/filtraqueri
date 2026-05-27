@@ -806,7 +806,7 @@ function QuestionWorkspacePanel({
           </div>
 
           <p className="question-workspace-safety-note">
-            Nothing runs until you review the setup and click Run query.
+            Nothing runs until you review the setup in Query Builder and choose Run query.
           </p>
 
           <dl className="question-workspace-review-card">

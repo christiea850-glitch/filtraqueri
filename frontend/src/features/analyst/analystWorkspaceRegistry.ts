@@ -65,7 +65,7 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
   {
     id: "sqlWorkspace",
     title: "SQL Workspace",
-    description: "Write, organize, and review analyst-level SQL workflows in a future release.",
+    description: "Write, generate, organize, and review analyst-level SQL before running it manually.",
     capabilities: ["SELECT workflows", "CTEs and subqueries", "Window functions"],
     modeRequirement: "analyst",
     requiresDataset: false,

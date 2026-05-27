@@ -146,8 +146,8 @@ function SqlAssistantPanel({
           <h3>{assistantMode === "templates" ? "Choose a template" : "Complex SQL Assist"}</h3>
           <p>
             {assistantMode === "templates"
-              ? "Insert template, review in Monaco, then run manually."
-              : "Describe the outcome, generate a SQL draft, review in Monaco, then run manually."}
+              ? "Templates insert into Monaco for review. Run query remains manual."
+              : "Describe the outcome, generate SQL into Monaco, then run manually."}
           </p>
         </div>
         <span>{selectedDialectProfile.displayName}</span>
@@ -266,7 +266,7 @@ function SqlAssistantPanel({
             >
               Find matching SQL
             </button>
-            <small>Nothing runs here. Generated SQL inserts into Monaco for review.</small>
+            <small>Generated SQL inserts into Monaco for review. Run query remains manual.</small>
           </div>
 
           {generatedDrafts.length > 0 && (
@@ -310,7 +310,7 @@ function SqlAssistantPanel({
                       <dd>
                         {draft.warnings.length > 0
                           ? draft.warnings.join(" ")
-                          : "No major uncertainty detected. Review in Monaco before running."}
+                          : "No major uncertainty detected. Review in Monaco before choosing Run query."}
                       </dd>
                     </div>
                   </dl>
