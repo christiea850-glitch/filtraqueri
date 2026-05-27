@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
+import type { DatasetMetadata, SchemaColumn } from "../../features/dataset/datasetTypes";
 import { buildControlledLogicDraft } from "../../features/questionWorkspace/questionLogicDraftBuilder";
 import { buildGovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestBuilder";
 import { createSchemaAwareDraftPlan } from "../../features/questionWorkspace/schemaQuestionTranslator";
@@ -41,12 +41,252 @@ type QuestionReviewHints = {
   starterSuggestions: string[];
 };
 
-const starterPrompts = [
-  "Which realtor manages the most properties?",
-  "What changed most recently?",
-  "Which locations perform best?",
-  "Which customers generate the most revenue?",
+const fallbackStarterPrompts = [
+  "Which category appears most often?",
+  "What are the highest values in this dataset?",
+  "Compare records by a selected field.",
 ];
+
+const domainSignalTerms = {
+  cattle: [
+    "cattle",
+    "cow",
+    "livestock",
+    "breed",
+    "milk",
+    "feed",
+    "parity",
+    "lactation",
+    "vaccine",
+    "climate",
+    "body temperature",
+  ],
+  health: [
+    "risk",
+    "disease",
+    "diagnosis",
+    "health",
+    "vaccine",
+    "temperature",
+    "symptom",
+    "infection",
+    "mortality",
+  ],
+  sales: ["revenue", "sales", "order", "product", "customer", "region", "segment", "performance"],
+  operations: ["department", "equipment", "shift", "activity", "machine", "operator", "facility"],
+  telco: ["churn", "tenure", "contract", "monthly charge", "service", "internet", "phone", "customer"],
+};
+
+const formatColumnLabel = (columnName: string) =>
+  columnName
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const getSchemaSearchText = (dataset: DatasetMetadata) =>
+  [
+    dataset.original_filename,
+    dataset.filename,
+    dataset.table_name,
+    ...dataset.schema.map((column) => column.name),
+  ]
+    .join(" ")
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+
+const hasSignal = (searchText: string, terms: string[]) =>
+  terms.some((term) => searchText.includes(term));
+
+const columnMatches = (column: SchemaColumn, terms: string[]) => {
+  const label = formatColumnLabel(column.name);
+  return terms.some((term) => label.includes(term));
+};
+
+const findColumnByTerms = (columns: SchemaColumn[], terms: string[]) =>
+  columns.find((column) => columnMatches(column, terms)) || null;
+
+const isLikelyIdentifier = (column: SchemaColumn, rowCount: number) => {
+  const label = formatColumnLabel(column.name);
+  const identifierName =
+    /\bid\b/.test(label) ||
+    label.endsWith(" code") ||
+    label.endsWith(" number") ||
+    label.includes("identifier");
+
+  if (identifierName) return true;
+
+  return (
+    (column.inferred_type === "text" || column.inferred_type === "categorical") &&
+    rowCount > 0 &&
+    column.unique_count >= Math.max(rowCount * 0.9, rowCount - 1)
+  );
+};
+
+const getCategoricalColumns = (dataset: DatasetMetadata) =>
+  dataset.schema.filter(
+    (column) =>
+      (column.inferred_type === "categorical" ||
+        column.inferred_type === "text" ||
+        column.inferred_type === "boolean") &&
+      !isLikelyIdentifier(column, dataset.row_count),
+  );
+
+const getNumericColumns = (dataset: DatasetMetadata) =>
+  dataset.schema.filter(
+    (column) => column.inferred_type === "numeric" && !isLikelyIdentifier(column, dataset.row_count),
+  );
+
+const addSuggestion = (suggestions: string[], suggestion: string) => {
+  if (!suggestions.includes(suggestion)) suggestions.push(suggestion);
+};
+
+const createDatasetAwareStarterPrompts = (dataset: DatasetMetadata) => {
+  const suggestions: string[] = [];
+  const searchText = getSchemaSearchText(dataset);
+  const categoricalColumns = getCategoricalColumns(dataset);
+  const numericColumns = getNumericColumns(dataset);
+  const dateColumns = dataset.schema.filter((column) => column.inferred_type === "date");
+  const firstCategory = categoricalColumns[0] || null;
+  const firstNumeric = numericColumns[0] || null;
+  const firstMeasureLabel = firstNumeric ? formatColumnLabel(firstNumeric.name) : "record count";
+  const hasCattleSignal = hasSignal(searchText, domainSignalTerms.cattle);
+  const hasHealthSignal = hasSignal(searchText, domainSignalTerms.health);
+  const hasSalesSignal = hasSignal(searchText, domainSignalTerms.sales);
+  const hasOperationsSignal = hasSignal(searchText, domainSignalTerms.operations);
+  const hasTelcoSignal = hasSignal(searchText, domainSignalTerms.telco);
+
+  if (hasCattleSignal) {
+    const breedField = findColumnByTerms(categoricalColumns, ["breed"]);
+    const countryField = findColumnByTerms(categoricalColumns, ["country", "region"]);
+    const managementField = findColumnByTerms(categoricalColumns, ["management system", "management"]);
+    const climateField = findColumnByTerms(categoricalColumns, ["climate zone", "climate"]);
+    const milkYieldField = findColumnByTerms(numericColumns, ["milk yield", "milk", "yield"]);
+    const bodyTemperatureField = findColumnByTerms(numericColumns, ["body temperature", "temperature", "temp"]);
+    const diseaseRiskField = findColumnByTerms([...numericColumns, ...categoricalColumns], ["disease risk", "risk"]);
+
+    if (breedField) addSuggestion(suggestions, `Which ${formatColumnLabel(breedField.name)} appears most often?`);
+    if (countryField) addSuggestion(suggestions, `Which ${formatColumnLabel(countryField.name)} has the most cattle records?`);
+    if (managementField && milkYieldField) {
+      addSuggestion(
+        suggestions,
+        `Which ${formatColumnLabel(managementField.name)} has the highest average ${formatColumnLabel(milkYieldField.name)}?`,
+      );
+    }
+    if (climateField && bodyTemperatureField) {
+      addSuggestion(
+        suggestions,
+        `Which ${formatColumnLabel(climateField.name)} has the highest average ${formatColumnLabel(bodyTemperatureField.name)}?`,
+      );
+    }
+    if (breedField && diseaseRiskField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(breedField.name)} shows higher disease-risk indicators?`);
+    }
+  }
+
+  if (hasHealthSignal) {
+    const healthCategory = findColumnByTerms(categoricalColumns, [
+      "risk",
+      "disease",
+      "diagnosis",
+      "health",
+      "symptom",
+      "infection",
+      "mortality",
+    ]);
+    const healthMeasure = findColumnByTerms(numericColumns, [
+      "risk",
+      "temperature",
+      "mortality",
+      "infection",
+      "severity",
+      "score",
+    ]);
+    const groupField =
+      findColumnByTerms(categoricalColumns, ["breed", "country", "region", "contract", "service", "group"]) ||
+      firstCategory;
+
+    if (healthCategory) addSuggestion(suggestions, `Which ${formatColumnLabel(healthCategory.name)} is most common?`);
+    if (groupField && healthMeasure) {
+      addSuggestion(
+        suggestions,
+        `Which ${formatColumnLabel(groupField.name)} has the highest average ${formatColumnLabel(healthMeasure.name)}?`,
+      );
+    }
+    if (groupField) addSuggestion(suggestions, `Which groups show unusual health patterns?`);
+  }
+
+  if (hasTelcoSignal) {
+    const churnField = findColumnByTerms(categoricalColumns, ["churn"]);
+    const contractField = findColumnByTerms(categoricalColumns, ["contract"]);
+    const serviceField = findColumnByTerms(categoricalColumns, ["service", "internet", "phone"]);
+    const tenureField = findColumnByTerms(numericColumns, ["tenure"]);
+    const monthlyChargeField = findColumnByTerms(numericColumns, ["monthly charge", "monthly", "charge"]);
+
+    if (churnField) addSuggestion(suggestions, `Which ${formatColumnLabel(churnField.name)} outcome is most common?`);
+    if (contractField && monthlyChargeField) {
+      addSuggestion(
+        suggestions,
+        `Which ${formatColumnLabel(contractField.name)} has the highest average ${formatColumnLabel(monthlyChargeField.name)}?`,
+      );
+    }
+    if (serviceField && churnField) addSuggestion(suggestions, `Compare ${formatColumnLabel(churnField.name)} by ${formatColumnLabel(serviceField.name)}.`);
+    if (contractField && tenureField) {
+      addSuggestion(
+        suggestions,
+        `Which ${formatColumnLabel(contractField.name)} has the highest average ${formatColumnLabel(tenureField.name)}?`,
+      );
+    }
+  }
+
+  if (hasSalesSignal) {
+    const productField = findColumnByTerms(categoricalColumns, ["product"]);
+    const customerField = findColumnByTerms(categoricalColumns, ["customer", "segment"]);
+    const regionField = findColumnByTerms(categoricalColumns, ["region", "country", "market"]);
+    const revenueField = findColumnByTerms(numericColumns, ["revenue", "sales", "amount", "profit"]);
+
+    if (productField && revenueField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(productField.name)} generates the most ${formatColumnLabel(revenueField.name)}?`);
+    }
+    if (customerField) addSuggestion(suggestions, `Which ${formatColumnLabel(customerField.name)} performs best?`);
+    if (regionField && revenueField) {
+      addSuggestion(suggestions, `Which ${formatColumnLabel(regionField.name)} has the highest ${formatColumnLabel(revenueField.name)}?`);
+    }
+    if (productField) addSuggestion(suggestions, `Which ${formatColumnLabel(productField.name)} has declining performance?`);
+  }
+
+  if (hasOperationsSignal) {
+    const departmentField = findColumnByTerms(categoricalColumns, ["department"]);
+    const equipmentField = findColumnByTerms(categoricalColumns, ["equipment", "machine"]);
+    const shiftField = findColumnByTerms(categoricalColumns, ["shift"]);
+
+    if (departmentField) addSuggestion(suggestions, `Which ${formatColumnLabel(departmentField.name)} has the highest activity?`);
+    if (equipmentField) addSuggestion(suggestions, `Which ${formatColumnLabel(equipmentField.name)} appears most often?`);
+    if (shiftField) addSuggestion(suggestions, `Which ${formatColumnLabel(shiftField.name)} has the most records?`);
+  }
+
+  if (firstCategory) {
+    addSuggestion(suggestions, `Which ${formatColumnLabel(firstCategory.name)} appears most often?`);
+    addSuggestion(suggestions, `Compare records by ${formatColumnLabel(firstCategory.name)}.`);
+  }
+
+  if (firstNumeric) addSuggestion(suggestions, `What is the average ${firstMeasureLabel}?`);
+
+  if (firstCategory && firstNumeric) {
+    addSuggestion(
+      suggestions,
+      `Which ${formatColumnLabel(firstCategory.name)} has the highest average ${firstMeasureLabel}?`,
+    );
+  }
+
+  if (dateColumns.length > 0) {
+    addSuggestion(suggestions, `How does ${firstMeasureLabel} change over time?`);
+    addSuggestion(suggestions, "What changed most recently?");
+  }
+
+  return (suggestions.length > 0 ? suggestions : fallbackStarterPrompts).slice(0, 5);
+};
 
 const measureTerms = [
   "revenue",
@@ -230,6 +470,10 @@ function QuestionWorkspacePanel({
       { label: "Rows", value: dataset.row_count.toLocaleString() },
     ],
     [dataset.column_count, dataset.original_filename, dataset.row_count, dataset.table_name, sourceName],
+  );
+  const starterPrompts = useMemo(
+    () => createDatasetAwareStarterPrompts(dataset),
+    [dataset],
   );
 
   const activeReviewQuestion = draft.draftStatus === "drafted" ? draft.rawQuestion : rawQuestion;
