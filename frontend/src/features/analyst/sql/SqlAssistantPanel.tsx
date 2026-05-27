@@ -26,11 +26,6 @@ const categoryOrder: SqlTemplateCategory[] = [
   "Dialect examples",
 ];
 
-const createSqlPreview = (sql: string) => {
-  const lines = sql.trim().split("\n");
-  return lines.length > 10 ? `${lines.slice(0, 10).join("\n")}\n...` : sql.trim();
-};
-
 function SqlTemplateCard({
   template,
   selectedDialect,
@@ -53,11 +48,13 @@ function SqlTemplateCard({
           <strong>{template.title}</strong>
           <span>{template.explanation}</span>
         </div>
-        <em className={isFutureDialect || isDifferentDialect ? "is-dialect-note" : ""}>
-          {template.dialectLabel}
-        </em>
+        <div className="sql-assistant-card-badges">
+          <em>{template.category}</em>
+          <em className={isFutureDialect || isDifferentDialect ? "is-dialect-note" : ""}>
+            {template.dialectLabel}
+          </em>
+        </div>
       </div>
-      <pre>{createSqlPreview(template.sql)}</pre>
       <div className="sql-assistant-card-foot">
         {(isFutureDialect || isDifferentDialect) && (
           <small>

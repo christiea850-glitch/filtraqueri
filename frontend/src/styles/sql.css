@@ -1189,22 +1189,22 @@
   font-weight: 800;
 }
 
+.sql-assistant-card-badges {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sql-assistant-card-badges em:first-child {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .sql-assistant-card em.is-dialect-note {
   background: #fff7ed;
   color: #9a3412;
-}
-
-.sql-assistant-card pre {
-  max-height: 164px;
-  margin: 0;
-  overflow: auto;
-  padding: 10px;
-  border-radius: 10px;
-  background: #0f172a;
-  color: #dbeafe;
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: pre-wrap;
 }
 
 .sql-assistant-card-foot {
