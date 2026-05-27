@@ -29,7 +29,6 @@ import {
   type WorkbookEntityRole,
   type WorkbookRelationshipIntelligence,
 } from "../../features/workbookIntelligence";
-import { TaskLauncherPanel } from "../../features/tasksLauncher";
 import DrillInDetailPanel from "../layout/DrillInDetailPanel";
 import FocusedWorkspaceShell from "../layout/FocusedWorkspaceShell";
 import WorkspaceTabs from "../layout/WorkspaceTabs";
@@ -690,8 +689,6 @@ function DatasetSummaryPanel({
   onDeleteDataset,
   onWorksheetSelect,
   isSwitchingWorksheet,
-  selectedTaskId,
-  onSelectedTaskIdChange,
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
@@ -1840,16 +1837,20 @@ function DatasetSummaryPanel({
       {dataset && activeFocusedWorkflow === "guidedAnalyticsTasks" && (
         <DrillInDetailPanel
           eyebrow="Explore opportunities"
-          title="Continue in Workspace"
-          summary="Use this dataset context when you are ready to shape the question."
+          title="Ready for investigation"
+          summary="This dataset context is available when you move to Investigate or Analyst Mode."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
-        <TaskLauncherPanel
-          dataset={dataset}
-          selectedTaskId={selectedTaskId}
-          onSelectedTaskIdChange={onSelectedTaskIdChange}
-        />
+        <section className="human-guidance-panel" aria-label="Dataset investigation readiness">
+          <div>
+            <p className="section-label">Dataset context</p>
+            <h2>Ready for investigation</h2>
+            <p>
+              The dataset profile is available for the next workspace. Use Investigate to ask business questions, or Analyst Mode for SQL.
+            </p>
+          </div>
+        </section>
         </DrillInDetailPanel>
       )}
 
