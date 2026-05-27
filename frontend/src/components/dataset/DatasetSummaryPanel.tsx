@@ -2,7 +2,6 @@ import { useEffect, useState, type PointerEvent as ReactPointerEvent, type React
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
-import { useKpiIntelligence } from "../../features/kpiIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { DatasetIntelligenceDetailPage } from "../../features/detailPages";
@@ -704,7 +703,7 @@ function DatasetSummaryPanel({
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const workbookRelationshipIntelligence = buildWorkbookRelationshipIntelligence(dataset?.workbook_metadata);
-  const { dataProfile, dialectRecommendation, humanSummary } = useDataIntelligence(dataset);
+  const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
   const {
     workflowRecommendationReport,
   } = useWorkflowRecommendations({
@@ -714,24 +713,28 @@ function DatasetSummaryPanel({
   const {
     businessSemanticReport,
     detectedSemanticEntities,
-    possibleBusinessKpis,
-    humanSummary: semanticSummary,
   } = useBusinessSemantics({
     dataset,
     dataProfile,
     workflowRecommendationReport,
   });
-  const {
-    opportunities: kpiOpportunities,
-    humanSummary: kpiSummary,
-  } = useKpiIntelligence({
-    dataProfile,
-    businessSemanticReport,
-    workflowRecommendationReport,
-  });
   const schemaTypeSummary = dataset ? createSchemaTypeSummary(dataset) : {};
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
   const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
+  const detectedNumericFields = dataProfile?.possibleMetrics || [];
+  const detectedCategoryFields = dataProfile?.possibleDimensions || [];
+  const detectedDateFields = dataProfile?.dateTimeFields || [];
+  const datasetReviewSummary = dataset
+    ? `${dataset.column_count.toLocaleString()} columns, ${dataset.row_count.toLocaleString()} rows, and ${Object.keys(
+        schemaTypeSummary,
+      ).length.toLocaleString()} detected field types.`
+    : "Dataset structure is available for review.";
+  const measureReviewSummary =
+    detectedNumericFields.length > 0
+      ? `${detectedNumericFields.length.toLocaleString()} numeric field${
+          detectedNumericFields.length === 1 ? "" : "s"
+        } may support measurement, ranking, or summaries.`
+      : "No clear numeric measure fields were detected yet.";
   const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
   const businessEntityHints = displayColumnProfiles
     .filter((profile) => profile.role === "customer" || profile.role === "description" || profile.role === "identifier")
@@ -775,7 +778,7 @@ function DatasetSummaryPanel({
     dataProfile?.possibleMetrics.length
       ? {
           title: "Measurable field",
-          detail: `${dataProfile.possibleMetrics[0].name} may anchor the first review.`,
+          detail: `${detectedNumericFields[0].name} may support measurement or ranking.`,
           tone: "opportunity" as HumanSignalTone,
           icon: "opportunity" as HumanSignalIcon,
         }
@@ -783,7 +786,7 @@ function DatasetSummaryPanel({
     dataProfile?.dateTimeFields.length
       ? {
           title: "Timeline ready",
-          detail: `${dataProfile.dateTimeFields[0].name} can order change over time.`,
+          detail: `${detectedDateFields[0].name} can order records over time.`,
           tone: "ready" as HumanSignalTone,
           icon: "timeline" as HumanSignalIcon,
         }
@@ -812,7 +815,7 @@ function DatasetSummaryPanel({
     dataProfile?.possibleDimensions.length
       ? {
           title: "Comparison field",
-          detail: `${dataProfile.possibleDimensions[0].name} may separate records into groups.`,
+          detail: `${detectedCategoryFields[0].name} may support grouping or comparison.`,
           tone: "opportunity" as HumanSignalTone,
           icon: "comparison" as HumanSignalIcon,
         }
@@ -885,7 +888,7 @@ function DatasetSummaryPanel({
     columnCount: dataset?.column_count || 0,
     detectedDataShapeSummary: `${Object.keys(schemaTypeSummary).length.toLocaleString()} field types`,
     opportunityPreview:
-      kpiOpportunities[0]?.label ||
+      detectedNumericFields[0]?.name ||
       semanticHints[0]?.displayName ||
       "Review the detected data profile.",
     whyItMattersPreview: "Column labels and workbook structure are cleaned up for review.",
@@ -1154,11 +1157,9 @@ function DatasetSummaryPanel({
                   />
                 ))}
               {activeOperationalWorkspace === "kpis" &&
-                (dataProfile?.possibleMetrics.length || kpiOpportunities.length ? (
-                  [
-                    ...(dataProfile?.possibleMetrics || []).map((field) => field.name),
-                    ...kpiOpportunities.map((opportunity) => opportunity.label),
-                  ]
+                (detectedNumericFields.length ? (
+                  detectedNumericFields
+                    .map((field) => field.name)
                     .slice(0, 6)
                     .map((label) => (
                       <EvidenceRow
@@ -1548,7 +1549,7 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Dataset detail"
           title="What the data suggests"
-          summary={humanSummary}
+          summary={datasetReviewSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
@@ -1557,7 +1558,7 @@ function DatasetSummaryPanel({
             <div>
               <p className="section-label">Dataset understanding</p>
               <h2>Dataset signals available in this file</h2>
-              <p>{humanSummary}</p>
+              <p>{datasetReviewSummary}</p>
             </div>
             <span className="dataset-count-pill">
               {dialectRecommendation?.recommendedFutureEngine?.label || "Suggested only"}
@@ -1597,7 +1598,7 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Dataset detail"
           title="Dataset meaning"
-          summary={semanticSummary || "Dataset context is derived from the available data profile."}
+          summary="Dataset context is derived from detected field names and profile metadata."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
@@ -1607,7 +1608,7 @@ function DatasetSummaryPanel({
             <div>
               <p className="section-label">Dataset meaning</p>
               <h2>Detected field context</h2>
-              <p>{semanticSummary}</p>
+              <p>Detected labels below are based on field names and profile metadata.</p>
             </div>
             <span className="dataset-count-pill">{detectedSemanticEntities.length}</span>
           </div>
@@ -1620,11 +1621,11 @@ function DatasetSummaryPanel({
               </article>
             ))}
           </div>
-          {possibleBusinessKpis.length > 0 && (
+          {detectedNumericFields.length > 0 && (
             <div className="business-kpi-list">
               <span>Possible measures</span>
-              {possibleBusinessKpis.slice(0, 5).map((kpi) => (
-                <small key={kpi.id}>{kpi.label}</small>
+              {detectedNumericFields.slice(0, 5).map((field) => (
+                <small key={field.name}>{field.name}</small>
               ))}
             </div>
           )}
@@ -1640,7 +1641,7 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Dataset detail"
           title="Possible measures"
-          summary={kpiSummary}
+          summary={measureReviewSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
@@ -1649,23 +1650,23 @@ function DatasetSummaryPanel({
             <div>
               <p className="section-label">Possible measures</p>
               <h2>Measure fields found in the data</h2>
-              <p>{kpiSummary}</p>
+              <p>{measureReviewSummary}</p>
             </div>
-            <span className="dataset-count-pill">{kpiOpportunities.length}</span>
+            <span className="dataset-count-pill">{detectedNumericFields.length}</span>
           </div>
           <div className="kpi-opportunity-list">
-            {kpiOpportunities.slice(0, 4).map((opportunity) => (
-              <article className="kpi-opportunity-card" key={opportunity.id}>
-                <strong>{opportunity.label}</strong>
-                <p>{opportunity.humanSummary}</p>
+            {detectedNumericFields.slice(0, 4).map((field) => (
+              <article className="kpi-opportunity-card" key={field.name}>
+                <strong>{field.name}</strong>
+                <p>This field may support measurement, ranking, or numeric summaries.</p>
                 <div>
-                  <small>{opportunity.confidence} confidence</small>
-                  <small>{opportunity.possibleChartTypes[0]?.replace(/_/g, " ") || "chart option"}</small>
+                  <small>{field.inferredType}</small>
+                  <small>{field.confidence} confidence</small>
                 </div>
               </article>
             ))}
           </div>
-          {kpiOpportunities.length === 0 && (
+          {detectedNumericFields.length === 0 && (
             <p className="compact-empty">No measure fields are available for this dataset yet.</p>
           )}
         </section>
