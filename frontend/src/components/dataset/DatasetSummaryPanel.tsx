@@ -59,11 +59,6 @@ export type HumanIntent =
   | "unusual_values"
   | "simple_chart";
 
-type HumanGuidanceCard = {
-  intent: HumanIntent;
-  label: string;
-};
-
 type DatasetSummaryPanelProps = {
   dataset: DatasetMetadata | null;
   recentDatasets: DatasetSession[];
@@ -193,16 +188,6 @@ function HumanSignalIcon({ name }: { name: HumanSignalIcon }) {
     </span>
   );
 }
-
-const humanGuidanceCards: HumanGuidanceCard[] = [
-  { intent: "summary", label: "Summarize" },
-  { intent: "missing_values", label: "Missing values" },
-  { intent: "top_categories", label: "Top categories" },
-  { intent: "compare_columns", label: "Compare fields" },
-  { intent: "trends", label: "Trend analysis" },
-  { intent: "unusual_values", label: "Unusual values" },
-  { intent: "simple_chart", label: "Visualize data" },
-];
 
 type DatasetSessionPanelProps = {
   dataset: DatasetMetadata;
@@ -701,7 +686,6 @@ function DatasetPreviewPage({
 
 function DatasetSummaryPanel({
   dataset,
-  onHumanIntentSelect,
   onOpenDataset,
   onDeleteDataset,
   onWorksheetSelect,
@@ -1873,26 +1857,17 @@ function DatasetSummaryPanel({
         <DrillInDetailPanel
           eyebrow="Workspace bridge"
           title="Continue with this dataset"
-          summary="Use the current dataset context for a guided next step."
+          summary="This dataset is ready for exploration. Use Investigate to ask business questions, or Analyst Mode for SQL."
           onBack={closeDrillIn}
           backLabel="Back to Data"
         >
         <section className="human-guidance-panel" aria-label="Human mode data guidance">
           <div>
             <p className="section-label">Workspace bridge</p>
-            <h2>Choose a simple follow-up</h2>
-          </div>
-          <div className="human-suggestion-grid">
-            {humanGuidanceCards.map((suggestion) => (
-              <button
-                type="button"
-                key={suggestion.intent}
-                onClick={() => onHumanIntentSelect(suggestion.intent)}
-              >
-                <strong>{suggestion.label}</strong>
-                <span>Human Mode</span>
-              </button>
-            ))}
+            <h2>Ready for exploration</h2>
+            <p>
+              This dataset is ready for exploration. Use Investigate to ask business questions, or Analyst Mode for SQL.
+            </p>
           </div>
         </section>
         </DrillInDetailPanel>
