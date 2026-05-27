@@ -39,6 +39,14 @@ import {
 import type { DatasetMetadata, DatasetSession } from "./datasetTypes";
 import useDatasetSessions from "./useDatasetSessions";
 
+const GENERIC_UPLOAD_FAILURE_MESSAGE = "Upload failed. Please check the file and try again.";
+const POST_UPLOAD_FAILURE_MESSAGE =
+  "Dataset uploaded, but FiltraQueri could not finish opening it. Please refresh or reopen it from Recent work.";
+
+function getErrorMessage(error: unknown, fallbackMessage: string) {
+  return error instanceof Error ? error.message : fallbackMessage;
+}
+
 function useWorkspaceDatasetController({
   activeResultTab,
   setActiveResultTab,
@@ -383,8 +391,19 @@ function useWorkspaceDatasetController({
     setHumanIntent(null);
     clearHistory();
 
+    let uploadResult: Awaited<ReturnType<typeof uploadDataset>>;
+
     try {
-      const uploadResult = await uploadDataset(file);
+      uploadResult = await uploadDataset(file);
+    } catch (error) {
+      console.error("Dataset upload request failed", error);
+      setErrorMessage(getErrorMessage(error, GENERIC_UPLOAD_FAILURE_MESSAGE));
+      setIsUploading(false);
+      event.target.value = "";
+      return;
+    }
+
+    try {
       const uploadColumns = uploadResult.dataset.schema.map((column) => column.name);
       const previewExecution = wrapWorkspaceExecutionOutput({
         source: "preview",
@@ -429,15 +448,8 @@ function useWorkspaceDatasetController({
       });
       updateDatasetSessionView("dataset");
     } catch (error) {
-      const rawMessage =
-        error instanceof Error ? error.message : "Upload failed. Please try again.";
-      const message = rawMessage.toLowerCase().includes("csv")
-        ? rawMessage
-        : rawMessage.toLowerCase().includes("backend is not running")
-          ? rawMessage
-          : "Upload failed. Please check the file and try again.";
-
-      setErrorMessage(message);
+      console.error("Dataset post-upload handling failed", error);
+      setErrorMessage(POST_UPLOAD_FAILURE_MESSAGE);
     } finally {
       setIsUploading(false);
       event.target.value = "";
