@@ -611,7 +611,6 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
           canOpenResultPreview={canOpenResultPreview}
           onOpenResultPreview={() => setFocusedView("result")}
           onOpenSavedDrafts={() => setFocusedView("drafts")}
-          onInsertSql={insertSql}
           dialectContext={{
             selectedDialect,
             selectedDialectProfile,

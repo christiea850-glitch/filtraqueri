@@ -1,0 +1,304 @@
+{
+  "version": 1,
+  "workspace_id": "c8828a555e0a4a0a806c06696623da77",
+  "workspace_name": "Telco_customer_churn.csv",
+  "active_dataset_id": "c8828a555e0a4a0a806c06696623da77",
+  "active_result_id": "preview",
+  "active_execution_id": null,
+  "current_mode": "human",
+  "current_result_tab": "preview",
+  "filter_metadata": {},
+  "query_builder_metadata": {
+    "selected_columns": [
+      "CustomerID",
+      "Gender",
+      "Senior Citizen",
+      "Partner"
+    ],
+    "group_by": [],
+    "aggregations": [
+      {
+        "id": 1,
+        "function": "COUNT",
+        "column": ""
+      }
+    ],
+    "sort_column": "",
+    "sort_direction": "ASC",
+    "limit": "100",
+    "has_run_query": false
+  },
+  "sql_workspace_metadata": {
+    "version": 1,
+    "selectedDialect": "duckdb",
+    "activeSqlTab": "editor",
+    "activeDraftId": null,
+    "activeSnippetId": null,
+    "lastOpenedContext": "sqlWorkspace",
+    "draftMetadata": {
+      "draftCount": 0,
+      "lastDraftSavedAt": null
+    },
+    "snippetMetadata": {
+      "snippetCount": 0,
+      "lastSnippetSavedAt": null
+    },
+    "drafts": [],
+    "snippets": [],
+    "updatedAt": "2026-05-27T00:14:32.816Z"
+  },
+  "datasets": [
+    {
+      "dataset_id": "c8828a555e0a4a0a806c06696623da77",
+      "dataset_name": "Telco_customer_churn.csv",
+      "source_type": "uploaded",
+      "uploaded_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\uploads\\c8828a555e0a4a0a806c06696623da77_Telco_customer_churn.csv",
+      "duckdb_path": "C:\\Users\\Yaa Princess\\filtraqueri\\backend\\storage\\sessions\\c8828a555e0a4a0a806c06696623da77.duckdb",
+      "schema": [
+        {
+          "name": "CustomerID",
+          "type": "VARCHAR",
+          "inferred_type": "text",
+          "null_count": 0,
+          "unique_count": 7043,
+          "sample_values": [
+            "0404-SWRVG",
+            "6207-WIOLX",
+            "1875-QIVME",
+            "7825-ECJRF",
+            "4629-NRXKX",
+            "9514-JDSKI",
+            "4959-JOSRX",
+            "3606-TWKGI",
+            "6323-AYBRX",
+            "4385-GZQXV",
+            "6432-TWQLB",
+            "2840-XANRC"
+          ]
+        },
+        {
+          "name": "Gender",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            "Female",
+            "Male"
+          ]
+        },
+        {
+          "name": "Senior Citizen",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Partner",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Dependents",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Tenure Months",
+          "type": "BIGINT",
+          "inferred_type": "numeric",
+          "null_count": 0,
+          "unique_count": 73,
+          "sample_values": [
+            11,
+            15,
+            55,
+            16,
+            52,
+            32,
+            22,
+            26,
+            67,
+            31,
+            0,
+            17
+          ],
+          "min": 0,
+          "max": 72
+        },
+        {
+          "name": "Multiple Lines",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "No phone service",
+            "Yes",
+            "No"
+          ]
+        },
+        {
+          "name": "Internet Service",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "No",
+            "DSL",
+            "Fiber optic"
+          ]
+        },
+        {
+          "name": "Online Security",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Online Backup",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Device Protection",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Tech Support",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Contract",
+          "type": "VARCHAR",
+          "inferred_type": "categorical",
+          "null_count": 0,
+          "unique_count": 3,
+          "sample_values": [
+            "One year",
+            "Two year",
+            "Month-to-month"
+          ]
+        },
+        {
+          "name": "Paperless Billing",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Electronic Check",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Monthly Charges",
+          "type": "DOUBLE",
+          "inferred_type": "numeric",
+          "null_count": 0,
+          "unique_count": 1585,
+          "sample_values": [
+            99.65,
+            64.7,
+            69.7,
+            106.35,
+            21.05,
+            76.5,
+            91.0,
+            106.6,
+            74.5,
+            80.3,
+            84.8,
+            19.9
+          ],
+          "min": 18.25,
+          "max": 118.75
+        },
+        {
+          "name": "Churn Label",
+          "type": "BOOLEAN",
+          "inferred_type": "boolean",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            false,
+            true
+          ]
+        },
+        {
+          "name": "Churn Value",
+          "type": "BIGINT",
+          "inferred_type": "numeric",
+          "null_count": 0,
+          "unique_count": 2,
+          "sample_values": [
+            0,
+            1
+          ],
+          "min": 0,
+          "max": 1
+        }
+      ],
+      "row_count": 7043,
+      "column_count": 18,
+      "created_at": "2026-05-26T23:49:15.069403+00:00"
+    }
+  ],
+  "created_at": "2026-05-26T23:49:15.069403+00:00",
+  "last_opened_at": "2026-05-27T03:00:31.778359+00:00",
+  "updated_at": "2026-05-27T03:00:31.778359+00:00"
+}

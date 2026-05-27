@@ -23,6 +23,8 @@ export type SqlTemplateCategory =
   | "Advanced SQL"
   | "Dialect examples";
 
+export type SqlAssistantFutureDialectId = "postgresql" | "mysql" | "sqlserver" | "sqlite";
+
 export type SqlAssistantTemplate = {
   id: string;
   title: string;
@@ -30,11 +32,56 @@ export type SqlAssistantTemplate = {
   explanation: string;
   dialectLabel: string;
   sql: string;
-  dialects?: Array<SqlDialectId | "postgresql">;
+  dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
+};
+
+export type SqlAssistantGenerationInput = {
+  dataset: DatasetMetadata | null;
+  selectedDialect: SqlDialectId;
+  requestText?: string;
+};
+
+export type SqlAssistantGenerationContext = {
+  requestText: string;
+  normalizedRequest: string;
+  selectedDialect: SqlDialectId;
+  rawTableName: string;
+  tableName: string;
+  schema: SchemaColumn[];
+  columnNames: string[];
+  displayColumns: string[];
+  numericColumns: SchemaColumn[];
+  categoricalColumns: SchemaColumn[];
+  dateColumns: SchemaColumn[];
 };
 
 const fallbackColumn = "column_name";
 const fallbackTable = "other_table";
+
+const normalizeRequestText = (requestText = "") =>
+  requestText.trim().replace(/\s+/g, " ").toLowerCase();
+
+export const createSqlAssistantGenerationContext = ({
+  dataset,
+  selectedDialect,
+  requestText = "",
+}: SqlAssistantGenerationInput): SqlAssistantGenerationContext => {
+  const schema = dataset?.schema || [];
+
+  return {
+    requestText,
+    normalizedRequest: normalizeRequestText(requestText),
+    selectedDialect,
+    rawTableName: dataset?.table_name || "uploaded_dataset",
+    tableName: formatSqlTable(dataset?.table_name || "uploaded_dataset"),
+    schema,
+    columnNames: schema.map((column) => column.name),
+    displayColumns: dataset ? getPrimaryDisplayColumns(dataset) : [],
+    numericColumns: getNumericColumns(schema),
+    categoricalColumns: getCategoricalColumns(schema),
+    dateColumns: getDateColumns(schema),
+  };
+};
 
 const quoteSampleValues = (column: SchemaColumn | undefined) => {
   if (!column) return "'value_1', 'value_2'";
@@ -82,13 +129,19 @@ export const createSqlAssistantTemplates = (
   dataset: DatasetMetadata | null,
   selectedDialect: SqlDialectId,
 ): SqlAssistantTemplate[] => {
-  const tableName = formatSqlTable(dataset?.table_name || "uploaded_dataset");
-  const schema = dataset?.schema || [];
-  const displayColumns = dataset ? getPrimaryDisplayColumns(dataset) : [];
+  const generationContext = createSqlAssistantGenerationContext({ dataset, selectedDialect });
+  const {
+    tableName,
+    schema,
+    displayColumns,
+    numericColumns,
+    categoricalColumns,
+    dateColumns,
+  } = generationContext;
   const selectList = buildSelectList(displayColumns);
-  const numericColumn = getNumericColumns(schema)[0];
-  const categoryColumn = getCategoricalColumns(schema)[0] || schema[0] || null;
-  const dateColumn = getDateColumns(schema)[0];
+  const numericColumn = numericColumns[0];
+  const categoryColumn = categoricalColumns[0] || schema[0] || null;
+  const dateColumn = dateColumns[0];
   const sortableColumn = getSortableColumns(schema)[0] || numericColumn || schema[0] || null;
   const numericExpression = placeholderColumn(numericColumn);
   const categoryExpression = placeholderColumn(categoryColumn);
