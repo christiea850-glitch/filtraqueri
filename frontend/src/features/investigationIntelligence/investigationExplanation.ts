@@ -20,7 +20,7 @@ export const explainInvestigationContext = (
   }
 
   if (themes.length === 0) {
-    return "FiltraQueri found general comparison and summary paths for this dataset.";
+    return "General comparison and summary paths are available for this dataset.";
   }
 
   return `Suggested paths focus on ${themes.slice(0, 3).join(", ")}.`;

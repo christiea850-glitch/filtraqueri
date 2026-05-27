@@ -155,7 +155,7 @@ const createHumanSummary = ({
   if (stage === "not-started") {
     return {
       headline: "Your investigation has not started yet.",
-      body: "Open a dataset or workbook so FiltraQueri can connect the workspace trail.",
+      body: "Open a dataset or workbook to connect the workspace trail.",
       nextStep: "Open data to begin.",
     };
   }

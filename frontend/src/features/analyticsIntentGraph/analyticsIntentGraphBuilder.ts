@@ -94,10 +94,10 @@ const buildHumanSummary = (args: {
   hasRevenue: boolean;
   hasRelationships: boolean;
 }) => {
-  if (args.hasForecasting) return "FiltraQueri connected forecasting opportunities with date-based metrics.";
+  if (args.hasForecasting) return "Forecasting opportunities are connected with date-based metrics.";
   if (args.hasRevenue) return "Revenue KPIs were linked to product and regional workflows.";
   if (args.hasRelationships) return "Workbook relationships may support connected analysis paths.";
-  return "FiltraQueri connected available metadata into an analytics intent graph.";
+  return "Available metadata is connected into an analytics intent graph.";
 };
 
 export const buildAnalyticsIntentGraph = ({

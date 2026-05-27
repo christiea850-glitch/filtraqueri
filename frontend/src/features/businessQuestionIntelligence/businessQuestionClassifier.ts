@@ -375,7 +375,7 @@ const classifyQuestion = ({
 };
 
 const humanSummaryForIntent = (category: BusinessQuestionIntentCategory) => {
-  if (category === "forecasting_question") return "FiltraQueri detected a forecasting-related business question.";
+  if (category === "forecasting_question") return "This appears to be a forecasting-related business question.";
   if (category === "regional_question") return "This appears to be a regional performance question.";
   if (category === "revenue_question") return "This question may relate to revenue analysis.";
   if (category === "product_question") return "This question may relate to product performance.";
@@ -385,7 +385,7 @@ const humanSummaryForIntent = (category: BusinessQuestionIntentCategory) => {
 };
 
 const buildHumanSummary = (interpretations: BusinessQuestionInterpretation[]) =>
-  interpretations[0]?.humanSummary || "FiltraQueri needs more metadata before interpreting business questions.";
+  interpretations[0]?.humanSummary || "More metadata is needed before interpreting business questions.";
 
 const buildAnalystSummary = (interpretations: BusinessQuestionInterpretation[]) => {
   const top = interpretations[0];

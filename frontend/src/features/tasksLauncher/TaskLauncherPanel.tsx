@@ -219,13 +219,13 @@ function TaskDetail({
   const planReadinessLabel = getAnalysisPlanReadinessLabel(analysisPlan);
   const primaryReadinessSummary =
     planningReadiness.status === "ready_for_future_execution"
-      ? "FiltraQueri has enough context to guide this investigation."
+      ? "There is enough context to guide this investigation."
       : missingInputs.length > 0
         ? "A little more business context is needed before this investigation is ready."
         : planningReadiness.status === "unsupported"
           ? "This investigation does not fit the current dataset yet."
           : planningReadiness.status === "engine_limited"
-            ? "This investigation is possible, but FiltraQueri has limited confidence."
+            ? "This investigation is possible, but confidence is limited."
             : planningReadiness.status === "relationship_dependent"
               ? "Related worksheet context may help this investigation."
               : "This investigation is partly prepared and needs a little more context.";
@@ -341,8 +341,8 @@ function TaskDetail({
   };
   const guidanceSummary =
     primaryMetric || primaryDate || primaryDimension
-      ? `FiltraQueri detected a likely ${task.label.toLowerCase()} setup for this dataset.`
-      : "FiltraQueri will suggest setup fields as soon as enough dataset context is available.";
+      ? `This dataset has a likely ${task.label.toLowerCase()} setup.`
+      : "Setup fields will appear as soon as enough dataset context is available.";
   const readinessStateLabel = canShowPreparationContext
     ? "Ready to prepare"
     : missingInputs.some((input) => input.type === "metric")
@@ -463,9 +463,9 @@ function TaskDetail({
         </div>
       </section>
 
-      <section className="task-focus-section task-noticed-section" aria-label="What FiltraQueri noticed">
+      <section className="task-focus-section task-noticed-section" aria-label="What the data suggests">
         <div className="task-assistant-panel">
-          <span>What FiltraQueri noticed</span>
+          <span>What the data suggests</span>
           <strong>This dataset appears to contain:</strong>
           <ul>
             {noticedSignals.slice(0, 5).map((signal) => (

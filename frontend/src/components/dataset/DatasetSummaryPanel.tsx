@@ -398,7 +398,7 @@ function WorkbookRelationshipSummaryPanel({
   ).length;
   const workbookNarrativeSummary =
     allConnections.length > 0
-      ? "FiltraQueri found business areas that may describe the same operation from different angles."
+      ? "Related business areas may describe the same operation from different angles."
       : intelligence.humanSummary;
   const formatConfidence = (value: string) =>
     value ? `${value.charAt(0).toUpperCase()}${value.slice(1)} confidence` : "Confidence";
@@ -787,7 +787,7 @@ function DatasetSummaryPanel({
         ? "This looks like business activity data with values over time."
         : (dataProfile?.possibleMetrics.length || 0) > 0
           ? "This looks like business data with measurable values."
-          : "FiltraQueri found structure it can help you investigate.";
+          : "This dataset has structure available for investigation.";
   const understandingSignals = [
     businessEntityHints[0] ? `Business entity: ${businessEntityHints[0].displayName}` : null,
     dataProfile?.possibleMetrics[0] ? `Possible metric: ${dataProfile.possibleMetrics[0].name}` : null,
@@ -813,7 +813,7 @@ function DatasetSummaryPanel({
   const businessNarrative =
     businessActivityLabels.length > 0
       ? `Start with ${businessActivityLabels.slice(0, 3).join(", ")}. These cues help narrow the first useful question.`
-      : "FiltraQueri is building a first read so you can choose a useful question sooner.";
+      : "A first read is being prepared so you can choose a useful question sooner.";
   const businessSignals = [
     dataProfile?.possibleMetrics.length
       ? {
@@ -1236,7 +1236,7 @@ function DatasetSummaryPanel({
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
                     title="Entity signal needs review"
-                    description="FiltraQueri has not found a strong customer, product, tenant, or segment cue yet."
+                    description="No strong customer, product, tenant, or segment cue is available yet."
                   />
                 ))}
               {activeOperationalWorkspace === "kpis" &&
@@ -1435,7 +1435,7 @@ function DatasetSummaryPanel({
                   <p>
                     {selectedEvidence
                       ? "This signal helps explain what the dataset appears to contain."
-                      : "FiltraQueri uses these signals to summarize the dataset before deeper work begins."}
+                      : "These signals summarize the dataset before deeper work begins."}
                   </p>
                   <div className="context-rail-actions">
                     <button type="button" onClick={() => openOperationalWorkspace(selectedEvidenceWorkspace)}>
@@ -1509,7 +1509,7 @@ function DatasetSummaryPanel({
                   {activeWorkflowMenu === "intelligence" && (
                     <div className="data-workflow-menu" role="menu" aria-label="Dataset follow-up options">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
-                        <strong>What FiltraQueri noticed</strong>
+                        <strong>What the data suggests</strong>
                         <span>Review business signals and useful fields.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("suggestedAnalysisPaths")}>
@@ -1552,7 +1552,7 @@ function DatasetSummaryPanel({
                     <div className="data-workflow-menu" role="menu" aria-label="Business questions">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
                         <strong>Business meaning</strong>
-                        <span>See what FiltraQueri thinks these fields represent.</span>
+                        <span>Review what these fields may represent.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
                         <strong>Possible measures</strong>
@@ -1611,7 +1611,7 @@ function DatasetSummaryPanel({
           </div>
         ) : (
           <div className="dataset-empty-guidance">
-            <p>No dataset open. Choose a CSV or Excel workbook so FiltraQueri can start finding the business story.</p>
+            <p>No dataset open. Choose a CSV or Excel workbook to start finding the business story.</p>
             <button type="button" className="primary-button" onClick={onOpenDataset}>
               Choose file
             </button>
@@ -1679,7 +1679,7 @@ function DatasetSummaryPanel({
       {dataset && dataProfile && activeFocusedWorkflow === "dataIntelligence" && (
         <DrillInDetailPanel
           eyebrow="Business understanding"
-          title="What FiltraQueri noticed"
+          title="What the data suggests"
           summary={humanSummary}
           onBack={closeDrillIn}
           backLabel="Back to Data"
@@ -1688,7 +1688,7 @@ function DatasetSummaryPanel({
           <div className="summary-header">
             <div>
               <p className="section-label">Dataset understanding</p>
-              <h2>Business signals FiltraQueri can use</h2>
+              <h2>Business signals available in this dataset</h2>
               <p>{humanSummary}</p>
             </div>
             <span className="dataset-count-pill">

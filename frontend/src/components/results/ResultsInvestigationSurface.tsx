@@ -185,7 +185,7 @@ function ResultsInvestigationSurface({
       {!isAnalystMode && (
         <div className="results-operational-shell is-stage-only">
           <InvestigationThread>
-            <WorkspaceHeader eyebrow="Review result" title="What did FiltraQueri find?" meta={sourceLabel} />
+            <WorkspaceHeader eyebrow="Review result" title="What the data shows" meta={sourceLabel} />
             <PrimaryFocusBlock
               eyebrow="Finding"
               title={explainabilityPreview.takeawaySentence}

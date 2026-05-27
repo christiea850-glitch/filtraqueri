@@ -52,21 +52,21 @@ const buildWorkflowSummary = (
   const dateField = getSelectionLabel(selections, "date-field") || "a valid date field";
 
   if (resultShape === "forecast_output") {
-    return `FiltraQueri may validate ${dateField}, forecast ${metric}, and prepare a future forecast output.`;
+    return `${dateField} may be validated, ${metric} forecasted, and a future forecast output prepared.`;
   }
   if (resultShape === "statistical_output") {
-    return "FiltraQueri may validate numeric measures and prepare a future statistical output.";
+    return "Numeric measures may be validated and prepared for a future statistical output.";
   }
   if (resultShape === "trend_output") {
-    return `FiltraQueri may aggregate ${metric} over ${dateField} and prepare a future trend output.`;
+    return `${metric} may be aggregated over ${dateField} for a future trend output.`;
   }
   if (resultShape === "ranked_output") {
-    return `FiltraQueri may group ${metric} by ${grouping} and prepare a ranked output.`;
+    return `${metric} may be grouped by ${grouping} for a ranked output.`;
   }
   if (task.id.includes("inactive")) {
-    return `FiltraQueri may validate activity dates for ${entity} and prepare a future summary table.`;
+    return `Activity dates for ${entity} may be validated for a future summary table.`;
   }
-  return `FiltraQueri may organize ${metric} by ${grouping} and prepare a future ${resultShape.replace(/_/g, " ")}.`;
+  return `${metric} may be organized by ${grouping} for a future ${resultShape.replace(/_/g, " ")}.`;
 };
 
 const createStage = (

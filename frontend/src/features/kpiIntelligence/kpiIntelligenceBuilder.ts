@@ -315,7 +315,7 @@ const buildDrafts = ({
       category: "forecasting_opportunity",
       label: "Forecasting opportunity",
       score: (dataProfile.timeSeriesReadiness.ready ? 5 : 0) + (hasForecastingPreview ? 2 : 0),
-      humanSummary: "FiltraQueri detected forecasting opportunities.",
+      humanSummary: "Forecasting opportunities are available.",
       supportingSignals: [
         createSignal("profile:forecasting", "Forecast readiness", dataProfile.timeSeriesReadiness.summary, "data_profile"),
         ...(executionPreview
@@ -453,7 +453,7 @@ const buildDrafts = ({
 
 const buildHumanSummary = (opportunities: KpiOpportunity[]) => {
   const top = opportunities[0];
-  if (!top) return "FiltraQueri needs more metadata before suggesting KPI opportunities.";
+  if (!top) return "More metadata is needed before suggesting KPI opportunities.";
   return top.humanSummary;
 };
 

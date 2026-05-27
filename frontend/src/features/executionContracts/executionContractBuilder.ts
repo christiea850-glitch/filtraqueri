@@ -93,9 +93,9 @@ const buildHumanSummary = (
   hasKpis: boolean,
 ) => {
   if (relationshipPending) return "Relationship confirmation is required before workbook analysis.";
-  if (hasForecasting) return "FiltraQueri prepared a future forecasting execution contract.";
+  if (hasForecasting) return "A future forecasting execution contract is prepared.";
   if (hasKpis && state === "ready_for_execution") return "KPI analysis is ready for future execution planning.";
-  return "FiltraQueri prepared a metadata-only future execution contract.";
+  return "A metadata-only future execution contract is prepared.";
 };
 
 export const buildExecutionContract = ({

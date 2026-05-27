@@ -31,21 +31,21 @@ const buildWorkflowSummary = (task: AnalyticsTask, selections: GuidedInputSelect
   const dateField = getSelectionValue(selections, "date-field");
 
   if (task.id.includes("forecast")) {
-    return `FiltraQueri may prepare ${metric} over time for a future forecasting workflow.`;
+    return `${metric} may be prepared over time for a future forecasting workflow.`;
   }
   if (task.id.includes("trend")) {
-    return `FiltraQueri may compare how ${metric} changes over ${dateField || "a selected date field"}.`;
+    return `${metric} may be compared over ${dateField || "a selected date field"}.`;
   }
   if (task.id.includes("correlation")) {
-    return "FiltraQueri may compare the selected measures to check whether they tend to move together.";
+    return "The selected measures may be compared to check whether they tend to move together.";
   }
   if (task.id.includes("inactive")) {
-    return `FiltraQueri may identify inactive ${entity || "business entities"} using a selected date field.`;
+    return `Inactive ${entity || "business entities"} may be identified using a selected date field.`;
   }
   if (task.id.includes("compare")) {
-    return `FiltraQueri may compare ${metric} across ${grouping || "selected groups"}.`;
+    return `${metric} may be compared across ${grouping || "selected groups"}.`;
   }
-  return `FiltraQueri may group ${metric} by ${grouping || "the selected business category"}.`;
+  return `${metric} may be grouped by ${grouping || "the selected business category"}.`;
 };
 
 const buildSelectedInputsSummary = (guidedInputState: GuidedInputState) => {
@@ -55,7 +55,7 @@ const buildSelectedInputsSummary = (guidedInputState: GuidedInputState) => {
 };
 
 const buildExpectedBehavior = (analysisPlan: AnalysisPlan | null) => {
-  if (!analysisPlan) return ["FiltraQueri needs an analysis plan before it can describe future behavior."];
+  if (!analysisPlan) return ["An analysis plan is needed before future behavior can be described."];
   return analysisPlan.executionSteps.map((step) => step.description);
 };
 

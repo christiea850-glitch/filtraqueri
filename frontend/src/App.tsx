@@ -390,7 +390,7 @@ function App() {
     if (!dataset) {
       return {
         title: guidance.label,
-        explanation: "Choose a file so FiltraQueri can suggest the first business question.",
+        explanation: "Choose a file to start shaping the first business question.",
         metrics: [
           { label: "Rows", value: "0" },
           { label: "Columns", value: "0" },
@@ -590,7 +590,7 @@ function App() {
   const renderNoDatasetView = () => (
     <section className="empty-state">
       <p className="section-label">Start investigation</p>
-      <h2>Choose a file so FiltraQueri can look for business signals.</h2>
+      <h2>Choose a file to look for business signals.</h2>
     </section>
   );
 
@@ -918,8 +918,8 @@ function App() {
         },
         {
           id: "data:intelligence",
-          title: "What FiltraQueri Noticed",
-          description: "Review business signals FiltraQueri found in the active dataset.",
+          title: "What the Data Suggests",
+          description: "Review business signals in the active dataset.",
           category: "Data",
           keywords: ["noticed", "understanding", "fields"],
           onRun: () => openDataCommand("intelligenceDetail"),
@@ -1000,7 +1000,7 @@ function App() {
       {
         id: "workflow:guided-analysis",
         title: "Start Suggested Investigation",
-        description: "Let FiltraQueri suggest a business direction for the active dataset.",
+        description: "Review a suggested business direction for the active dataset.",
         category: "Investigations",
         keywords: ["human mode", "opportunity", "guided"],
         disabled: !dataset,

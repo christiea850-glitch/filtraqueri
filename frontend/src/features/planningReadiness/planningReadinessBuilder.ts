@@ -17,7 +17,7 @@ const buildBeginnerSummary = (report: Pick<PlanningReadinessReport, "status" | "
     return "This task appears structurally ready for future analytics execution.";
   }
   if (report.status === "relationship_dependent") {
-    return "FiltraQueri understands the workflow structure, but workbook relationships may need confirmation before future execution.";
+    return "The workflow structure is available, but workbook relationships may need confirmation before future execution.";
   }
   if (report.status === "engine_limited") {
     return "This workflow needs stronger future engine support before it can be executed safely.";
@@ -26,9 +26,9 @@ const buildBeginnerSummary = (report: Pick<PlanningReadinessReport, "status" | "
     return "This workflow is not supported by the current planning metadata.";
   }
   if (report.status === "partially_ready") {
-    return "FiltraQueri can describe the workflow, but more planning metadata is needed before execution can be wired.";
+    return "The workflow can be described, but more planning metadata is needed before execution can be wired.";
   }
-  return "This task still needs guided inputs before FiltraQueri can prepare it for future execution.";
+  return "This task still needs guided inputs before it can be prepared for future execution.";
 };
 
 export function buildPlanningReadinessReport({

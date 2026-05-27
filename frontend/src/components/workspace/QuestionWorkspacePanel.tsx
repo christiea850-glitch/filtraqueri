@@ -384,8 +384,8 @@ function QuestionWorkspacePanel({
     };
 
     const whyThisApproach = primaryDimension || primaryMeasure || primaryDateField
-      ? "The matched fields give FiltraQueri a practical way to connect the question to the dataset without guessing. The next safe step is to confirm the field choices before executable logic exists."
-      : "The question needs a clearer connection to dataset fields before FiltraQueri can prepare reliable logic.";
+      ? "The matched fields give the workspace a practical way to connect the question to the dataset without guessing. The next safe step is to confirm the field choices before executable logic exists."
+      : "The question needs a clearer connection to dataset fields before reliable logic can be prepared.";
 
     return {
       fieldsToInspect: fieldsToInspect.length > 0 ? fieldsToInspect.join(", ") : "Needs field clarification",
@@ -517,7 +517,7 @@ function QuestionWorkspacePanel({
         <p className="section-label">Workspace</p>
         <h2>Ask a business question</h2>
         <p>
-          Start with what you want to learn. FiltraQueri will prepare a reviewable analysis
+          Start with what you want to learn. The workspace will prepare a reviewable analysis
           before anything runs.
         </p>
       </div>
@@ -564,7 +564,7 @@ function QuestionWorkspacePanel({
         <section className="question-workspace-review" aria-label="Question review shell">
           <div>
             <p className="section-label">Investigation Review</p>
-            <h3>FiltraQueri will prepare an analysis plan here.</h3>
+            <h3>A reviewable analysis plan will appear here.</h3>
           </div>
 
           <div className="question-workspace-protected-status" role="status">
@@ -612,7 +612,7 @@ function QuestionWorkspacePanel({
 
           {schemaDraftPlan && !hasSchemaCandidates && (
             <p className="question-workspace-fallback">
-              FiltraQueri could not confidently match this question to fields yet.
+              This question could not be confidently matched to fields yet.
             </p>
           )}
 
@@ -771,7 +771,7 @@ function QuestionWorkspacePanel({
                   <strong>{draft.rawQuestion}</strong>
                 </article>
                 <article>
-                  <span>Fields FiltraQueri would inspect</span>
+                  <span>Fields to inspect</span>
                   <strong>{investigationBlueprint.fieldsToInspect}</strong>
                 </article>
                 <article>
@@ -802,7 +802,7 @@ function QuestionWorkspacePanel({
               </div>
 
               <div className="question-workspace-blueprint-note">
-                <span>Before execution, FiltraQueri would still need...</span>
+                <span>Before execution, this still needs...</span>
                 {investigationBlueprint.missingRequirements.length > 0 ? (
                   <ul>
                     {investigationBlueprint.missingRequirements.map((requirement) => (
@@ -951,7 +951,7 @@ function QuestionWorkspacePanel({
                   </div>
 
                   <p className="question-workspace-preview-explainer">
-                    This preview helps explain how FiltraQueri may structure the investigation later before any real execution occurs.
+                    This preview explains how the investigation may be structured later before any real execution occurs.
                   </p>
 
                   <ul className="question-workspace-preview-list">
@@ -1078,7 +1078,7 @@ function QuestionWorkspacePanel({
 
                   {governedQueryBuilderRequestDraft.status === "blocked" && (
                     <p className="question-workspace-fallback">
-                      FiltraQueri needs more clarification before it can prepare a reviewable request.
+                      More clarification is needed before a reviewable request can be prepared.
                     </p>
                   )}
 

@@ -293,16 +293,16 @@ const listWorkflowConnections = (
 
 const buildHumanSummary = (entities: BusinessSemanticEntity[]) => {
   const categories = entityCategorySet(entities);
-  if (categories.has("customer")) return "FiltraQueri detected customer-related business data.";
+  if (categories.has("customer")) return "This appears to contain customer-related business data.";
   if (categories.has("sales") || categories.has("revenue")) {
     return "This workbook may contain sales and revenue information.";
   }
   if (categories.has("transaction") || categories.has("operational_event")) {
     return "Operational transaction patterns were detected.";
   }
-  if (categories.has("product")) return "FiltraQueri detected product-related business data.";
-  if (categories.has("metric_field")) return "FiltraQueri detected business metrics for future analysis.";
-  return "FiltraQueri is still looking for recognizable business semantics in this metadata.";
+  if (categories.has("product")) return "This appears to contain product-related business data.";
+  if (categories.has("metric_field")) return "Business metrics are available for future analysis.";
+  return "Recognizable business semantics still need review in this metadata.";
 };
 
 const buildAnalystSummary = (entities: BusinessSemanticEntity[], kpis: BusinessKpiSuggestion[]) =>

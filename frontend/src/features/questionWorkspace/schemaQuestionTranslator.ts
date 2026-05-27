@@ -275,13 +275,13 @@ export function buildClarifyingQuestions({
   const questions: string[] = [];
 
   if (missingRequirements.includes("clear_intent")) {
-    questions.push("What business outcome should FiltraQueri focus on?");
+    questions.push("What business outcome should this analysis focus on?");
   }
   if (missingRequirements.includes("measure")) {
     questions.push("Which metric should define the result?");
   }
   if (missingRequirements.includes("dimension")) {
-    questions.push("Which entity or group should FiltraQueri compare?");
+    questions.push("Which entity or group should be compared?");
   }
   if (missingRequirements.includes("date_field")) {
     questions.push("Which date or timeline field should be used?");

@@ -124,18 +124,18 @@ const buildShape = (dataset: DatasetMetadata): DataProfileShape => {
 
 const buildHumanSummary = (profile: Pick<DataProfileReport, "shape" | "workbookRelationshipContext">) => {
   if (profile.workbookRelationshipContext.hasWorkbookContext) {
-    return "FiltraQueri detected this as a workbook with possible related sheets.";
+    return "This appears to be a workbook with possible related sheets.";
   }
   if (profile.shape.shapeLabel === "large_table") {
-    return "FiltraQueri detected this as a large tabular dataset suited to filtering and grouping.";
+    return "This appears to be a large tabular dataset suited to filtering and grouping.";
   }
   if (profile.shape.shapeLabel === "wide_table") {
-    return "FiltraQueri detected this as a wide table with many fields to inspect.";
+    return "This appears to be a wide table with many fields to inspect.";
   }
   if (profile.shape.shapeLabel === "empty") {
-    return "FiltraQueri needs more populated data before it can profile this dataset.";
+    return "More populated data is needed before this dataset can be profiled.";
   }
-  return "FiltraQueri detected this as a tabular dataset for future filtering, grouping, and summaries.";
+  return "This appears to be a tabular dataset for future filtering, grouping, and summaries.";
 };
 
 export const buildDataProfile = (dataset: DatasetMetadata | null): DataProfileReport | null => {

@@ -41,7 +41,7 @@ import useDatasetSessions from "./useDatasetSessions";
 
 const GENERIC_UPLOAD_FAILURE_MESSAGE = "Upload failed. Please check the file and try again.";
 const POST_UPLOAD_FAILURE_MESSAGE =
-  "Dataset uploaded, but FiltraQueri could not finish opening it. Please refresh or reopen it from Recent work.";
+  "Dataset uploaded, but the app could not finish opening it. Please refresh or reopen it from Recent work.";
 
 function getErrorMessage(error: unknown, fallbackMessage: string) {
   return error instanceof Error ? error.message : fallbackMessage;

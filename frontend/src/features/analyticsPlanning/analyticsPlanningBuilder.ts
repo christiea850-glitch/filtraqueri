@@ -105,8 +105,8 @@ const buildHumanSummary = (
 ) => {
   if (relationshipPending) return "Relationship confirmation is needed before connected workbook analysis.";
   if (hasForecasting && status !== "ready") return "Forecasting preparation is waiting for a valid date field.";
-  if (status === "ready") return "FiltraQueri prepared a future revenue analysis workflow.";
-  return "FiltraQueri prepared a metadata-only future analytics plan.";
+  if (status === "ready") return "A future revenue analysis workflow is prepared.";
+  return "A metadata-only future analytics plan is prepared.";
 };
 
 export const buildAnalyticsPlan = ({

@@ -144,7 +144,7 @@ const buildDrafts = ({
       category: "dashboard_reporting",
       label: "Dashboard reporting",
       score: 2 + (hasMetrics ? 3 : 0) + (hasDimensions ? 2 : 0) + (hasDates ? 1 : 0),
-      humanSummary: "FiltraQueri detected business metrics suitable for dashboard reporting.",
+      humanSummary: "Business metrics suitable for dashboard reporting are available.",
       whyRecommended: ["Metrics and dimensions can support future dashboard-style summaries."],
       supportingMetadataSignals: [
         signal("metrics", "Metric candidates", `${dataProfile.possibleMetrics.length} possible metrics.`),
@@ -355,7 +355,7 @@ const buildDrafts = ({
 
 const buildHumanSummary = (recommendations: WorkflowRecommendation[]) => {
   const top = recommendations[0];
-  if (!top) return "FiltraQueri needs more metadata before recommending workflows.";
+  if (!top) return "More metadata is needed before recommending workflows.";
   return top.humanSummary;
 };
 
