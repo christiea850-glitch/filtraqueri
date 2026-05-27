@@ -6,6 +6,10 @@ import type { NarrativeReport } from "../../features/narrativeIntelligence";
 import type { ActiveResultModel } from "../../features/results/activeResultModel";
 import type { ResultTabKey } from "../../features/results/resultTypes";
 import {
+  formatDisplayLabel,
+  formatMetricDisplayLabel,
+} from "../../features/displayLabels/displayLabelFormatter";
+import {
   getActiveSortLabel,
   getChartSupportLabel,
   getHiddenColumnCount,
@@ -61,6 +65,13 @@ const toBusinessStatusLabel = (value: string) =>
     .replace(/readiness/g, "fit")
     .replace(/_/g, " ");
 
+const formatEmbeddedDisplayLabels = (value: string) =>
+  value.replace(/[A-Za-z0-9()%]+(?:_[A-Za-z0-9()%]+)+/g, (fieldName) =>
+    /^(sum|avg|count)_/i.test(fieldName)
+      ? formatMetricDisplayLabel(fieldName)
+      : formatDisplayLabel(fieldName),
+  );
+
 function ResultsInvestigationSurface({
   activeResultModel,
   activeResultTab,
@@ -82,6 +93,13 @@ function ResultsInvestigationSurface({
   const topContributorLabel = getTopContributorLabel(activeResultModel);
   const highlightLabel = getHighlightLabel(activeResultModel);
   const chartSupportLabel = getChartSupportLabel(activeResultModel);
+  const displaySourceLabel = formatEmbeddedDisplayLabels(sourceLabel);
+  const displayTakeaway = formatEmbeddedDisplayLabels(takeaway);
+  const displayContinuationSuggestion = formatEmbeddedDisplayLabels(continuationSuggestion);
+  const displayActiveSortLabel = formatEmbeddedDisplayLabels(activeSortLabel);
+  const displayTopContributorLabel = formatEmbeddedDisplayLabels(topContributorLabel);
+  const displayHighlightLabel = formatEmbeddedDisplayLabels(highlightLabel);
+  const displayChartSupportLabel = formatEmbeddedDisplayLabels(chartSupportLabel);
   const resultFollowUps = investigationReport.nextSteps.slice(0, 3);
   void analysisPackagePlan;
   void investigationWorkspacePlan;
@@ -91,17 +109,23 @@ function ResultsInvestigationSurface({
   const explainabilityPreview = createExplainabilityPreviewViewModel({
     sourceDescriptorVersion: "results-investigation-surface-v1",
     generatedAt: "deterministic-results-preview",
-    takeawaySentence: narrativeReport.summary || takeaway,
+    takeawaySentence: formatEmbeddedDisplayLabels(narrativeReport.summary || displayTakeaway),
     confidenceLabel: toBusinessStatusLabel(narrativeReadiness.label),
-    topEvidenceFact: primaryExecutiveInsight?.evidence[0] || {
-      label: "Top contributor",
-      value: topContributorLabel,
-    },
-    whyItMattersPreview: chartSupportLabel,
-    recommendationPreview: continuationSuggestion,
+    topEvidenceFact: primaryExecutiveInsight?.evidence[0]
+      ? {
+          ...primaryExecutiveInsight.evidence[0],
+          label: formatEmbeddedDisplayLabels(primaryExecutiveInsight.evidence[0].label),
+          value: formatEmbeddedDisplayLabels(String(primaryExecutiveInsight.evidence[0].value)),
+        }
+      : {
+          label: "Top contributor",
+          value: displayTopContributorLabel,
+        },
+    whyItMattersPreview: displayChartSupportLabel,
+    recommendationPreview: displayContinuationSuggestion,
   });
   const resultRowsLabel = activeResultModel.totalCount.toLocaleString();
-  const filterSortLabel = `${activeFilterCount.toLocaleString()} filters / ${activeSortLabel}`;
+  const filterSortLabel = `${activeFilterCount.toLocaleString()} filters / ${displayActiveSortLabel}`;
   const navigationContext = emptyNavigationContextPreservation(workspaceMode);
   const resultsInsightOrigin = createNavigationOriginDescriptor({
     preservationId: "preserve:results-insight-detail",
@@ -146,7 +170,7 @@ function ResultsInvestigationSurface({
     },
     selectedItem: {
       selectedItemId: activeResultModel.sourceTab,
-      selectedItemLabel: sourceLabel,
+      selectedItemLabel: displaySourceLabel,
       selectedItemType: "result",
     },
   });
@@ -169,7 +193,7 @@ function ResultsInvestigationSurface({
     return (
       <ResultsInsightDetailPage
         explainabilityPreview={explainabilityPreview}
-        sourceContext={`${sourceLabel} / ${activeResultTab} / ${activeResultModel.sourceType}`}
+        sourceContext={`${displaySourceLabel} / ${activeResultTab} / ${activeResultModel.sourceType}`}
         resultFactLabel={resultRowsLabel}
         filterSortLabel={filterSortLabel}
         preservedContextLabel={resultsInsightBackState.preservationId}
@@ -191,13 +215,13 @@ function ResultsInvestigationSurface({
       {!isAnalystMode && (
         <div className="results-operational-shell is-stage-only">
           <InvestigationThread>
-            <WorkspaceHeader eyebrow="Review result" title="What the data shows" meta={sourceLabel} />
+            <WorkspaceHeader eyebrow="Review result" title="What the data shows" meta={displaySourceLabel} />
             {preparedQuestionContext && (
               <div className="results-prepared-question-note" aria-label="Prepared question traceability">
                 <span>Answered question</span>
                 <strong>{preparedQuestionContext.questionText}</strong>
                 <small>
-                  Logic source: {preparedQuestionContext.sourceLabel}. Run with the existing Query Builder path.
+                  Logic source: {formatEmbeddedDisplayLabels(preparedQuestionContext.sourceLabel)}. Run with the existing Query Builder path.
                 </small>
               </div>
             )}
@@ -216,11 +240,11 @@ function ResultsInvestigationSurface({
                 <p className="section-label">Evidence</p>
                 <strong>Result context</strong>
               </div>
-              <EvidenceRow title="Top contributor" description={topContributorLabel} />
-              <EvidenceRow title="Highlight" description={highlightLabel} />
-              <EvidenceRow title="Supporting view" description={chartSupportLabel} />
+              <EvidenceRow title="Top contributor" description={displayTopContributorLabel} />
+              <EvidenceRow title="Highlight" description={displayHighlightLabel} />
+              <EvidenceRow title="Supporting view" description={displayChartSupportLabel} />
             </EvidenceRows>
-            <ActionRail eyebrow="Next move" title={continuationSuggestion}>
+            <ActionRail eyebrow="Next move" title={displayContinuationSuggestion}>
               <button type="button" className="is-primary" onClick={openResultsInsightDetail}>
                 Inspect finding
               </button>
@@ -235,7 +259,7 @@ function ResultsInvestigationSurface({
               <OperationalList>
                 {resultFollowUps.map((suggestion) => (
                   <button type="button" key={suggestion.id} onClick={openResultsInsightDetail}>
-                    {suggestion.question}
+                    {formatEmbeddedDisplayLabels(suggestion.question)}
                   </button>
                 ))}
               </OperationalList>
@@ -259,8 +283,8 @@ function ResultsInvestigationSurface({
         </div>
         <div className="results-investigation-focus">
           <span>Next useful move</span>
-          <strong>{continuationSuggestion}</strong>
-          <small>{chartSupportLabel}</small>
+          <strong>{displayContinuationSuggestion}</strong>
+          <small>{displayChartSupportLabel}</small>
         </div>
       </div>
 
@@ -278,26 +302,26 @@ function ResultsInvestigationSurface({
       <div className="results-insight-row" aria-label="Lightweight result insights">
         <span>
           <small>Top contributor</small>
-          <strong>{topContributorLabel}</strong>
+          <strong>{displayTopContributorLabel}</strong>
         </span>
         <span>
           <small>Highlight</small>
-          <strong>{highlightLabel}</strong>
+          <strong>{displayHighlightLabel}</strong>
         </span>
         <span>
           <small>Supporting view</small>
-          <strong>{chartSupportLabel}</strong>
+          <strong>{displayChartSupportLabel}</strong>
         </span>
         <span>
           <small>{isAnalystMode ? "Payload" : "Continuation"}</small>
-          <strong>{continuationSuggestion}</strong>
+          <strong>{displayContinuationSuggestion}</strong>
         </span>
       </div>
 
       <div className="results-review-facts" aria-label="Supporting result context">
         <span>
           <small>Source</small>
-          <strong>{sourceLabel}</strong>
+          <strong>{displaySourceLabel}</strong>
         </span>
         <span>
           <small>Result rows</small>

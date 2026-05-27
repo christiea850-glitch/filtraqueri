@@ -6,6 +6,10 @@ import {
   createDisplayColumnProfiles,
   getDisplayColumnName,
 } from "../../features/dataIntelligence/structuralPresentation";
+import {
+  formatDisplayLabel,
+  formatMetricDisplayLabel,
+} from "../../features/displayLabels/displayLabelFormatter";
 
 type ResultsGridProps = {
   title: string;
@@ -54,6 +58,13 @@ async function copyTextToClipboard(value: string) {
   document.body.removeChild(textarea);
 }
 
+const formatEmbeddedDisplayLabels = (value: string) =>
+  value.replace(/[A-Za-z0-9()%]+(?:_[A-Za-z0-9()%]+)+/g, (fieldName) =>
+    /^(sum|avg|count)_/i.test(fieldName)
+      ? formatMetricDisplayLabel(fieldName)
+      : formatDisplayLabel(fieldName),
+  );
+
 function ResultsGrid({
   title,
   label,
@@ -93,12 +104,16 @@ function ResultsGrid({
     () => createDisplayColumnProfiles(columns, rows),
     [columns, rows],
   );
+  const getFriendlyColumnName = (column: string) =>
+    formatDisplayLabel(getDisplayColumnName(displayColumnProfiles, column));
   const matchingColumns = useMemo(
     () =>
       normalizedColumnSearch
         ? new Set(
             visibleColumns.filter((column) => {
-              const displayName = getDisplayColumnName(displayColumnProfiles, column);
+              const displayName = formatDisplayLabel(
+                getDisplayColumnName(displayColumnProfiles, column),
+              );
               return (
                 column.toLowerCase().includes(normalizedColumnSearch) ||
                 displayName.toLowerCase().includes(normalizedColumnSearch)
@@ -252,7 +267,7 @@ function ResultsGrid({
                 </div>
                 <div className="columns-menu-list">
                   {columns.map((column) => {
-                    const displayName = getDisplayColumnName(displayColumnProfiles, column);
+                    const displayName = getFriendlyColumnName(column);
 
                     return (
                     <label key={column} title={column}>
@@ -294,7 +309,7 @@ function ResultsGrid({
       {filters.activeLabels.length > 0 && (
         <div className="active-filter-bar">
           {filters.activeLabels.map((filterLabel) => (
-            <span key={filterLabel}>{filterLabel}</span>
+            <span key={filterLabel}>{formatEmbeddedDisplayLabels(filterLabel)}</span>
           ))}
         </div>
       )}
@@ -320,7 +335,7 @@ function ResultsGrid({
                   Row
                 </th>
                 {visibleColumns.map((column, columnIndex) => {
-                  const displayName = getDisplayColumnName(displayColumnProfiles, column);
+                  const displayName = getFriendlyColumnName(column);
 
                   return (
                   <th
@@ -378,7 +393,7 @@ function ResultsGrid({
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        title={`${getDisplayColumnName(displayColumnProfiles, column)} (${column}): ${String(row[column] ?? "")}. Click to copy.`}
+                        title={`${getFriendlyColumnName(column)} (${column}): ${String(row[column] ?? "")}. Click to copy.`}
                         onClick={() => copyCellValue(column, rowIndex, row[column])}
                       >
                         {String(row[column] ?? "")}

@@ -4,6 +4,10 @@ import { buildControlledLogicDraft } from "../../features/questionWorkspace/ques
 import { buildGovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestBuilder";
 import { createSchemaAwareDraftPlan } from "../../features/questionWorkspace/schemaQuestionTranslator";
 import type { FilterDefinition } from "../../features/filters/filterTypes";
+import {
+  formatDisplayLabel,
+  formatMetricDisplayLabel,
+} from "../../features/displayLabels/displayLabelFormatter";
 import type { GovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestTypes";
 import type {
   CandidateFieldMatch,
@@ -140,40 +144,11 @@ const formatColumnLabel = (columnName: string) =>
     .trim()
     .toLowerCase();
 
-const friendlyQuestionLabels: Record<string, string> = {
-  "artist(s) name": "artist",
-  "artists name": "artist",
-  "artist name": "artist",
-  "track name": "track",
-  "song name": "song",
-  "released year": "release year",
-  "release year": "release year",
-  streams: "streams",
-  "in spotify playlists": "Spotify playlists",
-  "in apple playlists": "Apple playlists",
-  "in deezer playlists": "Deezer playlists",
-  bpm: "BPM",
-  "danceability %": "danceability",
-  "valence %": "valence",
-  "energy %": "energy",
-  "acousticness %": "acousticness",
-  "instrumentalness %": "instrumentalness",
-  "liveness %": "liveness",
-  "speechiness %": "speechiness",
-  "body temperature c": "body temperature",
-  "milk yield l": "milk yield",
-  "management system": "management system",
-  "climate zone": "climate zone",
-  "disease risk": "disease risk",
-  "monthly charges": "monthly charges",
-  "total charges": "total charges",
-  "internet service": "internet service",
-  "payment method": "payment method",
-};
-
 const formatQuestionDisplayLabel = (columnName: string) => {
-  const normalizedLabel = formatColumnLabel(columnName).replace(/[()]/g, "").trim();
-  return friendlyQuestionLabels[normalizedLabel] || normalizedLabel;
+  const displayLabel = formatDisplayLabel(columnName);
+  return displayLabel === displayLabel.toUpperCase()
+    ? displayLabel
+    : displayLabel.charAt(0).toLowerCase() + displayLabel.slice(1);
 };
 
 const getSchemaSearchText = (dataset: DatasetMetadata) =>
@@ -596,21 +571,32 @@ const formatPlanLabel = (value: string) => value.replace(/_/g, " ");
 const formatNullablePlanValue = (value: string | number | null) =>
   value === null ? "null" : String(value);
 
-const formatRequestList = (items: string[]) => (items.length > 0 ? items.join(", ") : "None");
+const formatDisplayRequestList = (items: string[]) =>
+  items.length > 0 ? items.map(formatDisplayLabel).join(", ") : "None";
 
-const formatRequestAggregation = (aggregation: { function: string; column: string | null }) =>
-  aggregation.column ? `${aggregation.function} ${aggregation.column}` : `${aggregation.function} records`;
+const formatRequestAggregation = (aggregation: { function: string; column: string | null }) => {
+  const normalizedFunction = aggregation.function.toLowerCase();
+  if (!aggregation.column) return normalizedFunction === "count" ? "Records" : `${aggregation.function} records`;
+
+  const columnLabel = formatDisplayLabel(aggregation.column).toLowerCase();
+  if (normalizedFunction === "sum") return `Total ${columnLabel}`;
+  if (normalizedFunction === "avg" || normalizedFunction === "average") return `Average ${columnLabel}`;
+  if (normalizedFunction === "count") return `Count of ${columnLabel}`;
+
+  return `${aggregation.function} ${formatMetricDisplayLabel(aggregation.column)}`;
+};
 
 const formatRequestFilter = (filter: FilterDefinition) => {
-  if (filter.values && filter.values.length > 0) return `${filter.column}: ${filter.values.join(", ")}`;
-  if (filter.value !== undefined && filter.value !== null) return `${filter.column}: ${String(filter.value)}`;
+  const displayColumn = formatDisplayLabel(filter.column);
+  if (filter.values && filter.values.length > 0) return `${displayColumn}: ${filter.values.join(", ")}`;
+  if (filter.value !== undefined && filter.value !== null) return `${displayColumn}: ${String(filter.value)}`;
   if (filter.min !== undefined || filter.max !== undefined) {
-    return `${filter.column}: ${formatNullablePlanValue(filter.min ?? null)} to ${formatNullablePlanValue(filter.max ?? null)}`;
+    return `${displayColumn}: ${formatNullablePlanValue(filter.min ?? null)} to ${formatNullablePlanValue(filter.max ?? null)}`;
   }
   if (filter.start || filter.end) {
-    return `${filter.column}: ${filter.start || "start"} to ${filter.end || "end"}`;
+    return `${displayColumn}: ${filter.start || "start"} to ${filter.end || "end"}`;
   }
-  return `${filter.column}: reviewed filter`;
+  return `${displayColumn}: reviewed filter`;
 };
 
 function QuestionWorkspacePanel({
@@ -648,7 +634,7 @@ function QuestionWorkspacePanel({
     candidates.length > 0
       ? candidates
           .slice(0, 4)
-          .map((candidate) => `${candidate.columnName} (${candidate.confidence})`)
+          .map((candidate) => `${formatDisplayLabel(candidate.columnName)} (${candidate.confidence})`)
           .join(", ")
       : "Not identified yet";
 
@@ -697,8 +683,9 @@ function QuestionWorkspacePanel({
       key={`${role}-${candidate.columnName}`}
       className={selectedColumn === candidate.columnName ? "is-selected" : ""}
       onClick={() => updatePlanningSelection(role, candidate.columnName)}
+      title={candidate.columnName}
     >
-      <strong>{candidate.columnName}</strong>
+      <strong>{formatDisplayLabel(candidate.columnName)}</strong>
       <span>{candidate.confidence} confidence</span>
       <small>{candidate.matchReason.replace(/_/g, " ")}</small>
     </button>
@@ -854,19 +841,25 @@ function QuestionWorkspacePanel({
               <article>
                 <span>Selected dimension</span>
                 <strong>
-                  {selectedDimension ||
-                    controlledLogicDraft?.selectedFields.dimension ||
-                    schemaDraftPlan?.candidateDimensions[0]?.columnName ||
-                    "Not selected"}
+                  {selectedDimension
+                    ? formatDisplayLabel(selectedDimension)
+                    : controlledLogicDraft?.selectedFields.dimension
+                      ? formatDisplayLabel(controlledLogicDraft.selectedFields.dimension)
+                      : schemaDraftPlan?.candidateDimensions[0]?.columnName
+                        ? formatDisplayLabel(schemaDraftPlan.candidateDimensions[0].columnName)
+                        : "Not selected"}
                 </strong>
               </article>
               <article>
                 <span>Selected measure</span>
                 <strong>
-                  {selectedMeasure ||
-                    controlledLogicDraft?.selectedFields.measure ||
-                    schemaDraftPlan?.candidateMeasures[0]?.columnName ||
-                    "Record count or not selected"}
+                  {selectedMeasure
+                    ? formatMetricDisplayLabel(selectedMeasure)
+                    : controlledLogicDraft?.selectedFields.measure
+                      ? formatMetricDisplayLabel(controlledLogicDraft.selectedFields.measure)
+                      : schemaDraftPlan?.candidateMeasures[0]?.columnName
+                        ? formatMetricDisplayLabel(schemaDraftPlan.candidateMeasures[0].columnName)
+                        : "Record count or not selected"}
                 </strong>
               </article>
               {(selectedDateField ||
@@ -875,10 +868,13 @@ function QuestionWorkspacePanel({
                 <article>
                   <span>Selected date field</span>
                   <strong>
-                    {selectedDateField ||
-                      controlledLogicDraft?.selectedFields.dateField ||
-                      schemaDraftPlan?.candidateDateFields[0]?.columnName ||
-                      "Not selected"}
+                    {selectedDateField
+                      ? formatDisplayLabel(selectedDateField)
+                      : controlledLogicDraft?.selectedFields.dateField
+                        ? formatDisplayLabel(controlledLogicDraft.selectedFields.dateField)
+                        : schemaDraftPlan?.candidateDateFields[0]?.columnName
+                          ? formatDisplayLabel(schemaDraftPlan.candidateDateFields[0].columnName)
+                          : "Not selected"}
                   </strong>
                 </article>
               )}
@@ -896,7 +892,9 @@ function QuestionWorkspacePanel({
                 <strong>
                   {controlledLogicDraft?.sorting
                     ? `${controlledLogicDraft.sorting.direction || "review"} ${
-                        controlledLogicDraft.sorting.field || "field"
+                        controlledLogicDraft.sorting.field
+                          ? formatDisplayLabel(controlledLogicDraft.sorting.field)
+                          : "field"
                       }`
                     : "Review in Query Builder"}
                 </strong>
@@ -930,7 +928,10 @@ function QuestionWorkspacePanel({
 
               {schemaDraftPlan.candidateDimensions.length > 0 && (
                 <div className="question-workspace-choice-group">
-                  <span>Selected dimension: {selectedDimension || "None yet"}</span>
+                  <span>
+                    Selected dimension:{" "}
+                    {selectedDimension ? formatDisplayLabel(selectedDimension) : "None yet"}
+                  </span>
                   <div>
                     {schemaDraftPlan.candidateDimensions
                       .slice(0, 5)
@@ -943,7 +944,10 @@ function QuestionWorkspacePanel({
 
               {schemaDraftPlan.candidateMeasures.length > 0 && (
                 <div className="question-workspace-choice-group">
-                  <span>Selected measure: {selectedMeasure || "None yet"}</span>
+                  <span>
+                    Selected measure:{" "}
+                    {selectedMeasure ? formatMetricDisplayLabel(selectedMeasure) : "None yet"}
+                  </span>
                   <div>
                     {schemaDraftPlan.candidateMeasures
                       .slice(0, 5)
@@ -956,7 +960,10 @@ function QuestionWorkspacePanel({
 
               {schemaDraftPlan.candidateDateFields.length > 0 && (
                 <div className="question-workspace-choice-group">
-                  <span>Selected date field: {selectedDateField || "None yet"}</span>
+                  <span>
+                    Selected date field:{" "}
+                    {selectedDateField ? formatDisplayLabel(selectedDateField) : "None yet"}
+                  </span>
                   <div>
                     {schemaDraftPlan.candidateDateFields
                       .slice(0, 5)
@@ -1044,7 +1051,9 @@ function QuestionWorkspacePanel({
                   {schemaDraftPlan.ambiguousTerms.map((item) => (
                     <p key={item.term}>
                       <strong>{item.term}</strong>:{" "}
-                      {item.candidates.map((candidate) => candidate.columnName).join(", ")}
+                      {item.candidates
+                        .map((candidate) => formatDisplayLabel(candidate.columnName))
+                        .join(", ")}
                     </p>
                   ))}
                 </div>
@@ -1094,11 +1103,13 @@ function QuestionWorkspacePanel({
                 <div className="question-workspace-preview-grid">
                   <article>
                     <span>Selected columns</span>
-                    <strong>{formatRequestList(governedQueryBuilderRequestDraft.request.selected_columns)}</strong>
+                    <strong>
+                      {formatDisplayRequestList(governedQueryBuilderRequestDraft.request.selected_columns)}
+                    </strong>
                   </article>
                   <article>
                     <span>Group by</span>
-                    <strong>{formatRequestList(governedQueryBuilderRequestDraft.request.group_by)}</strong>
+                    <strong>{formatDisplayRequestList(governedQueryBuilderRequestDraft.request.group_by)}</strong>
                   </article>
                   <article>
                     <span>Aggregations</span>
@@ -1124,7 +1135,9 @@ function QuestionWorkspacePanel({
                     <span>Order by</span>
                     <strong>
                       {governedQueryBuilderRequestDraft.request.order_by
-                        ? `${governedQueryBuilderRequestDraft.request.order_by.direction} ${governedQueryBuilderRequestDraft.request.order_by.column}`
+                        ? `${governedQueryBuilderRequestDraft.request.order_by.direction} ${formatDisplayLabel(
+                            governedQueryBuilderRequestDraft.request.order_by.column,
+                          )}`
                         : "None"}
                     </strong>
                   </article>
