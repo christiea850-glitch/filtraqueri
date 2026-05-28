@@ -19,6 +19,7 @@ import {
 } from "../../features/dataIntelligence/structuralPresentation";
 import {
   WORKBOOK_HEADER_WARNING_COPY,
+  getStructuralColumnNotice,
   getDatasetActiveWorksheet,
   hasSuspiciousWorkbookHeaders,
   listWorkbookWorksheets,
@@ -705,6 +706,7 @@ function DatasetSummaryPanel({
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
   const showHeaderWarning = hasSuspiciousWorkbookHeaders(dataset);
+  const structuralColumnNotice = getStructuralColumnNotice(dataset);
   const workbookRelationshipIntelligence = buildWorkbookRelationshipIntelligence(dataset?.workbook_metadata);
   const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
   const {
@@ -1352,6 +1354,9 @@ function DatasetSummaryPanel({
             </OperationalWorkspaceLayout>
             {showHeaderWarning && (
               <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
+            )}
+            {structuralColumnNotice && (
+              <p className="workbook-header-warning">{structuralColumnNotice}</p>
             )}
             <div className="data-tabs-row">
               <WorkspaceTabs

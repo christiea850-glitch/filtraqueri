@@ -39,6 +39,17 @@ export type WorksheetMetadata = {
     version: number;
     normalizedAt: string;
     headerRowIndex: number | null;
+    skippedLeadingRows: number | null;
+    headerDetectionStrategy: string | null;
+    headerDetectionConfidence: string | null;
+    headerDetectionWarning: string | null;
+    originalFirstRowPreview: string[] | null;
+    selectedHeaderRowPreview: string[] | null;
+    structuralColumnCandidates: string[];
+    structuralColumnDetectionWarning: string | null;
+    structuralColumnDetectionConfidence: string | null;
+    structuralColumnSampleSize: number | null;
+    recommendedHiddenColumns: string[];
     duplicateColumnCount: number;
     emptyColumnCount: number;
     warnings: string[];

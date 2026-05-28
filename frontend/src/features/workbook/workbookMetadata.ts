@@ -72,6 +72,19 @@ export const normalizeWorksheetMetadata = (
       version: worksheet.normalization?.version || WORKBOOK_METADATA_NORMALIZATION_VERSION,
       normalizedAt,
       headerRowIndex: worksheet.normalization?.headerRowIndex ?? null,
+      skippedLeadingRows: worksheet.normalization?.skippedLeadingRows ?? null,
+      headerDetectionStrategy: worksheet.normalization?.headerDetectionStrategy || null,
+      headerDetectionConfidence: worksheet.normalization?.headerDetectionConfidence || null,
+      headerDetectionWarning: worksheet.normalization?.headerDetectionWarning || null,
+      originalFirstRowPreview: worksheet.normalization?.originalFirstRowPreview || null,
+      selectedHeaderRowPreview: worksheet.normalization?.selectedHeaderRowPreview || null,
+      structuralColumnCandidates: worksheet.normalization?.structuralColumnCandidates || [],
+      structuralColumnDetectionWarning:
+        worksheet.normalization?.structuralColumnDetectionWarning || null,
+      structuralColumnDetectionConfidence:
+        worksheet.normalization?.structuralColumnDetectionConfidence || null,
+      structuralColumnSampleSize: worksheet.normalization?.structuralColumnSampleSize ?? null,
+      recommendedHiddenColumns: worksheet.normalization?.recommendedHiddenColumns || [],
       duplicateColumnCount: Math.max(0, worksheet.normalization?.duplicateColumnCount || 0),
       emptyColumnCount: Math.max(0, worksheet.normalization?.emptyColumnCount || 0),
       warnings: worksheet.normalization?.warnings || [],
@@ -165,6 +178,58 @@ export const normalizeUnknownWorksheetMetadata = (
           typeof (normalization.headerRowIndex ?? normalization.header_row_index) === "number"
             ? (normalization.headerRowIndex ?? normalization.header_row_index) as number
             : null,
+        skippedLeadingRows:
+          typeof (normalization.skippedLeadingRows ?? normalization.skipped_leading_rows) === "number"
+            ? (normalization.skippedLeadingRows ?? normalization.skipped_leading_rows) as number
+            : null,
+        headerDetectionStrategy:
+          typeof (normalization.headerDetectionStrategy ?? normalization.header_detection_strategy) === "string"
+            ? ((normalization.headerDetectionStrategy ?? normalization.header_detection_strategy) as string)
+            : null,
+        headerDetectionConfidence:
+          typeof (normalization.headerDetectionConfidence ?? normalization.header_detection_confidence) === "string"
+            ? ((normalization.headerDetectionConfidence ?? normalization.header_detection_confidence) as string)
+            : null,
+        headerDetectionWarning:
+          typeof (normalization.headerDetectionWarning ?? normalization.header_detection_warning) === "string"
+            ? ((normalization.headerDetectionWarning ?? normalization.header_detection_warning) as string)
+            : null,
+        originalFirstRowPreview: readArray<string>(
+          normalization.originalFirstRowPreview ?? normalization.original_first_row_preview,
+        ),
+        selectedHeaderRowPreview: readArray<string>(
+          normalization.selectedHeaderRowPreview ?? normalization.selected_header_row_preview,
+        ),
+        structuralColumnCandidates: readArray<string>(
+          normalization.structuralColumnCandidates ?? normalization.structural_column_candidates,
+        ),
+        structuralColumnDetectionWarning:
+          typeof (
+            normalization.structuralColumnDetectionWarning ??
+            normalization.structural_column_detection_warning
+          ) === "string"
+            ? ((normalization.structuralColumnDetectionWarning ??
+                normalization.structural_column_detection_warning) as string)
+            : null,
+        structuralColumnDetectionConfidence:
+          typeof (
+            normalization.structuralColumnDetectionConfidence ??
+            normalization.structural_column_detection_confidence
+          ) === "string"
+            ? ((normalization.structuralColumnDetectionConfidence ??
+                normalization.structural_column_detection_confidence) as string)
+            : null,
+        structuralColumnSampleSize:
+          typeof (
+            normalization.structuralColumnSampleSize ??
+            normalization.structural_column_sample_size
+          ) === "number"
+            ? ((normalization.structuralColumnSampleSize ??
+                normalization.structural_column_sample_size) as number)
+            : null,
+        recommendedHiddenColumns: readArray<string>(
+          normalization.recommendedHiddenColumns ?? normalization.recommended_hidden_columns,
+        ),
         duplicateColumnCount: readNumber(normalization.duplicateColumnCount ?? normalization.duplicate_column_count, 0),
         emptyColumnCount: readNumber(normalization.emptyColumnCount ?? normalization.empty_column_count, 0),
         warnings: readArray<string>(normalization.warnings),

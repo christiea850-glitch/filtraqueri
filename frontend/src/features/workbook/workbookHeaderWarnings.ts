@@ -1,4 +1,5 @@
 import type { DatasetMetadata, SchemaColumn } from "../dataset/datasetTypes";
+import { getDatasetActiveWorksheet } from "./workbookMetadata";
 
 export const WORKBOOK_HEADER_WARNING_COPY =
   "Possible header issue detected. Some column names look like data types, so FiltraQueri may be using the wrong row as headers. Review the worksheet before trusting generated SQL or report recipes.";
@@ -31,4 +32,25 @@ export const hasSuspiciousWorkbookHeaders = (dataset: DatasetMetadata | null) =>
     suspiciousHeaderCount >= suspiciousHeaderThreshold &&
     likelyBusinessSampleCount >= 2
   );
+};
+
+const formatCandidateList = (candidates: string[]) =>
+  candidates.length <= 2
+    ? candidates.join(", ")
+    : `${candidates.slice(0, 2).join(", ")} +${candidates.length - 2}`;
+
+export const getStructuralColumnNotice = (dataset: DatasetMetadata | null) => {
+  const candidates = getDatasetActiveWorksheet(dataset)?.normalization.structuralColumnCandidates || [];
+  const uniqueCandidates = Array.from(
+    new Set(candidates.map((candidate) => candidate.trim()).filter(Boolean)),
+  );
+
+  if (uniqueCandidates.length === 0) return null;
+
+  const candidateList = formatCandidateList(uniqueCandidates);
+  if (uniqueCandidates.length === 1) {
+    return `Possible structural column detected: ${candidateList}. This column may come from a data dictionary row and may not be part of the business data. Review before using it in filters, joins, SQL, or report recipes.`;
+  }
+
+  return `Possible structural columns detected: ${candidateList}. These columns may come from a data dictionary row and may not be part of the business data. Review before using them in filters, joins, SQL, or report recipes.`;
 };

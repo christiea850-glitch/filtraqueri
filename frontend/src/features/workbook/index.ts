@@ -1,5 +1,6 @@
 export {
   WORKBOOK_HEADER_WARNING_COPY,
+  getStructuralColumnNotice,
   hasSuspiciousWorkbookHeaders,
 } from "./workbookHeaderWarnings";
 export {
