@@ -160,6 +160,13 @@ function SqlReportRecipeCard({
         </div>
         <em>{selectedDialectProfile.displayName}</em>
       </div>
+      {recipe.domains && recipe.domains.length > 0 && (
+        <div className="sql-assistant-logic-list" aria-label="Recipe domains">
+          {recipe.domains.map((domain) => (
+            <span key={domain}>{domain}</span>
+          ))}
+        </div>
+      )}
       <p className={recipe.sql ? "sql-assistant-recipe-ready" : "sql-assistant-recipe-blocked"}>
         {readinessLine}
       </p>
@@ -264,6 +271,7 @@ function SqlAssistantPanel({
       recipe.supportSummary,
       recipe.warnings.join(" "),
       recipe.missingRequirements.join(" "),
+      recipe.domains?.join(" ") || "",
     ]
       .join(" ")
       .toLowerCase()

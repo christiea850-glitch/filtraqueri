@@ -19,6 +19,16 @@ export type SqlReportRecipeId =
   | "multi-table-join"
   | "vacancy-inventory";
 
+export type SqlReportRecipeDomain =
+  | "Marketing"
+  | "Sales"
+  | "Finance"
+  | "Operations"
+  | "Product"
+  | "CRM"
+  | "Retail"
+  | "Web";
+
 export type SqlReportRecipe = {
   id: SqlReportRecipeId;
   title: string;
@@ -31,6 +41,7 @@ export type SqlReportRecipe = {
   warnings: string[];
   missingRequirements: string[];
   dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
+  domains?: SqlReportRecipeDomain[];
 };
 
 const dialectDisplayNames: Record<string, string> = {
