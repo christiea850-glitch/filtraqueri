@@ -57,6 +57,9 @@ export type SqlAssistantGenerationContext = {
 
 const fallbackColumn = "column_name";
 const fallbackTable = "other_table";
+const commonSqlReviewLabel = "Common SQL; review dialect";
+const limitSyntaxReviewLabel = "DuckDB/MariaDB LIMIT style";
+const dialectReviewLabel = "Review dialect before running";
 
 const normalizeRequestText = (requestText = "") =>
   requestText.trim().replace(/\s+/g, " ").toLowerCase();
@@ -156,7 +159,7 @@ export const createSqlAssistantTemplates = (
       title: "Preview selected columns",
       category: "Preview and counts",
       explanation: "Inspect a small sample of rows before writing a larger query.",
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -167,7 +170,7 @@ LIMIT 100;`,
       title: "Count rows",
       category: "Preview and counts",
       explanation: "Count all rows in the active dataset.",
-      dialectLabel: "All dialects",
+      dialectLabel: commonSqlReviewLabel,
       sql: `SELECT
   COUNT(*) AS row_count
 FROM ${tableName};`,
@@ -177,7 +180,7 @@ FROM ${tableName};`,
       title: "Filter equals",
       category: "Filtering",
       explanation: `Filter records where ${labelColumn(categoryColumn)} matches one value.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -189,7 +192,7 @@ LIMIT 100;`,
       title: "Contains text",
       category: "Filtering",
       explanation: `Search text inside ${labelColumn(categoryColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -201,7 +204,7 @@ LIMIT 100;`,
       title: "Numeric greater than",
       category: "Filtering",
       explanation: `Filter records where ${labelColumn(numericColumn)} is above a threshold.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -213,7 +216,7 @@ LIMIT 100;`,
       title: "Between range",
       category: "Filtering",
       explanation: `Filter ${labelColumn(numericColumn)} between two values.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -225,7 +228,7 @@ LIMIT 100;`,
       title: "IN list",
       category: "Filtering",
       explanation: `Keep records where ${labelColumn(categoryColumn)} is in a short list.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -237,7 +240,7 @@ LIMIT 100;`,
       title: "IS NULL / IS NOT NULL",
       category: "Filtering",
       explanation: `Check missing or present values in ${labelColumn(categoryColumn || numericColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -249,7 +252,7 @@ LIMIT 100;`,
       title: "Count by category",
       category: "Aggregation",
       explanation: `Count records grouped by ${labelColumn(categoryColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${categoryExpression},
   COUNT(*) AS row_count
@@ -263,7 +266,7 @@ LIMIT 100;`,
       title: "Sum by category",
       category: "Aggregation",
       explanation: `Sum ${labelColumn(numericColumn)} by ${labelColumn(categoryColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${categoryExpression},
   SUM(${numericExpression}) AS total_value
@@ -277,7 +280,7 @@ LIMIT 100;`,
       title: "Average by category",
       category: "Aggregation",
       explanation: `Average ${labelColumn(numericColumn)} by ${labelColumn(categoryColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${categoryExpression},
   AVG(${numericExpression}) AS average_value
@@ -291,7 +294,7 @@ LIMIT 100;`,
       title: "Min / max summary",
       category: "Aggregation",
       explanation: `Summarize the range of ${labelColumn(numericColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: commonSqlReviewLabel,
       sql: `SELECT
   MIN(${numericExpression}) AS min_value,
   AVG(${numericExpression}) AS average_value,
@@ -303,7 +306,7 @@ FROM ${tableName};`,
       title: "HAVING threshold",
       category: "Aggregation",
       explanation: "Filter grouped results after aggregation.",
-      dialectLabel: "All dialects",
+      dialectLabel: commonSqlReviewLabel,
       sql: `SELECT
   ${categoryExpression},
   COUNT(*) AS row_count
@@ -317,7 +320,7 @@ ORDER BY row_count DESC;`,
       title: "Top N by metric",
       category: "Sorting and limits",
       explanation: `Find rows with the highest ${labelColumn(sortableColumn || numericColumn)} values.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -329,7 +332,7 @@ LIMIT 10;`,
       title: "Bottom N by metric",
       category: "Sorting and limits",
       explanation: `Find rows with the lowest ${labelColumn(sortableColumn || numericColumn)} values.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -341,7 +344,7 @@ LIMIT 10;`,
       title: "Date range",
       category: "Date/time",
       explanation: `Filter records using ${labelColumn(dateColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: "Date syntax; review dialect",
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -383,7 +386,7 @@ ORDER BY record_month;`,
       title: "Missing values by column",
       category: "Data quality",
       explanation: `Count missing values in ${labelColumn(categoryColumn || numericColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: commonSqlReviewLabel,
       sql: `SELECT
   COUNT(*) AS row_count,
   SUM(CASE WHEN ${placeholderColumn(categoryColumn || numericColumn)} IS NULL THEN 1 ELSE 0 END) AS missing_count
@@ -394,7 +397,7 @@ FROM ${tableName};`,
       title: "Duplicate check",
       category: "Data quality",
       explanation: `Find repeated values in ${labelColumn(categoryColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${categoryExpression},
   COUNT(*) AS duplicate_count
@@ -409,7 +412,7 @@ LIMIT 100;`,
       title: "Distinct values",
       category: "Data quality",
       explanation: `List distinct values from ${labelColumn(categoryColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT DISTINCT
   ${categoryExpression}
 FROM ${tableName}
@@ -422,7 +425,7 @@ LIMIT 100;`,
       title: "INNER JOIN",
       category: "Joins",
       explanation: "Template for matching rows between two tables.",
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   a.*,
   b.${formatSqlColumn(fallbackColumn)}
@@ -436,7 +439,7 @@ LIMIT 100;`,
       title: "LEFT JOIN",
       category: "Joins",
       explanation: "Keep all rows from the active dataset and matching rows from another table.",
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   a.*,
   b.${formatSqlColumn(fallbackColumn)}
@@ -450,8 +453,8 @@ LIMIT 100;`,
       title: "RIGHT JOIN",
       category: "Joins",
       explanation: "Keep all rows from the joined table and matching rows from the active dataset.",
-      dialectLabel: "DuckDB, MariaDB, Oracle",
-      dialects: ["duckdb", "mariadb", "oracle"],
+      dialectLabel: limitSyntaxReviewLabel,
+      dialects: ["duckdb", "mariadb"],
       sql: `SELECT
   a.*,
   b.${formatSqlColumn(fallbackColumn)}
@@ -465,7 +468,7 @@ LIMIT 100;`,
       title: "FULL OUTER JOIN",
       category: "Joins",
       explanation: "Keep unmatched rows from both joined tables. Review dialect support before running.",
-      dialectLabel: "Dialect-specific",
+      dialectLabel: "Dialect-specific; review limit",
       dialects: ["duckdb", "oracle", "postgresql"],
       sql: `SELECT
   a.*,
@@ -480,7 +483,7 @@ LIMIT 100;`,
       title: "CTE",
       category: "Advanced SQL",
       explanation: "Use a named query block before the final SELECT.",
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `WITH grouped_records AS (
   SELECT
     ${categoryExpression},
@@ -498,7 +501,7 @@ LIMIT 100;`,
       title: "Subquery",
       category: "Advanced SQL",
       explanation: "Filter records using a nested SELECT.",
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -513,7 +516,7 @@ LIMIT 100;`,
       title: "CASE WHEN",
       category: "Advanced SQL",
       explanation: `Create a conditional label from ${labelColumn(numericColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: limitSyntaxReviewLabel,
       sql: `SELECT
   ${selectList},
   CASE
@@ -529,7 +532,7 @@ LIMIT 100;`,
       title: "ROW_NUMBER",
       category: "Advanced SQL",
       explanation: `Rank rows inside each ${labelColumn(categoryColumn)} group.`,
-      dialectLabel: "All dialects",
+      dialectLabel: "Window function; review dialect",
       sql: `SELECT
   ${selectList},
   ROW_NUMBER() OVER (
@@ -544,7 +547,7 @@ LIMIT 100;`,
       title: "RANK window function",
       category: "Advanced SQL",
       explanation: `Rank ${labelColumn(numericColumn)} values within ${labelColumn(categoryColumn)} groups.`,
-      dialectLabel: "All dialects",
+      dialectLabel: "Window function; review dialect",
       sql: `SELECT
   ${selectList},
   RANK() OVER (
@@ -559,7 +562,7 @@ LIMIT 100;`,
       title: "Moving average",
       category: "Advanced SQL",
       explanation: `Calculate a rolling average of ${labelColumn(numericColumn)} over ${labelColumn(dateColumn)}.`,
-      dialectLabel: "All dialects",
+      dialectLabel: "Window frame; review dialect",
       sql: `SELECT
   ${dateExpression},
   ${numericExpression},
@@ -627,7 +630,7 @@ FROM ${tableName};`,
       title: "Dialect conversion note",
       category: "Dialect examples",
       explanation: "Use this comment block to mark SQL that needs dialect review before running.",
-      dialectLabel: "All dialects",
+      dialectLabel: dialectReviewLabel,
       sql: `-- Dialect review note:
 -- Source dialect: ${selectedDialect.toUpperCase()}
 -- Check date functions, identifier quoting, row limits, and join support before running.
