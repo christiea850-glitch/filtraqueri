@@ -2,6 +2,7 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlDialectId, SqlDialectProfile } from "../../sqlIntelligence";
 import {
+  createSqlAssistantGenerationContext,
   createSqlAssistantTemplates,
   type SqlAssistantTemplate,
   type SqlTemplateCategory,
@@ -46,6 +47,48 @@ const modeCopy: Record<SqlAssistantMode, { title: string; description: string }>
     title: "Report Recipes",
     description: "Choose a report pattern, insert the SQL draft into Monaco, then run manually.",
   },
+};
+
+const labelFromColumn = (columnName: string) =>
+  columnName
+    .replace(/[_%()]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const buildAssistPlaceholder = (
+  dataset: DatasetMetadata | null,
+  selectedDialect: SqlDialectId,
+) => {
+  const context = createSqlAssistantGenerationContext({ dataset, selectedDialect });
+  const category = context.categoricalColumns[0]?.name;
+  const metric = context.numericColumns[0]?.name;
+  const date = context.dateColumns[0]?.name;
+
+  if (!category && !metric && !date) {
+    return [
+      "Top items by total value",
+      "Items with more than 5 records and total value above 1000",
+      "Find duplicates",
+      "Show missing values",
+      "Average value by date",
+      "Rank items by value",
+      "Records after 2020",
+    ].join("\n");
+  }
+
+  const categoryLabel = labelFromColumn(category || "items");
+  const metricLabel = labelFromColumn(metric || "value");
+  const dateLabel = labelFromColumn(date || "date");
+
+  return [
+    `Top ${categoryLabel} by total ${metricLabel}`,
+    `${categoryLabel} with more than 5 records and total ${metricLabel} above 1000`,
+    `Find duplicate ${categoryLabel}`,
+    "Show missing values",
+    `Average ${metricLabel} by ${dateLabel}`,
+    `Rank ${categoryLabel} by ${metricLabel}`,
+    `Records after 2020 in ${dateLabel}`,
+  ].join("\n");
 };
 
 function SqlTemplateCard({
@@ -170,6 +213,10 @@ function SqlAssistantPanel({
   );
   const recipes = useMemo(
     () => createSqlReportRecipes(dataset, selectedDialect),
+    [dataset, selectedDialect],
+  );
+  const assistPlaceholder = useMemo(
+    () => buildAssistPlaceholder(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -338,16 +385,7 @@ function SqlAssistantPanel({
               }}
               onKeyDown={handleTaskKeyDown}
               rows={4}
-              placeholder={[
-                "Top artists by total streams",
-                "Artists with more than 5 songs and total streams above 1 billion",
-                "Find duplicate tracks",
-                "Show missing values",
-                "Average streams by release year",
-                "Rank tracks by streams",
-                "Compare streams by artist",
-                "Songs released after 2020",
-              ].join("\n")}
+              placeholder={assistPlaceholder}
             />
           </label>
           <div className="sql-assistant-complex-actions">
