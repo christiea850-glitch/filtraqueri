@@ -21,7 +21,7 @@ type SqlEditorPanelProps = {
 const statusLabels: Record<SqlExecutionStatus, string> = {
   idle: "Ready",
   "draft-saved": "Query saved to Saved Drafts",
-  "explain-ready": "Explain placeholder ready",
+  "explain-ready": "Diagnostics ready",
   running: "Running query",
   success: "Query complete",
   error: "Query failed",
@@ -111,10 +111,10 @@ export function SqlGuidancePanel({
   ).length;
 
   return (
-    <section className="sql-draft-panel" aria-label="SQL guidance">
-      <div className="sql-draft-list" aria-label="SQL guidance notes">
+    <section className="sql-draft-panel" aria-label="SQL diagnostics">
+      <div className="sql-draft-list" aria-label="SQL diagnostic notes">
         <div className="builder-block-header">
-          <span>SQL guidance</span>
+          <span>SQL diagnostics</span>
           <small>{diagnostics.length} notes</small>
         </div>
         <div className="sql-guidance-context">
@@ -124,7 +124,7 @@ export function SqlGuidancePanel({
           </span>
         </div>
         {visibleDiagnostics.length === 0 && guidanceCards.length === 0 ? (
-          <p>No SQL guidance yet.</p>
+          <p>No SQL diagnostics yet.</p>
         ) : (
           <>
             {visibleDiagnostics.map((diagnostic) => (

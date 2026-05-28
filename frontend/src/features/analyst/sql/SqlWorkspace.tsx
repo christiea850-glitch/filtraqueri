@@ -21,7 +21,7 @@ type FocusedSqlView = "editor" | "result" | "drafts" | "draft-detail";
 type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts";
 
 const bottomTabLabels: Record<BottomTab, string> = {
-  guidance: "Explain query",
+  guidance: "SQL diagnostics",
 };
 
 const bottomTabOrder: BottomTab[] = ["guidance"];
@@ -630,7 +630,7 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
             />
             <section
               className="sqlw-dock sqlw-dock-bot"
-              aria-label="Query output"
+              aria-label="SQL diagnostics"
               style={{ height: bottomHeight }}
             >
               <div className="sqlw-dock-head">
@@ -659,7 +659,7 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
         )}
 
         <div className="sqlw-dockbar sqlw-dockbar-bottom">
-          <span className="sqlw-dockbar-label">Support</span>
+          <span className="sqlw-dockbar-label">Review</span>
           {bottomTabOrder.map((tab) => (
             <button
               type="button"

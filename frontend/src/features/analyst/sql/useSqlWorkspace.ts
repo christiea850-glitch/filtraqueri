@@ -44,7 +44,7 @@ const createPreviewMessage = (status: SqlExecutionStatus) => {
   }
 
   if (status === "explain-ready") {
-    return "Explain query ready.";
+    return "Diagnostics ready.";
   }
 
   if (status === "draft-saved") {
