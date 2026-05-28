@@ -1,4 +1,8 @@
 export {
+  WORKBOOK_HEADER_WARNING_COPY,
+  hasSuspiciousWorkbookHeaders,
+} from "./workbookHeaderWarnings";
+export {
   DEFAULT_WORKBOOK_INGESTION_PROFILE,
   WORKBOOK_METADATA_NORMALIZATION_VERSION,
   generateSafeWorksheetTableName,

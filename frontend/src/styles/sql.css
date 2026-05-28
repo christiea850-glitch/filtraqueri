@@ -1230,6 +1230,18 @@
   justify-self: start;
 }
 
+.workbook-header-warning {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .sql-assistant-recipe-controls {
   align-items: center;
 }

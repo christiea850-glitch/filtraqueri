@@ -1,4 +1,8 @@
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import {
+  WORKBOOK_HEADER_WARNING_COPY,
+  hasSuspiciousWorkbookHeaders,
+} from "../../workbook";
 
 type SqlSchemaPanelProps = {
   dataset: DatasetMetadata | null;
@@ -13,6 +17,8 @@ function SqlSchemaPanel({
   onToggleCollapsed,
   onInsertSql,
 }: SqlSchemaPanelProps) {
+  const showHeaderWarning = hasSuspiciousWorkbookHeaders(dataset);
+
   return (
     <aside className="sql-context-panel" aria-label="SQL schema intelligence">
       <button
@@ -25,6 +31,9 @@ function SqlSchemaPanel({
       </button>
 
       <div className="sql-context-body">
+        {showHeaderWarning && (
+          <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
+        )}
         <div className="sql-helper-section">
           <div className="builder-block-header">
             <span>Columns</span>

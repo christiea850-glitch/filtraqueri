@@ -18,7 +18,9 @@ import {
   getBusinessRoleLabel,
 } from "../../features/dataIntelligence/structuralPresentation";
 import {
+  WORKBOOK_HEADER_WARNING_COPY,
   getDatasetActiveWorksheet,
+  hasSuspiciousWorkbookHeaders,
   listWorkbookWorksheets,
   type WorksheetMetadata,
 } from "../../features/workbook";
@@ -702,6 +704,7 @@ function DatasetSummaryPanel({
     }, {});
   const workbookWorksheets = listWorkbookWorksheets(dataset);
   const activeWorksheet = getDatasetActiveWorksheet(dataset);
+  const showHeaderWarning = hasSuspiciousWorkbookHeaders(dataset);
   const workbookRelationshipIntelligence = buildWorkbookRelationshipIntelligence(dataset?.workbook_metadata);
   const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
   const {
@@ -1347,6 +1350,9 @@ function DatasetSummaryPanel({
                 )}
               </ContextRail>
             </OperationalWorkspaceLayout>
+            {showHeaderWarning && (
+              <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
+            )}
             <div className="data-tabs-row">
               <WorkspaceTabs
                 items={dataTabs}
