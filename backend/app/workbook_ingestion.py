@@ -38,6 +38,18 @@ XML_NS = {
 }
 HEADER_SCAN_ROW_LIMIT = 6
 HEADER_PREVIEW_VALUE_LIMIT = 12
+STRUCTURAL_COLUMN_SAMPLE_LIMIT = 200
+STRUCTURAL_COLUMN_EMPTY_RATIO_THRESHOLD = 0.95
+STRUCTURAL_COLUMN_WARNING = (
+    "Possible structural column detected. This column may come from a data dictionary row "
+    "and may not be part of the business data."
+)
+STRUCTURAL_COLUMN_HEADER_NAMES = {
+    "attribute_name",
+    "field_name",
+    "column_name",
+    "data_type",
+}
 
 
 @dataclass(frozen=True)
@@ -53,6 +65,11 @@ class NormalizedWorksheetRows:
     header_detection_warning: str | None
     original_first_row_preview: list[str]
     selected_header_row_preview: list[str]
+    structural_column_candidates: list[str]
+    structural_column_detection_warning: str | None
+    structural_column_detection_confidence: str | None
+    structural_column_sample_size: int | None
+    recommended_hidden_columns: list[str]
 
 
 def safe_identifier(value: str, fallback: str) -> str:
@@ -184,6 +201,10 @@ def ratio(count: int, total: int) -> float:
     return count / total if total else 0
 
 
+def is_blank_cell(value: Any) -> bool:
+    return value in (None, "") or (isinstance(value, str) and not value.strip())
+
+
 def is_strong_datatype_row(row: list[Any]) -> bool:
     values = non_empty_values(row)
     if len(values) < 2:
@@ -218,6 +239,54 @@ def detect_header_row(
     return 0, "first_non_empty_row", None, None
 
 
+def normalize_structural_header_name(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    return re.sub(r"_+", "_", normalized)
+
+
+def detect_structural_column_candidates(
+    *,
+    columns: list[str],
+    data_rows: list[list[Any]],
+    header_detection_strategy: str,
+) -> tuple[list[str], str | None, str | None, int | None, list[str]]:
+    if (
+        header_detection_strategy != "datatype_row_then_field_header"
+        or len(columns) < 2
+        or normalize_structural_header_name(columns[0]) not in STRUCTURAL_COLUMN_HEADER_NAMES
+    ):
+        return [], None, None, None, []
+
+    sample_rows = data_rows[:STRUCTURAL_COLUMN_SAMPLE_LIMIT]
+    sample_size = len(sample_rows)
+    if sample_size <= 0:
+        return [], None, None, sample_size, []
+
+    blank_count = sum(1 for row in sample_rows if not row or is_blank_cell(row[0]))
+    if ratio(blank_count, sample_size) < STRUCTURAL_COLUMN_EMPTY_RATIO_THRESHOLD:
+        return [], None, None, sample_size, []
+
+    neighbor_indexes = range(1, min(len(columns), 5))
+    field_like_neighbors = [
+        index
+        for index in neighbor_indexes
+        if is_field_name_like_value(normalize_cell_text(columns[index]))
+    ]
+    required_neighbor_count = min(2, len(columns) - 1)
+    if len(field_like_neighbors) < required_neighbor_count:
+        return [], None, None, sample_size, []
+
+    has_neighbor_values = any(
+        any(len(row) > index and not is_blank_cell(row[index]) for row in sample_rows)
+        for index in field_like_neighbors
+    )
+    if not has_neighbor_values:
+        return [], None, None, sample_size, []
+
+    candidates = [columns[0]]
+    return candidates, STRUCTURAL_COLUMN_WARNING, "high", sample_size, candidates
+
+
 def normalize_rows(raw_rows: list[list[Any]]) -> NormalizedWorksheetRows:
     non_empty_rows = [
         (index, row)
@@ -237,6 +306,11 @@ def normalize_rows(raw_rows: list[list[Any]]) -> NormalizedWorksheetRows:
             header_detection_warning=None,
             original_first_row_preview=[],
             selected_header_row_preview=[],
+            structural_column_candidates=[],
+            structural_column_detection_warning=None,
+            structural_column_detection_confidence=None,
+            structural_column_sample_size=None,
+            recommended_hidden_columns=[],
         )
 
     selected_non_empty_index, strategy, confidence, warning = detect_header_row(non_empty_rows)
@@ -261,6 +335,17 @@ def normalize_rows(raw_rows: list[list[Any]]) -> NormalizedWorksheetRows:
         ]
     ]
     data_rows = [row[: len(columns)] for row in data_rows]
+    (
+        structural_column_candidates,
+        structural_column_detection_warning,
+        structural_column_detection_confidence,
+        structural_column_sample_size,
+        recommended_hidden_columns,
+    ) = detect_structural_column_candidates(
+        columns=columns,
+        data_rows=data_rows,
+        header_detection_strategy=strategy,
+    )
 
     return NormalizedWorksheetRows(
         columns=columns,
@@ -274,6 +359,11 @@ def normalize_rows(raw_rows: list[list[Any]]) -> NormalizedWorksheetRows:
         header_detection_warning=warning,
         original_first_row_preview=preview_row_values(original_first_row),
         selected_header_row_preview=preview_row_values(header_row),
+        structural_column_candidates=structural_column_candidates,
+        structural_column_detection_warning=structural_column_detection_warning,
+        structural_column_detection_confidence=structural_column_detection_confidence,
+        structural_column_sample_size=structural_column_sample_size,
+        recommended_hidden_columns=recommended_hidden_columns,
     )
 
 
@@ -506,12 +596,22 @@ def ingest_workbook(
                         header_detection_warning=normalized_rows.header_detection_warning,
                         original_first_row_preview=normalized_rows.original_first_row_preview,
                         selected_header_row_preview=normalized_rows.selected_header_row_preview,
+                        structural_column_candidates=normalized_rows.structural_column_candidates,
+                        structural_column_detection_warning=(
+                            normalized_rows.structural_column_detection_warning
+                        ),
+                        structural_column_detection_confidence=(
+                            normalized_rows.structural_column_detection_confidence
+                        ),
+                        structural_column_sample_size=normalized_rows.structural_column_sample_size,
+                        recommended_hidden_columns=normalized_rows.recommended_hidden_columns,
                         duplicate_column_count=normalized_rows.duplicate_column_count,
                         empty_column_count=normalized_rows.empty_column_count,
                         warnings=[
                             warning
                             for warning in [
                                 normalized_rows.header_detection_warning,
+                                normalized_rows.structural_column_detection_warning,
                                 None
                                 if status == "ready"
                                 else "Worksheet is empty and was not loaded as an active table.",

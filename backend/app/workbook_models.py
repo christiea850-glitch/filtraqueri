@@ -30,6 +30,11 @@ class WorksheetNormalizationMetadata(BaseModel):
     header_detection_warning: str | None = None
     original_first_row_preview: list[str] | None = None
     selected_header_row_preview: list[str] | None = None
+    structural_column_candidates: list[str] = Field(default_factory=list)
+    structural_column_detection_warning: str | None = None
+    structural_column_detection_confidence: str | None = None
+    structural_column_sample_size: int | None = Field(default=None, ge=0)
+    recommended_hidden_columns: list[str] = Field(default_factory=list)
     duplicate_column_count: int = Field(default=0, ge=0)
     empty_column_count: int = Field(default=0, ge=0)
     warnings: list[str] = Field(default_factory=list)
