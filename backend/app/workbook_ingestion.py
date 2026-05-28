@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,23 @@ XML_NS = {
     "rel": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
     "pkg_rel": "http://schemas.openxmlformats.org/package/2006/relationships",
 }
+HEADER_SCAN_ROW_LIMIT = 6
+HEADER_PREVIEW_VALUE_LIMIT = 12
+
+
+@dataclass(frozen=True)
+class NormalizedWorksheetRows:
+    columns: list[str]
+    data_rows: list[list[Any]]
+    duplicate_column_count: int
+    empty_column_count: int
+    header_row_index: int | None
+    skipped_leading_rows: int
+    header_detection_strategy: str
+    header_detection_confidence: str | None
+    header_detection_warning: str | None
+    original_first_row_preview: list[str]
+    selected_header_row_preview: list[str]
 
 
 def safe_identifier(value: str, fallback: str) -> str:
@@ -81,16 +99,150 @@ def normalize_header(value: Any, index: int, existing: set[str]) -> tuple[str, b
     return normalized, duplicate, empty_name
 
 
-def normalize_rows(raw_rows: list[list[Any]]) -> tuple[list[str], list[list[Any]], int, int]:
+def preview_row_values(row: list[Any]) -> list[str]:
+    return [str(value).strip() for value in row[:HEADER_PREVIEW_VALUE_LIMIT] if value not in (None, "")]
+
+
+def normalize_cell_text(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value).strip().lower()) if value not in (None, "") else ""
+
+
+def non_empty_values(row: list[Any]) -> list[str]:
+    return [normalize_cell_text(value) for value in row if normalize_cell_text(value)]
+
+
+def is_datatype_like_value(value: str) -> bool:
+    compact_value = value.replace(" ", "")
+    if value in {"data type", "datatype"}:
+        return True
+    if re.fullmatch(r"(char|nchar|varchar|nvarchar|text|string)(\(\d+\))?", compact_value):
+        return True
+    if re.fullmatch(r"(date|datetime|timestamp|time|boolean|bool)", compact_value):
+        return True
+    if re.fullmatch(r"(tinyint|smallint|int|integer|bigint)(\(\d+\))?(zerofill)?", compact_value):
+        return True
+    if re.fullmatch(r"(decimal|number|numeric|float|double|real)(\(\d+(,\d+)?\))?", compact_value):
+        return True
+    return False
+
+
+FIELD_NAME_TOKENS = {
+    "id",
+    "name",
+    "first",
+    "last",
+    "email",
+    "phone",
+    "amount",
+    "status",
+    "date",
+    "start",
+    "end",
+    "created",
+    "updated",
+    "move",
+    "tenant",
+    "customer",
+    "account",
+    "property",
+    "unit",
+    "order",
+    "request",
+    "payment",
+    "contract",
+}
+
+
+def is_field_name_like_value(value: str) -> bool:
+    if not value or is_datatype_like_value(value):
+        return False
+    if not re.search(r"[a-z]", value):
+        return False
+    if "@" in value:
+        return False
+    if re.fullmatch(r"[a-z]{1,5}\d{2,}", value):
+        return False
+    if re.fullmatch(r"\d+([./-]\d+)?", value):
+        return False
+
+    normalized = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+    tokens = [token for token in normalized.split("_") if token]
+    if not tokens:
+        return False
+    if normalized == "attribute_name":
+        return True
+    if normalized.endswith("_id") or normalized in {"id", "email", "phone", "status", "amount", "date"}:
+        return True
+    if any(token in FIELD_NAME_TOKENS for token in tokens):
+        return True
+    if "_" in normalized and all(re.fullmatch(r"[a-z][a-z0-9]*", token) for token in tokens):
+        return True
+    return False
+
+
+def ratio(count: int, total: int) -> float:
+    return count / total if total else 0
+
+
+def is_strong_datatype_row(row: list[Any]) -> bool:
+    values = non_empty_values(row)
+    if len(values) < 2:
+        return False
+    datatype_count = sum(1 for value in values if is_datatype_like_value(value))
+    return datatype_count >= 2 and ratio(datatype_count, len(values)) >= 0.6
+
+
+def is_strong_field_name_row(row: list[Any]) -> bool:
+    values = non_empty_values(row)
+    if len(values) < 2:
+        return False
+    field_count = sum(1 for value in values if is_field_name_like_value(value))
+    datatype_count = sum(1 for value in values if is_datatype_like_value(value))
+    return field_count >= 2 and ratio(field_count, len(values)) >= 0.5 and ratio(datatype_count, len(values)) < 0.4
+
+
+def detect_header_row(
+    non_empty_rows: list[tuple[int, list[Any]]],
+) -> tuple[int, str, str | None, str | None]:
+    scan_rows = non_empty_rows[:HEADER_SCAN_ROW_LIMIT]
+    for index in range(len(scan_rows) - 1):
+        _, current_row = scan_rows[index]
+        _, next_row = scan_rows[index + 1]
+        if is_strong_datatype_row(current_row) and is_strong_field_name_row(next_row):
+            return (
+                index + 1,
+                "datatype_row_then_field_header",
+                "high",
+                "Detected a datatype row above the header row; using the following row as worksheet headers.",
+            )
+    return 0, "first_non_empty_row", None, None
+
+
+def normalize_rows(raw_rows: list[list[Any]]) -> NormalizedWorksheetRows:
     non_empty_rows = [
-        row
-        for row in raw_rows
+        (index, row)
+        for index, row in enumerate(raw_rows)
         if any(value not in (None, "") for value in row)
     ]
     if not non_empty_rows:
-        return [], [], 0, 0
+        return NormalizedWorksheetRows(
+            columns=[],
+            data_rows=[],
+            duplicate_column_count=0,
+            empty_column_count=0,
+            header_row_index=None,
+            skipped_leading_rows=0,
+            header_detection_strategy="no_non_empty_rows",
+            header_detection_confidence=None,
+            header_detection_warning=None,
+            original_first_row_preview=[],
+            selected_header_row_preview=[],
+        )
 
-    header_values = non_empty_rows[0][:MAX_WORKSHEET_COLUMNS]
+    selected_non_empty_index, strategy, confidence, warning = detect_header_row(non_empty_rows)
+    original_first_row = non_empty_rows[0][1]
+    header_row_index, header_row = non_empty_rows[selected_non_empty_index]
+    header_values = header_row[:MAX_WORKSHEET_COLUMNS]
     existing: set[str] = set()
     columns: list[str] = []
     duplicate_count = 0
@@ -104,11 +256,25 @@ def normalize_rows(raw_rows: list[list[Any]]) -> tuple[list[str], list[list[Any]
 
     data_rows = [
         [*(row[: len(columns)]), *([None] * max(0, len(columns) - len(row)))]
-        for row in non_empty_rows[1 : MAX_WORKSHEET_ROWS + 1]
+        for _, row in non_empty_rows[
+            selected_non_empty_index + 1 : selected_non_empty_index + MAX_WORKSHEET_ROWS + 1
+        ]
     ]
     data_rows = [row[: len(columns)] for row in data_rows]
 
-    return columns, data_rows, duplicate_count, empty_count
+    return NormalizedWorksheetRows(
+        columns=columns,
+        data_rows=data_rows,
+        duplicate_column_count=duplicate_count,
+        empty_column_count=empty_count,
+        header_row_index=header_row_index,
+        skipped_leading_rows=header_row_index,
+        header_detection_strategy=strategy,
+        header_detection_confidence=confidence,
+        header_detection_warning=warning,
+        original_first_row_preview=preview_row_values(original_first_row),
+        selected_header_row_preview=preview_row_values(header_row),
+    )
 
 
 def read_shared_strings(workbook_zip: zipfile.ZipFile) -> list[str]:
@@ -300,7 +466,9 @@ def ingest_workbook(
         for index, sheet in enumerate(raw_sheets[:MAX_WORKSHEETS]):
             sheet_name = sheet["name"]
             table_name = generate_safe_worksheet_table_name(sheet_name, index)
-            columns, rows, duplicate_count, empty_count = normalize_rows(sheet["rows"])
+            normalized_rows = normalize_rows(sheet["rows"])
+            columns = normalized_rows.columns
+            rows = normalized_rows.data_rows
             status = "ready" if columns else "empty"
             schema: list[dict[str, Any]] = []
             row_count = 0
@@ -331,10 +499,25 @@ def ingest_workbook(
                     hidden_columns=[],
                     normalization=WorksheetNormalizationMetadata(
                         normalized_at=uploaded_at,
-                        header_row_index=0 if columns else None,
-                        duplicate_column_count=duplicate_count,
-                        empty_column_count=empty_count,
-                        warnings=[] if status == "ready" else ["Worksheet is empty and was not loaded as an active table."],
+                        header_row_index=normalized_rows.header_row_index,
+                        skipped_leading_rows=normalized_rows.skipped_leading_rows,
+                        header_detection_strategy=normalized_rows.header_detection_strategy,
+                        header_detection_confidence=normalized_rows.header_detection_confidence,
+                        header_detection_warning=normalized_rows.header_detection_warning,
+                        original_first_row_preview=normalized_rows.original_first_row_preview,
+                        selected_header_row_preview=normalized_rows.selected_header_row_preview,
+                        duplicate_column_count=normalized_rows.duplicate_column_count,
+                        empty_column_count=normalized_rows.empty_column_count,
+                        warnings=[
+                            warning
+                            for warning in [
+                                normalized_rows.header_detection_warning,
+                                None
+                                if status == "ready"
+                                else "Worksheet is empty and was not loaded as an active table.",
+                            ]
+                            if warning
+                        ],
                     ),
                 )
             )

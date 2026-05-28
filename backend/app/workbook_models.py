@@ -24,6 +24,12 @@ class WorksheetNormalizationMetadata(BaseModel):
     version: int = WORKBOOK_METADATA_NORMALIZATION_VERSION
     normalized_at: str
     header_row_index: int | None = Field(default=None, ge=0)
+    skipped_leading_rows: int | None = Field(default=None, ge=0)
+    header_detection_strategy: str | None = None
+    header_detection_confidence: str | None = None
+    header_detection_warning: str | None = None
+    original_first_row_preview: list[str] | None = None
+    selected_header_row_preview: list[str] | None = None
     duplicate_column_count: int = Field(default=0, ge=0)
     empty_column_count: int = Field(default=0, ge=0)
     warnings: list[str] = Field(default_factory=list)
