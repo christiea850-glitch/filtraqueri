@@ -10,6 +10,7 @@ import {
 import {
   createSqlReportRecipes,
   type SqlReportRecipe,
+  type SqlReportRecipeDomain,
 } from "./sqlReportRecipes";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
 
@@ -33,6 +34,7 @@ const categoryOrder: SqlTemplateCategory[] = [
 ];
 
 type SqlAssistantMode = "templates" | "assist" | "recipes";
+type SqlReportRecipeFilter = "All" | "Supported" | "Not supported" | SqlReportRecipeDomain;
 
 const modeCopy: Record<SqlAssistantMode, { title: string; description: string }> = {
   templates: {
@@ -48,6 +50,20 @@ const modeCopy: Record<SqlAssistantMode, { title: string; description: string }>
     description: "Choose a report pattern, insert the SQL draft into Monaco, then run manually.",
   },
 };
+
+const recipeFilters: SqlReportRecipeFilter[] = [
+  "All",
+  "Supported",
+  "Not supported",
+  "Operations",
+  "CRM",
+  "Product",
+  "Sales",
+  "Finance",
+  "Marketing",
+  "Retail",
+  "Web",
+];
 
 const labelFromColumn = (columnName: string) =>
   columnName
@@ -150,6 +166,8 @@ function SqlReportRecipeCard({
   const readinessLine = recipe.sql
     ? "Safe draft available. Insert into Monaco to review before running."
     : recipe.supportSummary;
+  const visibleDomains = recipe.domains?.slice(0, 2) || [];
+  const hiddenDomainCount = Math.max(0, (recipe.domains?.length || 0) - visibleDomains.length);
 
   return (
     <article className="sql-assistant-generated-card sql-assistant-recipe-card">
@@ -160,11 +178,12 @@ function SqlReportRecipeCard({
         </div>
         <em>{selectedDialectProfile.displayName}</em>
       </div>
-      {recipe.domains && recipe.domains.length > 0 && (
+      {visibleDomains.length > 0 && (
         <div className="sql-assistant-logic-list" aria-label="Recipe domains">
-          {recipe.domains.map((domain) => (
+          {visibleDomains.map((domain) => (
             <span key={domain}>{domain}</span>
           ))}
+          {hiddenDomainCount > 0 && <span>+{hiddenDomainCount}</span>}
         </div>
       )}
       <p className={recipe.sql ? "sql-assistant-recipe-ready" : "sql-assistant-recipe-blocked"}>
@@ -222,6 +241,7 @@ function SqlAssistantPanel({
   const [taskRequest, setTaskRequest] = useState("");
   const [generatedDrafts, setGeneratedDrafts] = useState<SqlTaskGenerationResult[]>([]);
   const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
+  const [activeRecipeFilter, setActiveRecipeFilter] = useState<SqlReportRecipeFilter>("All");
   const templates = useMemo(
     () => createSqlAssistantTemplates(dataset, selectedDialect),
     [dataset, selectedDialect],
@@ -260,6 +280,12 @@ function SqlAssistantPanel({
     }))
     .filter((group) => group.templates.length > 0);
   const filteredRecipes = recipes.filter((recipe) => {
+    const matchesFilter =
+      activeRecipeFilter === "All" ||
+      (activeRecipeFilter === "Supported" && Boolean(recipe.sql)) ||
+      (activeRecipeFilter === "Not supported" && !recipe.sql) ||
+      Boolean(recipe.domains?.includes(activeRecipeFilter as SqlReportRecipeDomain));
+    if (!matchesFilter) return false;
     if (!normalizedRecipeQuery) return true;
 
     return [
@@ -277,6 +303,8 @@ function SqlAssistantPanel({
       .toLowerCase()
       .includes(normalizedRecipeQuery);
   });
+  const supportedRecipes = filteredRecipes.filter((recipe) => recipe.sql);
+  const blockedRecipes = filteredRecipes.filter((recipe) => !recipe.sql);
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") event.preventDefault();
@@ -489,6 +517,19 @@ function SqlAssistantPanel({
             <p className="sql-assistant-recipe-note">
               Recipes combine patterns like grouping, ranking, thresholds, CASE checks, and joins into report-style drafts. They insert into Monaco only; blocked recipes show exactly what the active dataset is missing.
             </p>
+            <div className="sql-assistant-category-tabs" aria-label="Report recipe filters">
+              {recipeFilters.map((filter) => (
+                <button
+                  type="button"
+                  key={filter}
+                  className={activeRecipeFilter === filter ? "is-active" : ""}
+                  aria-pressed={activeRecipeFilter === filter}
+                  onClick={() => setActiveRecipeFilter(filter)}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="sql-assistant-generated-list" aria-label="Report recipe drafts">
@@ -499,14 +540,32 @@ function SqlAssistantPanel({
             {filteredRecipes.length === 0 ? (
               <p className="sql-helper-empty">No report recipes match this search.</p>
             ) : (
-              filteredRecipes.map((recipe) => (
-                <SqlReportRecipeCard
-                  key={recipe.id}
-                  recipe={recipe}
-                  selectedDialectProfile={selectedDialectProfile}
-                  onInsertSql={onInsertSql}
-                />
-              ))
+              <>
+                {supportedRecipes.map((recipe) => (
+                  <SqlReportRecipeCard
+                    key={recipe.id}
+                    recipe={recipe}
+                    selectedDialectProfile={selectedDialectProfile}
+                    onInsertSql={onInsertSql}
+                  />
+                ))}
+                {blockedRecipes.length > 0 && (
+                  <section className="sql-assistant-blocked-recipes" aria-label="Unsupported report recipes">
+                    <div className="sql-helper-section-label">
+                      <span>Not supported on this dataset</span>
+                      <small>{blockedRecipes.length.toLocaleString()}</small>
+                    </div>
+                    {blockedRecipes.map((recipe) => (
+                      <SqlReportRecipeCard
+                        key={recipe.id}
+                        recipe={recipe}
+                        selectedDialectProfile={selectedDialectProfile}
+                        onInsertSql={onInsertSql}
+                      />
+                    ))}
+                  </section>
+                )}
+              </>
             )}
           </div>
         </section>

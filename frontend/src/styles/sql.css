@@ -1234,6 +1234,19 @@
   align-items: center;
 }
 
+.sql-assistant-recipe-controls .sql-assistant-category-tabs,
+.sql-assistant-blocked-recipes {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sql-assistant-recipe-controls .sql-assistant-category-tabs {
+  display: flex;
+  gap: 6px;
+}
+
 .sql-assistant-recipe-note {
   margin: 0;
   color: #64748b;

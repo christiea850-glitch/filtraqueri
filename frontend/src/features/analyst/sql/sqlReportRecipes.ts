@@ -10,6 +10,7 @@ import {
 } from "./sqlTemplateLibrary";
 
 export type SqlReportRecipeId =
+  | "inactive-records"
   | "top-performers"
   | "data-quality"
   | "category-summary"
@@ -66,6 +67,83 @@ const columnText = (column: SchemaColumn) => normalizeText(column.name);
 
 const includesAny = (value: string, terms: string[]) =>
   terms.some((term) => value.includes(term));
+
+type InactiveEntityKind = "person" | "asset" | "workflow" | "generic";
+
+type InactiveEntityDetection = {
+  column: SchemaColumn;
+  kind: InactiveEntityKind;
+};
+
+const inactiveEntityTerms: Record<InactiveEntityKind, string[]> = {
+  person: ["customer", "user", "account", "member", "subscriber", "patient", "employee", "tenant"],
+  asset: ["product", "item", "sku", "unit", "property", "asset", "track", "song", "device"],
+  workflow: ["order", "ticket", "case", "contract", "lease", "claim"],
+  generic: ["id", "name", "number", "code", "reference", "record"],
+};
+
+const activityDateTerms = [
+  "date",
+  "time",
+  "created",
+  "updated",
+  "activity",
+  "last",
+  "recent",
+  "login",
+  "purchase",
+  "order",
+  "event",
+  "transaction",
+  "closed",
+  "resolved",
+  "renewed",
+  "start",
+  "end",
+];
+
+const inactiveBusinessPurpose: Record<InactiveEntityKind, string> = {
+  person: "Identifies people or accounts with no recent activity.",
+  asset: "Identifies assets or items with no recent activity.",
+  workflow: "Identifies operational records with no recent activity.",
+  generic: "Identifies records with no recent activity.",
+};
+
+const findInactiveEntityColumn = (columns: SchemaColumn[]): InactiveEntityDetection | null => {
+  const nonDateColumns = columns.filter((column) => column.inferred_type !== "date");
+  const searchableColumns = nonDateColumns.length > 0 ? nonDateColumns : columns;
+  const prioritizedKinds: InactiveEntityKind[] = ["person", "asset", "workflow"];
+
+  for (const kind of prioritizedKinds) {
+    const column = searchableColumns.find((candidate) =>
+      includesAny(columnText(candidate), inactiveEntityTerms[kind]),
+    );
+    if (column) return { column, kind };
+  }
+
+  const genericColumn =
+    searchableColumns.find((candidate) =>
+      includesAny(columnText(candidate), inactiveEntityTerms.generic),
+    ) ||
+    searchableColumns.find((candidate) => candidate.inferred_type === "categorical") ||
+    searchableColumns.find((candidate) => candidate.unique_count > 0);
+
+  return genericColumn ? { column: genericColumn, kind: "generic" } : null;
+};
+
+const pickInactiveActivityColumn = (columns: SchemaColumn[]) =>
+  columns.find((column) => column.inferred_type === "date" && includesAny(columnText(column), activityDateTerms)) ||
+  columns.find((column) => includesAny(columnText(column), activityDateTerms)) ||
+  columns.find((column) => column.inferred_type === "date") ||
+  columns.find((column) => includesAny(columnText(column), ["year"])) ||
+  null;
+
+const domainsForInactiveEntity = (kind: InactiveEntityKind): SqlReportRecipeDomain[] => {
+  if (kind === "person") return ["Operations", "CRM"];
+  if (kind === "asset") return ["Operations", "Product"];
+  if (kind === "workflow") return ["Operations"];
+  return ["Operations"];
+};
 
 const aliasFrom = (prefix: string, column: SchemaColumn | null) =>
   `${prefix}_${(column?.name || "value")
@@ -186,13 +264,66 @@ export const createSqlReportRecipes = (
   const context = createSqlAssistantGenerationContext({ dataset, selectedDialect });
   const topTenLimit = formatRowLimitClause(selectedDialect, 10);
   const topTwentyFiveLimit = formatRowLimitClause(selectedDialect, 25);
+  const topFiftyLimit = formatRowLimitClause(selectedDialect, 50);
   const categoryColumn = pickCategoryColumn(context.categoricalColumns);
   const measureColumn = pickMeasureColumn(context.numericColumns);
   const dateColumn = pickDateColumn(context.schema);
   const statusColumn = pickStatusColumn(context.schema);
   const segmentColumn = categoryColumn || context.schema[0] || null;
+  const inactiveEntity = findInactiveEntityColumn(context.schema);
+  const inactiveActivityColumn = pickInactiveActivityColumn(context.schema);
   const warnings = dialectWarning(selectedDialect);
   const recipes: SqlReportRecipe[] = [];
+
+  const inactiveMissing = requireFields([
+    ["entity-like field", inactiveEntity?.column || null],
+    ["date or activity-like field", inactiveActivityColumn],
+  ]);
+  recipes.push(
+    inactiveMissing.length > 0
+      ? createUnavailableRecipe(
+          {
+            id: "inactive-records",
+            title: "Inactive Records Report",
+            businessPurpose: "Identifies records with no recent activity.",
+            requiredFieldRoles: ["Entity-like field", "Date or activity-like field"],
+            sqlPatterns: ["GROUP BY", "MAX", "COUNT", "CASE", "ORDER BY", "ROW LIMIT"],
+            dialectSupportNote: "Uses common aggregate SQL and the selected dialect row-limit style; review date comparisons before running.",
+            supportSummary: blockedSummary(inactiveMissing),
+            domains: ["Operations"],
+            dialects: ["duckdb"],
+          },
+          inactiveMissing,
+          ["Needs more structure: an inactive records report needs both an entity-like field and a date or activity-like field."],
+        )
+      : {
+          id: "inactive-records",
+          title: "Inactive Records Report",
+          businessPurpose: inactiveBusinessPurpose[inactiveEntity!.kind],
+          requiredFieldRoles: ["Entity-like field", "Date or activity-like field"],
+          sqlPatterns: ["GROUP BY", "MAX", "COUNT", "CASE", "ORDER BY", "ROW LIMIT"],
+          dialectSupportNote: "Uses common aggregate SQL and the selected dialect row-limit style; review date comparisons before running.",
+          supportSummary: supportedSummary([inactiveEntity!.column.name, inactiveActivityColumn!.name]),
+          sql: `SELECT
+  ${formatSqlColumn(inactiveEntity!.column.name)},
+  MAX(${formatSqlColumn(inactiveActivityColumn!.name)}) AS latest_activity,
+  COUNT(*) AS record_count,
+  CASE
+    WHEN MAX(${formatSqlColumn(inactiveActivityColumn!.name)}) IS NULL THEN 'Needs review'
+    ELSE 'Recently active'
+  END AS activity_status
+FROM ${context.tableName}
+GROUP BY ${formatSqlColumn(inactiveEntity!.column.name)}
+ORDER BY
+  CASE WHEN MAX(${formatSqlColumn(inactiveActivityColumn!.name)}) IS NULL THEN 0 ELSE 1 END ASC,
+  latest_activity ASC
+${topFiftyLimit};`,
+          warnings,
+          missingRequirements: [],
+          domains: domainsForInactiveEntity(inactiveEntity!.kind),
+          dialects: ["duckdb"],
+        },
+  );
 
   const topPerformerMissing = requireFields([
     ["category or segment field", categoryColumn],
