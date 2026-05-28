@@ -137,6 +137,9 @@ const dialectWarning = (selectedDialect: SqlDialectId) =>
         }.`,
       ];
 
+const formatRowLimitClause = (dialect: SqlDialectId, limit: number) =>
+  dialect === "oracle" ? `FETCH FIRST ${limit} ROWS ONLY` : `LIMIT ${limit}`;
+
 const requireFields = (
   requirements: Array<[string, SchemaColumn | null]>,
 ) => requirements.filter(([, column]) => !column).map(([label]) => label);
@@ -172,6 +175,8 @@ export const createSqlReportRecipes = (
   selectedDialect: SqlDialectId,
 ): SqlReportRecipe[] => {
   const context = createSqlAssistantGenerationContext({ dataset, selectedDialect });
+  const topTenLimit = formatRowLimitClause(selectedDialect, 10);
+  const topTwentyFiveLimit = formatRowLimitClause(selectedDialect, 25);
   const categoryColumn = pickCategoryColumn(context.categoricalColumns);
   const measureColumn = pickMeasureColumn(context.numericColumns);
   const dateColumn = pickDateColumn(context.schema);
@@ -216,7 +221,7 @@ export const createSqlReportRecipes = (
 FROM ${context.tableName}
 GROUP BY ${formatSqlColumn(categoryColumn.name)}
 ORDER BY ${metricAlias("total", measureColumn)} DESC
-LIMIT 10;`,
+${topTenLimit};`,
           warnings,
           missingRequirements: [],
           dialects: ["duckdb"],
@@ -292,7 +297,7 @@ FROM ${context.tableName};`
 FROM ${context.tableName}
 GROUP BY ${formatSqlColumn(segmentColumn.name)}
 ORDER BY ${measureColumn ? metricAlias("total", measureColumn) : "record_count"} DESC
-LIMIT 25;`,
+${topTwentyFiveLimit};`,
           warnings,
           missingRequirements: [],
           dialects: ["duckdb"],
@@ -389,7 +394,7 @@ SELECT
   RANK() OVER (ORDER BY ${metricAlias("total", measureColumn)} DESC) AS report_rank
 FROM grouped_report
 ORDER BY report_rank
-LIMIT 25;`,
+${topTwentyFiveLimit};`,
           warnings,
           missingRequirements: [],
           dialects: ["duckdb"],
