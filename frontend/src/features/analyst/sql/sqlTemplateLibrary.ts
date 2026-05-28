@@ -1,5 +1,5 @@
 import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
-import type { SqlDialectId } from "../../sqlIntelligence";
+import { getDialectProfile, type SqlDialectId } from "../../sqlIntelligence";
 import {
   buildSampleValueHint,
   buildSelectList,
@@ -63,6 +63,9 @@ const dialectReviewLabel = "Review dialect before running";
 
 const normalizeRequestText = (requestText = "") =>
   requestText.trim().replace(/\s+/g, " ").toLowerCase();
+
+export const formatRowLimitClause = (dialect: SqlDialectId, limit: number) =>
+  dialect === "oracle" ? `FETCH FIRST ${limit} ROWS ONLY` : `LIMIT ${limit}`;
 
 export const createSqlAssistantGenerationContext = ({
   dataset,
@@ -152,6 +155,7 @@ export const createSqlAssistantTemplates = (
   const sortableExpression = placeholderColumn(sortableColumn);
   const yearExpression = createDatePartExpression(selectedDialect, dateExpression, "year");
   const monthExpression = createDatePartExpression(selectedDialect, dateExpression, "month");
+  const selectedDialectLabel = getDialectProfile(selectedDialect).displayName;
 
   return [
     {
@@ -358,7 +362,7 @@ LIMIT 100;`,
       title: "Group by year",
       category: "Date/time",
       explanation: `Summarize records by year from ${labelColumn(dateColumn)}.`,
-      dialectLabel: selectedDialect.toUpperCase(),
+      dialectLabel: selectedDialectLabel,
       dialects: [selectedDialect],
       sql: `SELECT
   ${yearExpression} AS record_year,
@@ -372,7 +376,7 @@ ORDER BY record_year;`,
       title: "Group by month",
       category: "Date/time",
       explanation: `Summarize records by month from ${labelColumn(dateColumn)}.`,
-      dialectLabel: selectedDialect.toUpperCase(),
+      dialectLabel: selectedDialectLabel,
       dialects: [selectedDialect],
       sql: `SELECT
   ${monthExpression} AS record_month,

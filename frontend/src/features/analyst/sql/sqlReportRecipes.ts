@@ -5,6 +5,7 @@ import {
 } from "./sqlSchemaHelpers";
 import {
   createSqlAssistantGenerationContext,
+  formatRowLimitClause,
   type SqlAssistantFutureDialectId,
 } from "./sqlTemplateLibrary";
 
@@ -136,9 +137,6 @@ const dialectWarning = (selectedDialect: SqlDialectId) =>
           dialectDisplayNames[selectedDialect] || selectedDialect
         }.`,
       ];
-
-const formatRowLimitClause = (dialect: SqlDialectId, limit: number) =>
-  dialect === "oracle" ? `FETCH FIRST ${limit} ROWS ONLY` : `LIMIT ${limit}`;
 
 const requireFields = (
   requirements: Array<[string, SchemaColumn | null]>,

@@ -5,6 +5,7 @@ import {
 } from "./sqlSchemaHelpers";
 import {
   createSqlAssistantGenerationContext,
+  formatRowLimitClause,
   type SqlAssistantGenerationInput,
 } from "./sqlTemplateLibrary";
 
@@ -183,6 +184,7 @@ export const generateSqlTaskDraft = ({
   requestText = "",
 }: SqlAssistantGenerationInput): SqlTaskGenerationResult => {
   const context = createSqlAssistantGenerationContext({ dataset, selectedDialect, requestText });
+  const previewLimitClause = formatRowLimitClause(selectedDialect, 100);
   const request = context.normalizedRequest;
   const warnings: string[] = [];
   const logicUsed: string[] = [];
@@ -203,13 +205,13 @@ export const generateSqlTaskDraft = ({
       warnings,
       sql: `SELECT *
 FROM ${context.tableName}
-LIMIT 100;`,
+${previewLimitClause};`,
     };
   }
 
   if (selectedDialect !== "duckdb") {
     warnings.push(
-      `Dialect-specific generation is limited today. This draft may need manual adjustment for ${
+      `Dialect-specific generation is limited today. Date functions, text casting, and identifier quoting may need review before running in ${
         dialectDisplayNames[selectedDialect] || selectedDialect
       }.`,
     );
@@ -233,6 +235,7 @@ LIMIT 100;`,
   const wantsAfter = /\bafter|since|newer than\b/.test(request);
   const wantsBefore = /\bbefore|older than\b/.test(request);
   const wantsHaving = /\bmore than|greater than|above|over|at least|having\b/.test(request);
+  const rowLimitClause = formatRowLimitClause(selectedDialect, limit);
 
   if (wantsMissing) {
     const mentionedColumns = context.schema.filter((column) => requestMentionsColumn(request, column));
@@ -305,7 +308,7 @@ ORDER BY duplicate_count DESC;`,
   ) AS metric_rank
 FROM ${context.tableName}
 ORDER BY metric_rank
-LIMIT ${limit};`,
+${rowLimitClause};`,
     };
   }
 
@@ -332,7 +335,7 @@ LIMIT ${limit};`,
 FROM ${context.tableName}
 WHERE ${formatSqlColumn(dateColumn.name)} ${operator} ${comparisonValue}
 ORDER BY ${formatSqlColumn(dateColumn.name)} DESC
-LIMIT 100;`,
+${previewLimitClause};`,
     };
   }
 
@@ -418,7 +421,7 @@ FROM ${context.tableName}
 GROUP BY ${formatSqlColumn(categoryColumn.name)}${
         havingClauses.length > 0 ? `\nHAVING ${havingClauses.join("\n   AND ")}` : ""
       }
-ORDER BY ${orderAlias} DESC${havingClauses.length > 0 ? "" : `\nLIMIT ${limit}`};`,
+ORDER BY ${orderAlias} DESC${havingClauses.length > 0 ? "" : `\n${rowLimitClause}`};`,
     };
   }
 
@@ -438,6 +441,6 @@ ORDER BY ${orderAlias} DESC${havingClauses.length > 0 ? "" : `\nLIMIT ${limit}`}
     sql: `SELECT
   ${buildSelectList(selectColumns)}
 FROM ${context.tableName}
-LIMIT 100;`,
+${previewLimitClause};`,
   };
 };

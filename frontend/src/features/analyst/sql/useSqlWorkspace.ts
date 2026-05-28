@@ -19,6 +19,7 @@ import {
   type SqlDialectId,
 } from "../../sqlIntelligence";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
+import { formatRowLimitClause } from "./sqlTemplateLibrary";
 import type {
   SqlEditorInterface,
   SqlExecutionStatus,
@@ -26,9 +27,9 @@ import type {
   SqlQueryDraft,
 } from "./sqlTypes";
 
-const createInitialSql = (tableName?: string) => `SELECT *
+const createInitialSql = (tableName: string | undefined, dialect: SqlDialectId) => `SELECT *
 FROM ${tableName || "uploaded_dataset"}
-LIMIT 100;`;
+${formatRowLimitClause(dialect, 100)};`;
 
 const createPreviewMessage = (status: SqlExecutionStatus) => {
   if (status === "running") {
@@ -69,7 +70,9 @@ function useSqlWorkspace(
     [normalizedMetadata],
   );
   const [sqlDraft, setSqlDraft] = useState(
-    () => restoredActiveDraft?.sql ?? createInitialSql(dataset?.table_name),
+    () =>
+      restoredActiveDraft?.sql ??
+      createInitialSql(dataset?.table_name, normalizedMetadata.selectedDialect),
   );
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>(() =>
     normalizedMetadata.snippets.map((snippet) => ({
