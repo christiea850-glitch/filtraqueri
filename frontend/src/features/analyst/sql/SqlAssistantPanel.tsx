@@ -125,11 +125,15 @@ function SqlReportRecipeCard({
           <dd>{recipe.dialectSupportNote}</dd>
         </div>
         <div>
-          <dt>Status</dt>
+          <dt>Current support</dt>
+          <dd>{recipe.supportSummary}</dd>
+        </div>
+        <div>
+          <dt>Insert readiness</dt>
           <dd>
-            {recipe.missingRequirements.length > 0
-              ? `Needs ${recipe.missingRequirements.join(", ")}.`
-              : "Safe draft available. Review in Monaco before choosing Run query."}
+            {recipe.sql
+              ? "Safe to insert into Monaco for manual review."
+              : `Blocked: ${recipe.missingRequirements.join(", ")}.`}
           </dd>
         </div>
       </dl>
@@ -202,6 +206,7 @@ function SqlAssistantPanel({
       recipe.requiredFieldRoles.join(" "),
       recipe.sqlPatterns.join(" "),
       recipe.dialectSupportNote,
+      recipe.supportSummary,
       recipe.warnings.join(" "),
       recipe.missingRequirements.join(" "),
     ]
@@ -428,7 +433,7 @@ function SqlAssistantPanel({
               />
             </label>
             <p className="sql-assistant-recipe-note">
-              Recipes combine SQL patterns into report drafts. They insert into Monaco only; related-table recipes stay blocked until relationships are known.
+              Recipes combine patterns like grouping, ranking, thresholds, CASE checks, and joins into report-style drafts. They insert into Monaco only; blocked recipes show exactly what the active dataset is missing.
             </p>
           </div>
 

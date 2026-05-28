@@ -12,6 +12,7 @@ export type SqlReportRecipeId =
   | "top-performers"
   | "data-quality"
   | "category-summary"
+  | "date-trend"
   | "ranking"
   | "threshold-having"
   | "multi-table-join"
@@ -24,6 +25,7 @@ export type SqlReportRecipe = {
   requiredFieldRoles: string[];
   sqlPatterns: string[];
   dialectSupportNote: string;
+  supportSummary: string;
   sql: string | null;
   warnings: string[];
   missingRequirements: string[];
@@ -110,6 +112,22 @@ const pickStatusColumn = (columns: SchemaColumn[]) =>
     ]),
   ) || null;
 
+const pickDateColumn = (columns: SchemaColumn[]) =>
+  columns.find((column) => column.inferred_type === "date") ||
+  columns.find((column) =>
+    includesAny(columnText(column), [
+      "date",
+      "year",
+      "month",
+      "time",
+      "released",
+      "release",
+      "created",
+      "updated",
+    ]),
+  ) ||
+  null;
+
 const dialectWarning = (selectedDialect: SqlDialectId) =>
   selectedDialect === "duckdb"
     ? []
@@ -143,6 +161,12 @@ const createMissingValueExpressions = (columns: SchemaColumn[]) =>
     )
     .join(",\n  ");
 
+const supportedSummary = (fieldNames: string[]) =>
+  `Supported by this dataset using ${fieldNames.join(", ")}.`;
+
+const blockedSummary = (missingRequirements: string[]) =>
+  `Needs more structure: ${missingRequirements.join(", ")}.`;
+
 export const createSqlReportRecipes = (
   dataset: DatasetMetadata | null,
   selectedDialect: SqlDialectId,
@@ -150,6 +174,7 @@ export const createSqlReportRecipes = (
   const context = createSqlAssistantGenerationContext({ dataset, selectedDialect });
   const categoryColumn = pickCategoryColumn(context.categoricalColumns);
   const measureColumn = pickMeasureColumn(context.numericColumns);
+  const dateColumn = pickDateColumn(context.schema);
   const statusColumn = pickStatusColumn(context.schema);
   const segmentColumn = categoryColumn || context.schema[0] || null;
   const warnings = dialectWarning(selectedDialect);
@@ -169,6 +194,7 @@ export const createSqlReportRecipes = (
             requiredFieldRoles: ["Category or segment", "Numeric measure"],
             sqlPatterns: ["GROUP BY", "SUM", "AVG", "COUNT", "ORDER BY", "LIMIT"],
             dialectSupportNote: "DuckDB draft today; other dialects need review before running.",
+            supportSummary: blockedSummary(topPerformerMissing),
             dialects: ["duckdb"],
           },
           topPerformerMissing,
@@ -181,6 +207,7 @@ export const createSqlReportRecipes = (
           requiredFieldRoles: ["Category or segment", "Numeric measure"],
           sqlPatterns: ["GROUP BY", "SUM", "AVG", "COUNT", "ORDER BY", "LIMIT"],
           dialectSupportNote: "DuckDB draft today; other dialects need review before running.",
+          supportSummary: supportedSummary([categoryColumn.name, measureColumn.name]),
           sql: `SELECT
   ${formatSqlColumn(categoryColumn.name)},
   SUM(${formatSqlColumn(measureColumn.name)}) AS ${metricAlias("total", measureColumn)},
@@ -203,6 +230,10 @@ LIMIT 10;`,
     requiredFieldRoles: ["Active table schema"],
     sqlPatterns: ["COUNT", "CASE WHEN", "SUM"],
     dialectSupportNote: "Uses portable aggregate logic; review identifier quoting for non-DuckDB targets.",
+    supportSummary:
+      context.schema.length > 0
+        ? supportedSummary([`${context.schema.length.toLocaleString()} schema fields`])
+        : blockedSummary(["active table schema"]),
     sql:
       context.schema.length > 0
         ? `SELECT
@@ -229,6 +260,7 @@ FROM ${context.tableName};`
             requiredFieldRoles: ["Category or segment", "Optional numeric measure"],
             sqlPatterns: ["GROUP BY", "COUNT", "SUM", "AVG", "ORDER BY"],
             dialectSupportNote: "DuckDB draft today; other dialects need review before running.",
+            supportSummary: blockedSummary(summaryMissing),
             dialects: ["duckdb"],
           },
           summaryMissing,
@@ -245,6 +277,9 @@ FROM ${context.tableName};`
             ? ["GROUP BY", "COUNT", "SUM", "AVG", "ORDER BY"]
             : ["GROUP BY", "COUNT", "ORDER BY"],
           dialectSupportNote: "DuckDB draft today; other dialects need review before running.",
+          supportSummary: supportedSummary(
+            measureColumn ? [segmentColumn.name, measureColumn.name] : [segmentColumn.name],
+          ),
           sql: `SELECT
   ${formatSqlColumn(segmentColumn.name)},
   COUNT(*) AS record_count${
@@ -258,6 +293,55 @@ FROM ${context.tableName}
 GROUP BY ${formatSqlColumn(segmentColumn.name)}
 ORDER BY ${measureColumn ? metricAlias("total", measureColumn) : "record_count"} DESC
 LIMIT 25;`,
+          warnings,
+          missingRequirements: [],
+          dialects: ["duckdb"],
+        },
+  );
+
+  const dateTrendMissing = requireFields([["date, year, month, or time field", dateColumn]]);
+  recipes.push(
+    dateTrendMissing.length > 0
+      ? createUnavailableRecipe(
+          {
+            id: "date-trend",
+            title: "Trend / date report",
+            businessPurpose: "Summarizes records over a detected date, year, month, or time field.",
+            requiredFieldRoles: ["Date, year, month, or time field", "Optional numeric measure"],
+            sqlPatterns: ["GROUP BY", "COUNT", "SUM", "AVG", "ORDER BY"],
+            dialectSupportNote: "Groups by the detected field directly to keep the draft portable.",
+            supportSummary: blockedSummary(dateTrendMissing),
+            dialects: ["duckdb"],
+          },
+          dateTrendMissing,
+          ["A trend report needs a date, year, month, or time-like field."],
+        )
+      : {
+          id: "date-trend",
+          title: "Trend / date report",
+          businessPurpose: measureColumn
+            ? `Summarizes ${measureColumn.name} over ${dateColumn!.name}.`
+            : `Counts records over ${dateColumn!.name}.`,
+          requiredFieldRoles: ["Date, year, month, or time field", "Optional numeric measure"],
+          sqlPatterns: measureColumn
+            ? ["GROUP BY", "COUNT", "SUM", "AVG", "ORDER BY"]
+            : ["GROUP BY", "COUNT", "ORDER BY"],
+          dialectSupportNote: "Groups by the detected field directly to keep the draft portable.",
+          supportSummary: supportedSummary(
+            measureColumn ? [dateColumn!.name, measureColumn.name] : [dateColumn!.name],
+          ),
+          sql: `SELECT
+  ${formatSqlColumn(dateColumn!.name)},
+  COUNT(*) AS record_count${
+            measureColumn
+              ? `,
+  SUM(${formatSqlColumn(measureColumn.name)}) AS ${metricAlias("total", measureColumn)},
+  AVG(${formatSqlColumn(measureColumn.name)}) AS ${metricAlias("average", measureColumn)}`
+              : ""
+          }
+FROM ${context.tableName}
+GROUP BY ${formatSqlColumn(dateColumn!.name)}
+ORDER BY ${formatSqlColumn(dateColumn!.name)};`,
           warnings,
           missingRequirements: [],
           dialects: ["duckdb"],
@@ -278,6 +362,7 @@ LIMIT 25;`,
             requiredFieldRoles: ["Category or segment", "Numeric measure"],
             sqlPatterns: ["CTE", "GROUP BY", "SUM", "RANK", "ORDER BY", "LIMIT"],
             dialectSupportNote: "Uses window functions; confirm support before running outside DuckDB.",
+            supportSummary: blockedSummary(rankingMissing),
             dialects: ["duckdb"],
           },
           rankingMissing,
@@ -290,6 +375,7 @@ LIMIT 25;`,
           requiredFieldRoles: ["Category or segment", "Numeric measure"],
           sqlPatterns: ["CTE", "GROUP BY", "SUM", "RANK", "ORDER BY", "LIMIT"],
           dialectSupportNote: "Uses window functions; confirm support before running outside DuckDB.",
+          supportSummary: supportedSummary([categoryColumn.name, measureColumn.name]),
           sql: `WITH grouped_report AS (
   SELECT
     ${formatSqlColumn(categoryColumn.name)},
@@ -324,6 +410,7 @@ LIMIT 25;`,
             requiredFieldRoles: ["Category or segment", "Numeric measure", "Thresholds to review"],
             sqlPatterns: ["GROUP BY", "COUNT", "SUM", "HAVING", "ORDER BY"],
             dialectSupportNote: "DuckDB draft today; threshold values should be adjusted before running.",
+            supportSummary: blockedSummary(thresholdMissing),
             dialects: ["duckdb"],
           },
           thresholdMissing,
@@ -336,6 +423,7 @@ LIMIT 25;`,
           requiredFieldRoles: ["Category or segment", "Numeric measure", "Thresholds to review"],
           sqlPatterns: ["GROUP BY", "COUNT", "SUM", "HAVING", "ORDER BY"],
           dialectSupportNote: "DuckDB draft today; threshold values should be adjusted before running.",
+          supportSummary: supportedSummary([categoryColumn.name, measureColumn.name]),
           sql: `SELECT
   ${formatSqlColumn(categoryColumn.name)},
   COUNT(*) AS record_count,
@@ -363,10 +451,11 @@ ORDER BY ${metricAlias("total", measureColumn)} DESC;`,
         requiredFieldRoles: ["Related tables or workbook sheets", "Known join keys"],
         sqlPatterns: ["JOIN", "COALESCE", "GROUP BY", "ORDER BY"],
         dialectSupportNote: "Placeholder only until related tables and join keys are available.",
+        supportSummary: blockedSummary(["related tables or workbook sheets", "known join keys"]),
         dialects: ["duckdb", "mariadb", "oracle", "postgresql"],
       },
       ["related tables or workbook sheets", "known join keys"],
-      ["This checkpoint does not infer joins. Add related tables and confirmed keys before drafting join SQL."],
+      ["This report needs related tables or workbook sheets with confirmed join keys before FiltraQueri can draft join SQL."],
     ),
   );
 
@@ -384,6 +473,7 @@ ORDER BY ${metricAlias("total", measureColumn)} DESC;`,
             requiredFieldRoles: ["Status or availability field", "Category or segment"],
             sqlPatterns: ["CASE WHEN", "UPPER", "CAST", "GROUP BY", "ORDER BY"],
             dialectSupportNote: "DuckDB draft today; text casting may need review in other dialects.",
+            supportSummary: blockedSummary(inventoryMissing),
             dialects: ["duckdb"],
           },
           inventoryMissing,
@@ -396,6 +486,7 @@ ORDER BY ${metricAlias("total", measureColumn)} DESC;`,
           requiredFieldRoles: ["Status or availability field", "Category or segment"],
           sqlPatterns: ["CASE WHEN", "UPPER", "CAST", "GROUP BY", "ORDER BY"],
           dialectSupportNote: "DuckDB draft today; text casting may need review in other dialects.",
+          supportSummary: supportedSummary([segmentColumn.name, statusColumn!.name]),
           sql: `SELECT
   ${formatSqlColumn(segmentColumn.name)},
   COUNT(*) AS total_items,
