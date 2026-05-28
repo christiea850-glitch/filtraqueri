@@ -6,6 +6,10 @@ import {
   type SqlAssistantTemplate,
   type SqlTemplateCategory,
 } from "./sqlTemplateLibrary";
+import {
+  createSqlReportRecipes,
+  type SqlReportRecipe,
+} from "./sqlReportRecipes";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
 
 type SqlAssistantPanelProps = {
@@ -27,7 +31,22 @@ const categoryOrder: SqlTemplateCategory[] = [
   "Dialect examples",
 ];
 
-type SqlAssistantMode = "templates" | "assist";
+type SqlAssistantMode = "templates" | "assist" | "recipes";
+
+const modeCopy: Record<SqlAssistantMode, { title: string; description: string }> = {
+  templates: {
+    title: "Choose a template",
+    description: "Templates insert into Monaco for review. Run query remains manual.",
+  },
+  assist: {
+    title: "Complex SQL Assist",
+    description: "Describe the outcome, generate SQL into Monaco, then run manually.",
+  },
+  recipes: {
+    title: "Report Recipes",
+    description: "Choose a report pattern, insert the SQL draft into Monaco, then run manually.",
+  },
+};
 
 function SqlTemplateCard({
   template,
@@ -70,6 +89,65 @@ function SqlTemplateCard({
   );
 }
 
+function SqlReportRecipeCard({
+  recipe,
+  selectedDialectProfile,
+  onInsertSql,
+}: {
+  recipe: SqlReportRecipe;
+  selectedDialectProfile: SqlDialectProfile;
+  onInsertSql: (sql: string) => void;
+}) {
+  return (
+    <article className="sql-assistant-generated-card sql-assistant-recipe-card">
+      <div className="sql-assistant-generated-head">
+        <div>
+          <strong>{recipe.title}</strong>
+          <span>{recipe.businessPurpose}</span>
+        </div>
+        <em>{selectedDialectProfile.displayName}</em>
+      </div>
+      <dl>
+        <div>
+          <dt>Required roles</dt>
+          <dd>{recipe.requiredFieldRoles.join(", ")}</dd>
+        </div>
+        <div>
+          <dt>SQL patterns used</dt>
+          <dd className="sql-assistant-logic-list">
+            {recipe.sqlPatterns.map((pattern) => (
+              <span key={pattern}>{pattern}</span>
+            ))}
+          </dd>
+        </div>
+        <div>
+          <dt>Dialect note</dt>
+          <dd>{recipe.dialectSupportNote}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>
+            {recipe.missingRequirements.length > 0
+              ? `Needs ${recipe.missingRequirements.join(", ")}.`
+              : "Safe draft available. Review in Monaco before choosing Run query."}
+          </dd>
+        </div>
+      </dl>
+      {recipe.warnings.length > 0 && (
+        <p className="sql-assistant-recipe-warning">{recipe.warnings.join(" ")}</p>
+      )}
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() => recipe.sql && onInsertSql(recipe.sql)}
+        disabled={!recipe.sql}
+      >
+        {recipe.sql ? "Insert into Monaco" : "Needs more structure"}
+      </button>
+    </article>
+  );
+}
+
 function SqlAssistantPanel({
   dataset,
   selectedDialect,
@@ -81,11 +159,17 @@ function SqlAssistantPanel({
   const [activeCategory, setActiveCategory] = useState<SqlTemplateCategory | "All">("All");
   const [taskRequest, setTaskRequest] = useState("");
   const [generatedDrafts, setGeneratedDrafts] = useState<SqlTaskGenerationResult[]>([]);
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
   const templates = useMemo(
     () => createSqlAssistantTemplates(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
+  const recipes = useMemo(
+    () => createSqlReportRecipes(dataset, selectedDialect),
+    [dataset, selectedDialect],
+  );
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const normalizedRecipeQuery = recipeSearchQuery.trim().toLowerCase();
   const filteredTemplates = templates.filter((template) => {
     const matchesCategory = activeCategory === "All" || template.category === activeCategory;
     const matchesSearch =
@@ -109,6 +193,22 @@ function SqlAssistantPanel({
       templates: filteredTemplates.filter((template) => template.category === category),
     }))
     .filter((group) => group.templates.length > 0);
+  const filteredRecipes = recipes.filter((recipe) => {
+    if (!normalizedRecipeQuery) return true;
+
+    return [
+      recipe.title,
+      recipe.businessPurpose,
+      recipe.requiredFieldRoles.join(" "),
+      recipe.sqlPatterns.join(" "),
+      recipe.dialectSupportNote,
+      recipe.warnings.join(" "),
+      recipe.missingRequirements.join(" "),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedRecipeQuery);
+  });
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") event.preventDefault();
@@ -135,12 +235,8 @@ function SqlAssistantPanel({
       <div className="sql-assistant-intro">
         <div>
           <p className="section-label">SQL Assistant</p>
-          <h3>{assistantMode === "templates" ? "Choose a template" : "Complex SQL Assist"}</h3>
-          <p>
-            {assistantMode === "templates"
-              ? "Templates insert into Monaco for review. Run query remains manual."
-              : "Describe the outcome, generate SQL into Monaco, then run manually."}
-          </p>
+          <h3>{modeCopy[assistantMode].title}</h3>
+          <p>{modeCopy[assistantMode].description}</p>
         </div>
         <span>{selectedDialectProfile.displayName}</span>
       </div>
@@ -161,6 +257,14 @@ function SqlAssistantPanel({
           onClick={() => setAssistantMode("assist")}
         >
           Complex SQL Assist
+        </button>
+        <button
+          type="button"
+          className={assistantMode === "recipes" ? "is-active" : ""}
+          aria-pressed={assistantMode === "recipes"}
+          onClick={() => setAssistantMode("recipes")}
+        >
+          Report Recipes
         </button>
       </div>
 
@@ -217,7 +321,7 @@ function SqlAssistantPanel({
             )}
           </div>
         </section>
-      ) : (
+      ) : assistantMode === "assist" ? (
         <section className="sql-assistant-mode-panel sql-assistant-complex" aria-label="Complex SQL Assist">
           <label className="sql-assistant-task-input">
             <span>Describe the task you want SQL to perform</span>
@@ -309,6 +413,43 @@ function SqlAssistantPanel({
               ))}
             </div>
           )}
+        </section>
+      ) : (
+        <section className="sql-assistant-mode-panel" aria-label="Report Recipes">
+          <div className="sql-assistant-controls sql-assistant-recipe-controls">
+            <label className="sql-assistant-search">
+              <span>Search report recipes</span>
+              <input
+                type="search"
+                value={recipeSearchQuery}
+                onChange={(event) => setRecipeSearchQuery(event.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Top performers, quality, ranking, HAVING, join..."
+              />
+            </label>
+            <p className="sql-assistant-recipe-note">
+              Recipes combine SQL patterns into report drafts. They insert into Monaco only; related-table recipes stay blocked until relationships are known.
+            </p>
+          </div>
+
+          <div className="sql-assistant-generated-list" aria-label="Report recipe drafts">
+            <div className="sql-helper-section-label">
+              <span>Available report recipes</span>
+              <small>{filteredRecipes.length.toLocaleString()}</small>
+            </div>
+            {filteredRecipes.length === 0 ? (
+              <p className="sql-helper-empty">No report recipes match this search.</p>
+            ) : (
+              filteredRecipes.map((recipe) => (
+                <SqlReportRecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  selectedDialectProfile={selectedDialectProfile}
+                  onInsertSql={onInsertSql}
+                />
+              ))
+            )}
+          </div>
         </section>
       )}
     </section>
