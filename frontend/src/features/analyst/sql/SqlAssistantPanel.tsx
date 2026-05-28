@@ -305,6 +305,15 @@ function SqlAssistantPanel({
   });
   const supportedRecipes = filteredRecipes.filter((recipe) => recipe.sql);
   const blockedRecipes = filteredRecipes.filter((recipe) => !recipe.sql);
+  const emptyRecipeMessage = normalizedRecipeQuery
+    ? "No recipes match this search. Try clearing the search or switching to All."
+    : activeRecipeFilter === "Supported"
+      ? "No supported recipes for this dataset yet. Try All to see recipes that need more structure."
+      : activeRecipeFilter === "Not supported"
+        ? "No blocked recipes for this dataset."
+        : activeRecipeFilter === "All"
+          ? "No report recipes match this dataset yet."
+          : `No ${activeRecipeFilter} recipes match this dataset. Try All or Supported.`;
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") event.preventDefault();
@@ -538,7 +547,7 @@ function SqlAssistantPanel({
               <small>{filteredRecipes.length.toLocaleString()}</small>
             </div>
             {filteredRecipes.length === 0 ? (
-              <p className="sql-helper-empty">No report recipes match this search.</p>
+              <p className="sql-helper-empty">{emptyRecipeMessage}</p>
             ) : (
               <>
                 {supportedRecipes.map((recipe) => (
