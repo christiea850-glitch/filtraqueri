@@ -141,6 +141,16 @@ function SqlReportRecipeCard({
   selectedDialectProfile: SqlDialectProfile;
   onInsertSql: (sql: string) => void;
 }) {
+  const importantWarnings = recipe.warnings.filter((warning) => {
+    const normalizedWarning = warning.toLowerCase();
+    return !recipe.missingRequirements.some((requirement) =>
+      normalizedWarning.includes(requirement.toLowerCase()),
+    );
+  });
+  const readinessLine = recipe.sql
+    ? "Safe draft available. Insert into Monaco to review before running."
+    : recipe.supportSummary;
+
   return (
     <article className="sql-assistant-generated-card sql-assistant-recipe-card">
       <div className="sql-assistant-generated-head">
@@ -150,39 +160,37 @@ function SqlReportRecipeCard({
         </div>
         <em>{selectedDialectProfile.displayName}</em>
       </div>
-      <dl>
-        <div>
-          <dt>Required roles</dt>
-          <dd>{recipe.requiredFieldRoles.join(", ")}</dd>
-        </div>
-        <div>
-          <dt>SQL patterns used</dt>
-          <dd className="sql-assistant-logic-list">
-            {recipe.sqlPatterns.map((pattern) => (
-              <span key={pattern}>{pattern}</span>
-            ))}
-          </dd>
-        </div>
-        <div>
-          <dt>Dialect note</dt>
-          <dd>{recipe.dialectSupportNote}</dd>
-        </div>
-        <div>
-          <dt>Current support</dt>
-          <dd>{recipe.supportSummary}</dd>
-        </div>
-        <div>
-          <dt>Insert readiness</dt>
-          <dd>
-            {recipe.sql
-              ? "Safe to insert into Monaco for manual review."
-              : `Blocked: ${recipe.missingRequirements.join(", ")}.`}
-          </dd>
-        </div>
-      </dl>
-      {recipe.warnings.length > 0 && (
-        <p className="sql-assistant-recipe-warning">{recipe.warnings.join(" ")}</p>
+      <p className={recipe.sql ? "sql-assistant-recipe-ready" : "sql-assistant-recipe-blocked"}>
+        {readinessLine}
+      </p>
+      {importantWarnings.length > 0 && (
+        <p className="sql-assistant-recipe-warning">{importantWarnings.join(" ")}</p>
       )}
+      <details className="sql-assistant-recipe-details">
+        <summary>Recipe details</summary>
+        <dl>
+          <div>
+            <dt>Required roles</dt>
+            <dd>{recipe.requiredFieldRoles.join(", ")}</dd>
+          </div>
+          <div>
+            <dt>SQL patterns used</dt>
+            <dd className="sql-assistant-logic-list">
+              {recipe.sqlPatterns.map((pattern) => (
+                <span key={pattern}>{pattern}</span>
+              ))}
+            </dd>
+          </div>
+          <div>
+            <dt>Dialect note</dt>
+            <dd>{recipe.dialectSupportNote}</dd>
+          </div>
+          <div>
+            <dt>Current support</dt>
+            <dd>{recipe.supportSummary}</dd>
+          </div>
+        </dl>
+      </details>
       <button
         type="button"
         className="secondary-button"

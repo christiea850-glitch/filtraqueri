@@ -1254,6 +1254,37 @@
   line-height: 1.45;
 }
 
+.sql-assistant-recipe-ready,
+.sql-assistant-recipe-blocked {
+  margin: 0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.sql-assistant-recipe-blocked {
+  color: #9a3412;
+}
+
+.sql-assistant-recipe-details {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sql-assistant-recipe-details summary {
+  width: fit-content;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sql-assistant-recipe-details dl {
+  margin-top: 8px;
+}
+
 .sql-assistant-recipe-card > .secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.62;
