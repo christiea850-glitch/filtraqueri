@@ -1259,7 +1259,7 @@ function DatasetSummaryPanel({
                   <p className="section-label">Understand</p>
                   <h3>{datasetPurposeLabel}</h3>
                   <p>Early read of the structure behind the data.</p>
-                  <div className="evidence-chip-row" aria-label="Initial evidence">
+                  <div className="evidence-chip-row" aria-label="Initial detected signals">
                     {understandingSignals.map((signal) => (
                       <OperationalTag key={signal}>{signal}</OperationalTag>
                     ))}
@@ -1268,7 +1268,7 @@ function DatasetSummaryPanel({
 
                 <EvidenceRows>
                   <div className="thread-section-heading">
-                    <p className="section-label">Evidence</p>
+                    <p className="section-label">Detected signals</p>
                     <strong>{businessNarrative}</strong>
                   </div>
                   {businessSignals.slice(0, 3).map((signal, index) => (
@@ -1325,8 +1325,8 @@ function DatasetSummaryPanel({
               <ContextRail>
                 <ContextRailHeader
                   eyebrow="Context"
-                  title={selectedEvidence?.title || "Evidence"}
-                  description={selectedEvidence?.detail || "Select an evidence row to see why it matters."}
+                  title={selectedEvidence?.title || "Detected signal"}
+                  description={selectedEvidence?.detail || "Select a signal to see why it matters."}
                 />
                 <ContextRailSection title="Dataset meaning">
                   <p>
@@ -1400,7 +1400,7 @@ function DatasetSummaryPanel({
                         <span>Review dataset signals and useful fields.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                        <strong>Investigation readiness</strong>
+                        <strong>Dataset readiness</strong>
                         <span>See how this dataset can be used outside Data.</span>
                       </button>
                     </div>
@@ -1442,7 +1442,7 @@ function DatasetSummaryPanel({
                         <span>Review measurable fields found in the data.</span>
                       </button>
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
-                        <strong>Exploration guidance</strong>
+                        <strong>Where to go next</strong>
                         <span>See where question asking and SQL belong.</span>
                       </button>
                     </div>
