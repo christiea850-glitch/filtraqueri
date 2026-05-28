@@ -1352,12 +1352,11 @@ function DatasetSummaryPanel({
                 )}
               </ContextRail>
             </OperationalWorkspaceLayout>
-            {showHeaderWarning && (
-              <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
-            )}
-            {structuralColumnNotice && (
+            {structuralColumnNotice ? (
               <p className="workbook-header-warning">{structuralColumnNotice}</p>
-            )}
+            ) : showHeaderWarning ? (
+              <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
+            ) : null}
             <div className="data-tabs-row">
               <WorkspaceTabs
                 items={dataTabs}

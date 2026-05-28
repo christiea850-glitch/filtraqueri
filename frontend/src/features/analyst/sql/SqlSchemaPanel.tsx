@@ -33,12 +33,11 @@ function SqlSchemaPanel({
       </button>
 
       <div className="sql-context-body">
-        {showHeaderWarning && (
-          <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
-        )}
-        {structuralColumnNotice && (
+        {structuralColumnNotice ? (
           <p className="workbook-header-warning">{structuralColumnNotice}</p>
-        )}
+        ) : showHeaderWarning ? (
+          <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
+        ) : null}
         <div className="sql-helper-section">
           <div className="builder-block-header">
             <span>Columns</span>
