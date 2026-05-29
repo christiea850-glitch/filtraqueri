@@ -35,7 +35,6 @@ import WorkspaceTabs from "../layout/WorkspaceTabs";
 import {
   ContextRail,
   ContextRailHeader,
-  ContextRailSection,
   EvidenceRow,
   EvidenceRows,
   InlineDisclosure,
@@ -1232,25 +1231,13 @@ function DatasetSummaryPanel({
                 </MetadataFooter>
               </InvestigationThread>
 
-              <ContextRail>
-                <ContextRailHeader
-                  eyebrow="Context"
-                  title={selectedEvidence?.title || "Detected signal"}
-                  description={selectedEvidence?.detail || "Select a signal to see why it matters."}
-                />
-                <ContextRailSection title="Dataset meaning">
-                  <p>
-                    {selectedEvidence
-                      ? "This signal helps explain what the dataset appears to contain."
-                      : "These signals summarize the dataset before deeper work begins."}
-                  </p>
-                </ContextRailSection>
-                {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
+              {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
+                <ContextRail>
                   <InlineDisclosure summary="Connected source detail" className="context-disclosure">
                     <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
                   </InlineDisclosure>
-                )}
-              </ContextRail>
+                </ContextRail>
+              )}
             </OperationalWorkspaceLayout>
             {structuralColumnNotice ? (
               <p className="workbook-header-warning">{structuralColumnNotice}</p>
