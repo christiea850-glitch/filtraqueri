@@ -76,7 +76,7 @@ type DatasetSummaryPanelProps = {
 };
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
-type DataWorkflowMenu = "intelligence" | "semantic";
+type DataWorkflowMenu = "details";
 type DataFocusedWorkflow =
   | "dataIntelligence"
   | "businessSemantics"
@@ -1318,14 +1318,14 @@ function DatasetSummaryPanel({
                     type="button"
                     className="secondary-button data-action-btn data-workflow-trigger"
                     aria-haspopup="menu"
-                    aria-expanded={activeWorkflowMenu === "intelligence"}
+                    aria-expanded={activeWorkflowMenu === "details"}
                     onClick={() =>
                       setActiveWorkflowMenu((current) =>
-                        current === "intelligence" ? null : "intelligence",
+                        current === "details" ? null : "details",
                       )
                     }
                   >
-                    Explore
+                    Dataset details
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
@@ -1338,42 +1338,12 @@ function DatasetSummaryPanel({
                       <path d="m6 9 6 6 6-6" />
                     </svg>
                   </button>
-                  {activeWorkflowMenu === "intelligence" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Dataset follow-up options">
+                  {activeWorkflowMenu === "details" && (
+                    <div className="data-workflow-menu" role="menu" aria-label="Dataset details">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
                         <strong>What the data suggests</strong>
                         <span>Review dataset signals and useful fields.</span>
                       </button>
-                    </div>
-                  )}
-                </div>
-                <div className="data-workflow-menu-wrap">
-                  <button
-                    type="button"
-                    className="secondary-button data-action-btn data-workflow-trigger"
-                    aria-haspopup="menu"
-                    aria-expanded={activeWorkflowMenu === "semantic"}
-                    onClick={() =>
-                      setActiveWorkflowMenu((current) =>
-                        current === "semantic" ? null : "semantic",
-                      )
-                    }
-                  >
-                    Details
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </button>
-                  {activeWorkflowMenu === "semantic" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Dataset details">
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
                         <strong>Dataset meaning</strong>
                         <span>Review what these fields may represent.</span>
