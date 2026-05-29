@@ -1,9 +1,7 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { getPreview } from "../../services/api";
-import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
-import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { DatasetIntelligenceDetailPage } from "../../features/detailPages";
 import {
@@ -734,38 +732,13 @@ function DatasetSummaryPanel({
   const showHeaderWarning = hasSuspiciousWorkbookHeaders(dataset);
   const structuralColumnNotice = getStructuralColumnNotice(dataset);
   const workbookRelationshipIntelligence = buildWorkbookRelationshipIntelligence(dataset?.workbook_metadata);
-  const { dataProfile, dialectRecommendation } = useDataIntelligence(dataset);
-  const {
-    workflowRecommendationReport,
-  } = useWorkflowRecommendations({
-    dataProfile,
-    dialectRecommendation,
-  });
-  const {
-    businessSemanticReport,
-    detectedSemanticEntities,
-  } = useBusinessSemantics({
-    dataset,
-    dataProfile,
-    workflowRecommendationReport,
-  });
+  const { dataProfile } = useDataIntelligence(dataset);
   const schemaTypeSummary = dataset ? createSchemaTypeSummary(dataset) : {};
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
   const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
   const detectedNumericFields = dataProfile?.possibleMetrics || [];
   const detectedCategoryFields = dataProfile?.possibleDimensions || [];
   const detectedDateFields = dataProfile?.dateTimeFields || [];
-  const datasetReviewSummary = dataset
-    ? `${dataset.column_count.toLocaleString()} columns, ${dataset.row_count.toLocaleString()} rows, and ${Object.keys(
-        schemaTypeSummary,
-      ).length.toLocaleString()} detected field types.`
-    : "Dataset structure is available for review.";
-  const measureReviewSummary =
-    detectedNumericFields.length > 0
-      ? `${detectedNumericFields.length.toLocaleString()} numeric field${
-          detectedNumericFields.length === 1 ? "" : "s"
-        } may support measurement, ranking, or summaries.`
-      : "No clear numeric measure fields were detected yet.";
   const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
   const businessEntityHints = displayColumnProfiles
     .filter((profile) => profile.role === "customer" || profile.role === "description" || profile.role === "identifier")
@@ -945,18 +918,6 @@ function DatasetSummaryPanel({
     closeControlledHashDetailRoute(datasetIntelligenceDetailRouteId);
     setIsDatasetIntelligenceDetailOpen(false);
   };
-  const openFocusedWorkflow = (workflow: DataFocusedWorkflow) => {
-    setIsDatasetPreviewOpen(false);
-    setIsDatasetIntelligenceDetailOpen(false);
-    setActiveOperationalWorkspace(null);
-    setActiveWorkflowMenu(null);
-    setActiveFocusedWorkflow(workflow);
-    setActiveDrillInView(
-      workflow === "dataIntelligence"
-        ? "dataIntelligence"
-        : "businessSemantics",
-    );
-  };
   const openOperationalWorkspace = (workspace: FocusedOperationalWorkspace) => {
     setIsDatasetPreviewOpen(false);
     setIsDatasetIntelligenceDetailOpen(false);
@@ -1014,13 +975,12 @@ function DatasetSummaryPanel({
         return;
       }
 
-      if (target === "intelligence") {
-        openFocusedWorkflow("dataIntelligence");
-        return;
-      }
-
-      if (target === "semantics") {
-        openFocusedWorkflow("businessSemantics");
+      if (target === "intelligence" || target === "semantics") {
+        setIsDatasetPreviewOpen(false);
+        setIsDatasetIntelligenceDetailOpen(false);
+        setActiveOperationalWorkspace(null);
+        setActiveFocusedWorkflow(null);
+        setActiveDrillInView("overview");
       }
     };
 
@@ -1285,11 +1245,6 @@ function DatasetSummaryPanel({
                       : "These signals summarize the dataset before deeper work begins."}
                   </p>
                 </ContextRailSection>
-                <InlineDisclosure summary="Advanced context" className="context-disclosure">
-                  <p>
-                    Field names, worksheet links, and profile metadata remain available without leading the Human Mode flow.
-                  </p>
-                </InlineDisclosure>
                 {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
                   <InlineDisclosure summary="Connected source detail" className="context-disclosure">
                     <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
@@ -1313,48 +1268,6 @@ function DatasetSummaryPanel({
                 }}
               />
               <div className="data-profile-actions">
-                <div className="data-workflow-menu-wrap">
-                  <button
-                    type="button"
-                    className="secondary-button data-action-btn data-workflow-trigger"
-                    aria-haspopup="menu"
-                    aria-expanded={activeWorkflowMenu === "details"}
-                    onClick={() =>
-                      setActiveWorkflowMenu((current) =>
-                        current === "details" ? null : "details",
-                      )
-                    }
-                  >
-                    Dataset details
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </button>
-                  {activeWorkflowMenu === "details" && (
-                    <div className="data-workflow-menu" role="menu" aria-label="Dataset details">
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("dataIntelligence")}>
-                        <strong>What the data suggests</strong>
-                        <span>Review dataset signals and useful fields.</span>
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("businessSemantics")}>
-                        <strong>Dataset meaning</strong>
-                        <span>Review what these fields may represent.</span>
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
-                        <strong>Possible measures</strong>
-                        <span>Review measurable fields found in the data.</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
                 <button
                   type="button"
                   className="secondary-button data-action-btn"
@@ -1459,134 +1372,6 @@ function DatasetSummaryPanel({
             isSwitchingWorksheet={isSwitchingWorksheet}
             onWorksheetSelect={onWorksheetSelect}
           />
-        </DrillInDetailPanel>
-      )}
-
-      {dataset && dataProfile && activeFocusedWorkflow === "dataIntelligence" && (
-        <DrillInDetailPanel
-          eyebrow="Dataset detail"
-          title="What the data suggests"
-          summary={datasetReviewSummary}
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        <section className="data-intelligence-panel" aria-label="Dataset understanding">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Dataset understanding</p>
-              <h2>Dataset signals available in this file</h2>
-              <p>{datasetReviewSummary}</p>
-            </div>
-            <span className="dataset-count-pill">
-              {dialectRecommendation?.recommendedFutureEngine?.label || "Suggested only"}
-            </span>
-          </div>
-          <div className="data-intelligence-grid">
-            <span>
-              Dataset shape
-              <strong>{dataProfile.shape.shapeLabel.replace(/_/g, " ")}</strong>
-            </span>
-            <span>
-              Possible metrics
-              <strong>{dataProfile.possibleMetrics.length}</strong>
-            </span>
-            <span>
-              Possible segments
-              <strong>{dataProfile.possibleDimensions.length}</strong>
-            </span>
-            <span>
-              Timeline fields
-              <strong>{dataProfile.dateTimeFields.length}</strong>
-            </span>
-            <span>
-              Trend potential
-              <strong>{dataProfile.timeSeriesReadiness.ready ? "Possible" : "Needs fields"}</strong>
-            </span>
-            <span>
-              Comparison potential
-              <strong>{dataProfile.statisticalReadiness.ready ? "Possible" : "Needs metrics"}</strong>
-            </span>
-          </div>
-        </section>
-        </DrillInDetailPanel>
-      )}
-
-      {dataset && activeFocusedWorkflow === "businessSemantics" && (
-        <DrillInDetailPanel
-          eyebrow="Dataset detail"
-          title="Dataset meaning"
-          summary="Dataset context is derived from detected field names and profile metadata."
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        {businessSemanticReport && (
-        <section className="business-semantics-panel" aria-label="Dataset meaning">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Dataset meaning</p>
-              <h2>Detected field context</h2>
-              <p>Detected labels below are based on field names and profile metadata.</p>
-            </div>
-            <span className="dataset-count-pill">{detectedSemanticEntities.length}</span>
-          </div>
-          <div className="business-semantics-grid">
-            {detectedSemanticEntities.slice(0, 6).map((entity) => (
-              <article className="business-semantic-card" key={entity.id}>
-                <strong>{entity.label}</strong>
-                <span>{entity.confidence} confidence</span>
-                <p>{entity.supportingMetadataSignals[0]?.description || "Detected from the data profile."}</p>
-              </article>
-            ))}
-          </div>
-          {detectedNumericFields.length > 0 && (
-            <div className="business-kpi-list">
-              <span>Possible measures</span>
-              {detectedNumericFields.slice(0, 5).map((field) => (
-                <small key={field.name}>{field.name}</small>
-              ))}
-            </div>
-          )}
-        </section>
-        )}
-        {!businessSemanticReport && (
-          <p className="compact-empty">No dataset context is available for this dataset yet.</p>
-        )}
-        </DrillInDetailPanel>
-      )}
-
-      {dataset && activeFocusedWorkflow === "kpiIntelligence" && (
-        <DrillInDetailPanel
-          eyebrow="Dataset detail"
-          title="Possible measures"
-          summary={measureReviewSummary}
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        <section className="kpi-intelligence-panel" aria-label="Possible measures">
-          <div className="summary-header">
-            <div>
-              <p className="section-label">Possible measures</p>
-              <h2>Measure fields found in the data</h2>
-              <p>{measureReviewSummary}</p>
-            </div>
-            <span className="dataset-count-pill">{detectedNumericFields.length}</span>
-          </div>
-          <div className="kpi-opportunity-list">
-            {detectedNumericFields.slice(0, 4).map((field) => (
-              <article className="kpi-opportunity-card" key={field.name}>
-                <strong>{field.name}</strong>
-                <p>This field may support measurement, ranking, or numeric summaries.</p>
-                <div>
-                  <small>{field.inferredType}</small>
-                  <small>{field.confidence} confidence</small>
-                </div>
-              </article>
-            ))}
-          </div>
-          {detectedNumericFields.length === 0 && (
-            <p className="compact-empty">No measure fields are available for this dataset yet.</p>
-          )}
-        </section>
         </DrillInDetailPanel>
       )}
 
