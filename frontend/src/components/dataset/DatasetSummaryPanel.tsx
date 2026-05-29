@@ -1,5 +1,6 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import { getPreview } from "../../services/api";
 import { useBusinessSemantics } from "../../features/businessSemantics";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { useWorkflowRecommendations } from "../../features/workflowRecommendations";
@@ -527,6 +528,9 @@ function DatasetPreviewPage({
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(
     initialWorksheetId || worksheets[0]?.worksheetId || null,
   );
+  const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
+  const [previewStatus, setPreviewStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const selectedWorksheet = hasWorkbook
     ? worksheets.find((sheet) => sheet.worksheetId === selectedWorksheetId) || worksheets[0]
     : null;
@@ -535,12 +539,35 @@ function DatasetPreviewPage({
     : Array.isArray(dataset.schema)
       ? dataset.schema
       : [];
-  const sampleRowCount = previewColumns.reduce(
-    (count, column) =>
-      Math.max(count, Array.isArray(column.sample_values) ? column.sample_values.length : 0),
-    0,
-  );
-  const visibleRowCount = Math.min(sampleRowCount, 25);
+  const visibleRowCount = previewRows.length;
+
+  useEffect(() => {
+    let cancelled = false;
+    setPreviewStatus("loading");
+    setPreviewError(null);
+
+    getPreview(dataset.dataset_id, { limit: 25, page: 1 })
+      .then((response) => {
+        if (cancelled) return;
+        const responseRows = Array.isArray(response?.rows) ? response.rows : [];
+        setPreviewRows(responseRows as Record<string, unknown>[]);
+        setPreviewStatus("success");
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setPreviewRows([]);
+        setPreviewError(
+          error instanceof Error && error.message
+            ? error.message
+            : "Preview unavailable. Try Refresh.",
+        );
+        setPreviewStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dataset.dataset_id]);
   const previewLabel = selectedWorksheet
     ? selectedWorksheet.displayName || selectedWorksheet.sheetName
     : dataset.original_filename;
@@ -620,8 +647,14 @@ function DatasetPreviewPage({
       )}
 
       <div className="dataset-preview-table-wrap">
-        {previewColumns.length === 0 || visibleRowCount === 0 ? (
-          <p className="compact-empty">No sample data is available for this worksheet.</p>
+        {previewColumns.length === 0 ? (
+          <p className="compact-empty">No columns are available for this worksheet.</p>
+        ) : previewStatus === "loading" ? (
+          <p className="compact-empty">Loading preview rows...</p>
+        ) : previewStatus === "error" ? (
+          <p className="compact-empty">{previewError || "Preview unavailable. Try Refresh."}</p>
+        ) : visibleRowCount === 0 ? (
+          <p className="compact-empty">No rows to preview.</p>
         ) : (
           <table
             className={["dataset-preview-table", isWrapped ? "is-wrapped" : ""]
@@ -654,15 +687,11 @@ function DatasetPreviewPage({
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: visibleRowCount }).map((_, rowIndex) => (
+              {previewRows.map((row, rowIndex) => (
                 <tr key={rowIndex}>
                   <td className="dataset-preview-rownum">{rowIndex + 1}</td>
                   {previewColumns.map((column) => {
-                    const cellText = formatCell(
-                      Array.isArray(column.sample_values)
-                        ? column.sample_values[rowIndex]
-                        : undefined,
-                    );
+                    const cellText = formatCell(row[column.name]);
                     return (
                       <td key={column.name} title={cellText}>
                         <span className="dataset-preview-cell">{cellText}</span>
