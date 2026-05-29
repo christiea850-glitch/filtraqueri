@@ -43,7 +43,6 @@ import {
   InvestigationThread,
   InvestigationThreadStage,
   MetadataFooter,
-  OperationalList,
   OperationalTag,
   OperationalWorkspaceLayout,
   WorkspaceHeader,
@@ -79,10 +78,8 @@ type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence
 type DataWorkflowMenu = "intelligence" | "semantic";
 type DataFocusedWorkflow =
   | "dataIntelligence"
-  | "guidedAnalyticsTasks"
   | "businessSemantics"
-  | "kpiIntelligence"
-  | "humanGuidance";
+  | "kpiIntelligence";
 type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
 type DataWorkspaceCommandTarget =
   | "preview"
@@ -831,47 +828,6 @@ function DatasetSummaryPanel({
     tone: HumanSignalTone;
     icon: HumanSignalIcon;
   }>;
-  const investigationNextSteps = [
-    dataProfile?.dateTimeFields.length
-      ? {
-          label: "Review change over time",
-          detail: "Look for shifts, seasonality, or timing effects.",
-          icon: "trend" as HumanSignalIcon,
-        }
-      : null,
-    dataProfile?.possibleMetrics.length
-      ? {
-          label: "Review the key measure",
-          detail: "Review the strongest measurable field in the dataset.",
-          icon: "opportunity" as HumanSignalIcon,
-        }
-      : null,
-    businessEntityHints.length
-      ? {
-          label: "Review entity fields",
-          detail: "Review the record groups or segments detected in the fields.",
-          icon: "entity" as HumanSignalIcon,
-        }
-      : null,
-    (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
-      ? {
-          label: "Review connected sources",
-          detail: "See how multiple sheets may describe related records.",
-          icon: "connected" as HumanSignalIcon,
-        }
-      : null,
-    dataProfile?.possibleDimensions.length
-      ? {
-          label: "Compare segments",
-          detail: "Review categories, regions, or segments detected in the data.",
-          icon: "comparison" as HumanSignalIcon,
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    label: string;
-    detail: string;
-    icon: HumanSignalIcon;
-  }>;
   const selectedEvidence =
     businessSignals.find((signal) => signal.title === selectedEvidenceTitle) ||
     businessSignals[0] ||
@@ -967,7 +923,7 @@ function DatasetSummaryPanel({
     setActiveWorkflowMenu(null);
     setActiveFocusedWorkflow(workflow);
     setActiveDrillInView(
-      workflow === "dataIntelligence" || workflow === "guidedAnalyticsTasks"
+      workflow === "dataIntelligence"
         ? "dataIntelligence"
         : "businessSemantics",
     );
@@ -984,20 +940,6 @@ function DatasetSummaryPanel({
     setActiveOperationalWorkspace(null);
     setActiveDrillInView("overview");
   };
-  const getWorkspaceForStep = (step: (typeof investigationNextSteps)[number]) => {
-    if (step.icon === "trend") return "trends";
-    if (step.icon === "connected") return "connections";
-    if (step.icon === "entity" || step.icon === "comparison") return "entities";
-    return "kpis";
-  };
-  const selectedEvidenceWorkspace: FocusedOperationalWorkspace =
-    selectedEvidence?.icon === "timeline"
-      ? "trends"
-      : selectedEvidence?.icon === "connected"
-        ? "connections"
-        : selectedEvidence?.icon === "entity" || selectedEvidence?.icon === "comparison"
-          ? "entities"
-          : "kpis";
 
   useEffect(() => {
     return subscribeControlledHashDetailRoute(datasetIntelligenceDetailRouteId, (event) => {
@@ -1032,11 +974,7 @@ function DatasetSummaryPanel({
       }
 
       if (target === "connections") {
-        setIsDatasetPreviewOpen(false);
-        setIsDatasetIntelligenceDetailOpen(false);
-        setActiveFocusedWorkflow(null);
-        setActiveOperationalWorkspace("connections");
-        setActiveDrillInView("overview");
+        openOperationalWorkspace("connections");
         return;
       }
 
@@ -1285,23 +1223,6 @@ function DatasetSummaryPanel({
                   ))}
                 </EvidenceRows>
 
-                <InlineDisclosure summary="Suggested next steps">
-                  <OperationalList>
-                    {investigationNextSteps.slice(0, 3).map((step, index) => (
-                      <button
-                        type="button"
-                        key={step.label}
-                        className={index === 0 ? "is-recommended" : undefined}
-                        onClick={() => {
-                          openOperationalWorkspace(getWorkspaceForStep(step));
-                        }}
-                      >
-                        {step.label}
-                      </button>
-                    ))}
-                  </OperationalList>
-                </InlineDisclosure>
-
                 <MetadataFooter>
                   <span>
                     Rows
@@ -1334,11 +1255,6 @@ function DatasetSummaryPanel({
                       ? "This signal helps explain what the dataset appears to contain."
                       : "These signals summarize the dataset before deeper work begins."}
                   </p>
-                  <div className="context-rail-actions">
-                    <button type="button" onClick={() => openOperationalWorkspace(selectedEvidenceWorkspace)}>
-                      Review detail
-                    </button>
-                  </div>
                 </ContextRailSection>
                 <InlineDisclosure summary="Advanced context" className="context-disclosure">
                   <p>
@@ -1399,10 +1315,6 @@ function DatasetSummaryPanel({
                         <strong>What the data suggests</strong>
                         <span>Review dataset signals and useful fields.</span>
                       </button>
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("guidedAnalyticsTasks")}>
-                        <strong>Dataset readiness</strong>
-                        <span>See how this dataset can be used outside Data.</span>
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1440,10 +1352,6 @@ function DatasetSummaryPanel({
                       <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("kpiIntelligence")}>
                         <strong>Possible measures</strong>
                         <span>Review measurable fields found in the data.</span>
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => openFocusedWorkflow("humanGuidance")}>
-                        <strong>Where to go next</strong>
-                        <span>See where question asking and SQL belong.</span>
                       </button>
                     </div>
                   )}
@@ -1683,45 +1591,6 @@ function DatasetSummaryPanel({
         </DrillInDetailPanel>
       )}
 
-      {dataset && activeFocusedWorkflow === "guidedAnalyticsTasks" && (
-        <DrillInDetailPanel
-          eyebrow="Data context"
-          title="Ready for investigation"
-          summary="This dataset context is available in Investigate or Analyst Mode."
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        <section className="human-guidance-panel" aria-label="Dataset investigation readiness">
-          <div>
-            <p className="section-label">Dataset context</p>
-            <h2>Ready for investigation</h2>
-            <p>
-              The dataset profile is available in Investigate for business questions, or in Analyst Mode for SQL.
-            </p>
-          </div>
-        </section>
-        </DrillInDetailPanel>
-      )}
-
-      {dataset && activeFocusedWorkflow === "humanGuidance" && (
-        <DrillInDetailPanel
-          eyebrow="Data context"
-          title="Ready for exploration"
-          summary="This dataset is ready for exploration. Use Investigate to ask business questions, or Analyst Mode for SQL."
-          onBack={closeDrillIn}
-          backLabel="Back to Data"
-        >
-        <section className="human-guidance-panel" aria-label="Human mode data guidance">
-          <div>
-            <p className="section-label">Data context</p>
-            <h2>Ready for exploration</h2>
-            <p>
-              This dataset is ready for exploration. Use Investigate to ask business questions, or Analyst Mode for SQL.
-            </p>
-          </div>
-        </section>
-        </DrillInDetailPanel>
-      )}
     </div>
   );
 }
