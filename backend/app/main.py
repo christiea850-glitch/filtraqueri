@@ -861,6 +861,116 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
             profile["min"] = minimum
             profile["max"] = maximum
 
+        # === Phase G1: additive distribution profile (failure-tolerant per branch) ===
+        if inferred_type == "numeric":
+            try:
+                stats_row = connection.execute(
+                    f"""
+                    SELECT MIN({identifier}), MAX({identifier}), AVG({identifier}),
+                           MEDIAN({identifier}), STDDEV({identifier})
+                    FROM {TABLE_NAME} WHERE {identifier} IS NOT NULL
+                    """
+                ).fetchone()
+                if stats_row and stats_row[0] is not None:
+                    profile["numeric_stats"] = {
+                        "min": float(stats_row[0]),
+                        "max": float(stats_row[1]),
+                        "mean": float(stats_row[2]) if stats_row[2] is not None else 0.0,
+                        "median": float(stats_row[3]) if stats_row[3] is not None else 0.0,
+                        "std": float(stats_row[4]) if stats_row[4] is not None else 0.0,
+                    }
+            except Exception:
+                pass
+
+            try:
+                if profile.get("min") is not None and profile.get("max") is not None:
+                    col_min = float(profile["min"])
+                    col_max = float(profile["max"])
+                    num_buckets = 10
+                    if col_min == col_max:
+                        single_count = connection.execute(
+                            f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE {identifier} IS NOT NULL"
+                        ).fetchone()[0]
+                        profile["histogram_buckets"] = [
+                            {"bucket_min": col_min, "bucket_max": col_max, "count": int(single_count)}
+                        ]
+                    else:
+                        bucket_width = (col_max - col_min) / num_buckets
+                        histogram_rows = connection.execute(
+                            f"""
+                            SELECT
+                                LEAST(CAST(FLOOR(({identifier} - ?) / ?) AS INTEGER), ?) AS bucket_idx,
+                                COUNT(*) AS bucket_count
+                            FROM {TABLE_NAME}
+                            WHERE {identifier} IS NOT NULL
+                            GROUP BY bucket_idx
+                            ORDER BY bucket_idx
+                            """,
+                            [col_min, bucket_width, num_buckets - 1],
+                        ).fetchall()
+                        buckets = []
+                        for bucket_idx, bucket_count in histogram_rows:
+                            idx = int(bucket_idx)
+                            b_min = col_min + idx * bucket_width
+                            b_max = col_min + (idx + 1) * bucket_width
+                            buckets.append({
+                                "bucket_min": float(b_min),
+                                "bucket_max": float(b_max),
+                                "count": int(bucket_count),
+                            })
+                        profile["histogram_buckets"] = buckets
+            except Exception:
+                pass
+
+        elif inferred_type == "date":
+            try:
+                if profile.get("min") is not None and profile.get("max") is not None:
+                    profile["date_range"] = {
+                        "min": str(profile["min"]),
+                        "max": str(profile["max"]),
+                    }
+            except Exception:
+                pass
+
+        elif inferred_type in ("categorical", "boolean"):
+            try:
+                top_rows = connection.execute(
+                    f"""
+                    SELECT {identifier} AS top_value, COUNT(*) AS cnt
+                    FROM {TABLE_NAME}
+                    WHERE {identifier} IS NOT NULL
+                    GROUP BY {identifier}
+                    ORDER BY cnt DESC, top_value ASC
+                    LIMIT 10
+                    """
+                ).fetchall()
+                profile["top_values"] = [
+                    {"value": str(value) if value is not None else "", "count": int(cnt)}
+                    for value, cnt in top_rows
+                ]
+            except Exception:
+                pass
+
+        elif inferred_type == "text":
+            try:
+                length_row = connection.execute(
+                    f"""
+                    SELECT MIN(LENGTH(CAST({identifier} AS VARCHAR))),
+                           MAX(LENGTH(CAST({identifier} AS VARCHAR))),
+                           AVG(LENGTH(CAST({identifier} AS VARCHAR)))
+                    FROM {TABLE_NAME} WHERE {identifier} IS NOT NULL
+                    """
+                ).fetchone()
+                if length_row and length_row[0] is not None:
+                    profile["text_length_stats"] = {
+                        "min_length": int(length_row[0]),
+                        "max_length": int(length_row[1]),
+                        "avg_length": float(length_row[2]) if length_row[2] is not None else 0.0,
+                    }
+            except Exception:
+                pass
+        # === end Phase G1 ===
+
         profiles.append(profile)
 
     return profiles

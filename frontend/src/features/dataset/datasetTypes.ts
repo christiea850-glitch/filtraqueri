@@ -5,6 +5,36 @@ import type { ResultState, ResultTabKey, SortDirection } from "../results/result
 import type { WorkspaceManifest } from "../workspace/workspaceManifestTypes";
 import type { WorkbookMetadata } from "../workbook";
 
+export type HistogramBucket = {
+  bucket_min: number;
+  bucket_max: number;
+  count: number;
+};
+
+export type NumericStats = {
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+  std: number;
+};
+
+export type TopValue = {
+  value: string;
+  count: number;
+};
+
+export type DateRange = {
+  min: string;
+  max: string;
+};
+
+export type TextLengthStats = {
+  min_length: number;
+  max_length: number;
+  avg_length: number;
+};
+
 export type SchemaColumn = {
   name: string;
   type: string;
@@ -14,6 +44,11 @@ export type SchemaColumn = {
   sample_values: unknown[];
   min?: number | string;
   max?: number | string;
+  histogram_buckets?: HistogramBucket[];
+  numeric_stats?: NumericStats;
+  top_values?: TopValue[];
+  date_range?: DateRange;
+  text_length_stats?: TextLengthStats;
 };
 
 export type DatasetMetadata = {

@@ -1,6 +1,7 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { getPreview } from "../../services/api";
+import ColumnDistributionCard from "./ColumnDistributionCard";
 import MissingValuesOverview from "./MissingValuesOverview";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
@@ -721,6 +722,7 @@ function DatasetSummaryPanel({
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
   const [selectedEvidenceTitle, setSelectedEvidenceTitle] = useState<string | null>(null);
+  const [expandedColumnName, setExpandedColumnName] = useState<string | null>(null);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -1331,19 +1333,40 @@ function DatasetSummaryPanel({
                 const displayProfile =
                   displayColumnProfiles.find((profile) => profile.sourceName === column.name) ||
                   null;
+                const isExpanded = expandedColumnName === column.name;
+                const handleToggle = () =>
+                  setExpandedColumnName((current) => (current === column.name ? null : column.name));
 
                 return (
-                <span key={column.name} title={displayProfile?.displayName !== column.name ? column.name : undefined}>
-                  <strong>{displayProfile?.displayName || column.name}</strong>
-                  <small>
-                    {displayProfile?.role
-                      ? getBusinessRoleLabel(displayProfile.role)
-                      : column.inferred_type || "unknown"}
-                  </small>
-                  {displayProfile && displayProfile.displayName !== column.name && (
-                    <em>Source: {column.name}</em>
-                  )}
-                </span>
+                  <div
+                    key={column.name}
+                    className={`detected-column-item${isExpanded ? " is-expanded" : ""}`}
+                  >
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={isExpanded}
+                      onClick={handleToggle}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleToggle();
+                        }
+                      }}
+                      title={displayProfile?.displayName !== column.name ? column.name : undefined}
+                    >
+                      <strong>{displayProfile?.displayName || column.name}</strong>
+                      <small>
+                        {displayProfile?.role
+                          ? getBusinessRoleLabel(displayProfile.role)
+                          : column.inferred_type || "unknown"}
+                      </small>
+                      {displayProfile && displayProfile.displayName !== column.name && (
+                        <em>Source: {column.name}</em>
+                      )}
+                    </span>
+                    {isExpanded && <ColumnDistributionCard column={column} />}
+                  </div>
                 );
               })}
             </div>

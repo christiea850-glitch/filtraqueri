@@ -7922,3 +7922,146 @@ body {
 .missing-values-disclosure[open] > summary {
   margin-bottom: 8px;
 }
+
+/* Phase G1: Per-column distribution cards (Fields drill-in) */
+.detected-column-list .detected-column-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.detected-column-list .detected-column-item > span[role="button"] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.detected-column-list .detected-column-item.is-expanded > span[role="button"] {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.detected-column-list .detected-column-item > span[role="button"]:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.detected-column-list .detected-column-item > span[role="button"]:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.55);
+  outline-offset: -2px;
+}
+
+.column-distribution-card {
+  padding: 12px 14px;
+  background: rgba(248, 250, 252, 0.7);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.column-distribution-fallback p {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.column-distribution-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.column-distribution-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.column-distribution-stat dt {
+  font-size: 11px;
+  color: rgba(15, 23, 42, 0.55);
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+.column-distribution-stat dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(15, 23, 42, 0.9);
+  font-variant-numeric: tabular-nums;
+}
+
+.column-distribution-histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 72px;
+  padding: 4px 0;
+  background: rgba(15, 23, 42, 0.03);
+  border-radius: 6px;
+}
+
+.column-distribution-bucket {
+  flex: 1;
+  min-width: 4px;
+  background: rgba(99, 102, 241, 0.55);
+  border-radius: 2px;
+  align-self: flex-end;
+  transition: height 180ms ease;
+}
+
+.column-distribution-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+.column-distribution-top-values {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.column-distribution-top-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+
+.column-distribution-top-value {
+  font-weight: 500;
+  color: rgba(15, 23, 42, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.column-distribution-top-count {
+  font-variant-numeric: tabular-nums;
+  color: rgba(15, 23, 42, 0.55);
+  white-space: nowrap;
+}
+
+.column-distribution-top-bar-track {
+  background: rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
+  height: 5px;
+  overflow: hidden;
+}
+
+.column-distribution-top-bar-fill {
+  height: 100%;
+  background: rgba(99, 102, 241, 0.55);
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
