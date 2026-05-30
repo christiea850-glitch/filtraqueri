@@ -1,6 +1,7 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { getPreview } from "../../services/api";
+import MissingValuesOverview from "./MissingValuesOverview";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
 import { DatasetIntelligenceDetailPage } from "../../features/detailPages";
@@ -1244,6 +1245,10 @@ function DatasetSummaryPanel({
             ) : showHeaderWarning ? (
               <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
             ) : null}
+            <MissingValuesOverview
+              schema={Array.isArray(dataset.schema) ? dataset.schema : []}
+              rowCount={dataset.row_count}
+            />
             <div className="data-tabs-row">
               <WorkspaceTabs
                 items={dataTabs}
