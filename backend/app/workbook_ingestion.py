@@ -222,10 +222,229 @@ def is_strong_field_name_row(row: list[Any]) -> bool:
     return field_count >= 2 and ratio(field_count, len(values)) >= 0.5 and ratio(datatype_count, len(values)) < 0.4
 
 
+KNOWN_BUSINESS_HEADER_TERMS = {
+    # Row identifiers / counts
+    "no", "number", "num", "id", "code", "ref", "reference", "line", "row", "entry",
+    # Shipment / logistics
+    "waybill", "consignor", "consignee", "shipper", "receiver", "tracking",
+    # Place / geography
+    "location", "address", "city", "country", "region", "branch", "site",
+    # Classification
+    "reason", "status", "type", "category", "group", "segment", "class",
+    # Notes
+    "notes", "note", "comments", "comment", "remarks", "description",
+    # Money / value
+    "amount", "total", "subtotal", "balance", "price", "cost", "value", "fee", "charge", "rate",
+    # Time
+    "date", "datetime", "day", "month", "year", "time", "period", "due",
+    # Person / entity
+    "customer", "client", "tenant", "buyer", "vendor", "supplier", "user", "member",
+    "name", "first", "last", "title",
+    # Documents
+    "invoice", "receipt", "voucher", "transaction", "order",
+    # Items
+    "product", "item", "sku", "part", "service",
+    # Quantities
+    "quantity", "qty", "count", "units",
+    # Contact
+    "email", "phone", "contact",
+    # Org
+    "company", "organization", "department", "team",
+    # State
+    "paid", "pending", "open", "closed", "active", "inactive",
+    # Measurement
+    "score", "rating", "rank",
+}
+
+HEADER_SCORE_MIN_THRESHOLD = 6
+
+
+def looks_like_numeric_value(value: str) -> bool:
+    if not value:
+        return False
+    compact = value.replace(",", "").replace(" ", "")
+    return bool(re.fullmatch(r"[-+]?\d+(\.\d+)?", compact))
+
+
+_MONTH_TOKENS = {
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+    "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec",
+}
+
+
+def looks_like_date_value(value: str) -> bool:
+    if not value:
+        return False
+    compact = value.replace(" ", "")
+    if re.fullmatch(r"\d{1,4}[./-]\d{1,2}[./-]\d{1,4}", compact):
+        return True
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}([t\s]\d{2}:\d{2}.*)?", compact):
+        return True
+    if re.fullmatch(r"q[1-4][-_ ]*(19|20)\d{2}", value):
+        return True
+    tokens = [token for token in re.split(r"[^a-z0-9]+", value) if token]
+    if not tokens:
+        return False
+    if any(token in _MONTH_TOKENS for token in tokens):
+        has_year = any(re.fullmatch(r"(19|20)\d{2}", token) for token in tokens)
+        has_day = any(re.fullmatch(r"\d{1,2}", token) for token in tokens)
+        if has_year or has_day:
+            return True
+    return False
+
+
+def is_all_caps_short_phrase_row(row: list[Any]) -> bool:
+    raw_strings: list[str] = []
+    for cell in row:
+        if cell in (None, ""):
+            continue
+        text = str(cell).strip()
+        if text:
+            raw_strings.append(text)
+    if not raw_strings or len(raw_strings) > 3:
+        return False
+    for text in raw_strings:
+        letters = [character for character in text if character.isalpha()]
+        if not letters:
+            return False
+        if not all(character.isupper() for character in letters):
+            return False
+    return True
+
+
+def numeric_or_date_dominance(values: list[str]) -> float:
+    if not values:
+        return 0.0
+    matched = sum(
+        1 for value in values
+        if looks_like_numeric_value(value) or looks_like_date_value(value)
+    )
+    return matched / len(values)
+
+
+def header_business_term_hits(value: str) -> int:
+    if not value:
+        return 0
+    normalized = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
+    tokens = [token for token in normalized.split("_") if token]
+    return sum(1 for token in tokens if token in KNOWN_BUSINESS_HEADER_TERMS)
+
+
+def count_row_repeats(
+    scan_rows: list[tuple[int, list[Any]]],
+    target_index: int,
+) -> int:
+    if not (0 <= target_index < len(scan_rows)):
+        return 0
+    _, target_row = scan_rows[target_index]
+    target_signature = tuple(non_empty_values(target_row))
+    if not target_signature:
+        return 0
+    repeats = 0
+    for index, (_, row) in enumerate(scan_rows):
+        if index == target_index:
+            continue
+        if tuple(non_empty_values(row)) == target_signature:
+            repeats += 1
+    return repeats
+
+
+def score_header_candidate(
+    row: list[Any],
+    next_row: list[Any] | None,
+    repeat_count: int,
+    max_data_row_width: int,
+) -> int:
+    values = non_empty_values(row)
+    cell_count = len(values)
+    if cell_count == 0:
+        return -100
+
+    score = 0
+
+    # +4 per non-empty cell, capped at +12
+    score += min(cell_count * 4, 12)
+
+    # +2 per text-like cell (non-numeric, non-date)
+    text_like = sum(
+        1 for value in values
+        if not looks_like_numeric_value(value) and not looks_like_date_value(value)
+    )
+    score += text_like * 2
+
+    # +3 per cell with a known business header term, capped at +15
+    business_hits = sum(1 for value in values if header_business_term_hits(value) > 0)
+    score += min(business_hits * 3, 15)
+
+    # +2 if the row below is more numeric/date-heavy and is data-shaped
+    if next_row is not None:
+        next_values = non_empty_values(next_row)
+        if next_values:
+            candidate_density = numeric_or_date_dominance(values)
+            next_density = numeric_or_date_dominance(next_values)
+            next_wide_enough = len(next_values) >= max(2, cell_count - 1)
+            if next_density > candidate_density and next_wide_enough:
+                score += 2
+
+    # -6 if sparse (< 3 cells) and a wider data row exists below
+    if cell_count < 3 and max_data_row_width >= 4:
+        score -= 6
+
+    # -5 if only populated cell is date-like
+    if cell_count == 1 and looks_like_date_value(values[0]):
+        score -= 5
+
+    # -4 if all-caps short banner phrase
+    if is_all_caps_short_phrase_row(row):
+        score -= 4
+
+    # -3 if the row content repeats elsewhere in the scan window (banner)
+    if repeat_count > 0:
+        score -= 3
+
+    return score
+
+
+def scored_header_row_scan(
+    non_empty_rows: list[tuple[int, list[Any]]],
+) -> tuple[int, int, int] | None:
+    scan_rows = non_empty_rows[:HEADER_SCAN_ROW_LIMIT]
+    if not scan_rows:
+        return None
+
+    max_data_row_width = 0
+    if len(scan_rows) >= 2:
+        max_data_row_width = max(
+            (len(non_empty_values(row)) for _, row in scan_rows[1:]),
+            default=0,
+        )
+
+    scores: list[int] = []
+    for index, (_, row) in enumerate(scan_rows):
+        next_row = scan_rows[index + 1][1] if index + 1 < len(scan_rows) else None
+        repeat_count = count_row_repeats(scan_rows, index)
+        scores.append(
+            score_header_candidate(row, next_row, repeat_count, max_data_row_width)
+        )
+
+    if not scores:
+        return None
+
+    winning_index = max(range(len(scores)), key=lambda i: scores[i])
+    winning_score = scores[winning_index]
+    runner_up_scores = [score for index, score in enumerate(scores) if index != winning_index]
+    runner_up_score = max(runner_up_scores) if runner_up_scores else 0
+
+    return winning_index, winning_score, runner_up_score
+
+
 def detect_header_row(
     non_empty_rows: list[tuple[int, list[Any]]],
 ) -> tuple[int, str, str | None, str | None]:
     scan_rows = non_empty_rows[:HEADER_SCAN_ROW_LIMIT]
+
+    # Priority 1: data-dictionary pattern (datatype row above field-name row) — unchanged.
     for index in range(len(scan_rows) - 1):
         _, current_row = scan_rows[index]
         _, next_row = scan_rows[index + 1]
@@ -236,6 +455,31 @@ def detect_header_row(
                 "high",
                 "Detected a datatype row above the header row; using the following row as worksheet headers.",
             )
+
+    # Priority 2: scored scan over the first HEADER_SCAN_ROW_LIMIT non-empty rows.
+    scan_result = scored_header_row_scan(non_empty_rows)
+    if scan_result is not None:
+        winning_index, winning_score, runner_up_score = scan_result
+        if winning_score >= HEADER_SCORE_MIN_THRESHOLD:
+            margin = winning_score - runner_up_score
+            if winning_score >= 10 and margin >= 6:
+                confidence = "high"
+                warning = None
+            elif winning_score >= 8 and margin >= 3:
+                confidence = "medium"
+                warning = (
+                    "Header row was auto-detected with medium confidence; "
+                    "review the column names before relying on analysis."
+                )
+            else:
+                confidence = "low"
+                warning = (
+                    "Header row could not be detected confidently; "
+                    "review the worksheet structure before relying on analysis."
+                )
+            return winning_index, "scored_header_scan", confidence, warning
+
+    # Priority 3: fall back to the first non-empty row (existing behaviour).
     return 0, "first_non_empty_row", None, None
 
 
