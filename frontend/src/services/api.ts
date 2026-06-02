@@ -174,6 +174,41 @@ export type CleaningRecipePreview = {
   message: string;
 };
 
+export type CleaningRecipeApplyResponse = {
+  status: "applied_to_working_copy" | "no_recipe_needed";
+  dataset_id: string;
+  worksheet_id: string;
+  worksheet_name: string;
+  cleaned_table_name: string | null;
+  before: {
+    row_count: number;
+    column_count: number;
+  };
+  after: {
+    row_count: number;
+    column_count: number;
+    columns: string[];
+  };
+  recipe_applied: {
+    type: string;
+    original_row_indexes?: number[];
+    original_column_indexes?: number[];
+    added_columns?: string[];
+    explanation: string;
+  }[];
+  excluded: {
+    repeated_headers: number;
+    section_banners: number;
+    date_title_rows: number;
+    layout_rows: number;
+    placeholder_rows: number;
+    side_note_columns: number;
+  };
+  preview_rows: Record<string, unknown>[];
+  preview_row_limit: number;
+  message: string;
+};
+
 async function parseError(response: Response, fallbackMessage: string) {
   try {
     const payload = await response.json();
@@ -300,6 +335,22 @@ export async function getCleaningRecipePreview(
       method: "GET",
     },
     "Cleaning recipe preview could not be loaded.",
+  );
+}
+
+export async function applyCleaningRecipe(
+  datasetId: string,
+  worksheetId: string,
+  rowLimitPreview = 25,
+) {
+  return requestJson<CleaningRecipeApplyResponse>(
+    `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/apply-cleaning-recipe`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ row_limit_preview: rowLimitPreview }),
+    },
+    "Cleaned working copy could not be created.",
   );
 }
 

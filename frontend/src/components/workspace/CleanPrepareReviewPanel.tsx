@@ -8,9 +8,18 @@ import {
   type WorksheetTemplateStructureEvidenceType,
 } from "../../features/workbook";
 import {
+  applyCleaningRecipe,
   getCleaningRecipePreview,
+  type CleaningRecipeApplyResponse,
   type CleaningRecipePreview,
 } from "../../services/api";
+
+type ApplyState =
+  | { status: "idle" }
+  | { status: "confirming" }
+  | { status: "applying" }
+  | { status: "success"; result: CleaningRecipeApplyResponse }
+  | { status: "error"; message: string };
 
 type CleanPrepareReviewPanelProps = {
   dataset: DatasetMetadata;
@@ -294,6 +303,9 @@ export function CleanPrepareReviewPanel({
     "idle",
   );
   const [recipeError, setRecipeError] = useState<string | null>(null);
+  const [applyStateByWorksheet, setApplyStateByWorksheet] = useState<
+    Record<string, ApplyState>
+  >({});
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
   const isPrioritized = review.priority !== "low";
   const workbook = useMemo(() => getWorkbookMetadata(dataset), [dataset]);
@@ -365,6 +377,59 @@ export function CleanPrepareReviewPanel({
     setRecipeStatus("loading");
     setRecipeError(null);
     setSelectedWorksheetId(worksheet.worksheetId);
+  };
+
+  // When the dataset changes (different upload), reset per-worksheet apply state.
+  // Worksheet IDs are dataset-scoped, so reusing the map between datasets would
+  // be incorrect; clearing here keeps the UI honest about which working copies
+  // exist for the dataset currently in view.
+  useEffect(() => {
+    setApplyStateByWorksheet({});
+  }, [dataset.dataset_id]);
+
+  const selectedWorksheetApplyState: ApplyState =
+    (selectedWorksheet && applyStateByWorksheet[selectedWorksheet.worksheetId]) || {
+      status: "idle",
+    };
+  const hasActionableRecipe =
+    recipePreview !== null &&
+    recipePreview.recipe.length > 0 &&
+    recipeStatus === "success" &&
+    selectedWorksheet?.status === "ready";
+
+  const updateApplyState = (worksheetId: string, next: ApplyState) => {
+    setApplyStateByWorksheet((current) => ({ ...current, [worksheetId]: next }));
+  };
+
+  const beginApplyConfirm = () => {
+    if (!selectedWorksheet || !hasActionableRecipe) return;
+    updateApplyState(selectedWorksheet.worksheetId, { status: "confirming" });
+  };
+
+  const cancelApplyConfirm = () => {
+    if (!selectedWorksheet) return;
+    updateApplyState(selectedWorksheet.worksheetId, { status: "idle" });
+  };
+
+  const confirmApply = async () => {
+    if (!selectedWorksheet || !hasActionableRecipe) return;
+    const worksheetId = selectedWorksheet.worksheetId;
+    updateApplyState(worksheetId, { status: "applying" });
+    try {
+      const result = await applyCleaningRecipe(dataset.dataset_id, worksheetId);
+      updateApplyState(worksheetId, { status: "success", result });
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Cleaned working copy could not be created.";
+      updateApplyState(worksheetId, { status: "error", message });
+    }
+  };
+
+  const retryApply = () => {
+    if (!selectedWorksheet) return;
+    updateApplyState(selectedWorksheet.worksheetId, { status: "confirming" });
   };
 
   const toggleReview = () => {
@@ -558,6 +623,132 @@ export function CleanPrepareReviewPanel({
                       No cleaned rows are available to preview for this worksheet.
                     </p>
                   )}
+
+                  {hasActionableRecipe && selectedWorksheet && (
+                    <div
+                      className={`clean-prepare-apply-area is-${selectedWorksheetApplyState.status}`}
+                      aria-live="polite"
+                    >
+                      {selectedWorksheetApplyState.status === "idle" && (
+                        <>
+                          <p className="clean-prepare-apply-helper">
+                            The original workbook will not be changed. A new cleaned table is created alongside the existing analysis table.
+                          </p>
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={beginApplyConfirm}
+                          >
+                            Create cleaned working copy
+                          </button>
+                        </>
+                      )}
+
+                      {selectedWorksheetApplyState.status === "confirming" && (
+                        <div className="clean-prepare-apply-confirm" role="group" aria-label="Confirm create cleaned working copy">
+                          <p>
+                            Create a cleaned working copy from this worksheet? The original workbook will remain unchanged.
+                          </p>
+                          <div className="clean-prepare-apply-confirm-actions">
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              onClick={cancelApplyConfirm}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="primary-button"
+                              onClick={confirmApply}
+                            >
+                              Create cleaned working copy
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedWorksheetApplyState.status === "applying" && (
+                        <p className="clean-prepare-apply-progress">
+                          Creating cleaned working copy…
+                        </p>
+                      )}
+
+                      {selectedWorksheetApplyState.status === "success" && (
+                        <div className="clean-prepare-apply-success" role="status">
+                          <strong>Cleaned working copy created. Original workbook unchanged.</strong>
+                          {selectedWorksheetApplyState.result.status === "no_recipe_needed" ? (
+                            <p>{selectedWorksheetApplyState.result.message}</p>
+                          ) : (
+                            <>
+                              <div className="clean-prepare-summary-grid">
+                                <div>
+                                  <span>Before</span>
+                                  <strong>
+                                    {selectedWorksheetApplyState.result.before.row_count.toLocaleString()} rows /{" "}
+                                    {selectedWorksheetApplyState.result.before.column_count.toLocaleString()} columns
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span>After cleanup</span>
+                                  <strong>
+                                    {selectedWorksheetApplyState.result.after.row_count.toLocaleString()} rows /{" "}
+                                    {selectedWorksheetApplyState.result.after.column_count.toLocaleString()} columns
+                                  </strong>
+                                </div>
+                              </div>
+                              {selectedWorksheetApplyState.result.cleaned_table_name && (
+                                <p className="clean-prepare-apply-table-name">
+                                  Cleaned table: <code>{selectedWorksheetApplyState.result.cleaned_table_name}</code>
+                                </p>
+                              )}
+                              <p className="clean-prepare-apply-activation-note">
+                                The active analysis table is unchanged. Activating the cleaned working copy will come in a later phase.
+                              </p>
+                              {selectedWorksheetApplyState.result.preview_rows.length > 0 && (
+                                <div className="clean-prepare-preview-table-wrap">
+                                  <table className="clean-prepare-preview-table">
+                                    <thead>
+                                      <tr>
+                                        <th>#</th>
+                                        {selectedWorksheetApplyState.result.after.columns.map((column) => (
+                                          <th key={column}>{column}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {selectedWorksheetApplyState.result.preview_rows.map((row, index) => (
+                                        <tr key={`applied:${index}`}>
+                                          <td>{index + 1}</td>
+                                          {selectedWorksheetApplyState.result.after.columns.map((column) => (
+                                            <td key={column}>{formatPreviewCell(row[column])}</td>
+                                          ))}
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {selectedWorksheetApplyState.status === "error" && (
+                        <div className="clean-prepare-apply-error" role="alert">
+                          <strong>Could not create cleaned working copy.</strong>
+                          <p>{selectedWorksheetApplyState.message}</p>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={retryApply}
+                          >
+                            Try again
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="clean-prepare-preview-state">
@@ -569,8 +760,22 @@ export function CleanPrepareReviewPanel({
 
           <section className="clean-prepare-draft-status">
             <h4>Draft recipe status</h4>
-            <strong>Preview only — no changes have been applied.</strong>
-            <p>Creating a cleaned working copy will come in a later phase.</p>
+            {selectedWorksheetApplyState.status === "success" &&
+            selectedWorksheetApplyState.result.status === "applied_to_working_copy" ? (
+              <>
+                <strong>
+                  Cleaned working copy created for {selectedWorksheetApplyState.result.worksheet_name}. Original workbook unchanged.
+                </strong>
+                <p>
+                  Other worksheets that have not been applied remain preview-only. Activation of cleaned working copies will come in a later phase.
+                </p>
+              </>
+            ) : (
+              <>
+                <strong>Preview only — no changes have been applied to this worksheet yet.</strong>
+                <p>Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original.</p>
+              </>
+            )}
           </section>
         </div>
       )}

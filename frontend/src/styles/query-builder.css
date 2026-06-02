@@ -233,6 +233,113 @@
   background: #fffbeb;
 }
 
+.clean-prepare-apply-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 12px;
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.clean-prepare-apply-area.is-success {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.clean-prepare-apply-area.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.clean-prepare-apply-area.is-applying {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.clean-prepare-apply-area.is-confirming {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.clean-prepare-apply-helper {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.clean-prepare-apply-confirm p {
+  margin: 0 0 10px 0;
+  color: #1f2937;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.clean-prepare-apply-confirm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.clean-prepare-apply-progress {
+  margin: 0;
+  color: #1d4ed8;
+  font-size: 13.5px;
+}
+
+.clean-prepare-apply-success {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clean-prepare-apply-success strong {
+  color: #047857;
+  font-size: 13.5px;
+}
+
+.clean-prepare-apply-table-name {
+  margin: 0;
+  color: #334155;
+  font-size: 12.5px;
+}
+
+.clean-prepare-apply-table-name code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #d1fae5;
+  color: #065f46;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.clean-prepare-apply-activation-note {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.clean-prepare-apply-error {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clean-prepare-apply-error strong {
+  color: #b91c1c;
+  font-size: 13.5px;
+}
+
+.clean-prepare-apply-error p {
+  margin: 0;
+  color: #7f1d1d;
+  font-size: 13px;
+}
+
 .clean-prepare-recipe-preview {
   min-width: 0;
   padding-top: 12px;
