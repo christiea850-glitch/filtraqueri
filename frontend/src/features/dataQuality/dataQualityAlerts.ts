@@ -1,8 +1,9 @@
-import type { DatasetMetadata, SchemaColumn } from "../dataset/datasetTypes";
+import type { DatasetMetadata } from "../dataset/datasetTypes";
 import {
-  getWorkbookMetadata,
-  hasSuspiciousWorkbookHeaders,
-  type WorksheetMetadata,
+  buildPreparationSignalReport,
+  type PreparationSignalReport,
+} from "../dataPreparation/preparationSignals";
+import {
   type WorksheetTemplateStructureEvidence,
 } from "../workbook";
 
@@ -40,10 +41,6 @@ export type DataQualityAlertSummary = {
   highestSeverity: DataQualityAlertSeverity | "neutral";
 };
 
-const HIGH_BLANK_THRESHOLD = 0.7;
-const REPEATED_PATTERN_MIN_COLUMNS = 3;
-const REPEATED_PATTERN_TOLERANCE = 0.01;
-
 const severityRank: Record<DataQualityAlertSeverity, number> = {
   critical: 3,
   warning: 2,
@@ -80,12 +77,12 @@ const evidenceLocation = (evidence: WorksheetTemplateStructureEvidence) => {
 };
 
 const worksheetEvidenceLabel = (
-  worksheet: WorksheetMetadata,
+  worksheetName: string,
   evidence: WorksheetTemplateStructureEvidence,
 ) => {
   const location = evidenceLocation(evidence);
   const label = evidence.label ? ` (${evidence.label})` : "";
-  return `${worksheet.displayName}: ${evidence.type.replace(/_/g, " ")}${location ? `, ${location}` : ""}${label}`;
+  return `${worksheetName}: ${evidence.type.replace(/_/g, " ")}${location ? `, ${location}` : ""}${label}`;
 };
 
 const getHighestSeverity = (alerts: DataQualityAlert[]) =>
@@ -97,38 +94,17 @@ const getHighestSeverity = (alerts: DataQualityAlert[]) =>
     return highest;
   }, "neutral");
 
-const hasRepeatedHighBlankPattern = (columns: SchemaColumn[], rowCount: number) => {
-  if (rowCount <= 0) return false;
-  const highBlankRates = columns
-    .map((column) => column.null_count / rowCount)
-    .filter((rate) => rate >= HIGH_BLANK_THRESHOLD);
-
-  return (
-    highBlankRates.length >= REPEATED_PATTERN_MIN_COLUMNS &&
-    Math.max(...highBlankRates) - Math.min(...highBlankRates) <= REPEATED_PATTERN_TOLERANCE
-  );
-};
-
 const createHeaderIntegrityAlert = (
-  dataset: DatasetMetadata,
-  worksheets: WorksheetMetadata[],
+  report: PreparationSignalReport,
 ): DataQualityAlert | null => {
-  const suspiciousHeaders = hasSuspiciousWorkbookHeaders(dataset);
-  const warningWorksheets = worksheets.filter(
-    (worksheet) =>
-      worksheet.normalization.headerDetectionWarning ||
-      worksheet.normalization.headerDetectionConfidence === "low",
-  );
-  const repeatedHeaderEvidence = worksheets.flatMap((worksheet) =>
-    worksheet.normalization.templateStructureEvidence
-      .filter((evidence) => evidence.type === "repeated_header")
-      .map((evidence) => worksheetEvidenceLabel(worksheet, evidence)),
-  );
-  const normalizedHeaderWorksheets = worksheets.filter(
-    (worksheet) =>
-      worksheet.normalization.duplicateColumnCount > 0 ||
-      worksheet.normalization.emptyColumnCount > 0,
-  );
+  const suspiciousHeaders = report.hasSuspiciousHeaders;
+  const warningWorksheets = report.headerWarningWorksheets;
+  const repeatedHeaderEvidence = report.templateEvidenceSignals
+    .filter(({ evidence }) => evidence.type === "repeated_header")
+    .map(({ worksheetName, evidence }) =>
+      worksheetEvidenceLabel(worksheetName, evidence),
+    );
+  const normalizedHeaderWorksheets = report.normalizedHeaderWorksheets;
 
   if (
     !suspiciousHeaders &&
@@ -174,32 +150,34 @@ const createHeaderIntegrityAlert = (
   };
 };
 
-const createTemplateLayoutAlert = (worksheets: WorksheetMetadata[]): DataQualityAlert | null => {
-  const candidateWorksheets = worksheets.filter(
-    (worksheet) => worksheet.normalization.templateStructureCandidate,
+const createTemplateLayoutAlert = (report: PreparationSignalReport): DataQualityAlert | null => {
+  const candidateWorksheets = report.templateCandidateWorksheets;
+  const evidenceWorksheetIds = new Set(
+    (candidateWorksheets.length > 0 ? candidateWorksheets : report.worksheets).map(
+      (worksheet) => worksheet.worksheetId,
+    ),
   );
-  const evidenceWorksheets = candidateWorksheets.length > 0 ? candidateWorksheets : worksheets;
-  const layoutEvidence = evidenceWorksheets.flatMap((worksheet) =>
-    worksheet.normalization.templateStructureEvidence
-      .filter(
-        (evidence) =>
-          evidence.type !== "repeated_header" && evidence.type !== "clean_table_counter_signal",
-      )
-      .map((evidence) => worksheetEvidenceLabel(worksheet, evidence)),
-  );
+  const layoutEvidence = report.templateEvidenceSignals
+    .filter(
+      ({ worksheetId, evidence }) =>
+        evidenceWorksheetIds.has(worksheetId) &&
+        evidence.type !== "repeated_header" &&
+        evidence.type !== "clean_table_counter_signal",
+    )
+    .map(({ worksheetName, evidence }) =>
+      worksheetEvidenceLabel(worksheetName, evidence),
+    );
 
   if (candidateWorksheets.length === 0 && layoutEvidence.length === 0) return null;
 
   const affectedWorksheets = unique([
     ...candidateWorksheets.map((worksheet) => worksheet.displayName),
-    ...worksheets
-      .filter((worksheet) =>
-        worksheet.normalization.templateStructureEvidence.some(
-          (evidence) =>
-            evidence.type !== "repeated_header" && evidence.type !== "clean_table_counter_signal",
-        ),
+    ...report.templateEvidenceSignals
+      .filter(
+        ({ evidence }) =>
+          evidence.type !== "repeated_header" && evidence.type !== "clean_table_counter_signal",
       )
-      .map((worksheet) => worksheet.displayName),
+      .map(({ worksheetName }) => worksheetName),
   ]);
 
   return {
@@ -218,16 +196,16 @@ const createTemplateLayoutAlert = (worksheets: WorksheetMetadata[]): DataQuality
   };
 };
 
-const createMissingValuesAlert = (dataset: DatasetMetadata): DataQualityAlert | null => {
-  const missingColumns = dataset.schema
-    .filter((column) => column.null_count > 0)
+const createMissingValuesAlert = (
+  dataset: DatasetMetadata,
+  report: PreparationSignalReport,
+): DataQualityAlert | null => {
+  const missingColumns = [...report.missingColumns]
     .sort((left, right) => right.null_count - left.null_count);
   if (missingColumns.length === 0) return null;
 
-  const repeatedPattern = hasRepeatedHighBlankPattern(missingColumns, dataset.row_count);
-  const hasHighBlankRate = missingColumns.some(
-    (column) => dataset.row_count > 0 && column.null_count / dataset.row_count >= HIGH_BLANK_THRESHOLD,
-  );
+  const repeatedPattern = report.hasRepeatedHighBlankPattern;
+  const hasHighBlankRate = report.hasHighBlankRate;
   const evidence = missingColumns.slice(0, 4).map((column) => {
     const percent = dataset.row_count > 0 ? (column.null_count / dataset.row_count) * 100 : 0;
     return `${column.name}: ${column.null_count.toLocaleString()} blank values (${percent.toFixed(1)}%).`;
@@ -249,15 +227,10 @@ const createMissingValuesAlert = (dataset: DatasetMetadata): DataQualityAlert | 
 };
 
 const createColumnQualityAlert = (
-  dataset: DatasetMetadata,
-  worksheets: WorksheetMetadata[],
+  report: PreparationSignalReport,
 ): DataQualityAlert | null => {
-  const generatedColumns = dataset.schema
-    .map((column) => column.name)
-    .filter((name) => /^column_\d+(?:_\d+)?$/i.test(name.trim()));
-  const structuralColumns = unique(
-    worksheets.flatMap((worksheet) => worksheet.normalization.structuralColumnCandidates),
-  );
+  const generatedColumns = report.generatedColumns;
+  const structuralColumns = report.structuralColumns;
 
   if (generatedColumns.length === 0 && structuralColumns.length === 0) return null;
 
@@ -281,8 +254,9 @@ const createColumnQualityAlert = (
   };
 };
 
-const createWorksheetStatusAlert = (worksheets: WorksheetMetadata[]): DataQualityAlert | null => {
-  const unavailableWorksheets = worksheets.filter((worksheet) => worksheet.status !== "ready");
+const createWorksheetStatusAlert = (report: PreparationSignalReport): DataQualityAlert | null => {
+  const worksheets = report.worksheets;
+  const unavailableWorksheets = report.unavailableWorksheets;
   if (unavailableWorksheets.length > 0) {
     const hasError = unavailableWorksheets.some((worksheet) => worksheet.status === "error");
     return {
@@ -326,13 +300,13 @@ export const buildDataQualityAlertSummary = (
     };
   }
 
-  const worksheets = getWorkbookMetadata(dataset)?.worksheets || [];
+  const report = buildPreparationSignalReport(dataset);
   const alerts = [
-    createHeaderIntegrityAlert(dataset, worksheets),
-    createTemplateLayoutAlert(worksheets),
-    createMissingValuesAlert(dataset),
-    createColumnQualityAlert(dataset, worksheets),
-    createWorksheetStatusAlert(worksheets),
+    createHeaderIntegrityAlert(report),
+    createTemplateLayoutAlert(report),
+    createMissingValuesAlert(dataset, report),
+    createColumnQualityAlert(report),
+    createWorksheetStatusAlert(report),
   ].filter((alert): alert is DataQualityAlert => Boolean(alert));
 
   return {

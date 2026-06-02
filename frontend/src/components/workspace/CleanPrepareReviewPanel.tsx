@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
+import { buildPreparationSignalReport } from "../../features/dataPreparation/preparationSignals";
 import {
-  getWorkbookMetadata,
-  type WorksheetMetadata,
   type WorksheetTemplateStructureEvidence,
   type WorksheetTemplateStructureEvidenceType,
 } from "../../features/workbook";
@@ -31,10 +30,6 @@ type PreparationReview = {
   issues: PreparationIssue[];
   suggestedFixes: SuggestedFix[];
 };
-
-const HIGH_BLANK_THRESHOLD = 0.7;
-const REPEATED_PATTERN_MIN_COLUMNS = 3;
-const REPEATED_PATTERN_TOLERANCE = 0.01;
 
 const columnIndexToLabel = (index: number) => {
   let remaining = index + 1;
@@ -167,50 +162,38 @@ const getSuggestedFix = (
   }
 };
 
-const buildEvidenceIssues = (worksheets: WorksheetMetadata[]) =>
-  worksheets.flatMap((worksheet) =>
-    worksheet.normalization.templateStructureEvidence.flatMap((evidence, index) => {
-      const copy = getEvidenceIssueCopy(evidence);
-      if (!copy) return [];
+const buildEvidenceIssues = (
+  templateEvidenceSignals: ReturnType<typeof buildPreparationSignalReport>["templateEvidenceSignals"],
+) =>
+  templateEvidenceSignals.flatMap((signal) => {
+    const { evidence } = signal;
+    const copy = getEvidenceIssueCopy(evidence);
+    if (!copy) return [];
 
-      const location = formatEvidenceLocation(evidence);
-      const label = evidence.label ? ` Label: ${evidence.label}.` : "";
+    const location = formatEvidenceLocation(evidence);
+    const label = evidence.label ? ` Label: ${evidence.label}.` : "";
 
-      return [
-        {
-          id: `${worksheet.worksheetId}:${evidence.type}:${index}`,
-          title: copy.title,
-          detail: `${worksheet.displayName}${location ? `, ${location}` : ""}: ${copy.detail}${label}`,
-        },
-      ];
-    }),
-  );
+    return [
+      {
+        id: signal.id,
+        title: copy.title,
+        detail: `${signal.worksheetName}${location ? `, ${location}` : ""}: ${copy.detail}${label}`,
+      },
+    ];
+  });
 
 const buildPreparationReview = (dataset: DatasetMetadata): PreparationReview => {
-  const workbook = getWorkbookMetadata(dataset);
-  const worksheets = workbook?.worksheets || [];
-  const evidence = worksheets.flatMap(
-    (worksheet) => worksheet.normalization.templateStructureEvidence,
-  );
-  const issues = buildEvidenceIssues(worksheets);
+  const report = buildPreparationSignalReport(dataset);
+  const issues = buildEvidenceIssues(report.templateEvidenceSignals);
   const suggestedFixes = new Map<string, SuggestedFix>();
 
-  evidence.forEach((item) => {
-    const fix = getSuggestedFix(item.type);
+  report.templateEvidenceSignals.forEach(({ evidence }) => {
+    const fix = getSuggestedFix(evidence.type);
     if (fix) suggestedFixes.set(fix.id, fix);
   });
 
-  const missingColumns = dataset.schema.filter((column) => column.null_count > 0);
-  const highBlankColumns = dataset.schema.filter(
-    (column) => dataset.row_count > 0 && column.null_count / dataset.row_count >= HIGH_BLANK_THRESHOLD,
-  );
-  const highBlankRates = highBlankColumns.map((column) => column.null_count / dataset.row_count);
-  const hasRepeatedHighBlankPattern =
-    highBlankRates.length >= REPEATED_PATTERN_MIN_COLUMNS &&
-    Math.max(...highBlankRates) - Math.min(...highBlankRates) <= REPEATED_PATTERN_TOLERANCE;
-  const generatedColumns = dataset.schema.filter((column) =>
-    /^column_\d+(?:_\d+)?$/i.test(column.name.trim()),
-  );
+  const { missingColumns, highBlankColumns, generatedColumns, hasRepeatedHighBlankPattern } =
+    report;
 
   if (missingColumns.length > 0) {
     issues.push({
@@ -237,7 +220,7 @@ const buildPreparationReview = (dataset: DatasetMetadata): PreparationReview => 
     issues.push({
       id: "dataset:generated-columns",
       title: "Generated column names detected",
-      detail: `${generatedColumns.length} field${generatedColumns.length === 1 ? "" : "s"} still use names such as ${generatedColumns[0].name}.`,
+      detail: `${generatedColumns.length} field${generatedColumns.length === 1 ? "" : "s"} still use names such as ${generatedColumns[0]}.`,
     });
     suggestedFixes.set("dataset:generated-columns", {
       id: "dataset:generated-columns",
@@ -246,11 +229,9 @@ const buildPreparationReview = (dataset: DatasetMetadata): PreparationReview => 
     });
   }
 
-  const hasTemplateCandidate = worksheets.some(
-    (worksheet) => worksheet.normalization.templateStructureCandidate,
-  );
-  const hasActionableEvidence = evidence.some(
-    (item) => item.type !== "clean_table_counter_signal",
+  const hasTemplateCandidate = report.templateCandidateWorksheets.length > 0;
+  const hasActionableEvidence = report.templateEvidenceSignals.some(
+    ({ evidence }) => evidence.type !== "clean_table_counter_signal",
   );
   const priority: PreparationPriority =
     hasTemplateCandidate || hasRepeatedHighBlankPattern
