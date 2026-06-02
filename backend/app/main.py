@@ -23,6 +23,7 @@ from .workbook_contract_diagnostics import analyze_contract_diagnostics
 from .workbook_ingestion import ingest_workbook
 from .workbook_cleaning_apply import apply_cleaning_recipe_to_working_copy
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
+from .workbook_missing_value_apply import apply_missing_value_decisions_to_cleaned_copy
 from .workbook_original_layout import extract_original_workbook_layout
 
 
@@ -996,6 +997,17 @@ class WorkbookWorksheetSelectionRequest(BaseModel):
 class WorkbookCleaningApplyRequest(BaseModel):
     row_limit_preview: int = Field(25, ge=1, le=200)
     confirm_preview_version: str | None = None
+
+
+class WorkbookMissingValueColumnDecision(BaseModel):
+    column_name: str = Field(..., min_length=1)
+    strategy: str = Field(..., min_length=1)
+    custom_value: str | None = None
+
+
+class WorkbookMissingValueApplyRequest(BaseModel):
+    worksheet_strategy: str = Field(..., min_length=1)
+    column_decisions: list[WorkbookMissingValueColumnDecision] = Field(default_factory=list)
 
 
 class WorkbookRelationshipReviewRequest(BaseModel):
@@ -2051,6 +2063,111 @@ def apply_workbook_cleaning_recipe(
         dataset_sessions[dataset_id] = metadata
         persist_dataset_manifest_metadata(metadata)
 
+    return result
+
+
+@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/apply-missing-value-decisions")
+def apply_workbook_missing_value_decisions(
+    dataset_id: str,
+    worksheet_id: str,
+    request: WorkbookMissingValueApplyRequest,
+) -> dict[str, Any]:
+    """K7: apply confirmed missing-value decisions to one cleaned copy only."""
+    metadata = get_dataset_metadata(dataset_id)
+    duckdb_path_value = metadata.get("duckdb_path")
+    if not duckdb_path_value:
+        raise HTTPException(status_code=400, detail="Dataset has no session storage")
+
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    worksheet = next(
+        (
+            candidate
+            for candidate in workbook_metadata.get("worksheets", [])
+            if candidate.get("worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not worksheet:
+        raise HTTPException(status_code=404, detail="Worksheet was not found")
+    if worksheet.get("status") != "ready":
+        raise HTTPException(status_code=400, detail="Only ready worksheets can apply missing-value decisions")
+
+    active_analysis_source = workbook_metadata.get("active_analysis_source")
+    if (
+        isinstance(active_analysis_source, dict)
+        and active_analysis_source.get("type") == "cleaned_working_copy"
+        and active_analysis_source.get("worksheet_id") == worksheet_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Return to the original analysis table before updating this cleaned working copy",
+        )
+
+    cleaned_copy = next(
+        (
+            candidate
+            for candidate in workbook_metadata.get("cleaned_working_copies", [])
+            if isinstance(candidate, dict) and candidate.get("source_worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not cleaned_copy or not cleaned_copy.get("cleaned_table_name"):
+        raise HTTPException(
+            status_code=404,
+            detail="Create a cleaned working copy before applying missing-value decisions",
+        )
+
+    allowed_worksheet_strategies = {
+        "leave_unchanged",
+        "layout_space",
+        "remove_mostly_blank_rows",
+        "decide_per_column",
+    }
+    if request.worksheet_strategy not in allowed_worksheet_strategies:
+        raise HTTPException(status_code=400, detail="Unsupported worksheet missing-value strategy")
+
+    result = apply_missing_value_decisions_to_cleaned_copy(
+        duckdb_path=Path(str(duckdb_path_value)),
+        cleaned_table_name=str(cleaned_copy["cleaned_table_name"]),
+        worksheet_schema=worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else [],
+        worksheet_name=str(worksheet.get("display_name") or worksheet.get("sheet_name") or worksheet_id),
+        worksheet_strategy=request.worksheet_strategy,
+        column_decisions=[
+            {
+                "column_name": decision.column_name,
+                "strategy": decision.strategy,
+                "custom_value": decision.custom_value,
+            }
+            for decision in request.column_decisions
+        ],
+    )
+
+    applied_at = datetime.now(timezone.utc).isoformat()
+    cleaned_copy["missing_value_decisions"] = {
+        "worksheet_strategy": request.worksheet_strategy,
+        "column_decisions": [
+            {
+                "column_name": decision.column_name,
+                "strategy": decision.strategy,
+                "custom_value": decision.custom_value,
+            }
+            for decision in request.column_decisions
+        ],
+        "applied_at": applied_at,
+        "columns_changed": result["columns_changed"],
+        "rows_removed": result["rows_removed"],
+        "skipped_decisions": result["skipped_decisions"],
+    }
+    cleaned_copy_after = cleaned_copy.get("after")
+    if isinstance(cleaned_copy_after, dict):
+        cleaned_copy_after["row_count"] = result["row_count"]
+    workbook_metadata["updated_at"] = applied_at
+    metadata["workbook_metadata"] = workbook_metadata
+    dataset_sessions[dataset_id] = metadata
+    persist_dataset_manifest_metadata(metadata)
     return result
 
 

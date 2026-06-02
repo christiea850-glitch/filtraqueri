@@ -209,6 +209,38 @@ export type CleaningRecipeApplyResponse = {
   message: string;
 };
 
+export type MissingValueDecisionApplyRequest = {
+  worksheet_strategy: string;
+  column_decisions: {
+    column_name: string;
+    strategy: string;
+    custom_value?: string;
+  }[];
+};
+
+export type MissingValueDecisionApplyResponse = {
+  status: "applied_to_cleaned_working_copy";
+  worksheet_name: string;
+  cleaned_table_name: string;
+  decisions_applied: {
+    column_name?: string;
+    strategy: string;
+    rows_changed?: number;
+    scope?: string;
+    explanation: string;
+  }[];
+  columns_changed: string[];
+  rows_removed: number;
+  skipped_decisions: {
+    column_name: string;
+    strategy: string;
+    explanation: string;
+  }[];
+  row_count: number;
+  preview_rows: Record<string, unknown>[];
+  message: string;
+};
+
 async function parseError(response: Response, fallbackMessage: string) {
   try {
     const payload = await response.json();
@@ -351,6 +383,22 @@ export async function applyCleaningRecipe(
       body: JSON.stringify({ row_limit_preview: rowLimitPreview }),
     },
     "Cleaned working copy could not be created.",
+  );
+}
+
+export async function applyMissingValueDecisions(
+  datasetId: string,
+  worksheetId: string,
+  request: MissingValueDecisionApplyRequest,
+) {
+  return requestJson<MissingValueDecisionApplyResponse>(
+    `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/apply-missing-value-decisions`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    },
+    "Missing-value decisions could not be applied.",
   );
 }
 

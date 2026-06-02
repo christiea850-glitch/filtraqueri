@@ -329,6 +329,37 @@
   white-space: nowrap;
 }
 
+.clean-prepare-missing-apply-button {
+  justify-self: start;
+}
+
+.clean-prepare-missing-apply-summary {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  background: #ecfdf5;
+}
+
+.clean-prepare-missing-apply-summary > strong {
+  color: #047857;
+  font-size: 13px;
+}
+
+.clean-prepare-missing-apply-summary code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #d1fae5;
+  color: #065f46;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.clean-prepare-missing-apply-summary .secondary-button {
+  justify-self: start;
+}
+
 @media (max-width: 760px) {
   .clean-prepare-missing-column {
     grid-template-columns: 1fr;

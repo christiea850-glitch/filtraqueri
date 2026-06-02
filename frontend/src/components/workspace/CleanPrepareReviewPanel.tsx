@@ -21,9 +21,11 @@ import {
 } from "../../features/workbook";
 import {
   applyCleaningRecipe,
+  applyMissingValueDecisions,
   getCleaningRecipePreview,
   type CleaningRecipeApplyResponse,
   type CleaningRecipePreview,
+  type MissingValueDecisionApplyResponse,
 } from "../../services/api";
 
 type ApplyState =
@@ -36,6 +38,12 @@ type ApplyState =
 type ActivationState =
   | { status: "idle" }
   | { status: "switching"; worksheetId: string }
+  | { status: "error"; message: string };
+
+type MissingValueApplyState =
+  | { status: "idle" }
+  | { status: "applying" }
+  | { status: "success"; result: MissingValueDecisionApplyResponse }
   | { status: "error"; message: string };
 
 type CleanPrepareReviewPanelProps = {
@@ -358,6 +366,9 @@ export function CleanPrepareReviewPanel({
     Record<string, ApplyState>
   >({});
   const [activationState, setActivationState] = useState<ActivationState>({ status: "idle" });
+  const [missingValueApplyStateByWorksheet, setMissingValueApplyStateByWorksheet] = useState<
+    Record<string, MissingValueApplyState>
+  >({});
   const [missingValueDecisions, setMissingValueDecisions] = useState(readMissingValueDecisions);
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
   const issueGroups = useMemo(
@@ -421,6 +432,8 @@ export function CleanPrepareReviewPanel({
       ? "Ready for cleanup plan"
       : "Decision needed";
   const worstBlankColumns = missingValueColumns.slice(0, 3);
+  const selectedMissingValueApplyState: MissingValueApplyState =
+    missingValueApplyStateByWorksheet[decisionWorksheetId] || { status: "idle" };
   const previewWorksheetId = selectedWorksheet?.worksheetId;
   const previewWorksheetStatus = selectedWorksheet?.status;
   const excludedEntries = recipePreview
@@ -586,6 +599,65 @@ export function CleanPrepareReviewPanel({
       writeMissingValueDecisions(next);
       return next;
     });
+  };
+
+  const applyMissingValueDecisionDraft = async () => {
+    if (
+      !selectedWorksheet ||
+      !worksheetDecision ||
+      !missingValueDecisionReady ||
+      !hasCleanedWorkingCopy ||
+      isUsingCleanedCopy
+    ) {
+      return;
+    }
+    const shouldApply = window.confirm(
+      "Apply missing-value decisions to cleaned working copy? Original workbook will remain unchanged.",
+    );
+    if (!shouldApply) return;
+
+    const worksheetId = selectedWorksheet.worksheetId;
+    setMissingValueApplyStateByWorksheet((current) => ({
+      ...current,
+      [worksheetId]: { status: "applying" },
+    }));
+    try {
+      const columnDecisions =
+        worksheetDecision.strategy === "decide_per_column"
+          ? missingValueColumns.flatMap((column) => {
+              const decision =
+                missingValueDecisions[
+                  createMissingValueDecisionKey(dataset.dataset_id, worksheetId, column.name)
+                ];
+              return decision
+                ? [{
+                    column_name: column.name,
+                    strategy: decision.strategy,
+                    custom_value: decision.customValue,
+                  }]
+                : [];
+            })
+          : [];
+      const result = await applyMissingValueDecisions(dataset.dataset_id, worksheetId, {
+        worksheet_strategy: worksheetDecision.strategy,
+        column_decisions: columnDecisions,
+      });
+      setMissingValueApplyStateByWorksheet((current) => ({
+        ...current,
+        [worksheetId]: { status: "success", result },
+      }));
+    } catch (error) {
+      setMissingValueApplyStateByWorksheet((current) => ({
+        ...current,
+        [worksheetId]: {
+          status: "error",
+          message:
+            error instanceof Error && error.message
+              ? error.message
+              : "Missing-value decisions could not be applied.",
+        },
+      }));
+    }
   };
 
   const beginApplyConfirm = () => {
@@ -906,6 +978,96 @@ export function CleanPrepareReviewPanel({
                 Draft decision only. Decision saved for a future cleanup plan; no values have been
                 changed.
               </p>
+
+              {missingValueDecisionReady && hasCleanedWorkingCopy && !isUsingCleanedCopy && (
+                <button
+                  type="button"
+                  className="primary-button clean-prepare-missing-apply-button"
+                  onClick={applyMissingValueDecisionDraft}
+                  disabled={selectedMissingValueApplyState.status === "applying"}
+                >
+                  {selectedMissingValueApplyState.status === "applying"
+                    ? "Applying missing-value decisions..."
+                    : "Apply missing-value decisions"}
+                </button>
+              )}
+
+              {missingValueDecisionReady && isUsingCleanedCopy && (
+                <p className="clean-prepare-missing-warning">
+                  Return to the original analysis table before updating this cleaned working copy.
+                </p>
+              )}
+
+              {selectedMissingValueApplyState.status === "error" && (
+                <p className="clean-prepare-preview-state is-error">
+                  {selectedMissingValueApplyState.message}
+                </p>
+              )}
+
+              {selectedMissingValueApplyState.status === "success" && (
+                <div className="clean-prepare-missing-apply-summary" role="status">
+                  <strong>Missing-value decisions applied to cleaned working copy.</strong>
+                  <p>{selectedMissingValueApplyState.result.worksheet_name}</p>
+                  <div className="clean-prepare-missing-summary">
+                    <span>Cleaned working copy updated</span>
+                    <span>{pluralise(selectedMissingValueApplyState.result.decisions_applied.length, "decision")} applied</span>
+                    <span>{pluralise(selectedMissingValueApplyState.result.columns_changed.length, "column")} changed</span>
+                    <span>{selectedMissingValueApplyState.result.rows_removed.toLocaleString()} rows removed</span>
+                    <span>{pluralise(selectedMissingValueApplyState.result.skipped_decisions.length, "decision")} skipped</span>
+                  </div>
+                  <p>
+                    Cleaned table: <code>{selectedMissingValueApplyState.result.cleaned_table_name}</code>
+                  </p>
+                  <p>
+                    Columns changed:{" "}
+                    {selectedMissingValueApplyState.result.columns_changed.length > 0
+                      ? selectedMissingValueApplyState.result.columns_changed.join(", ")
+                      : "None"}
+                  </p>
+                  {selectedMissingValueApplyState.result.decisions_applied.length > 0 && (
+                    <details className="clean-prepare-disclosure">
+                      <summary>
+                        <strong>Applied decisions</strong>
+                        <span>{selectedMissingValueApplyState.result.decisions_applied.length.toLocaleString()}</span>
+                      </summary>
+                      <ul>
+                        {selectedMissingValueApplyState.result.decisions_applied.map((decision, index) => (
+                          <li key={`${decision.column_name || decision.scope || "worksheet"}:${decision.strategy}:${index}`}>
+                            <strong>{decision.column_name || "Worksheet decision"}</strong>
+                            <span>{decision.strategy.replace(/_/g, " ")}. {decision.explanation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {selectedMissingValueApplyState.result.skipped_decisions.length > 0 && (
+                    <details className="clean-prepare-disclosure">
+                      <summary>
+                        <strong>Skipped decisions</strong>
+                        <span>{selectedMissingValueApplyState.result.skipped_decisions.length.toLocaleString()}</span>
+                      </summary>
+                      <ul>
+                        {selectedMissingValueApplyState.result.skipped_decisions.map((decision) => (
+                          <li key={`${decision.column_name}:${decision.strategy}`}>
+                            <strong>{decision.column_name || "Worksheet decision"}</strong>
+                            <span>{decision.explanation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  <p>Original workbook unchanged. Activation remains a separate user choice.</p>
+                  {onPreviewDataset && selectedWorksheet && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={previewDataset}
+                    >
+                      Preview dataset
+                    </button>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
