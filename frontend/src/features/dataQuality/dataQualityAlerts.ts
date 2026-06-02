@@ -15,7 +15,12 @@ export type DataQualityAlertFamily =
 
 export type DataQualityAlertSeverity = "critical" | "warning" | "info";
 
-export type DataQualityAlertAction = "data" | "preview" | "clean-prepare";
+export type DataQualityAlertAction =
+  | "data-overview"
+  | "data-missing-values"
+  | "data-columns"
+  | "preview"
+  | "clean-prepare";
 
 export type DataQualityAlert = {
   id: DataQualityAlertFamily;
@@ -238,8 +243,8 @@ const createMissingValuesAlert = (dataset: DatasetMetadata): DataQualityAlert | 
       : "Blank values can affect comparisons and summaries if their meaning is unclear.",
     evidence,
     affectedSummary: pluralize(missingColumns.length, "column"),
-    action: "data",
-    actionLabel: "Review in Data",
+    action: "data-missing-values",
+    actionLabel: "Review missing values",
   };
 };
 
@@ -271,8 +276,8 @@ const createColumnQualityAlert = (
         : []),
     ]),
     affectedSummary: pluralize(unique([...generatedColumns, ...structuralColumns]).length, "column"),
-    action: "data",
-    actionLabel: "Review in Data",
+    action: "data-columns",
+    actionLabel: "Review fields in Data",
   };
 };
 
@@ -290,8 +295,8 @@ const createWorksheetStatusAlert = (worksheets: WorksheetMetadata[]): DataQualit
         .slice(0, 4)
         .map((worksheet) => `${worksheet.displayName}: ${worksheet.status}.`),
       affectedSummary: pluralize(unavailableWorksheets.length, "worksheet"),
-      action: "data",
-      actionLabel: "Review in Data",
+      action: "data-overview",
+      actionLabel: "Open Data overview",
     };
   }
 
@@ -305,8 +310,8 @@ const createWorksheetStatusAlert = (worksheets: WorksheetMetadata[]): DataQualit
     whyItMatters: "Review worksheet scope before assuming the active table represents the full workbook.",
     evidence: [`Available worksheets: ${formatList(worksheets.map((worksheet) => worksheet.displayName))}.`],
     affectedSummary: pluralize(worksheets.length, "worksheet"),
-    action: "data",
-    actionLabel: "Review in Data",
+    action: "data-overview",
+    actionLabel: "Open Data overview",
   };
 };
 

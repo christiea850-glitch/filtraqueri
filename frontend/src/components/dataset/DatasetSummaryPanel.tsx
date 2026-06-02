@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import { getPreview } from "../../services/api";
 import ColumnDistributionCard from "./ColumnDistributionCard";
@@ -82,6 +82,9 @@ type DataFocusedWorkflow =
   | "kpiIntelligence";
 type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
 type DataWorkspaceCommandTarget =
+  | "overview"
+  | "missingValues"
+  | "columns"
   | "preview"
   | "worksheetPreview"
   | "connections"
@@ -723,6 +726,9 @@ function DatasetSummaryPanel({
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
   const [selectedEvidenceTitle, setSelectedEvidenceTitle] = useState<string | null>(null);
   const [expandedColumnName, setExpandedColumnName] = useState<string | null>(null);
+  const dataOverviewRef = useRef<HTMLElement | null>(null);
+  const missingValuesRef = useRef<HTMLDivElement | null>(null);
+  const detectedColumnsRef = useRef<HTMLElement | null>(null);
   const createSchemaTypeSummary = (metadata: DatasetMetadata) =>
     (Array.isArray(metadata.schema) ? metadata.schema : []).reduce<Record<string, number>>((summary, column) => {
       const type = column.inferred_type || "unknown";
@@ -932,6 +938,18 @@ function DatasetSummaryPanel({
     setActiveOperationalWorkspace(null);
     setActiveDrillInView("overview");
   };
+  const focusDataTarget = (target: "overview" | "missingValues" | "columns") => {
+    window.setTimeout(() => {
+      const element =
+        target === "columns"
+          ? detectedColumnsRef.current
+          : target === "missingValues"
+            ? missingValuesRef.current || dataOverviewRef.current
+            : dataOverviewRef.current;
+      element?.scrollIntoView({ behavior: "smooth", block: "start" });
+      element?.focus({ preventScroll: true });
+    }, 0);
+  };
 
   useEffect(() => {
     return subscribeControlledHashDetailRoute(datasetIntelligenceDetailRouteId, (event) => {
@@ -962,6 +980,16 @@ function DatasetSummaryPanel({
       if (target === "preview" || target === "worksheetPreview") {
         setActiveFocusedWorkflow(null);
         setIsDatasetPreviewOpen(true);
+        return;
+      }
+
+      if (target === "overview" || target === "missingValues" || target === "columns") {
+        setIsDatasetPreviewOpen(false);
+        setIsDatasetIntelligenceDetailOpen(false);
+        setActiveOperationalWorkspace(null);
+        setActiveFocusedWorkflow(null);
+        setActiveDrillInView(target === "columns" ? "columns" : "overview");
+        focusDataTarget(target);
         return;
       }
 
@@ -1153,7 +1181,12 @@ function DatasetSummaryPanel({
   return (
     <div className="human-dataset-workspace">
       {!activeFocusedWorkflow && (
-      <section className="dataset-hub-panel" aria-label="Dataset management hub">
+      <section
+        ref={dataOverviewRef}
+        className="dataset-hub-panel"
+        aria-label="Dataset management hub"
+        tabIndex={-1}
+      >
         <div className="data-page-head">
           <div>
             <p className="section-label">Data</p>
@@ -1247,10 +1280,12 @@ function DatasetSummaryPanel({
             ) : showHeaderWarning ? (
               <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
             ) : null}
-            <MissingValuesOverview
-              schema={Array.isArray(dataset.schema) ? dataset.schema : []}
-              rowCount={dataset.row_count}
-            />
+            <div ref={missingValuesRef} tabIndex={-1}>
+              <MissingValuesOverview
+                schema={Array.isArray(dataset.schema) ? dataset.schema : []}
+                rowCount={dataset.row_count}
+              />
+            </div>
             <div className="data-tabs-row">
               <WorkspaceTabs
                 items={dataTabs}
@@ -1320,7 +1355,12 @@ function DatasetSummaryPanel({
           summary="Column details are shown here so the main Data page stays compact."
           onBack={closeDrillIn}
         >
-          <section className="detected-columns-section" aria-label="Detected columns">
+          <section
+            ref={detectedColumnsRef}
+            className="detected-columns-section"
+            aria-label="Detected columns"
+            tabIndex={-1}
+          >
             <div className="worksheet-selector-header">
               <div>
                 <p className="section-label">Detected columns</p>

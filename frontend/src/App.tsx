@@ -405,7 +405,13 @@ function App() {
       return;
     }
 
-    openDataCommand();
+    openDataCommand(
+      action === "data-missing-values"
+        ? "missingValues"
+        : action === "data-columns"
+          ? "columns"
+          : "overview",
+    );
   };
 
   const openAnalystCommand = (target: "editor" | "result" | "drafts" = "editor") => {

@@ -260,6 +260,7 @@ body {
   right: 16px;
   z-index: 45;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: min(420px, calc(100vw - 24px));
   max-height: min(680px, calc(100vh - 70px));
   overflow: hidden;
@@ -330,8 +331,11 @@ body {
 .data-quality-alert-list {
   display: grid;
   gap: 9px;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
+  scrollbar-gutter: stable;
 }
 
 .data-quality-alert-card {
