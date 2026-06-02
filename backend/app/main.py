@@ -982,11 +982,12 @@ def fetch_preview(
     page: int = 1,
     order_by: SortDefinition | None = None,
     valid_columns: set[str] | None = None,
+    table_name: str = TABLE_NAME,
 ) -> list[dict[str, Any]]:
     params: list[Any] = [limit, (page - 1) * limit]
     order_clause = build_order_clause(order_by, valid_columns or set())
     result = connection.execute(
-        f"SELECT * FROM {TABLE_NAME} {order_clause} LIMIT ? OFFSET ?",
+        f"SELECT * FROM {quote_identifier(table_name)} {order_clause} LIMIT ? OFFSET ?",
         params,
     )
     columns = [description[0] for description in result.description]
@@ -1512,6 +1513,7 @@ def get_dataset_preview(
     page: int = 1,
     sort_by: str | None = None,
     sort_direction: str = "ASC",
+    worksheet_id: str | None = None,
 ) -> dict[str, Any]:
     if limit < 1 or limit > MAX_QUERY_LIMIT:
         raise HTTPException(
@@ -1522,16 +1524,57 @@ def get_dataset_preview(
         raise HTTPException(status_code=400, detail="Page must be 1 or greater")
 
     metadata = get_dataset_metadata(dataset_id)
-    valid_columns = {column["name"] for column in metadata["schema"]}
+    table_name = TABLE_NAME
+    schema = metadata["schema"]
+    total_count = metadata["row_count"]
+    if worksheet_id:
+        workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+        if not workbook_metadata:
+            raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+        worksheet = next(
+            (
+                worksheet
+                for worksheet in workbook_metadata.get("worksheets", [])
+                if worksheet.get("worksheet_id") == worksheet_id
+            ),
+            None,
+        )
+        if not worksheet:
+            raise HTTPException(status_code=404, detail="Worksheet was not found")
+        if worksheet.get("status") != "ready":
+            raise HTTPException(status_code=400, detail="Only ready worksheets can be previewed")
+
+        table_name = worksheet.get("table_name")
+        if not table_name:
+            raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
+        schema = worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
+
+    valid_columns = {column["name"] for column in schema}
     order_by = SortDefinition(column=sort_by, direction=sort_direction) if sort_by else None
     with get_connection(dataset_id) as connection:
-        rows = fetch_preview(connection, limit, page, order_by, valid_columns)
+        if worksheet_id:
+            table_exists = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'main' AND table_name = ?
+                """,
+                [table_name],
+            ).fetchone()[0]
+            if not table_exists:
+                raise HTTPException(status_code=404, detail="Worksheet table is missing")
+            total_count = connection.execute(
+                f"SELECT COUNT(*) FROM {quote_identifier(table_name)}"
+            ).fetchone()[0]
+
+        rows = fetch_preview(connection, limit, page, order_by, valid_columns, table_name)
 
     return {
         "dataset_id": dataset_id,
         "rows": rows,
         "row_count": len(rows),
-        "total_count": metadata["row_count"],
+        "total_count": total_count,
         "limit": limit,
         "page": page,
     }

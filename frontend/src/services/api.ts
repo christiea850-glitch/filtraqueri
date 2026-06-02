@@ -140,13 +140,18 @@ export async function uploadDataset(file: File) {
   );
 }
 
-export async function getPreview(datasetId: string, options: PreviewOptions = {}) {
+type WorksheetPreviewOptions = PreviewOptions & {
+  worksheet_id?: string;
+};
+
+export async function getPreview(datasetId: string, options: WorksheetPreviewOptions = {}) {
   const params = new URLSearchParams();
 
   if (options.limit) params.set("limit", String(options.limit));
   if (options.page) params.set("page", String(options.page));
   if (options.sort_by) params.set("sort_by", options.sort_by);
   if (options.sort_direction) params.set("sort_direction", options.sort_direction);
+  if (options.worksheet_id) params.set("worksheet_id", options.worksheet_id);
 
   const queryString = params.toString();
 

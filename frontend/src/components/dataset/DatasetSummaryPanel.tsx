@@ -525,55 +525,77 @@ function DatasetPreviewPage({
   onBack: () => void;
 }) {
   const hasWorkbook = worksheets.length > 0;
+  const firstReadyWorksheet = worksheets.find((sheet) => sheet.status === "ready") || null;
+  const initialWorksheet = worksheets.find(
+    (sheet) => sheet.worksheetId === initialWorksheetId && sheet.status === "ready",
+  );
   const [isWrapped, setIsWrapped] = useState(false);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(
-    initialWorksheetId || worksheets[0]?.worksheetId || null,
+    initialWorksheet?.worksheetId || firstReadyWorksheet?.worksheetId || null,
   );
   const [previewRows, setPreviewRows] = useState<Record<string, unknown>[]>([]);
   const [previewStatus, setPreviewStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [previewError, setPreviewError] = useState<string | null>(null);
   const selectedWorksheet = hasWorkbook
-    ? worksheets.find((sheet) => sheet.worksheetId === selectedWorksheetId) || worksheets[0]
+    ? worksheets.find((sheet) => sheet.worksheetId === selectedWorksheetId) || firstReadyWorksheet
     : null;
   const previewColumns = selectedWorksheet
     ? selectedWorksheet.schema
     : Array.isArray(dataset.schema)
       ? dataset.schema
       : [];
+  const previewWorksheetId =
+    selectedWorksheet?.status === "ready" ? selectedWorksheet.worksheetId : undefined;
   const visibleRowCount = previewRows.length;
 
   useEffect(() => {
     let cancelled = false;
-    setPreviewStatus("loading");
-    setPreviewError(null);
+    if (hasWorkbook && !previewWorksheetId) return undefined;
 
-    getPreview(dataset.dataset_id, { limit: 25, page: 1 })
-      .then((response) => {
-        if (cancelled) return;
-        const responseRows = Array.isArray(response?.rows) ? response.rows : [];
-        setPreviewRows(responseRows as Record<string, unknown>[]);
-        setPreviewStatus("success");
+    const requestTimeout = window.setTimeout(() => {
+      setPreviewStatus("loading");
+      setPreviewError(null);
+
+      getPreview(dataset.dataset_id, {
+        limit: 25,
+        page: 1,
+        worksheet_id: previewWorksheetId,
       })
-      .catch((error) => {
-        if (cancelled) return;
-        setPreviewRows([]);
-        setPreviewError(
-          error instanceof Error && error.message
-            ? error.message
-            : "Preview unavailable. Try Refresh.",
-        );
-        setPreviewStatus("error");
-      });
+        .then((response) => {
+          if (cancelled) return;
+          const responseRows = Array.isArray(response?.rows) ? response.rows : [];
+          setPreviewRows(responseRows as Record<string, unknown>[]);
+          setPreviewStatus("success");
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setPreviewRows([]);
+          setPreviewError(
+            error instanceof Error && error.message
+              ? error.message
+              : "Preview unavailable. Try Refresh.",
+          );
+          setPreviewStatus("error");
+        });
+    }, 0);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(requestTimeout);
     };
-  }, [dataset.dataset_id]);
+  }, [dataset.dataset_id, hasWorkbook, previewWorksheetId]);
   const previewLabel = selectedWorksheet
     ? selectedWorksheet.displayName || selectedWorksheet.sheetName
     : dataset.original_filename;
   const previewRowTotal = selectedWorksheet ? selectedWorksheet.rowCount : dataset.row_count;
+
+  const selectPreviewWorksheet = (worksheetId: string) => {
+    setPreviewRows([]);
+    setPreviewStatus("loading");
+    setPreviewError(null);
+    setSelectedWorksheetId(worksheetId);
+  };
 
   const formatCell = (value: unknown) => {
     if (value === null || value === undefined || value === "") return "—";
@@ -640,7 +662,13 @@ function DatasetPreviewPage({
               className={`dataset-preview-sheet${
                 sheet.worksheetId === selectedWorksheet?.worksheetId ? " active" : ""
               }`}
-              onClick={() => setSelectedWorksheetId(sheet.worksheetId)}
+              disabled={sheet.status !== "ready"}
+              onClick={() => selectPreviewWorksheet(sheet.worksheetId)}
+              title={
+                sheet.status === "ready"
+                  ? sheet.displayName || sheet.sheetName
+                  : `${sheet.displayName || sheet.sheetName} is not ready for preview`
+              }
             >
               {sheet.displayName || sheet.sheetName}
             </button>
