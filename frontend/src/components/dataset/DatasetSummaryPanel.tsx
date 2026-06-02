@@ -82,6 +82,7 @@ type DatasetSummaryPanelProps = {
   onDeleteDataset: (datasetId: string) => void;
   onWorksheetSelect: (worksheetId: string) => void;
   isSwitchingWorksheet: boolean;
+  onPreviewBackToCleanPrepare?: (worksheetId: string, scrollY: number) => void;
   selectedTaskId?: string | null;
   onSelectedTaskIdChange?: (taskId: string | null) => void;
 };
@@ -1034,6 +1035,7 @@ function DatasetSummaryPanel({
   onDeleteDataset,
   onWorksheetSelect,
   isSwitchingWorksheet,
+  onPreviewBackToCleanPrepare,
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
@@ -1042,6 +1044,12 @@ function DatasetSummaryPanel({
     useState<FocusedOperationalWorkspace | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
+  const [requestedPreviewWorksheetId, setRequestedPreviewWorksheetId] = useState<string | null>(null);
+  const [previewOrigin, setPreviewOrigin] = useState<{
+    type: "cleanPrepare";
+    worksheetId: string;
+    scrollY: number;
+  } | null>(null);
   const [selectedEvidenceTitle, setSelectedEvidenceTitle] = useState<string | null>(null);
   const [expandedColumnName, setExpandedColumnName] = useState<string | null>(null);
   const dataOverviewRef = useRef<HTMLElement | null>(null);
@@ -1292,10 +1300,37 @@ function DatasetSummaryPanel({
     const handleDataWorkspaceCommand = (event: Event) => {
       if (!dataset) return;
 
-      const commandEvent = event as CustomEvent<{ target?: DataWorkspaceCommandTarget }>;
+      const commandEvent = event as CustomEvent<{
+        target?: DataWorkspaceCommandTarget;
+        worksheetId?: string;
+        origin?: "cleanPrepare";
+        scrollY?: number;
+      }>;
       const target = commandEvent.detail?.target;
 
       if (target === "preview" || target === "worksheetPreview") {
+        const requestedWorksheetId =
+          target === "worksheetPreview" &&
+          workbookWorksheets.some(
+            (worksheet) =>
+              worksheet.worksheetId === commandEvent.detail?.worksheetId &&
+              worksheet.status === "ready",
+          )
+            ? commandEvent.detail?.worksheetId || null
+            : null;
+        setRequestedPreviewWorksheetId(requestedWorksheetId);
+        setPreviewOrigin(
+          requestedWorksheetId && commandEvent.detail?.origin === "cleanPrepare"
+            ? {
+                type: "cleanPrepare",
+                worksheetId: requestedWorksheetId,
+                scrollY:
+                  typeof commandEvent.detail.scrollY === "number"
+                    ? commandEvent.detail.scrollY
+                    : 0,
+              }
+            : null,
+        );
         setActiveFocusedWorkflow(null);
         setIsDatasetPreviewOpen(true);
         return;
@@ -1342,8 +1377,15 @@ function DatasetSummaryPanel({
       <DatasetPreviewPage
         dataset={dataset}
         worksheets={workbookWorksheets}
-        initialWorksheetId={activeWorksheet?.worksheetId || null}
-        onBack={() => setIsDatasetPreviewOpen(false)}
+        initialWorksheetId={requestedPreviewWorksheetId || activeWorksheet?.worksheetId || null}
+        onBack={() => {
+          if (previewOrigin?.type === "cleanPrepare") {
+            onPreviewBackToCleanPrepare?.(previewOrigin.worksheetId, previewOrigin.scrollY);
+          }
+          setPreviewOrigin(null);
+          setRequestedPreviewWorksheetId(null);
+          setIsDatasetPreviewOpen(false);
+        }}
       />
     );
   }
@@ -1618,7 +1660,11 @@ function DatasetSummaryPanel({
                 <button
                   type="button"
                   className="secondary-button data-action-btn"
-                  onClick={() => setIsDatasetPreviewOpen(true)}
+                  onClick={() => {
+                    setPreviewOrigin(null);
+                    setRequestedPreviewWorksheetId(null);
+                    setIsDatasetPreviewOpen(true);
+                  }}
                 >
                   <svg
                     viewBox="0 0 24 24"

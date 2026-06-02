@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { humanIntentGuidance } from "./app/appCompositionConfig";
 import DatasetSummaryPanel, {
   type HumanIntent,
@@ -56,6 +56,12 @@ type PreparedQuestionContext = {
 
 type HumanAnalyzeStage = "investigate" | "review";
 
+type CleanPrepareRestoreContext = {
+  worksheetId: string;
+  scrollY: number;
+  requestId: number;
+};
+
 // S5-P3: App.tsx remains the current composition root. The S5 navigation
 // skeleton is intentionally inactive here; routing, mode switching, dataset
 // restore, SQL, results, export, and runtime wiring stay behaviorally unchanged.
@@ -84,6 +90,12 @@ function App() {
   const [executedPreparedQuestionContext, setExecutedPreparedQuestionContext] =
     useState<PreparedQuestionContext | null>(null);
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
+  const [cleanPrepareRestoreContext, setCleanPrepareRestoreContext] =
+    useState<CleanPrepareRestoreContext | null>(null);
+  const consumeCleanPrepareRestoreContext = useCallback(
+    () => setCleanPrepareRestoreContext(null),
+    [],
+  );
   const [humanInsightBackTarget, setHumanInsightBackTarget] = useState<{
     view: ActiveView;
     tab: ResultTabKey;
@@ -393,6 +405,25 @@ function App() {
     if (target) {
       dispatchDeferredWorkspaceCommand("filtraqueri:data-workspace-command", { target });
     }
+  };
+
+  const openDatasetPreview = (worksheetId: string) => {
+    openHumanView("dataset");
+    dispatchDeferredWorkspaceCommand("filtraqueri:data-workspace-command", {
+      target: "worksheetPreview",
+      worksheetId,
+      origin: "cleanPrepare",
+      scrollY: window.scrollY,
+    });
+  };
+
+  const returnToCleanPrepare = (worksheetId: string, scrollY: number) => {
+    setCleanPrepareRestoreContext({
+      worksheetId,
+      scrollY,
+      requestId: Date.now(),
+    });
+    openHumanView("queryBuilder");
   };
 
   const handleDataQualityNavigate = (action: DataQualityAlertAction) => {
@@ -761,6 +792,7 @@ function App() {
             onDeleteDataset={confirmFutureDatasetDelete}
             onWorksheetSelect={handleWorksheetSelect}
             isSwitchingWorksheet={isSwitchingWorksheet}
+            onPreviewBackToCleanPrepare={returnToCleanPrepare}
             selectedTaskId={runtimePersistence.selectedTaskId}
             onSelectedTaskIdChange={(selectedTaskId) =>
               setRuntimePersistence((currentState) => ({
@@ -803,6 +835,9 @@ function App() {
               }
               onApplyQueryBuilderRequestDraft={applyGovernedQueryBuilderRequestForReview}
               onAnalysisSourceSelect={handleAnalysisSourceSelect}
+              onPreviewDataset={openDatasetPreview}
+              cleanPrepareRestoreContext={cleanPrepareRestoreContext}
+              onCleanPrepareRestoreConsumed={consumeCleanPrepareRestoreContext}
             />
           </div>
           <div hidden={humanAnalyzeStage !== "review"}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 import { buildPreparationSignalReport } from "../../features/dataPreparation/preparationSignals";
 import {
@@ -30,6 +30,13 @@ type CleanPrepareReviewPanelProps = {
   dataset: DatasetMetadata;
   sourceName: string;
   onAnalysisSourceSelect?: (worksheetId: string, source: "cleaned" | "original") => Promise<void>;
+  onPreviewDataset?: (worksheetId: string) => void;
+  restoreContext?: {
+    worksheetId: string;
+    scrollY: number;
+    requestId: number;
+  } | null;
+  onRestoreContextConsumed?: () => void;
 };
 
 type PreparationPriority = "low" | "medium" | "high";
@@ -50,6 +57,27 @@ type PreparationReview = {
   priority: PreparationPriority;
   issues: PreparationIssue[];
   suggestedFixes: SuggestedFix[];
+};
+
+const getIssueCategory = (issue: PreparationIssue) => {
+  if (issue.id.includes("side_note_region_candidate")) return "Side-note regions";
+  if (
+    issue.id.includes("missing-values") ||
+    issue.id.includes("missing_pattern") ||
+    issue.id.includes("high-blank-rate")
+  ) {
+    return "Missing values";
+  }
+  if (issue.id.includes("generated-columns")) return "Generated columns";
+  if (
+    issue.id.includes("date_title_row") ||
+    issue.id.includes("section_banner") ||
+    issue.id.includes("sparse_layout_gap") ||
+    issue.id.includes("serial_only_placeholder_rows")
+  ) {
+    return "Template/layout rows";
+  }
+  return "Structure issues";
 };
 
 const columnIndexToLabel = (index: number) => {
@@ -302,7 +330,11 @@ export function CleanPrepareReviewPanel({
   dataset,
   sourceName,
   onAnalysisSourceSelect,
+  onPreviewDataset,
+  restoreContext,
+  onRestoreContextConsumed,
 }: CleanPrepareReviewPanelProps) {
+  const reviewRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(null);
   const [recipePreview, setRecipePreview] = useState<CleaningRecipePreview | null>(null);
@@ -315,6 +347,17 @@ export function CleanPrepareReviewPanel({
   >({});
   const [activationState, setActivationState] = useState<ActivationState>({ status: "idle" });
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
+  const issueGroups = useMemo(
+    () =>
+      Array.from(
+        review.issues.reduce<Map<string, PreparationIssue[]>>((groups, issue) => {
+          const category = getIssueCategory(issue);
+          groups.set(category, [...(groups.get(category) || []), issue]);
+          return groups;
+        }, new Map()),
+      ),
+    [review.issues],
+  );
   const isPrioritized = review.priority !== "low";
   const workbook = useMemo(() => getWorkbookMetadata(dataset), [dataset]);
   const worksheets = workbook?.worksheets || [];
@@ -340,6 +383,17 @@ export function CleanPrepareReviewPanel({
         number,
       ][]).filter(([, count]) => count > 0)
     : [];
+
+  useEffect(() => {
+    if (!restoreContext) return;
+    setSelectedWorksheetId(restoreContext.worksheetId);
+    setIsOpen(true);
+    window.setTimeout(() => {
+      window.scrollTo({ top: restoreContext.scrollY, behavior: "auto" });
+      reviewRef.current?.focus({ preventScroll: true });
+      onRestoreContextConsumed?.();
+    }, 0);
+  }, [onRestoreContextConsumed, restoreContext]);
 
   useEffect(() => {
     let cancelled = false;
@@ -548,6 +602,11 @@ export function CleanPrepareReviewPanel({
     }
   };
 
+  const previewDataset = () => {
+    if (!selectedWorksheet || !onPreviewDataset) return;
+    onPreviewDataset(selectedWorksheet.worksheetId);
+  };
+
   const toggleReview = () => {
     if (!isOpen && supportsRecipePreview && selectedWorksheet) {
       setRecipePreview(null);
@@ -585,7 +644,12 @@ export function CleanPrepareReviewPanel({
       </div>
 
       {isOpen && (
-        <div id="clean-prepare-review" className="clean-prepare-review">
+        <div
+          id="clean-prepare-review"
+          className="clean-prepare-review"
+          ref={reviewRef}
+          tabIndex={-1}
+        >
           <div className="clean-prepare-review-heading">
             <div>
               <p className="section-label">Read-only preparation review</p>
@@ -596,24 +660,38 @@ export function CleanPrepareReviewPanel({
             </button>
           </div>
 
-          <section>
-            <h4>Issues found</h4>
+          <section className="clean-prepare-issue-groups">
+            <div className="clean-prepare-compact-heading">
+              <h4>Issues found</h4>
+              <span>{pluralise(review.issues.length, "issue")}</span>
+            </div>
             {review.issues.length > 0 ? (
-              <ul>
-                {review.issues.map((issue) => (
-                  <li key={issue.id}>
-                    <strong>{issue.title}</strong>
-                    <span>{issue.detail}</span>
-                  </li>
-                ))}
-              </ul>
+              issueGroups.map(([category, issues]) => (
+                <details className="clean-prepare-disclosure" key={category}>
+                  <summary>
+                    <strong>{category}</strong>
+                    <span>{pluralise(issues.length, "issue")}</span>
+                  </summary>
+                  <ul>
+                    {issues.map((issue) => (
+                      <li key={issue.id}>
+                        <strong>{issue.title}</strong>
+                        <span>{issue.detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ))
             ) : (
               <p>No urgent preparation issues were detected from the current dataset profile.</p>
             )}
           </section>
 
-          <section>
-            <h4>Suggested fixes</h4>
+          <details className="clean-prepare-disclosure">
+            <summary>
+              <strong>Suggested fixes</strong>
+              <span>{pluralise(review.suggestedFixes.length, "draft recommendation")}</span>
+            </summary>
             {review.suggestedFixes.length > 0 ? (
               <ul>
                 {review.suggestedFixes.map((fix) => (
@@ -626,7 +704,7 @@ export function CleanPrepareReviewPanel({
             ) : (
               <p>No draft fixes are suggested yet.</p>
             )}
-          </section>
+          </details>
 
           {supportsRecipePreview && worksheets.length > 0 && (
             <section className="clean-prepare-recipe-preview">
@@ -706,14 +784,20 @@ export function CleanPrepareReviewPanel({
                   </div>
 
                   {recipePreview.recipe.length > 0 ? (
-                    <ul className="clean-prepare-recipe-list">
-                      {recipePreview.recipe.map((step) => (
-                        <li key={step.type}>
-                          <strong>{recipeStepLabels[step.type] || step.type}</strong>
-                          <span>{step.explanation}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <details className="clean-prepare-disclosure">
+                      <summary>
+                        <strong>Draft recipe steps</strong>
+                        <span>{pluralise(recipePreview.recipe.length, "step")}</span>
+                      </summary>
+                      <ul className="clean-prepare-recipe-list">
+                        {recipePreview.recipe.map((step) => (
+                          <li key={step.type}>
+                            <strong>{recipeStepLabels[step.type] || step.type}</strong>
+                            <span>{step.explanation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
                   ) : (
                     <p className="clean-prepare-preview-state">
                       No cleaning recipe is needed for this worksheet.
@@ -721,21 +805,31 @@ export function CleanPrepareReviewPanel({
                   )}
 
                   {excludedEntries.length > 0 && (
-                    <div className="clean-prepare-excluded">
-                      <strong>Proposed exclusions</strong>
-                      <div>
-                        {excludedEntries.map(([key, count]) => (
-                          <span key={key}>
-                            {excludedLabels[key]}: {count.toLocaleString()}
-                          </span>
-                        ))}
+                    <details className="clean-prepare-disclosure">
+                      <summary>
+                        <strong>Proposed exclusions</strong>
+                        <span>{pluralise(excludedEntries.length, "category", "categories")}</span>
+                      </summary>
+                      <div className="clean-prepare-excluded">
+                        <div>
+                          {excludedEntries.map(([key, count]) => (
+                            <span key={key}>
+                              {excludedLabels[key]}: {count.toLocaleString()}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    </details>
                   )}
 
                   {recipePreview.after_preview.rows.length > 0 ? (
-                    <div className="clean-prepare-preview-table-wrap">
-                      <table className="clean-prepare-preview-table">
+                    <details className="clean-prepare-disclosure">
+                      <summary>
+                        <strong>Preview cleaned rows</strong>
+                        <span>{pluralise(recipePreview.after_preview.rows.length, "sample row")}</span>
+                      </summary>
+                      <div className="clean-prepare-preview-table-wrap">
+                        <table className="clean-prepare-preview-table">
                         <thead>
                           <tr>
                             <th>#</th>
@@ -760,8 +854,9 @@ export function CleanPrepareReviewPanel({
                             );
                           })}
                         </tbody>
-                      </table>
-                    </div>
+                        </table>
+                      </div>
+                    </details>
                   ) : (
                     <p className="clean-prepare-preview-state">
                       No cleaned rows are available to preview for this worksheet.
@@ -852,8 +947,13 @@ export function CleanPrepareReviewPanel({
                                 The active analysis table is unchanged until you choose to use this copy.
                               </p>
                               {selectedWorksheetApplyState.result.preview_rows.length > 0 && (
-                                <div className="clean-prepare-preview-table-wrap">
-                                  <table className="clean-prepare-preview-table">
+                                <details className="clean-prepare-disclosure">
+                                  <summary>
+                                    <strong>Preview created copy rows</strong>
+                                    <span>{pluralise(selectedWorksheetApplyState.result.preview_rows.length, "sample row")}</span>
+                                  </summary>
+                                  <div className="clean-prepare-preview-table-wrap">
+                                    <table className="clean-prepare-preview-table">
                                     <thead>
                                       <tr>
                                         <th>#</th>
@@ -872,8 +972,9 @@ export function CleanPrepareReviewPanel({
                                         </tr>
                                       ))}
                                     </tbody>
-                                  </table>
-                                </div>
+                                    </table>
+                                  </div>
+                                </details>
                               )}
                             </>
                           )}
@@ -933,6 +1034,16 @@ export function CleanPrepareReviewPanel({
                       )}
                       {activationState.status === "error" && (
                         <p className="clean-prepare-activation-error">{activationState.message}</p>
+                      )}
+                      {onPreviewDataset && (
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={previewDataset}
+                          disabled={activationState.status === "switching"}
+                        >
+                          Preview dataset
+                        </button>
                       )}
                     </div>
                   )}

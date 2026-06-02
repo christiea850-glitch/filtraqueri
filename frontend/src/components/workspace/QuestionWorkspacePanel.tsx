@@ -30,6 +30,13 @@ type QuestionWorkspacePanelProps = {
   sourceName: string;
   onApplyQueryBuilderRequestDraft?: (draft: GovernedQueryBuilderRequestDraft) => void;
   onAnalysisSourceSelect?: (worksheetId: string, source: "cleaned" | "original") => Promise<void>;
+  onPreviewDataset?: (worksheetId: string) => void;
+  cleanPrepareRestoreContext?: {
+    worksheetId: string;
+    scrollY: number;
+    requestId: number;
+  } | null;
+  onCleanPrepareRestoreConsumed?: () => void;
 };
 
 type PlanningSelectionRole = "dimension" | "measure" | "date";
@@ -606,6 +613,9 @@ function QuestionWorkspacePanel({
   sourceName,
   onApplyQueryBuilderRequestDraft,
   onAnalysisSourceSelect,
+  onPreviewDataset,
+  cleanPrepareRestoreContext,
+  onCleanPrepareRestoreConsumed,
 }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
@@ -776,6 +786,9 @@ function QuestionWorkspacePanel({
         dataset={dataset}
         sourceName={sourceName}
         onAnalysisSourceSelect={onAnalysisSourceSelect}
+        onPreviewDataset={onPreviewDataset}
+        restoreContext={cleanPrepareRestoreContext}
+        onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
       />
 
       <label className="question-workspace-input">
