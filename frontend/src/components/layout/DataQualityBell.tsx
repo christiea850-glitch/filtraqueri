@@ -1,35 +1,40 @@
 import { useEffect, useState } from "react";
 import type {
   DataQualityAlert,
-  DataQualityAlertAction,
   DataQualityAlertSummary,
 } from "../../features/dataQuality/dataQualityAlerts";
 
 type DataQualityBellProps = {
   summary: DataQualityAlertSummary;
-  onNavigate: (action: DataQualityAlertAction) => void;
+  onNavigate: (alert: DataQualityAlert) => void;
+  onDismiss: (alert: DataQualityAlert) => void;
+  onResetStates: () => void;
 };
 
 const getBellTone = (summary: DataQualityAlertSummary) => {
-  if (summary.alerts.some((alert) => alert.severity === "critical")) return "critical";
-  if (summary.alerts.some((alert) => alert.severity === "warning")) return "warning";
+  if (summary.highestSeverity === "critical") return "critical";
+  if (summary.highestSeverity === "warning") return "warning";
   return "neutral";
 };
 
 const DataQualityAlertCard = ({
   alert,
   onNavigate,
+  onDismiss,
 }: {
   alert: DataQualityAlert;
-  onNavigate: (action: DataQualityAlertAction) => void;
+  onNavigate: (alert: DataQualityAlert) => void;
+  onDismiss: (alert: DataQualityAlert) => void;
 }) => (
-  <article className={`data-quality-alert-card is-${alert.severity}`}>
+  <article className={`data-quality-alert-card is-${alert.severity} is-${alert.state}`}>
     <div className="data-quality-alert-card-heading">
       <span className={`data-quality-severity is-${alert.severity}`}>{alert.severity}</span>
+      <span className={`data-quality-alert-state is-${alert.state}`}>{alert.state}</span>
       <small>{alert.affectedSummary}</small>
     </div>
     <strong>{alert.title}</strong>
     <p>{alert.whyItMatters}</p>
+    {alert.stateSummary && <p className="data-quality-alert-state-summary">{alert.stateSummary}.</p>}
     {alert.evidence.length > 0 && (
       <ul>
         {alert.evidence.map((item) => (
@@ -37,15 +42,25 @@ const DataQualityAlertCard = ({
         ))}
       </ul>
     )}
-    <button type="button" className="secondary-button" onClick={() => onNavigate(alert.action)}>
-      {alert.actionLabel}
-    </button>
+    <div className="data-quality-alert-card-actions">
+      <button type="button" className="secondary-button" onClick={() => onNavigate(alert)}>
+        {alert.actionLabel}
+      </button>
+      {alert.severity !== "critical" && alert.state !== "resolved" && (
+        <button type="button" className="data-quality-alert-dismiss" onClick={() => onDismiss(alert)}>
+          Dismiss
+        </button>
+      )}
+    </div>
   </article>
 );
 
-export function DataQualityBell({ summary, onNavigate }: DataQualityBellProps) {
+export function DataQualityBell({ summary, onNavigate, onDismiss, onResetStates }: DataQualityBellProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showReviewed, setShowReviewed] = useState(false);
   const bellTone = getBellTone(summary);
+  const unresolvedAlerts = summary.alerts.filter((alert) => alert.state === "unresolved");
+  const reviewedAlerts = summary.alerts.filter((alert) => alert.state !== "unresolved");
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -58,9 +73,9 @@ export function DataQualityBell({ summary, onNavigate }: DataQualityBellProps) {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [isOpen]);
 
-  const navigate = (action: DataQualityAlertAction) => {
+  const navigate = (alert: DataQualityAlert) => {
     setIsOpen(false);
-    onNavigate(action);
+    onNavigate(alert);
   };
 
   return (
@@ -109,14 +124,40 @@ export function DataQualityBell({ summary, onNavigate }: DataQualityBellProps) {
           </div>
 
           <div className="data-quality-alert-list">
-            {summary.alerts.length > 0 ? (
-              summary.alerts.map((alert) => (
-                <DataQualityAlertCard key={alert.id} alert={alert} onNavigate={navigate} />
+            {unresolvedAlerts.length > 0 ? (
+              unresolvedAlerts.map((alert) => (
+                <DataQualityAlertCard key={alert.id} alert={alert} onNavigate={navigate} onDismiss={onDismiss} />
               ))
             ) : (
               <p className="data-quality-alert-empty">
-                No important data-quality issues were detected from the current metadata.
+                No unresolved data-quality alerts remain. Reviewed signals are still available below.
               </p>
+            )}
+            {reviewedAlerts.length > 0 && (
+              <div className="data-quality-alert-history">
+                <button
+                  type="button"
+                  className="data-quality-alert-history-toggle"
+                  onClick={() => setShowReviewed((current) => !current)}
+                  aria-expanded={showReviewed}
+                >
+                  {showReviewed ? "Hide reviewed alerts" : "Show reviewed alerts"}
+                  <span>{reviewedAlerts.length}</span>
+                </button>
+                {showReviewed &&
+                  reviewedAlerts.map((alert) => (
+                    <DataQualityAlertCard key={alert.id} alert={alert} onNavigate={navigate} onDismiss={onDismiss} />
+                  ))}
+              </div>
+            )}
+            {reviewedAlerts.length > 0 && (
+              <button
+                type="button"
+                className="data-quality-alert-reset"
+                onClick={onResetStates}
+              >
+                Reset reviewed and dismissed alerts
+              </button>
             )}
           </div>
 

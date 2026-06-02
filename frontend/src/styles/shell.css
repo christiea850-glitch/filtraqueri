@@ -360,10 +360,19 @@ body {
   border-left-color: #94a3b8;
 }
 
+.data-quality-alert-card.is-reviewed,
+.data-quality-alert-card.is-resolved {
+  opacity: 0.72;
+  background: #f8fafc;
+}
+
+.data-quality-alert-card.is-resolved {
+  border-left-color: #10b981;
+}
+
 .data-quality-alert-card-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
@@ -375,7 +384,24 @@ body {
   color: #c2410c;
 }
 
+.data-quality-alert-state {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.data-quality-alert-state.is-resolved {
+  background: #d1fae5;
+  color: #047857;
+}
+
 .data-quality-alert-card-heading small {
+  margin-left: auto;
   color: #64748b;
   font-size: 11px;
 }
@@ -396,6 +422,64 @@ body {
   min-height: 28px;
   padding: 0 9px;
   font-size: 11px;
+}
+
+.data-quality-alert-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.data-quality-alert-dismiss,
+.data-quality-alert-reset {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.data-quality-alert-reset {
+  justify-self: start;
+  padding: 4px 0;
+}
+
+.data-quality-alert-state-summary {
+  color: #047857 !important;
+  font-weight: 700;
+}
+
+.data-quality-alert-history {
+  display: grid;
+  gap: 9px;
+}
+
+.data-quality-alert-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.data-quality-alert-history-toggle span {
+  display: inline-grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 999px;
+  background: #e2e8f0;
+  font-size: 10px;
 }
 
 .data-quality-alert-footnote {

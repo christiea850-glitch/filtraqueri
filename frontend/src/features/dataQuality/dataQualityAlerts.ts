@@ -15,6 +15,7 @@ export type DataQualityAlertFamily =
   | "worksheet-status";
 
 export type DataQualityAlertSeverity = "critical" | "warning" | "info";
+export type DataQualityAlertState = "unresolved" | "reviewed" | "resolved" | "dismissed";
 
 export type DataQualityAlertAction =
   | "data-overview"
@@ -33,6 +34,10 @@ export type DataQualityAlert = {
   affectedSummary: string;
   action: DataQualityAlertAction;
   actionLabel: string;
+  scopeKeys: string[];
+  resolvedScopeKeys: string[];
+  state: DataQualityAlertState;
+  stateSummary?: string;
 };
 
 export type DataQualityAlertSummary = {
@@ -56,6 +61,71 @@ const pluralize = (count: number, singular: string, plural = `${singular}s`) =>
   `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
 
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
+const alertScopeKey = (
+  datasetId: string,
+  family: DataQualityAlertFamily,
+  worksheetId?: string | null,
+) => `${datasetId}:${worksheetId || "dataset"}:${family}`;
+
+const getScopedWorksheetIds = (
+  dataset: DatasetMetadata,
+  worksheetIds: string[],
+) => unique(worksheetIds).length > 0
+  ? unique(worksheetIds)
+  : [dataset.workbook_metadata?.activeWorksheetId || "dataset"];
+
+const addAlertState = (
+  dataset: DatasetMetadata,
+  alert: Omit<DataQualityAlert, "scopeKeys" | "resolvedScopeKeys" | "state" | "stateSummary">,
+  worksheetIds: string[],
+  reviewedScopeKeys: ReadonlySet<string>,
+  dismissedScopeKeys: ReadonlySet<string>,
+  resolvedWorksheetIds: ReadonlySet<string> = new Set(),
+): DataQualityAlert => {
+  const scopedWorksheetIds = getScopedWorksheetIds(dataset, worksheetIds);
+  const scopeKeys = scopedWorksheetIds.map((worksheetId) =>
+    alertScopeKey(dataset.dataset_id, alert.family, worksheetId),
+  );
+  const resolvedScopeKeys = scopedWorksheetIds
+    .filter((worksheetId) => resolvedWorksheetIds.has(worksheetId))
+    .map((worksheetId) => alertScopeKey(dataset.dataset_id, alert.family, worksheetId));
+  const unresolvedScopeKeys = scopeKeys.filter((key) => !resolvedScopeKeys.includes(key));
+  const reviewedUnresolvedScopeKeys = unresolvedScopeKeys.filter((key) => reviewedScopeKeys.has(key));
+  const dismissedUnresolvedScopeKeys = unresolvedScopeKeys.filter((key) => dismissedScopeKeys.has(key));
+  const state =
+    unresolvedScopeKeys.length === 0
+      ? "resolved"
+      : unresolvedScopeKeys.every((key) => dismissedScopeKeys.has(key))
+        ? "dismissed"
+      : unresolvedScopeKeys.every((key) => reviewedScopeKeys.has(key))
+        ? "reviewed"
+        : "unresolved";
+
+  return {
+    ...alert,
+    scopeKeys,
+    resolvedScopeKeys,
+    state,
+    stateSummary:
+      resolvedScopeKeys.length + reviewedUnresolvedScopeKeys.length + dismissedUnresolvedScopeKeys.length > 0 &&
+      resolvedScopeKeys.length + reviewedUnresolvedScopeKeys.length + dismissedUnresolvedScopeKeys.length < scopeKeys.length
+        ? `${(resolvedScopeKeys.length + reviewedUnresolvedScopeKeys.length + dismissedUnresolvedScopeKeys.length).toLocaleString()} of ${scopeKeys.length.toLocaleString()} worksheet concerns reviewed, dismissed, or resolved`
+        : undefined,
+  };
+};
+
+export const getDataQualityAlertReviewKeys = (
+  alert: DataQualityAlert,
+  dataset: DatasetMetadata | null,
+) => {
+  const activeWorksheetId = dataset?.workbook_metadata?.activeWorksheetId;
+  if (!activeWorksheetId) return alert.scopeKeys;
+
+  const activeWorksheetScopeKey = alert.scopeKeys.find((key) =>
+    key === alertScopeKey(dataset.dataset_id, alert.family, activeWorksheetId),
+  );
+  return activeWorksheetScopeKey ? [activeWorksheetScopeKey] : alert.scopeKeys;
+};
 
 const evidenceLocation = (evidence: WorksheetTemplateStructureEvidence) => {
   if (evidence.rowRange && evidence.rowRange.length >= 2) {
@@ -95,7 +165,10 @@ const getHighestSeverity = (alerts: DataQualityAlert[]) =>
   }, "neutral");
 
 const createHeaderIntegrityAlert = (
+  dataset: DatasetMetadata,
   report: PreparationSignalReport,
+  reviewedScopeKeys: ReadonlySet<string>,
+  dismissedScopeKeys: ReadonlySet<string>,
 ): DataQualityAlert | null => {
   const suspiciousHeaders = report.hasSuspiciousHeaders;
   const warningWorksheets = report.headerWarningWorksheets;
@@ -105,6 +178,11 @@ const createHeaderIntegrityAlert = (
       worksheetEvidenceLabel(worksheetName, evidence),
     );
   const normalizedHeaderWorksheets = report.normalizedHeaderWorksheets;
+  const repeatedHeaderWorksheetIds = unique(
+    report.templateEvidenceSignals
+      .filter(({ evidence }) => evidence.type === "repeated_header")
+      .map(({ worksheetId }) => worksheetId),
+  );
 
   if (
     !suspiciousHeaders &&
@@ -134,7 +212,25 @@ const createHeaderIntegrityAlert = (
     ...(suspiciousHeaders ? ["Active schema includes header labels that resemble data values."] : []),
   ]);
 
-  return {
+  const affectedWorksheetIds = unique([
+    ...repeatedHeaderWorksheetIds,
+    ...warningWorksheets.map((worksheet) => worksheet.worksheetId),
+    ...normalizedHeaderWorksheets.map((worksheet) => worksheet.worksheetId),
+  ]);
+  const activeCleanedWorksheetId =
+    dataset.workbook_metadata?.activeAnalysisSource?.type === "cleaned_working_copy"
+      ? dataset.workbook_metadata.activeAnalysisSource.worksheetId
+      : null;
+  const resolvedWorksheetIds = new Set(
+    !suspiciousHeaders && activeCleanedWorksheetId &&
+    repeatedHeaderWorksheetIds.includes(activeCleanedWorksheetId) &&
+    !warningWorksheets.some((worksheet) => worksheet.worksheetId === activeCleanedWorksheetId) &&
+    !normalizedHeaderWorksheets.some((worksheet) => worksheet.worksheetId === activeCleanedWorksheetId)
+      ? [activeCleanedWorksheetId]
+      : [],
+  );
+
+  return addAlertState(dataset, {
     id: "header-integrity",
     family: "header-integrity",
     severity: isCritical ? "critical" : "warning",
@@ -147,10 +243,15 @@ const createHeaderIntegrityAlert = (
         : "Active dataset schema",
     action: repeatedHeaderEvidence.length > 0 ? "clean-prepare" : "preview",
     actionLabel: repeatedHeaderEvidence.length > 0 ? "Review Clean & Prepare" : "Preview dataset",
-  };
+  }, affectedWorksheetIds, reviewedScopeKeys, dismissedScopeKeys, resolvedWorksheetIds);
 };
 
-const createTemplateLayoutAlert = (report: PreparationSignalReport): DataQualityAlert | null => {
+const createTemplateLayoutAlert = (
+  dataset: DatasetMetadata,
+  report: PreparationSignalReport,
+  reviewedScopeKeys: ReadonlySet<string>,
+  dismissedScopeKeys: ReadonlySet<string>,
+): DataQualityAlert | null => {
   const candidateWorksheets = report.templateCandidateWorksheets;
   const evidenceWorksheetIds = new Set(
     (candidateWorksheets.length > 0 ? candidateWorksheets : report.worksheets).map(
@@ -180,7 +281,21 @@ const createTemplateLayoutAlert = (report: PreparationSignalReport): DataQuality
       .map(({ worksheetName }) => worksheetName),
   ]);
 
-  return {
+  const affectedWorksheetIds = unique([
+    ...candidateWorksheets.map((worksheet) => worksheet.worksheetId),
+    ...report.templateEvidenceSignals
+      .filter(
+        ({ evidence }) =>
+          evidence.type !== "repeated_header" && evidence.type !== "clean_table_counter_signal",
+      )
+      .map(({ worksheetId }) => worksheetId),
+  ]);
+  const activeCleanedWorksheetId =
+    dataset.workbook_metadata?.activeAnalysisSource?.type === "cleaned_working_copy"
+      ? dataset.workbook_metadata.activeAnalysisSource.worksheetId
+      : null;
+
+  return addAlertState(dataset, {
     id: "template-layout",
     family: "template-layout",
     severity: candidateWorksheets.length > 0 ? "warning" : "info",
@@ -193,12 +308,14 @@ const createTemplateLayoutAlert = (report: PreparationSignalReport): DataQuality
     affectedSummary: pluralize(affectedWorksheets.length, "worksheet"),
     action: "clean-prepare",
     actionLabel: "Review Clean & Prepare",
-  };
+  }, affectedWorksheetIds, reviewedScopeKeys, dismissedScopeKeys, new Set(activeCleanedWorksheetId ? [activeCleanedWorksheetId] : []));
 };
 
 const createMissingValuesAlert = (
   dataset: DatasetMetadata,
   report: PreparationSignalReport,
+  reviewedScopeKeys: ReadonlySet<string>,
+  dismissedScopeKeys: ReadonlySet<string>,
 ): DataQualityAlert | null => {
   const missingColumns = [...report.missingColumns]
     .sort((left, right) => right.null_count - left.null_count);
@@ -211,7 +328,7 @@ const createMissingValuesAlert = (
     return `${column.name}: ${column.null_count.toLocaleString()} blank values (${percent.toFixed(1)}%).`;
   });
 
-  return {
+  return addAlertState(dataset, {
     id: "missing-values",
     family: "missing-values",
     severity: repeatedPattern || hasHighBlankRate ? "warning" : "info",
@@ -223,18 +340,21 @@ const createMissingValuesAlert = (
     affectedSummary: pluralize(missingColumns.length, "column"),
     action: "data-missing-values",
     actionLabel: "Review missing values",
-  };
+  }, [], reviewedScopeKeys, dismissedScopeKeys);
 };
 
 const createColumnQualityAlert = (
+  dataset: DatasetMetadata,
   report: PreparationSignalReport,
+  reviewedScopeKeys: ReadonlySet<string>,
+  dismissedScopeKeys: ReadonlySet<string>,
 ): DataQualityAlert | null => {
   const generatedColumns = report.generatedColumns;
   const structuralColumns = report.structuralColumns;
 
   if (generatedColumns.length === 0 && structuralColumns.length === 0) return null;
 
-  return {
+  return addAlertState(dataset, {
     id: "column-quality",
     family: "column-quality",
     severity: "warning",
@@ -251,15 +371,20 @@ const createColumnQualityAlert = (
     affectedSummary: pluralize(unique([...generatedColumns, ...structuralColumns]).length, "column"),
     action: "data-columns",
     actionLabel: "Review fields in Data",
-  };
+  }, [], reviewedScopeKeys, dismissedScopeKeys);
 };
 
-const createWorksheetStatusAlert = (report: PreparationSignalReport): DataQualityAlert | null => {
+const createWorksheetStatusAlert = (
+  dataset: DatasetMetadata,
+  report: PreparationSignalReport,
+  reviewedScopeKeys: ReadonlySet<string>,
+  dismissedScopeKeys: ReadonlySet<string>,
+): DataQualityAlert | null => {
   const worksheets = report.worksheets;
   const unavailableWorksheets = report.unavailableWorksheets;
   if (unavailableWorksheets.length > 0) {
     const hasError = unavailableWorksheets.some((worksheet) => worksheet.status === "error");
-    return {
+    return addAlertState(dataset, {
       id: "worksheet-status",
       family: "worksheet-status",
       severity: hasError ? "critical" : "warning",
@@ -271,12 +396,12 @@ const createWorksheetStatusAlert = (report: PreparationSignalReport): DataQualit
       affectedSummary: pluralize(unavailableWorksheets.length, "worksheet"),
       action: "data-overview",
       actionLabel: "Open Data overview",
-    };
+    }, unavailableWorksheets.map((worksheet) => worksheet.worksheetId), reviewedScopeKeys, dismissedScopeKeys);
   }
 
   if (worksheets.length <= 1) return null;
 
-  return {
+  return addAlertState(dataset, {
     id: "worksheet-status",
     family: "worksheet-status",
     severity: "info",
@@ -286,11 +411,13 @@ const createWorksheetStatusAlert = (report: PreparationSignalReport): DataQualit
     affectedSummary: pluralize(worksheets.length, "worksheet"),
     action: "data-overview",
     actionLabel: "Open Data overview",
-  };
+  }, worksheets.map((worksheet) => worksheet.worksheetId), reviewedScopeKeys, dismissedScopeKeys);
 };
 
 export const buildDataQualityAlertSummary = (
   dataset: DatasetMetadata | null,
+  reviewedScopeKeys: ReadonlySet<string> = new Set(),
+  dismissedScopeKeys: ReadonlySet<string> = new Set(),
 ): DataQualityAlertSummary => {
   if (!dataset) {
     return {
@@ -302,16 +429,17 @@ export const buildDataQualityAlertSummary = (
 
   const report = buildPreparationSignalReport(dataset);
   const alerts = [
-    createHeaderIntegrityAlert(report),
-    createTemplateLayoutAlert(report),
-    createMissingValuesAlert(dataset, report),
-    createColumnQualityAlert(report),
-    createWorksheetStatusAlert(report),
+    createHeaderIntegrityAlert(dataset, report, reviewedScopeKeys, dismissedScopeKeys),
+    createTemplateLayoutAlert(dataset, report, reviewedScopeKeys, dismissedScopeKeys),
+    createMissingValuesAlert(dataset, report, reviewedScopeKeys, dismissedScopeKeys),
+    createColumnQualityAlert(dataset, report, reviewedScopeKeys, dismissedScopeKeys),
+    createWorksheetStatusAlert(dataset, report, reviewedScopeKeys, dismissedScopeKeys),
   ].filter((alert): alert is DataQualityAlert => Boolean(alert));
+  const unresolvedAlerts = alerts.filter((alert) => alert.state === "unresolved");
 
   return {
     alerts,
-    attentionCount: alerts.filter((alert) => alert.severity !== "info").length,
-    highestSeverity: getHighestSeverity(alerts),
+    attentionCount: unresolvedAlerts.filter((alert) => alert.severity !== "info").length,
+    highestSeverity: getHighestSeverity(unresolvedAlerts),
   };
 };

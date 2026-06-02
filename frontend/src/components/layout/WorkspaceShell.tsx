@@ -7,6 +7,8 @@ import type {
 } from "../../features/dataset/datasetTypes";
 import {
   buildDataQualityAlertSummary,
+  getDataQualityAlertReviewKeys,
+  type DataQualityAlert,
   type DataQualityAlertAction,
 } from "../../features/dataQuality/dataQualityAlerts";
 import type { WorkspaceRuntimeContext } from "../../features/workspaceRuntime";
@@ -70,6 +72,20 @@ type WorkspaceShellProps = {
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 300;
 const SIDEBAR_DEFAULT_WIDTH = 240;
+const DATA_QUALITY_REVIEW_STORAGE_KEY = "filtraqueri:data-quality-reviewed-scopes";
+const DATA_QUALITY_DISMISS_STORAGE_KEY = "filtraqueri:data-quality-dismissed-scopes";
+
+const readDataQualityScopes = (storageKey: string) => {
+  try {
+    const storedValue = window.localStorage.getItem(storageKey);
+    const parsedValue = storedValue ? JSON.parse(storedValue) : [];
+    return Array.isArray(parsedValue)
+      ? parsedValue.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+};
 
 const productDestinations: ProductDestination[] = [
   {
@@ -226,7 +242,15 @@ function WorkspaceShell({
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isCommandLauncherOpen, setIsCommandLauncherOpen] = useState(false);
-  const dataQualityAlertSummary = buildDataQualityAlertSummary(dataset);
+  const [reviewedDataQualityScopes, setReviewedDataQualityScopes] =
+    useState<string[]>(() => readDataQualityScopes(DATA_QUALITY_REVIEW_STORAGE_KEY));
+  const [dismissedDataQualityScopes, setDismissedDataQualityScopes] =
+    useState<string[]>(() => readDataQualityScopes(DATA_QUALITY_DISMISS_STORAGE_KEY));
+  const dataQualityAlertSummary = buildDataQualityAlertSummary(
+    dataset,
+    new Set(reviewedDataQualityScopes),
+    new Set(dismissedDataQualityScopes),
+  );
   const activeDestinationId = destinationByActiveView[activeView];
   const activeDestination =
     productDestinations.find((destination) => destination.id === activeDestinationId) ||
@@ -316,6 +340,47 @@ function WorkspaceShell({
     if (destination.mode !== workspaceMode) onModeChange(destination.mode);
     onViewChange(destination.defaultView);
   };
+
+  const navigateDataQualityAlert = (alert: DataQualityAlert) => {
+    setReviewedDataQualityScopes((current) =>
+      Array.from(new Set([...current, ...getDataQualityAlertReviewKeys(alert, dataset)])),
+    );
+    onDataQualityNavigate(alert.action);
+  };
+
+  const dismissDataQualityAlert = (alert: DataQualityAlert) => {
+    if (alert.severity === "critical") return;
+    setDismissedDataQualityScopes((current) =>
+      Array.from(new Set([...current, ...getDataQualityAlertReviewKeys(alert, dataset)])),
+    );
+  };
+
+  const resetDataQualityAlertStates = () => {
+    setReviewedDataQualityScopes([]);
+    setDismissedDataQualityScopes([]);
+  };
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        DATA_QUALITY_REVIEW_STORAGE_KEY,
+        JSON.stringify(reviewedDataQualityScopes),
+      );
+    } catch {
+      // Local review state is optional. Alerts remain fully usable without storage.
+    }
+  }, [reviewedDataQualityScopes]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        DATA_QUALITY_DISMISS_STORAGE_KEY,
+        JSON.stringify(dismissedDataQualityScopes),
+      );
+    } catch {
+      // Local dismissal state is optional. Alerts remain fully usable without storage.
+    }
+  }, [dismissedDataQualityScopes]);
 
   useEffect(() => {
     const openLauncher = (event: KeyboardEvent) => {
@@ -424,7 +489,9 @@ function WorkspaceShell({
         {dataset && (
           <DataQualityBell
             summary={dataQualityAlertSummary}
-            onNavigate={onDataQualityNavigate}
+            onNavigate={navigateDataQualityAlert}
+            onDismiss={dismissDataQualityAlert}
+            onResetStates={resetDataQualityAlertStates}
           />
         )}
         <div className="mode-switcher" aria-label="Workspace mode">
