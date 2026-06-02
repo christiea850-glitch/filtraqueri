@@ -137,6 +137,43 @@ export type OriginalWorkbookLayout = {
   }[];
 };
 
+export type CleaningRecipePreview = {
+  status: "preview_only";
+  worksheet_id: string;
+  worksheet_name: string;
+  before: {
+    row_count: number;
+    column_count: number;
+  };
+  after_preview: {
+    row_count: number;
+    column_count: number;
+    columns: string[];
+    rows: Record<string, unknown>[];
+    row_provenance: {
+      preview_row_index: number;
+      original_row_index: number;
+    }[];
+  };
+  recipe: {
+    type: string;
+    original_row_indexes?: number[];
+    original_column_indexes?: number[];
+    added_columns?: string[];
+    explanation: string;
+  }[];
+  excluded: {
+    repeated_headers: number;
+    section_banners: number;
+    date_title_rows: number;
+    layout_rows: number;
+    placeholder_rows: number;
+    side_note_columns: number;
+  };
+  preview_row_limit: number;
+  message: string;
+};
+
 async function parseError(response: Response, fallbackMessage: string) {
   try {
     const payload = await response.json();
@@ -248,6 +285,22 @@ export async function getOriginalWorkbookLayout(datasetId: string, worksheetId: 
 
     throw error;
   }
+}
+
+export async function getCleaningRecipePreview(
+  datasetId: string,
+  worksheetId: string,
+  rowLimit = 10,
+) {
+  const params = new URLSearchParams({ row_limit: String(rowLimit) });
+
+  return requestJson<CleaningRecipePreview>(
+    `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/cleaning-recipe-preview?${params.toString()}`,
+    {
+      method: "GET",
+    },
+    "Cleaning recipe preview could not be loaded.",
+  );
 }
 
 export async function getDataset(datasetId: string) {

@@ -233,6 +233,136 @@
   background: #fffbeb;
 }
 
+.clean-prepare-recipe-preview {
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.clean-prepare-section-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clean-prepare-section-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.clean-prepare-section-heading > strong {
+  color: #1d4ed8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clean-prepare-worksheet-tabs,
+.clean-prepare-excluded > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.clean-prepare-worksheet-tabs button {
+  padding: 6px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.clean-prepare-worksheet-tabs button.is-active {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.clean-prepare-worksheet-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.clean-prepare-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.clean-prepare-summary-grid div,
+.clean-prepare-excluded {
+  display: grid;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.clean-prepare-summary-grid span,
+.clean-prepare-excluded span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.clean-prepare-summary-grid strong,
+.clean-prepare-excluded strong {
+  color: #334155;
+  font-size: 13px;
+}
+
+.clean-prepare-preview-state {
+  padding: 10px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.clean-prepare-preview-state.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.clean-prepare-preview-table-wrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.clean-prepare-preview-table {
+  min-width: 100%;
+  border-collapse: collapse;
+  color: #475569;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.clean-prepare-preview-table th,
+.clean-prepare-preview-table td {
+  max-width: 240px;
+  padding: 7px 8px;
+  overflow: hidden;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.clean-prepare-preview-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+}
+
 .question-workspace-input {
   display: grid;
   gap: 7px;
@@ -915,6 +1045,10 @@
   .clean-prepare-pill {
     min-width: 0;
     width: 100%;
+  }
+
+  .clean-prepare-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .question-workspace-review-card div,
