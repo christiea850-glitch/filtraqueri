@@ -142,27 +142,33 @@ def _recipe_step(
     }
 
 
-def build_cleaning_recipe_preview(
+def compute_cleaning_recipe_plan(
     *,
     workbook_path: Path,
     worksheet: dict[str, Any],
-    row_limit: int,
 ) -> dict[str, Any]:
+    """Compute the full cleaning recipe plan for a worksheet.
+
+    Returns the complete cleaned-row set (not row-limited) plus the recipe,
+    excluded counts, and provenance. This is the shared core used by both
+    the read-only preview (clamped to a small row limit) and the
+    apply-to-working-copy flow (writes a DuckDB table). It performs no I/O
+    other than reading the original workbook.
+    """
     if workbook_path.suffix.lower() != ".xlsx":
         raise HTTPException(
             status_code=400,
-            detail="Cleaning recipe preview currently supports XLSX workbooks only",
+            detail="Cleaning recipe currently supports XLSX workbooks only",
         )
     if not workbook_path.exists():
         raise HTTPException(status_code=404, detail="Original workbook file mapping is missing")
 
-    clamped_row_limit = min(max(row_limit, 1), MAX_CLEANING_PREVIEW_ROWS)
     if worksheet.get("status") == "empty":
-        return _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
+        return _empty_plan(worksheet=worksheet)
     if worksheet.get("status") != "ready":
         raise HTTPException(
             status_code=400,
-            detail="Worksheet is not available for cleaning recipe preview",
+            detail="Worksheet is not available for cleaning recipe",
         )
 
     sheets = parse_xlsx_workbook(workbook_path)
@@ -177,12 +183,12 @@ def build_cleaning_recipe_preview(
     normalization = normalization if isinstance(normalization, dict) else {}
     header_row_index = normalization.get("header_row_index")
     if not isinstance(header_row_index, int) or header_row_index >= len(raw_rows):
-        return _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
+        return _empty_plan(worksheet=worksheet)
 
     header_row = raw_rows[header_row_index]
     business_width = contiguous_header_width(header_row)
     if business_width <= 0:
-        return _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
+        return _empty_plan(worksheet=worksheet)
 
     existing_headers: set[str] = set()
     business_columns = [
@@ -209,9 +215,8 @@ def build_cleaning_recipe_preview(
     if has_section_context:
         output_columns.extend(["_section_date", "_section_label"])
 
-    preview_rows: list[dict[str, Any]] = []
+    cleaned_rows: list[dict[str, Any]] = []
     row_provenance: list[dict[str, int]] = []
-    cleaned_row_count = 0
     current_section_date: str | None = None
     current_section_label: str | None = None
     excluded = _empty_excluded_counts()
@@ -276,15 +281,13 @@ def build_cleaning_recipe_preview(
             values["_section_date"] = current_section_date
             values["_section_label"] = current_section_label
 
-        if len(preview_rows) < clamped_row_limit:
-            preview_rows.append(values)
-            row_provenance.append(
-                {
-                    "preview_row_index": len(preview_rows) - 1,
-                    "original_row_index": original_row_index,
-                }
-            )
-        cleaned_row_count += 1
+        cleaned_rows.append(values)
+        row_provenance.append(
+            {
+                "cleaned_row_index": len(cleaned_rows) - 1,
+                "original_row_index": original_row_index,
+            }
+        )
 
     excluded["repeated_headers"] = len(counted_repeated_header_rows)
     excluded["section_banners"] = len(section_banner_rows)
@@ -292,7 +295,7 @@ def build_cleaning_recipe_preview(
     excluded["layout_rows"] = len(counted_layout_rows)
     excluded["placeholder_rows"] = len(counted_placeholder_rows)
 
-    recipe = []
+    recipe: list[dict[str, Any]] = []
     if repeated_header_rows:
         recipe.append(
             _recipe_step(
@@ -352,22 +355,75 @@ def build_cleaning_recipe_preview(
         )
 
     return {
-        "status": "preview_only",
+        "is_empty": False,
         "worksheet_id": worksheet.get("worksheet_id"),
         "worksheet_name": worksheet.get("sheet_name"),
         "before": {
             "row_count": int(worksheet.get("row_count") or 0),
             "column_count": int(worksheet.get("column_count") or 0),
         },
+        "output_columns": output_columns,
+        "rows": cleaned_rows,
+        "row_provenance": row_provenance,
+        "recipe": recipe,
+        "excluded": excluded,
+        "has_section_context": has_section_context,
+    }
+
+
+def _empty_plan(*, worksheet: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "is_empty": True,
+        "worksheet_id": worksheet.get("worksheet_id"),
+        "worksheet_name": worksheet.get("sheet_name"),
+        "before": {
+            "row_count": int(worksheet.get("row_count") or 0),
+            "column_count": int(worksheet.get("column_count") or 0),
+        },
+        "output_columns": [],
+        "rows": [],
+        "row_provenance": [],
+        "recipe": [],
+        "excluded": _empty_excluded_counts(),
+        "has_section_context": False,
+    }
+
+
+def build_cleaning_recipe_preview(
+    *,
+    workbook_path: Path,
+    worksheet: dict[str, Any],
+    row_limit: int,
+) -> dict[str, Any]:
+    """Read-only preview of the cleaning recipe, clamped to `row_limit` rows."""
+    clamped_row_limit = min(max(row_limit, 1), MAX_CLEANING_PREVIEW_ROWS)
+    plan = compute_cleaning_recipe_plan(workbook_path=workbook_path, worksheet=worksheet)
+    if plan.get("is_empty"):
+        return _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
+
+    preview_rows = plan["rows"][:clamped_row_limit]
+    row_provenance = [
+        {
+            "preview_row_index": index,
+            "original_row_index": entry["original_row_index"],
+        }
+        for index, entry in enumerate(plan["row_provenance"][:clamped_row_limit])
+    ]
+
+    return {
+        "status": "preview_only",
+        "worksheet_id": plan["worksheet_id"],
+        "worksheet_name": plan["worksheet_name"],
+        "before": plan["before"],
         "after_preview": {
-            "row_count": cleaned_row_count,
-            "column_count": len(output_columns),
-            "columns": output_columns,
+            "row_count": len(plan["rows"]),
+            "column_count": len(plan["output_columns"]),
+            "columns": plan["output_columns"],
             "rows": preview_rows,
             "row_provenance": row_provenance,
         },
-        "recipe": recipe,
-        "excluded": excluded,
+        "recipe": plan["recipe"],
+        "excluded": plan["excluded"],
         "preview_row_limit": clamped_row_limit,
         "message": "Preview only - no changes have been applied.",
     }

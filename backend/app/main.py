@@ -21,6 +21,7 @@ from .workbook_contracts import (
 )
 from .workbook_contract_diagnostics import analyze_contract_diagnostics
 from .workbook_ingestion import ingest_workbook
+from .workbook_cleaning_apply import apply_cleaning_recipe_to_working_copy
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_original_layout import extract_original_workbook_layout
 
@@ -748,6 +749,11 @@ class ExportRequest(BaseModel):
 
 class WorkbookWorksheetSelectionRequest(BaseModel):
     worksheet_id: str = Field(..., min_length=1)
+
+
+class WorkbookCleaningApplyRequest(BaseModel):
+    row_limit_preview: int = Field(25, ge=1, le=200)
+    confirm_preview_version: str | None = None
 
 
 class WorkbookRelationshipReviewRequest(BaseModel):
@@ -1681,6 +1687,119 @@ def get_cleaning_recipe_preview(
         worksheet=worksheet,
         row_limit=row_limit,
     )
+
+
+@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/apply-cleaning-recipe")
+def apply_workbook_cleaning_recipe(
+    dataset_id: str,
+    worksheet_id: str,
+    request: WorkbookCleaningApplyRequest | None = None,
+) -> dict[str, Any]:
+    """K1 / H3C-1 — apply the existing cleaning recipe to a new working copy.
+
+    Creates a new DuckDB table named ``cleaned_<safe_worksheet_id>`` for the
+    cleaned rows. Does **not** mutate the original uploaded workbook file,
+    the per-worksheet source tables, or the active analysis VIEW (``data``).
+    Idempotent: re-applying for the same worksheet drops and recreates the
+    same cleaned table. CSV uploads are rejected with a clear message. If
+    the worksheet does not need any cleanup, returns ``no_recipe_needed``
+    without writing anything.
+    """
+    if request is None:
+        request = WorkbookCleaningApplyRequest()
+
+    metadata = get_dataset_metadata(dataset_id)
+    uploaded_path_value = metadata.get("uploaded_path")
+    duckdb_path_value = metadata.get("duckdb_path")
+    if not uploaded_path_value or not duckdb_path_value:
+        raise HTTPException(
+            status_code=400,
+            detail="Dataset has no uploaded file or session storage",
+        )
+
+    uploaded_path = Path(uploaded_path_value)
+    duckdb_path = Path(duckdb_path_value)
+
+    if uploaded_path.suffix.lower() != ".xlsx":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Apply cleaning recipe currently supports XLSX workbooks only. "
+                "CSV uploads are not supported by this endpoint."
+            ),
+        )
+
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(
+            status_code=400,
+            detail="Dataset does not contain workbook metadata",
+        )
+
+    worksheet = next(
+        (
+            candidate
+            for candidate in workbook_metadata.get("worksheets", [])
+            if candidate.get("worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not worksheet:
+        raise HTTPException(status_code=404, detail="Worksheet was not found")
+    if worksheet.get("status") != "ready":
+        raise HTTPException(
+            status_code=400,
+            detail="Only ready worksheets can have a cleaning recipe applied",
+        )
+
+    result = apply_cleaning_recipe_to_working_copy(
+        workbook_path=uploaded_path,
+        worksheet=worksheet,
+        duckdb_path=duckdb_path,
+        dataset_id=dataset_id,
+        row_limit_preview=request.row_limit_preview,
+    )
+
+    # Persist a working-copy record only when something was actually written.
+    # The no-op response intentionally does not touch the manifest so that
+    # repeated calls on clean tables stay free of stale entries.
+    if result.get("status") == "applied_to_working_copy":
+        cleaned_copies_raw = workbook_metadata.get("cleaned_working_copies")
+        cleaned_copies = [
+            entry
+            for entry in (cleaned_copies_raw if isinstance(cleaned_copies_raw, list) else [])
+            if isinstance(entry, dict) and entry.get("source_worksheet_id") != worksheet_id
+        ]
+        created_at = datetime.now(timezone.utc).isoformat()
+        cleaned_copies.append(
+            {
+                "cleaned_copy_id": uuid4().hex,
+                "source_worksheet_id": worksheet_id,
+                "source_table_name": worksheet.get("table_name"),
+                "cleaned_table_name": result["cleaned_table_name"],
+                "recipe_applied": result["recipe_applied"],
+                "excluded": result["excluded"],
+                "before": result["before"],
+                "after": {
+                    "row_count": result["after"]["row_count"],
+                    "column_count": result["after"]["column_count"],
+                    "columns": result["after"]["columns"],
+                },
+                "created_at": created_at,
+                "reversible_link": {
+                    "worksheet_id": worksheet_id,
+                    "source_table_name": worksheet.get("table_name"),
+                    "active_analysis_table": metadata.get("table_name") or TABLE_NAME,
+                },
+            }
+        )
+        workbook_metadata["cleaned_working_copies"] = cleaned_copies
+        workbook_metadata["updated_at"] = created_at
+        metadata["workbook_metadata"] = workbook_metadata
+        dataset_sessions[dataset_id] = metadata
+        persist_dataset_manifest_metadata(metadata)
+
+    return result
 
 
 @app.post("/datasets/{dataset_id}/workbook/active-worksheet")
