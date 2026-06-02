@@ -20,6 +20,7 @@ import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceReg
 import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
+import type { DataQualityAlertAction } from "./features/dataQuality/dataQualityAlerts";
 import useExecutionRegistry from "./features/execution/executionRegistry";
 import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatasetController";
 import useExportController from "./features/export/useExportController";
@@ -391,6 +392,20 @@ function App() {
     if (target) {
       dispatchDeferredWorkspaceCommand("filtraqueri:data-workspace-command", { target });
     }
+  };
+
+  const handleDataQualityNavigate = (action: DataQualityAlertAction) => {
+    if (action === "preview") {
+      openDataCommand("preview");
+      return;
+    }
+
+    if (action === "clean-prepare") {
+      openHumanView("queryBuilder");
+      return;
+    }
+
+    openDataCommand();
   };
 
   const openAnalystCommand = (target: "editor" | "result" | "drafts" = "editor") => {
@@ -1144,6 +1159,7 @@ function App() {
         openDatasetPicker();
       }}
       onViewChange={handleWorkspaceViewChange}
+      onDataQualityNavigate={handleDataQualityNavigate}
       onModeChange={(mode) => {
         setWorkspaceMode(mode);
         if (mode === "human") setHumanAnalyzeStage("investigate");

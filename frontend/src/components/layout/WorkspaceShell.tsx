@@ -5,8 +5,13 @@ import type {
   DatasetSession,
   WorkspaceMode,
 } from "../../features/dataset/datasetTypes";
+import {
+  buildDataQualityAlertSummary,
+  type DataQualityAlertAction,
+} from "../../features/dataQuality/dataQualityAlerts";
 import type { WorkspaceRuntimeContext } from "../../features/workspaceRuntime";
 import CommandLauncher, { type CommandLauncherItem } from "./CommandLauncher";
+import { DataQualityBell } from "./DataQualityBell";
 
 type AnalystNavItem = {
   view: ActiveView;
@@ -51,6 +56,7 @@ type WorkspaceShellProps = {
   children: ReactNode;
   onOpenFile: () => void;
   onViewChange: (view: ActiveView) => void;
+  onDataQualityNavigate: (action: DataQualityAlertAction) => void;
   onModeChange: (mode: WorkspaceMode) => void;
   onRecentDatasetClick: (datasetId: string) => void;
   onRuntimePanelToggle: () => void;
@@ -211,6 +217,7 @@ function WorkspaceShell({
   children,
   onOpenFile,
   onViewChange,
+  onDataQualityNavigate,
   onModeChange,
   onRuntimePanelToggle,
   onRuntimeTrailSelect,
@@ -219,6 +226,7 @@ function WorkspaceShell({
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isCommandLauncherOpen, setIsCommandLauncherOpen] = useState(false);
+  const dataQualityAlertSummary = buildDataQualityAlertSummary(dataset);
   const activeDestinationId = destinationByActiveView[activeView];
   const activeDestination =
     productDestinations.find((destination) => destination.id === activeDestinationId) ||
@@ -413,6 +421,12 @@ function WorkspaceShell({
           <strong>Search actions</strong>
           <kbd>Ctrl K</kbd>
         </button>
+        {dataset && (
+          <DataQualityBell
+            summary={dataQualityAlertSummary}
+            onNavigate={onDataQualityNavigate}
+          />
+        )}
         <div className="mode-switcher" aria-label="Workspace mode">
           <button
             type="button"
