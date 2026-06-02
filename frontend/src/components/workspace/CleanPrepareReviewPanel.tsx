@@ -406,8 +406,63 @@ export function CleanPrepareReviewPanel({
   const isSelectedWorksheetActive = activeAnalysisSource?.worksheetId === selectedWorksheet?.worksheetId;
   const isUsingCleanedCopy =
     isSelectedWorksheetActive && activeAnalysisSource?.type === "cleaned_working_copy";
-  const analysisSourceLabel =
-    activeAnalysisSource?.type === "cleaned_working_copy" ? "Cleaned working copy" : "Original";
+
+  // Worksheets that the user just applied a recipe to in this session but for
+  // which the server-side workbook metadata has not yet refreshed. Used so the
+  // badges and summary reflect freshly-created cleaned copies immediately.
+  const locallyAppliedWorksheetIds = Object.entries(applyStateByWorksheet)
+    .filter(
+      ([, state]) =>
+        state.status === "success" && state.result.status === "applied_to_working_copy",
+    )
+    .map(([worksheetId]) => worksheetId);
+
+  type WorksheetCleaningStatus = "original" | "needs-review" | "available" | "active";
+
+  const getWorksheetCleaningStatus = (
+    worksheet: WorksheetMetadata,
+  ): WorksheetCleaningStatus => {
+    const worksheetHasCleaned =
+      workbook?.cleanedWorkingCopies.some(
+        (copy) => copy.sourceWorksheetId === worksheet.worksheetId,
+      ) || locallyAppliedWorksheetIds.includes(worksheet.worksheetId);
+    const worksheetIsActive =
+      worksheetHasCleaned &&
+      activeAnalysisSource?.type === "cleaned_working_copy" &&
+      activeAnalysisSource.worksheetId === worksheet.worksheetId;
+    if (worksheetIsActive) return "active";
+    if (worksheetHasCleaned) return "available";
+    if (
+      worksheet.status === "ready" &&
+      worksheet.normalization.templateStructureCandidate
+    ) {
+      return "needs-review";
+    }
+    return "original";
+  };
+
+  const worksheetCleaningStatusLabel: Record<WorksheetCleaningStatus, string> = {
+    original: "Original",
+    "needs-review": "Needs review",
+    available: "Cleaned copy available",
+    active: "Active cleaned copy",
+  };
+
+  const workbookCleanedCount =
+    (workbook?.cleanedWorkingCopies.length || 0) +
+    locallyAppliedWorksheetIds.filter(
+      (worksheetId) =>
+        !workbook?.cleanedWorkingCopies.some((copy) => copy.sourceWorksheetId === worksheetId),
+    ).length;
+  const workbookActiveCleanedCount =
+    activeAnalysisSource?.type === "cleaned_working_copy" ? 1 : 0;
+  const workbookNeedsReviewCount = worksheets.filter(
+    (worksheet) => getWorksheetCleaningStatus(worksheet) === "needs-review",
+  ).length;
+  const hasWorkbookCleaningSummary =
+    workbookCleanedCount > 0 || workbookNeedsReviewCount > 0;
+  const pluralise = (count: number, singular: string, plural = `${singular}s`) =>
+    `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
   const hasActionableRecipe =
     recipePreview !== null &&
     recipePreview.recipe.length > 0 &&
@@ -584,24 +639,46 @@ export function CleanPrepareReviewPanel({
               </div>
 
               <div className="clean-prepare-worksheet-tabs" aria-label="Cleaning recipe worksheets">
-                {worksheets.map((worksheet) => (
-                  <button
-                    type="button"
-                    key={worksheet.worksheetId}
-                    className={worksheet.worksheetId === selectedWorksheet?.worksheetId ? "is-active" : ""}
-                    disabled={worksheet.status !== "ready" && worksheet.status !== "empty"}
-                    onClick={() => selectWorksheet(worksheet)}
-                  >
-                    {worksheet.displayName || worksheet.sheetName}
-                  </button>
-                ))}
+                {worksheets.map((worksheet) => {
+                  const worksheetStatus = getWorksheetCleaningStatus(worksheet);
+                  const statusLabel = worksheetCleaningStatusLabel[worksheetStatus];
+                  const worksheetLabel = worksheet.displayName || worksheet.sheetName;
+                  return (
+                    <button
+                      type="button"
+                      key={worksheet.worksheetId}
+                      className={worksheet.worksheetId === selectedWorksheet?.worksheetId ? "is-active" : ""}
+                      disabled={worksheet.status !== "ready" && worksheet.status !== "empty"}
+                      onClick={() => selectWorksheet(worksheet)}
+                      aria-label={`${worksheetLabel}, ${statusLabel}`}
+                      title={`${worksheetLabel} — ${statusLabel}`}
+                    >
+                      <span className="clean-prepare-worksheet-tab-label">{worksheetLabel}</span>
+                      <span
+                        className={`clean-prepare-worksheet-badge is-${worksheetStatus}`}
+                        aria-hidden="true"
+                      >
+                        {statusLabel}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="clean-prepare-analysis-source" aria-live="polite">
-                <span>Current analysis source</span>
-                <strong>{analysisSourceLabel}</strong>
-                <p>Original workbook preserved. You can switch back to the original analysis table.</p>
-              </div>
+              {hasWorkbookCleaningSummary && (
+                <div className="clean-prepare-workbook-summary" aria-live="polite">
+                  <strong>Workbook cleaning status</strong>
+                  <span>
+                    {workbookCleanedCount > 0 &&
+                      `${pluralise(workbookCleanedCount, "cleaned working copy", "cleaned working copies")} available`}
+                    {workbookCleanedCount > 0 && workbookActiveCleanedCount > 0 && " · 1 active"}
+                    {workbookCleanedCount > 0 && workbookNeedsReviewCount > 0 && " · "}
+                    {workbookNeedsReviewCount > 0 &&
+                      `${pluralise(workbookNeedsReviewCount, "worksheet")} needs review`}
+                  </span>
+                  <p>Each worksheet keeps its own original data and its own cleaned working copy.</p>
+                </div>
+              )}
 
               {recipeStatus === "loading" ? (
                 <p className="clean-prepare-preview-state">Loading draft recipe preview...</p>
@@ -823,8 +900,11 @@ export function CleanPrepareReviewPanel({
                     <div className="clean-prepare-activation-area" aria-live="polite">
                       {isUsingCleanedCopy ? (
                         <>
-                          <strong>Current analysis source: Cleaned working copy</strong>
-                          <p>Original workbook preserved. You can switch back to the original analysis table.</p>
+                          <strong>
+                            Active for this worksheet: Cleaned working copy
+                            {selectedWorksheet && ` (${selectedWorksheet.displayName || selectedWorksheet.sheetName})`}
+                          </strong>
+                          <p>Original workbook preserved. You can switch this worksheet back to its original analysis table.</p>
                           <button
                             type="button"
                             className="secondary-button"

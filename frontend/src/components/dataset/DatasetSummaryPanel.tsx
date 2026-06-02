@@ -887,35 +887,73 @@ function DatasetPreviewPage({
 
       {previewMode === "analysis" && (
         <p className="dataset-preview-analysis-source">
-          Current analysis source:{" "}
+          Displayed analysis source:{" "}
           <strong>{isViewingCleanedAnalysisSource ? "Cleaned working copy" : "Original"}</strong>
+          {selectedWorksheet && (
+            <span className="dataset-preview-analysis-source-scope">
+              {` for ${selectedWorksheet.displayName || selectedWorksheet.sheetName}`}
+            </span>
+          )}
         </p>
       )}
 
       {hasWorkbook && (
         <div className="dataset-preview-sheets" aria-label="Worksheets">
-          {worksheets.map((sheet) => (
-            <button
-              type="button"
-              key={sheet.worksheetId}
-              className={`dataset-preview-sheet${
-                sheet.worksheetId === selectedWorksheet?.worksheetId ? " active" : ""
-              }`}
-              disabled={
-                previewMode === "analysis"
-                  ? sheet.status !== "ready"
-                  : sheet.status !== "ready" && sheet.status !== "empty"
-              }
-              onClick={() => selectPreviewWorksheet(sheet.worksheetId)}
-              title={
-                sheet.status === "ready"
-                  ? sheet.displayName || sheet.sheetName
-                  : `${sheet.displayName || sheet.sheetName} is not ready for preview`
-              }
-            >
-              {sheet.displayName || sheet.sheetName}
-            </button>
-          ))}
+          {worksheets.map((sheet) => {
+            const sheetCleanedCopy = dataset.workbook_metadata?.cleanedWorkingCopies?.find(
+              (copy) => copy.sourceWorksheetId === sheet.worksheetId,
+            );
+            const sheetIsActiveCleaned =
+              Boolean(sheetCleanedCopy) &&
+              activeAnalysisSource?.type === "cleaned_working_copy" &&
+              activeAnalysisSource.worksheetId === sheet.worksheetId;
+            const sheetBadgeStatus: "active" | "available" | "original" =
+              sheetIsActiveCleaned ? "active" : sheetCleanedCopy ? "available" : "original";
+            const sheetBadgeLabel =
+              sheetBadgeStatus === "active"
+                ? "Cleaned active"
+                : sheetBadgeStatus === "available"
+                ? "Cleaned available"
+                : "Original";
+            const sheetName = sheet.displayName || sheet.sheetName;
+            const shouldShowBadge =
+              previewMode === "analysis" && sheetBadgeStatus !== "original";
+            return (
+              <button
+                type="button"
+                key={sheet.worksheetId}
+                className={`dataset-preview-sheet${
+                  sheet.worksheetId === selectedWorksheet?.worksheetId ? " active" : ""
+                }`}
+                disabled={
+                  previewMode === "analysis"
+                    ? sheet.status !== "ready"
+                    : sheet.status !== "ready" && sheet.status !== "empty"
+                }
+                onClick={() => selectPreviewWorksheet(sheet.worksheetId)}
+                title={
+                  sheet.status === "ready"
+                    ? `${sheetName}${shouldShowBadge ? ` — ${sheetBadgeLabel}` : ""}`
+                    : `${sheetName} is not ready for preview`
+                }
+                aria-label={
+                  shouldShowBadge
+                    ? `${sheetName}, ${sheetBadgeLabel}`
+                    : sheetName
+                }
+              >
+                <span className="dataset-preview-sheet-label">{sheetName}</span>
+                {shouldShowBadge && (
+                  <span
+                    className={`dataset-preview-sheet-badge is-${sheetBadgeStatus}`}
+                    aria-hidden="true"
+                  >
+                    {sheetBadgeLabel}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 

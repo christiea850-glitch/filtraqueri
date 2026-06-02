@@ -4339,7 +4339,14 @@ body {
   color: #1e3a8a;
 }
 
+.app .dataset-preview-analysis-source-scope {
+  color: #64748b;
+}
+
 .app .dataset-preview-sheet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 999px;
@@ -4353,6 +4360,36 @@ body {
     background 140ms ease,
     border-color 140ms ease,
     color 140ms ease;
+}
+
+.app .dataset-preview-sheet-label {
+  line-height: 1.1;
+}
+
+.app .dataset-preview-sheet-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.app .dataset-preview-sheet-badge.is-active {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #065f46;
+}
+
+.app .dataset-preview-sheet-badge.is-available {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
 .app .dataset-preview-sheet:hover {
