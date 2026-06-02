@@ -36,7 +36,7 @@ XML_NS = {
     "rel": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
     "pkg_rel": "http://schemas.openxmlformats.org/package/2006/relationships",
 }
-HEADER_SCAN_ROW_LIMIT = 6
+HEADER_SCAN_ROW_LIMIT = 8
 HEADER_PREVIEW_VALUE_LIMIT = 12
 STRUCTURAL_COLUMN_SAMPLE_LIMIT = 200
 STRUCTURAL_COLUMN_EMPTY_RATIO_THRESHOLD = 0.95
