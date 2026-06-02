@@ -267,6 +267,20 @@ export async function removeWorkspaceManifest(workspaceId: string) {
   );
 }
 
+export async function deleteDataset(datasetId: string) {
+  return requestJson<{
+    deleted: boolean;
+    dataset_id: string;
+    removed_artifacts: string[];
+  }>(
+    `${API_BASE_URL}/datasets/${datasetId}`,
+    {
+      method: "DELETE",
+    },
+    "Dataset could not be deleted.",
+  );
+}
+
 export async function filterDataset(datasetId: string, request: FilterRequest) {
   return requestJson<FilterResponse>(
     `${API_BASE_URL}/datasets/${datasetId}/filter`,

@@ -1,6 +1,7 @@
 import { type ChangeEvent, useEffect, useState } from "react";
 import type { HumanIntent } from "../../components/dataset/DatasetSummaryPanel";
 import {
+  deleteDataset,
   getDataset,
   getPreview,
   getWorkspaceManifest,
@@ -492,19 +493,32 @@ function useWorkspaceDatasetController({
     if (shouldRemove) removeRecentDataset(datasetId);
   };
 
-  const confirmFutureDatasetDelete = (datasetId: string) => {
+  const confirmFutureDatasetDelete = async (datasetId: string) => {
     const targetDataset =
       dataset?.dataset_id === datasetId
         ? dataset
         : recentDatasets.find((session) => session.dataset.dataset_id === datasetId)?.dataset;
     const datasetName = targetDataset?.original_filename || "this dataset";
     const shouldContinue = window.confirm(
-      `Delete "${datasetName}"? Backend dataset deletion is not connected yet, so no data will be deleted in this phase.`,
+      `Delete "${datasetName}"? This permanently removes the uploaded data, the analysis database, and the manifest from the server. This cannot be undone.`,
     );
 
-    if (shouldContinue) {
-      window.alert("Dataset deletion is future-ready, but backend deletion is not connected yet.");
+    if (!shouldContinue) return;
+
+    try {
+      await deleteDataset(datasetId);
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Dataset could not be deleted.";
+      window.alert(`Could not delete "${datasetName}": ${message}`);
+      return;
     }
+
+    if (dataset?.dataset_id === datasetId) {
+      clearCurrentDatasetSession();
+    }
+    removeRecentDataset(datasetId);
   };
 
   useEffect(() => {

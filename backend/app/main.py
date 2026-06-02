@@ -1415,6 +1415,96 @@ def get_dataset(dataset_id: str) -> dict[str, Any]:
     return {"dataset": get_dataset_metadata(dataset_id)}
 
 
+@app.delete("/datasets/{dataset_id}")
+def delete_dataset(dataset_id: str) -> dict[str, Any]:
+    metadata = dataset_sessions.get(dataset_id)
+    removed_artifacts: list[str] = []
+
+    if metadata is None:
+        # Fall back: scan manifests for orphaned references so the user can clean up
+        # leftover state from datasets whose in-memory session was lost (e.g., backend
+        # restart after upload but before we cached the manifest re-hydration).
+        manifest_hit = False
+        for manifest_path in MANIFESTS_DIR.glob("*.json"):
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                continue
+            datasets = manifest.get("datasets")
+            if not isinstance(datasets, list):
+                continue
+            if any(
+                isinstance(entry, dict) and entry.get("dataset_id") == dataset_id
+                for entry in datasets
+            ):
+                manifest_hit = True
+                break
+        if not manifest_hit:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+
+    if isinstance(metadata, dict):
+        duckdb_path_value = metadata.get("duckdb_path")
+        if duckdb_path_value:
+            try:
+                Path(duckdb_path_value).unlink(missing_ok=True)
+                removed_artifacts.append("duckdb")
+            except OSError:
+                pass
+
+        uploaded_path_value = metadata.get("uploaded_path")
+        if uploaded_path_value:
+            try:
+                Path(uploaded_path_value).unlink(missing_ok=True)
+                removed_artifacts.append("uploaded")
+            except OSError:
+                pass
+
+    if dataset_sessions.pop(dataset_id, None) is not None:
+        removed_artifacts.append("session")
+
+    # Remove this dataset from any workspace manifests that reference it.
+    # If a manifest has no other datasets after removal, drop the manifest file.
+    for manifest_path in MANIFESTS_DIR.glob("*.json"):
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        datasets = manifest.get("datasets")
+        if not isinstance(datasets, list):
+            continue
+
+        filtered_datasets = [
+            entry for entry in datasets
+            if not (isinstance(entry, dict) and entry.get("dataset_id") == dataset_id)
+        ]
+        changed = len(filtered_datasets) != len(datasets)
+
+        if manifest.get("active_dataset_id") == dataset_id:
+            manifest["active_dataset_id"] = None
+            changed = True
+
+        if not changed:
+            continue
+
+        manifest["datasets"] = filtered_datasets
+        try:
+            if not filtered_datasets:
+                manifest_path.unlink(missing_ok=True)
+                removed_artifacts.append(f"manifest:{manifest_path.stem}")
+            else:
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                removed_artifacts.append(f"manifest_update:{manifest_path.stem}")
+        except OSError:
+            pass
+
+    return {
+        "deleted": True,
+        "dataset_id": dataset_id,
+        "removed_artifacts": removed_artifacts,
+    }
+
+
 @app.get("/datasets/{dataset_id}/preview")
 def get_dataset_preview(
     dataset_id: str,
