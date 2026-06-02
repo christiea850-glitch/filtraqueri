@@ -20,6 +20,27 @@ class WorksheetTableMapping(BaseModel):
     original_index: int = Field(ge=0)
 
 
+class WorksheetTemplateStructureEvidence(BaseModel):
+    type: Literal[
+        "repeated_header",
+        "date_title_row",
+        "section_banner",
+        "sparse_layout_gap",
+        "serial_only_placeholder_rows",
+        "side_note_region_candidate",
+        "repeated_missing_pattern",
+        "clean_table_counter_signal",
+    ]
+    row_index: int | None = Field(default=None, ge=0)
+    row_range: list[int] | None = None
+    row_indexes: list[int] = Field(default_factory=list)
+    column_range: list[int] | None = None
+    label: str | None = None
+    preview_values: list[str] = Field(default_factory=list)
+    confidence: Literal["low", "medium", "high"]
+    explanation: str
+
+
 class WorksheetNormalizationMetadata(BaseModel):
     version: int = WORKBOOK_METADATA_NORMALIZATION_VERSION
     normalized_at: str
@@ -37,6 +58,9 @@ class WorksheetNormalizationMetadata(BaseModel):
     recommended_hidden_columns: list[str] = Field(default_factory=list)
     duplicate_column_count: int = Field(default=0, ge=0)
     empty_column_count: int = Field(default=0, ge=0)
+    template_structure_candidate: bool = False
+    template_structure_confidence: Literal["low", "medium", "high"] = "low"
+    template_structure_evidence: list[WorksheetTemplateStructureEvidence] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 

@@ -19,6 +19,7 @@ from .workbook_models import (
     WorkbookSourceFileMetadata,
     WorksheetMetadata,
     WorksheetNormalizationMetadata,
+    WorksheetTemplateStructureEvidence,
     WorksheetTableMapping,
 )
 from .workbook_relationships import profile_relationship_candidates
@@ -50,6 +51,8 @@ STRUCTURAL_COLUMN_HEADER_NAMES = {
     "column_name",
     "data_type",
 }
+TEMPLATE_STRUCTURE_CANDIDATE_SCORE = 5
+TEMPLATE_STRUCTURE_HIGH_CONFIDENCE_SCORE = 9
 
 
 @dataclass(frozen=True)
@@ -531,6 +534,253 @@ def detect_structural_column_candidates(
     return candidates, STRUCTURAL_COLUMN_WARNING, "high", sample_size, candidates
 
 
+def populated_column_indexes(row: list[Any]) -> list[int]:
+    return [index for index, value in enumerate(row) if not is_blank_cell(value)]
+
+
+def contiguous_header_width(header_row: list[Any]) -> int:
+    width = 0
+    for value in header_row:
+        if is_blank_cell(value):
+            break
+        width += 1
+    return width
+
+
+def row_signature(row: list[Any], width: int) -> tuple[str, ...]:
+    return tuple(normalize_cell_text(value) for value in row[:width])
+
+
+def contiguous_ranges(indexes: list[int]) -> list[list[int]]:
+    if not indexes:
+        return []
+    ranges: list[list[int]] = []
+    start = indexes[0]
+    end = indexes[0]
+    for index in indexes[1:]:
+        if index == end + 1:
+            end = index
+            continue
+        ranges.append([start, end])
+        start = index
+        end = index
+    ranges.append([start, end])
+    return ranges
+
+
+def detect_template_structure(
+    raw_rows: list[list[Any]],
+    header_row_index: int | None,
+) -> tuple[bool, str, list[WorksheetTemplateStructureEvidence]]:
+    if header_row_index is None or not (0 <= header_row_index < len(raw_rows)):
+        return False, "low", []
+
+    header_row = raw_rows[header_row_index]
+    main_width = contiguous_header_width(header_row)
+    if main_width < 2:
+        return False, "low", []
+
+    evidence: list[WorksheetTemplateStructureEvidence] = []
+    score = 0
+    canonical_signature = row_signature(header_row, main_width)
+
+    repeated_header_indexes = [
+        index
+        for index, row in enumerate(raw_rows[header_row_index + 1 :], start=header_row_index + 1)
+        if row_signature(row, main_width) == canonical_signature
+    ]
+    if repeated_header_indexes:
+        score += 4
+        evidence.append(
+            WorksheetTemplateStructureEvidence(
+                type="repeated_header",
+                row_indexes=repeated_header_indexes,
+                row_range=[repeated_header_indexes[0], repeated_header_indexes[-1]],
+                preview_values=preview_row_values(header_row[:main_width]),
+                confidence="high",
+                explanation=(
+                    f"Canonical worksheet headers repeat {len(repeated_header_indexes)} time(s) "
+                    "below the selected header row."
+                ),
+            )
+        )
+
+    date_title_indexes = [
+        index
+        for index, row in enumerate(raw_rows)
+        if len(non_empty_values(row)) == 1 and looks_like_date_value(non_empty_values(row)[0])
+    ]
+    if date_title_indexes:
+        score += 2
+        evidence.append(
+            WorksheetTemplateStructureEvidence(
+                type="date_title_row",
+                row_indexes=date_title_indexes,
+                row_range=[date_title_indexes[0], date_title_indexes[-1]],
+                preview_values=[
+                    preview_row_values(raw_rows[index])[0]
+                    for index in date_title_indexes[:5]
+                ],
+                confidence="medium" if len(date_title_indexes) == 1 else "high",
+                explanation=(
+                    f"Detected {len(date_title_indexes)} sparse date/title row(s), "
+                    "which may label recurring report blocks."
+                ),
+            )
+        )
+
+    banner_indexes_by_label: dict[str, list[int]] = {}
+    for index, row in enumerate(raw_rows):
+        values = non_empty_values(row)
+        if (
+            len(values) == 1
+            and not looks_like_date_value(values[0])
+            and not looks_like_numeric_value(values[0])
+            and is_all_caps_short_phrase_row(row)
+        ):
+            banner_indexes_by_label.setdefault(values[0], []).append(index)
+    for label, indexes in banner_indexes_by_label.items():
+        if len(indexes) < 2:
+            continue
+        score += 3
+        evidence.append(
+            WorksheetTemplateStructureEvidence(
+                type="section_banner",
+                row_indexes=indexes,
+                row_range=[indexes[0], indexes[-1]],
+                label=label.upper(),
+                preview_values=[label.upper()],
+                confidence="high",
+                explanation=f"Repeated section banner appears {len(indexes)} time(s).",
+            )
+        )
+
+    blank_indexes = [
+        index for index, row in enumerate(raw_rows)
+        if not populated_column_indexes(row)
+    ]
+    layout_gap_ranges = [
+        row_range for row_range in contiguous_ranges(blank_indexes)
+        if row_range[1] - row_range[0] + 1 >= 2
+    ]
+    if layout_gap_ranges:
+        score += 1
+        for row_range in layout_gap_ranges[:10]:
+            evidence.append(
+                WorksheetTemplateStructureEvidence(
+                    type="sparse_layout_gap",
+                    row_range=row_range,
+                    confidence="medium",
+                    explanation="Consecutive blank rows may represent visual spacing between template blocks.",
+                )
+            )
+
+    placeholder_indexes = [
+        index
+        for index, row in enumerate(raw_rows[header_row_index + 1 :], start=header_row_index + 1)
+        if populated_column_indexes(row) == [0]
+        and looks_like_numeric_value(normalize_cell_text(row[0]))
+    ]
+    placeholder_ranges = [
+        row_range for row_range in contiguous_ranges(placeholder_indexes)
+        if row_range[1] - row_range[0] + 1 >= 2
+    ]
+    if placeholder_ranges:
+        score += 2
+        for row_range in placeholder_ranges[:10]:
+            evidence.append(
+                WorksheetTemplateStructureEvidence(
+                    type="serial_only_placeholder_rows",
+                    row_range=row_range,
+                    confidence="high",
+                    explanation=(
+                        "Consecutive rows contain only serial numbers while business fields are blank; "
+                        "these may be pre-formatted template slots."
+                    ),
+                )
+            )
+
+    populated_header_indexes = populated_column_indexes(header_row)
+    separator_columns = [
+        index for index in range(main_width, max(populated_header_indexes, default=-1))
+        if is_blank_cell(header_row[index])
+    ]
+    side_note_indexes = [index for index in populated_header_indexes if index > main_width]
+    if separator_columns and side_note_indexes:
+        score += 2
+        evidence.append(
+            WorksheetTemplateStructureEvidence(
+                type="side_note_region_candidate",
+                row_index=header_row_index,
+                column_range=[side_note_indexes[0], side_note_indexes[-1]],
+                preview_values=preview_row_values(header_row[side_note_indexes[0] : side_note_indexes[-1] + 1]),
+                confidence="high",
+                explanation=(
+                    "Populated cells appear to the right of the main header region after one or more "
+                    "blank separator columns."
+                ),
+            )
+        )
+
+    missing_patterns: dict[tuple[bool, ...], list[int]] = {}
+    for index, row in enumerate(raw_rows[header_row_index + 1 :], start=header_row_index + 1):
+        pattern = tuple(is_blank_cell(value) for value in row[:main_width])
+        populated_count = sum(1 for is_blank in pattern if not is_blank)
+        if 0 < populated_count < main_width:
+            missing_patterns.setdefault(pattern, []).append(index)
+    repeated_sparse_patterns = [
+        indexes for indexes in missing_patterns.values()
+        if len(indexes) >= 3
+    ]
+    if repeated_sparse_patterns:
+        score += 1
+        indexes = max(repeated_sparse_patterns, key=len)
+        evidence.append(
+            WorksheetTemplateStructureEvidence(
+                type="repeated_missing_pattern",
+                row_indexes=indexes[:25],
+                row_range=[indexes[0], indexes[-1]],
+                confidence="medium",
+                explanation=(
+                    f"A sparse missing-value pattern repeats {len(indexes)} time(s) "
+                    "within the main table-shaped region."
+                ),
+            )
+        )
+
+    data_rows = [
+        row[:main_width]
+        for row in raw_rows[header_row_index + 1 :]
+        if populated_column_indexes(row)
+    ]
+    rectangular_rows = sum(
+        1 for row in data_rows
+        if len(row) >= main_width and all(not is_blank_cell(value) for value in row)
+    )
+    has_repeated_banner = any(len(indexes) >= 2 for indexes in banner_indexes_by_label.values())
+    has_structural_repeat = bool(repeated_header_indexes or has_repeated_banner or layout_gap_ranges)
+    if data_rows and ratio(rectangular_rows, len(data_rows)) >= 0.9 and not has_structural_repeat:
+        score -= 4
+        evidence.append(
+            WorksheetTemplateStructureEvidence(
+                type="clean_table_counter_signal",
+                row_range=[header_row_index + 1, len(raw_rows) - 1],
+                confidence="high",
+                explanation="Rows below the selected header form a consistently populated rectangular table.",
+            )
+        )
+
+    candidate = score >= TEMPLATE_STRUCTURE_CANDIDATE_SCORE
+    confidence = (
+        "high"
+        if score >= TEMPLATE_STRUCTURE_HIGH_CONFIDENCE_SCORE
+        else "medium"
+        if candidate
+        else "low"
+    )
+    return candidate, confidence, evidence
+
+
 def normalize_rows(raw_rows: list[list[Any]]) -> NormalizedWorksheetRows:
     non_empty_rows = [
         (index, row)
@@ -801,6 +1051,14 @@ def ingest_workbook(
             sheet_name = sheet["name"]
             table_name = generate_safe_worksheet_table_name(sheet_name, index)
             normalized_rows = normalize_rows(sheet["rows"])
+            (
+                template_structure_candidate,
+                template_structure_confidence,
+                template_structure_evidence,
+            ) = detect_template_structure(
+                sheet["rows"],
+                normalized_rows.header_row_index,
+            )
             columns = normalized_rows.columns
             rows = normalized_rows.data_rows
             status = "ready" if columns else "empty"
@@ -851,6 +1109,9 @@ def ingest_workbook(
                         recommended_hidden_columns=normalized_rows.recommended_hidden_columns,
                         duplicate_column_count=normalized_rows.duplicate_column_count,
                         empty_column_count=normalized_rows.empty_column_count,
+                        template_structure_candidate=template_structure_candidate,
+                        template_structure_confidence=template_structure_confidence,
+                        template_structure_evidence=template_structure_evidence,
                         warnings=[
                             warning
                             for warning in [
