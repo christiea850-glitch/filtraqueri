@@ -2,6 +2,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 import { buildPreparationSignalReport } from "../../features/dataPreparation/preparationSignals";
 import {
+  createMissingValueDecision,
+  createMissingValueDecisionKey,
+  decisionNeedsCustomValue,
+  getColumnMissingValueStrategies,
+  missingValueStrategyLabels,
+  readMissingValueDecisions,
+  WORKSHEET_DECISION_COLUMN,
+  worksheetMissingValueStrategies,
+  writeMissingValueDecisions,
+  type MissingValueStrategy,
+} from "../../features/dataPreparation/missingValueDecisions";
+import {
   getWorkbookMetadata,
   type WorksheetMetadata,
   type WorksheetTemplateStructureEvidence,
@@ -346,6 +358,7 @@ export function CleanPrepareReviewPanel({
     Record<string, ApplyState>
   >({});
   const [activationState, setActivationState] = useState<ActivationState>({ status: "idle" });
+  const [missingValueDecisions, setMissingValueDecisions] = useState(readMissingValueDecisions);
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
   const issueGroups = useMemo(
     () =>
@@ -375,6 +388,39 @@ export function CleanPrepareReviewPanel({
     worksheets.find((worksheet) => worksheet.worksheetId === selectedWorksheetId) ||
     activePreviewableWorksheet ||
     firstPreviewableWorksheet;
+  const decisionWorksheetId = selectedWorksheet?.worksheetId || "dataset";
+  const decisionColumns = selectedWorksheet?.schema || dataset.schema;
+  const decisionRowCount = selectedWorksheet?.rowCount || dataset.row_count;
+  const missingValueColumns = decisionColumns
+    .filter((column) => column.null_count > 0)
+    .sort((left, right) => right.null_count - left.null_count);
+  const worksheetDecisionKey = createMissingValueDecisionKey(
+    dataset.dataset_id,
+    decisionWorksheetId,
+    WORKSHEET_DECISION_COLUMN,
+  );
+  const worksheetDecision = missingValueDecisions[worksheetDecisionKey];
+  const isPerColumnDecision = worksheetDecision?.strategy === "decide_per_column";
+  const decidedColumnCount = missingValueColumns.filter((column) => {
+    const decision =
+      missingValueDecisions[
+        createMissingValueDecisionKey(dataset.dataset_id, decisionWorksheetId, column.name)
+      ];
+    return Boolean(
+      decision &&
+      (!decisionNeedsCustomValue(decision.strategy) || decision.customValue?.trim()),
+    );
+  }).length;
+  const missingValueDecisionReady =
+    missingValueColumns.length > 0 &&
+    Boolean(worksheetDecision) &&
+    (!isPerColumnDecision || decidedColumnCount === missingValueColumns.length);
+  const missingValueDecisionStatus = !worksheetDecision
+    ? "Not reviewed"
+    : missingValueDecisionReady
+      ? "Ready for cleanup plan"
+      : "Decision needed";
+  const worstBlankColumns = missingValueColumns.slice(0, 3);
   const previewWorksheetId = selectedWorksheet?.worksheetId;
   const previewWorksheetStatus = selectedWorksheet?.status;
   const excludedEntries = recipePreview
@@ -525,6 +571,21 @@ export function CleanPrepareReviewPanel({
 
   const updateApplyState = (worksheetId: string, next: ApplyState) => {
     setApplyStateByWorksheet((current) => ({ ...current, [worksheetId]: next }));
+  };
+
+  const saveMissingValueDecision = (
+    key: string,
+    strategy: MissingValueStrategy,
+    customValue?: string,
+  ) => {
+    setMissingValueDecisions((current) => {
+      const next = {
+        ...current,
+        [key]: createMissingValueDecision(strategy, customValue),
+      };
+      writeMissingValueDecisions(next);
+      return next;
+    });
   };
 
   const beginApplyConfirm = () => {
@@ -705,6 +766,148 @@ export function CleanPrepareReviewPanel({
               <p>No draft fixes are suggested yet.</p>
             )}
           </details>
+
+          {missingValueColumns.length > 0 && (
+            <section className="clean-prepare-missing-decisions">
+              <div className="clean-prepare-section-heading">
+                <div>
+                  <h4>Missing value decisions</h4>
+                  <p>
+                    Blanks may be intentional layout space, empty future-entry rows, real missing
+                    values, unknown values, or fields that should be completed later.
+                  </p>
+                </div>
+                <strong>{missingValueDecisionStatus}</strong>
+              </div>
+
+              {selectedWorksheet?.normalization.templateStructureCandidate && (
+                <p className="clean-prepare-missing-warning">
+                  This worksheet has template-layout signals. Review blanks before choosing any fill
+                  strategy.
+                </p>
+              )}
+
+              <div className="clean-prepare-missing-summary">
+                <span>{pluralise(missingValueColumns.length, "column")} with blanks</span>
+                <span>{worksheetDecision ? "Reviewed" : "Not reviewed"}</span>
+                <span>
+                  {worksheetDecision
+                    ? `Selected strategy: ${missingValueStrategyLabels[worksheetDecision.strategy]}`
+                    : "Selected strategy: Decision needed"}
+                </span>
+                {isPerColumnDecision && (
+                  <span>{decidedColumnCount.toLocaleString()} of {missingValueColumns.length.toLocaleString()} columns decided</span>
+                )}
+              </div>
+
+              <label className="clean-prepare-missing-strategy">
+                <span>Worksheet strategy</span>
+                <select
+                  value={worksheetDecision?.strategy || ""}
+                  onChange={(event) =>
+                    saveMissingValueDecision(
+                      worksheetDecisionKey,
+                      event.target.value as MissingValueStrategy,
+                    )
+                  }
+                >
+                  <option value="" disabled>Choose a draft decision</option>
+                  {worksheetMissingValueStrategies.map((strategy) => (
+                    <option key={strategy} value={strategy}>
+                      {missingValueStrategyLabels[strategy]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <details className="clean-prepare-disclosure">
+                <summary>
+                  <strong>Worst blank-rate fields</strong>
+                  <span>{pluralise(worstBlankColumns.length, "field")}</span>
+                </summary>
+                <ul>
+                  {worstBlankColumns.map((column) => {
+                    const rate = decisionRowCount > 0
+                      ? (column.null_count / decisionRowCount) * 100
+                      : 0;
+                    return (
+                      <li key={column.name}>
+                        <strong>{column.name}</strong>
+                        <span>{column.null_count.toLocaleString()} blanks ({rate.toFixed(1)}%). {rate >= 70 ? "High blank rate: review before filling." : "Review before future cleanup."}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+
+              {isPerColumnDecision && (
+                <details className="clean-prepare-disclosure" open>
+                  <summary>
+                    <strong>Decide per column</strong>
+                    <span>{pluralise(missingValueColumns.length, "field")}</span>
+                  </summary>
+                  <div className="clean-prepare-missing-columns">
+                    {missingValueColumns.map((column) => {
+                      const decisionKey = createMissingValueDecisionKey(
+                        dataset.dataset_id,
+                        decisionWorksheetId,
+                        column.name,
+                      );
+                      const decision = missingValueDecisions[decisionKey];
+                      const rate = decisionRowCount > 0
+                        ? (column.null_count / decisionRowCount) * 100
+                        : 0;
+                      return (
+                        <div className="clean-prepare-missing-column" key={column.name}>
+                          <div>
+                            <strong>{column.name}</strong>
+                            <span>{column.inferred_type} / {rate.toFixed(1)}% blank</span>
+                          </div>
+                          <select
+                            aria-label={`Missing value strategy for ${column.name}`}
+                            value={decision?.strategy || ""}
+                            onChange={(event) =>
+                              saveMissingValueDecision(
+                                decisionKey,
+                                event.target.value as MissingValueStrategy,
+                              )
+                            }
+                          >
+                            <option value="" disabled>Choose decision</option>
+                            {getColumnMissingValueStrategies(column).map((strategy) => (
+                              <option key={strategy} value={strategy}>
+                                {missingValueStrategyLabels[strategy]}
+                              </option>
+                            ))}
+                          </select>
+                          {decisionNeedsCustomValue(decision?.strategy) && (
+                            <input
+                              type={decision?.strategy === "custom_date" ? "date" : "text"}
+                              value={decision?.customValue || ""}
+                              placeholder="Custom value"
+                              aria-label={`Custom missing value for ${column.name}`}
+                              onChange={(event) =>
+                                saveMissingValueDecision(
+                                  decisionKey,
+                                  decision.strategy,
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              )}
+
+              <p className="clean-prepare-missing-draft-note">
+                Draft decision only. Decision saved for a future cleanup plan; no values have been
+                changed.
+              </p>
+            </section>
+          )}
 
           {supportsRecipePreview && worksheets.length > 0 && (
             <section className="clean-prepare-recipe-preview">
