@@ -32,6 +32,10 @@ UPLOADS_DIR = STORAGE_DIR / "uploads"
 SESSIONS_DIR = STORAGE_DIR / "sessions"
 MANIFESTS_DIR = STORAGE_DIR / "manifests"
 TABLE_NAME = "data"
+RESTORE_CLEANED_COPY_FALLBACK_WARNING = (
+    "Cleaned working copy was unavailable during restore, so FiltraQueri returned "
+    "to the original analysis table."
+)
 WORKSPACE_MANIFEST_VERSION = 1
 DEFAULT_PREVIEW_LIMIT = 25
 MAX_QUERY_LIMIT = 1000
@@ -626,12 +630,23 @@ def validate_workspace_manifest_files(manifest: dict[str, Any]) -> None:
             raise HTTPException(status_code=404, detail="Workspace dataset files are missing")
         workbook_metadata = dataset_entry.get("workbook_metadata")
         if isinstance(workbook_metadata, dict):
-            workbook_messages = validate_workbook_manifest_tables(workbook_metadata, duckdb_path)
+            workbook_messages = validate_workbook_manifest_tables(
+                workbook_metadata,
+                duckdb_path,
+                include_active_source_warnings=False,
+                include_compatibility_view_warning=False,
+            )
             if workbook_messages:
                 raise HTTPException(status_code=404, detail="Workbook worksheet tables are missing")
 
 
-def validate_workbook_manifest_tables(workbook_metadata: dict[str, Any], duckdb_path: Path) -> list[str]:
+def validate_workbook_manifest_tables(
+    workbook_metadata: dict[str, Any],
+    duckdb_path: Path,
+    *,
+    include_active_source_warnings: bool = True,
+    include_compatibility_view_warning: bool = True,
+) -> list[str]:
     worksheets = workbook_metadata.get("worksheets") if isinstance(workbook_metadata.get("worksheets"), list) else []
     ready_table_names = [
         worksheet.get("table_name")
@@ -654,15 +669,240 @@ def validate_workbook_manifest_tables(workbook_metadata: dict[str, Any], duckdb_
                 for table_name in ready_table_names
                 if table_name not in existing_tables
             ]
-            if TABLE_NAME not in existing_tables:
+            if include_compatibility_view_warning and TABLE_NAME not in existing_tables:
                 messages.append("Active workbook compatibility table is missing.")
+            if include_active_source_warnings:
+                messages.extend(
+                    validate_active_analysis_source(workbook_metadata, existing_tables)
+                )
             return messages
     except duckdb.Error:
         return ["Workbook DuckDB session could not be validated."]
 
 
+def validate_active_analysis_source(
+    workbook_metadata: dict[str, Any],
+    existing_tables: set[str],
+) -> list[str]:
+    active_source = workbook_metadata.get("active_analysis_source")
+    if not isinstance(active_source, dict):
+        return []
+
+    source_type = active_source.get("type")
+    if source_type not in ("original", "cleaned_working_copy"):
+        return ["Active analysis source type is invalid and will be reset during restore."]
+
+    worksheets = workbook_metadata.get("worksheets")
+    worksheets = worksheets if isinstance(worksheets, list) else []
+    worksheet = next(
+        (
+            candidate
+            for candidate in worksheets
+            if isinstance(candidate, dict)
+            and candidate.get("worksheet_id") == active_source.get("worksheet_id")
+        ),
+        None,
+    )
+    if not worksheet:
+        return ["Active analysis source worksheet is missing and will be reset during restore."]
+
+    original_table_name = worksheet.get("table_name")
+    if not original_table_name or original_table_name not in existing_tables:
+        return ["Active analysis source original worksheet table is missing."]
+    if source_type == "original":
+        return []
+
+    cleaned_copies = workbook_metadata.get("cleaned_working_copies")
+    cleaned_copies = cleaned_copies if isinstance(cleaned_copies, list) else []
+    cleaned_copy = next(
+        (
+            candidate
+            for candidate in cleaned_copies
+            if isinstance(candidate, dict)
+            and candidate.get("source_worksheet_id") == worksheet.get("worksheet_id")
+        ),
+        None,
+    )
+    cleaned_table_name = cleaned_copy.get("cleaned_table_name") if cleaned_copy else None
+    if not cleaned_table_name or cleaned_table_name not in existing_tables:
+        return [RESTORE_CLEANED_COPY_FALLBACK_WARNING]
+    return []
+
+
+def sanitize_restored_query_builder_metadata(
+    manifest: dict[str, Any],
+    valid_columns: set[str],
+) -> bool:
+    query_builder_metadata = manifest.get("query_builder_metadata")
+    if not isinstance(query_builder_metadata, dict):
+        return False
+
+    sanitized = {**query_builder_metadata}
+    for field in ("selected_columns", "group_by"):
+        values = query_builder_metadata.get(field)
+        if isinstance(values, list):
+            sanitized[field] = [
+                value for value in values if isinstance(value, str) and value in valid_columns
+            ]
+
+    aggregations = query_builder_metadata.get("aggregations")
+    if isinstance(aggregations, list):
+        sanitized["aggregations"] = [
+            aggregation
+            for aggregation in aggregations
+            if isinstance(aggregation, dict)
+            and (
+                aggregation.get("column") in (None, "")
+                or aggregation.get("column") in valid_columns
+            )
+        ]
+
+    sort_column = query_builder_metadata.get("sort_column")
+    if isinstance(sort_column, str) and sort_column and sort_column not in valid_columns:
+        sanitized["sort_column"] = ""
+
+    if sanitized == query_builder_metadata:
+        return False
+    manifest["query_builder_metadata"] = sanitized
+    return True
+
+
+def reconcile_restored_analysis_source(
+    dataset_entry: dict[str, Any],
+    manifest: dict[str, Any],
+) -> bool:
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        dataset_entry.get("workbook_metadata")
+    )
+    if not workbook_metadata:
+        return False
+
+    worksheets = workbook_metadata.get("worksheets")
+    worksheets = worksheets if isinstance(worksheets, list) else []
+    ready_worksheets = [
+        worksheet
+        for worksheet in worksheets
+        if isinstance(worksheet, dict) and worksheet.get("status") == "ready"
+    ]
+    if not ready_worksheets:
+        return False
+
+    worksheet = next(
+        (
+            candidate
+            for candidate in ready_worksheets
+            if candidate.get("worksheet_id") == workbook_metadata.get("active_worksheet_id")
+        ),
+        ready_worksheets[0],
+    )
+    active_source = workbook_metadata.get("active_analysis_source")
+    source_type = active_source.get("type") if isinstance(active_source, dict) else "original"
+    source_worksheet_id = (
+        active_source.get("worksheet_id") if isinstance(active_source, dict) else None
+    )
+    candidate_worksheet = next(
+        (
+            candidate
+            for candidate in ready_worksheets
+            if candidate.get("worksheet_id") == source_worksheet_id
+        ),
+        None,
+    )
+    should_persist = False
+    fallback_warning: str | None = None
+    if source_type not in ("original", "cleaned_working_copy") or not candidate_worksheet:
+        source_type = "original"
+        fallback_warning = "Active analysis source metadata was invalid during restore, so FiltraQueri returned to the original analysis table."
+    else:
+        worksheet = candidate_worksheet
+
+    original_table_name = str(worksheet.get("table_name") or "")
+    if not original_table_name:
+        raise HTTPException(status_code=404, detail="Worksheet table mapping is missing")
+
+    duckdb_path = Path(str(dataset_entry.get("duckdb_path") or ""))
+    try:
+        with duckdb.connect(str(duckdb_path)) as connection:
+            existing_tables = {
+                row[0]
+                for row in connection.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+                ).fetchall()
+            }
+            if original_table_name not in existing_tables:
+                raise HTTPException(status_code=404, detail="Worksheet table is missing")
+
+            trusted_table_name = original_table_name
+            if source_type == "cleaned_working_copy":
+                cleaned_copies = workbook_metadata.get("cleaned_working_copies")
+                cleaned_copies = cleaned_copies if isinstance(cleaned_copies, list) else []
+                cleaned_copy = next(
+                    (
+                        candidate
+                        for candidate in cleaned_copies
+                        if isinstance(candidate, dict)
+                        and candidate.get("source_worksheet_id") == worksheet.get("worksheet_id")
+                    ),
+                    None,
+                )
+                cleaned_table_name = cleaned_copy.get("cleaned_table_name") if cleaned_copy else None
+                if cleaned_table_name and cleaned_table_name in existing_tables:
+                    trusted_table_name = str(cleaned_table_name)
+                else:
+                    source_type = "original"
+                    fallback_warning = RESTORE_CLEANED_COPY_FALLBACK_WARNING
+
+            connection.execute(
+                f"CREATE OR REPLACE VIEW {quote_identifier(TABLE_NAME)} AS SELECT * FROM {quote_identifier(trusted_table_name)}"
+            )
+            schema = profile_dataset(connection)
+            row_count, column_count = table_stats(connection)
+    except HTTPException:
+        raise
+    except duckdb.Error as error:
+        raise HTTPException(status_code=400, detail=f"Workbook restore failed: {error}") from error
+
+    active_analysis_source = {
+        "type": source_type,
+        "worksheet_id": worksheet.get("worksheet_id"),
+        "table_name": trusted_table_name,
+        "original_table_name": original_table_name,
+        "activated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    workbook_metadata["active_worksheet_id"] = worksheet.get("worksheet_id")
+    workbook_metadata["active_analysis_source"] = active_analysis_source
+    if fallback_warning:
+        normalization = workbook_metadata.get("normalization")
+        normalization = normalization if isinstance(normalization, dict) else {}
+        warnings = normalization.get("warnings")
+        warnings = warnings if isinstance(warnings, list) else []
+        if fallback_warning not in warnings:
+            warnings.append(fallback_warning)
+        normalization["warnings"] = warnings
+        workbook_metadata["normalization"] = normalization
+        should_persist = True
+
+    dataset_entry["schema"] = schema
+    dataset_entry["row_count"] = row_count
+    dataset_entry["column_count"] = column_count
+    dataset_entry["workbook_metadata"] = workbook_metadata
+    if manifest.get("active_dataset_id") == dataset_entry.get("dataset_id"):
+        manifest["workbook_metadata"] = workbook_metadata
+        should_persist = sanitize_restored_query_builder_metadata(
+            manifest,
+            {column["name"] for column in schema},
+        ) or should_persist
+    return should_persist
+
+
 def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
+    should_persist = False
     for dataset_entry in manifest.get("datasets", []):
+        if isinstance(dataset_entry.get("workbook_metadata"), dict):
+            should_persist = (
+                reconcile_restored_analysis_source(dataset_entry, manifest)
+                or should_persist
+            )
         dataset_id = dataset_entry["dataset_id"]
         if dataset_id in dataset_sessions:
             continue
@@ -682,6 +922,8 @@ def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
         if isinstance(dataset_entry.get("workbook_metadata"), dict):
             metadata["workbook_metadata"] = normalize_workbook_manifest_metadata(dataset_entry["workbook_metadata"])
         dataset_sessions[dataset_id] = metadata
+    if should_persist:
+        save_workspace_manifest(manifest)
 
 
 def load_workspace_manifests() -> None:
