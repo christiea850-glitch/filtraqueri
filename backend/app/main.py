@@ -21,6 +21,7 @@ from .workbook_contracts import (
 )
 from .workbook_contract_diagnostics import analyze_contract_diagnostics
 from .workbook_ingestion import ingest_workbook
+from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_original_layout import extract_original_workbook_layout
 
 
@@ -1638,6 +1639,47 @@ def get_original_workbook_layout(
         row_limit=row_limit,
         column_start=column_start,
         column_limit=column_limit,
+    )
+
+
+@app.get("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview")
+def get_cleaning_recipe_preview(
+    dataset_id: str,
+    worksheet_id: str,
+    row_limit: int = 10,
+) -> dict[str, Any]:
+    if row_limit < 1:
+        raise HTTPException(status_code=400, detail="Cleaning recipe preview limit must be 1 or greater")
+
+    metadata = get_dataset_metadata(dataset_id)
+    uploaded_path = metadata.get("uploaded_path")
+    if not uploaded_path:
+        raise HTTPException(status_code=404, detail="Original workbook file mapping is missing")
+    if Path(uploaded_path).suffix.lower() != ".xlsx":
+        raise HTTPException(
+            status_code=400,
+            detail="Cleaning recipe preview currently supports XLSX workbooks only",
+        )
+
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    worksheet = next(
+        (
+            worksheet
+            for worksheet in workbook_metadata.get("worksheets", [])
+            if worksheet.get("worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not worksheet:
+        raise HTTPException(status_code=404, detail="Worksheet was not found")
+
+    return build_cleaning_recipe_preview(
+        workbook_path=Path(uploaded_path),
+        worksheet=worksheet,
+        row_limit=row_limit,
     )
 
 
