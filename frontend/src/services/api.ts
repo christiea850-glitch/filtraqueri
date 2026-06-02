@@ -72,6 +72,71 @@ export type RelationshipContractDiagnosticsResponse = {
   };
 };
 
+export type OriginalWorkbookBorderSide = {
+  style: string | null;
+  color: string | null;
+};
+
+export type OriginalWorkbookCellStyle = {
+  fill_color: string | null;
+  font: {
+    bold: boolean;
+    italic: boolean;
+    size: number | null;
+    color: string | null;
+  };
+  border: {
+    top: OriginalWorkbookBorderSide;
+    right: OriginalWorkbookBorderSide;
+    bottom: OriginalWorkbookBorderSide;
+    left: OriginalWorkbookBorderSide;
+  };
+  alignment: {
+    horizontal: string | null;
+    vertical: string | null;
+    wrap_text: boolean;
+  };
+};
+
+export type OriginalWorkbookLayout = {
+  worksheet_id: string;
+  worksheet_name: string;
+  row_start: number;
+  row_end: number;
+  column_start: number;
+  column_end: number;
+  total_rows: number;
+  total_columns: number;
+  is_empty: boolean;
+  is_bounded: boolean;
+  cells: {
+    row: number;
+    column: number;
+    coordinate: string;
+    display_value: string;
+    is_formula: boolean;
+    style: OriginalWorkbookCellStyle;
+  }[];
+  merged_ranges: {
+    range: string;
+    start_row: number;
+    end_row: number;
+    start_column: number;
+    end_column: number;
+  }[];
+  rows: {
+    index: number;
+    height: number | null;
+    hidden: boolean;
+  }[];
+  columns: {
+    index: number;
+    letter: string;
+    width: number | null;
+    hidden: boolean;
+  }[];
+};
+
 async function parseError(response: Response, fallbackMessage: string) {
   try {
     const payload = await response.json();
@@ -162,6 +227,27 @@ export async function getPreview(datasetId: string, options: WorksheetPreviewOpt
     },
     "Preview could not be loaded.",
   );
+}
+
+export async function getOriginalWorkbookLayout(datasetId: string, worksheetId: string) {
+  try {
+    return await requestJson<OriginalWorkbookLayout>(
+      `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/original-layout?row_start=1&row_limit=200&column_start=1&column_limit=50`,
+      {
+        method: "GET",
+      },
+      "Original workbook layout could not be loaded.",
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message === "Not Found") {
+      throw new Error(
+        "Original workbook view is not available from the running backend. Restart the backend and try again.",
+        { cause: error },
+      );
+    }
+
+    throw error;
+  }
 }
 
 export async function getDataset(datasetId: string) {

@@ -3,3 +3,4 @@ fastapi
 python-multipart
 uvicorn
 xlrd
+openpyxl

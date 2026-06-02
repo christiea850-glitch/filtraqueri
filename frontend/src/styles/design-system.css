@@ -4301,6 +4301,34 @@ body {
   gap: 6px;
 }
 
+.app .dataset-preview-mode-switch {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid #dbe3ea;
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.app .dataset-preview-mode-switch button {
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app .dataset-preview-mode-switch button.is-active {
+  background: #ffffff;
+  color: #0f6575;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
 .app .dataset-preview-sheet {
   padding: 6px 12px;
   border: 1px solid #cbd5e1;
@@ -4416,6 +4444,93 @@ body {
   padding: 24px;
   color: #64748b;
   font-size: 13px;
+}
+
+.app .original-workbook-reference {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.app .original-workbook-reference-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.app .original-workbook-reference-note strong {
+  color: #334155;
+}
+
+.app .original-workbook-reference-note small {
+  color: #8a5d12;
+  font-weight: 700;
+}
+
+.app .original-workbook-grid-wrap {
+  max-height: min(62vh, 680px);
+  overflow: auto;
+  border: 1px solid #dbe3ea;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.app .original-workbook-grid {
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: max-content;
+  color: #1f2937;
+  font-family: Arial, sans-serif;
+  font-size: 12px;
+}
+
+.app .original-workbook-grid th,
+.app .original-workbook-grid td {
+  min-width: 0;
+  height: 20px;
+  padding: 3px 5px;
+  border: 1px solid #d6dce3;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.app .original-workbook-grid thead th,
+.app .original-workbook-grid tbody th {
+  position: sticky;
+  z-index: 2;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.app .original-workbook-grid thead th {
+  top: 0;
+}
+
+.app .original-workbook-grid tbody th {
+  left: 0;
+  width: 42px;
+}
+
+.app .original-workbook-row-heading-column {
+  width: 42px;
+}
+
+.app .original-workbook-corner {
+  left: 0;
+  z-index: 3 !important;
+}
+
+.app .original-workbook-grid .is-hidden-dimension {
+  opacity: 0.42;
 }
 
 /* --- D2: Workbook Connections — clearer, livelier identity -- */

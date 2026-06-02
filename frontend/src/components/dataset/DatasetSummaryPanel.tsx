@@ -1,6 +1,18 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
-import { getPreview } from "../../services/api";
+import {
+  getOriginalWorkbookLayout,
+  getPreview,
+  type OriginalWorkbookCellStyle,
+  type OriginalWorkbookLayout,
+} from "../../services/api";
 import ColumnDistributionCard from "./ColumnDistributionCard";
 import MissingValuesOverview from "./MissingValuesOverview";
 import { useDataIntelligence } from "../../features/dataIntelligence";
@@ -513,6 +525,182 @@ function CountUp({ value }: { value: number }) {
   return <>{shownValue.toLocaleString()}</>;
 }
 
+type PreviewMode = "analysis" | "original";
+
+const getOriginalBorderStyle = (side: OriginalWorkbookCellStyle["border"]["top"]) => {
+  if (!side.style) return undefined;
+
+  const width = side.style === "medium" ? "2px" : side.style === "thick" ? "3px" : "1px";
+  const style = side.style.includes("dash") ? "dashed" : side.style === "dotted" ? "dotted" : "solid";
+  return `${width} ${style} ${side.color || "#cbd5e1"}`;
+};
+
+const getOriginalCellStyle = (cellStyle?: OriginalWorkbookCellStyle): CSSProperties => {
+  if (!cellStyle) return {};
+
+  return {
+    backgroundColor: cellStyle.fill_color || undefined,
+    color: cellStyle.font.color || undefined,
+    fontSize: cellStyle.font.size ? `${cellStyle.font.size}px` : undefined,
+    fontStyle: cellStyle.font.italic ? "italic" : undefined,
+    fontWeight: cellStyle.font.bold ? 700 : undefined,
+    textAlign: (cellStyle.alignment.horizontal as CSSProperties["textAlign"]) || undefined,
+    verticalAlign: (cellStyle.alignment.vertical as CSSProperties["verticalAlign"]) || undefined,
+    whiteSpace: cellStyle.alignment.wrap_text ? "normal" : undefined,
+    borderTop: getOriginalBorderStyle(cellStyle.border.top),
+    borderRight: getOriginalBorderStyle(cellStyle.border.right),
+    borderBottom: getOriginalBorderStyle(cellStyle.border.bottom),
+    borderLeft: getOriginalBorderStyle(cellStyle.border.left),
+  };
+};
+
+function OriginalWorkbookPreview({
+  datasetId,
+  worksheet,
+}: {
+  datasetId: string;
+  worksheet: WorksheetMetadata | null;
+}) {
+  const [layout, setLayout] = useState<OriginalWorkbookLayout | null>(null);
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!worksheet || (worksheet.status !== "ready" && worksheet.status !== "empty")) return undefined;
+
+    const requestTimeout = window.setTimeout(() => {
+      setStatus("loading");
+      setError(null);
+      setLayout(null);
+
+      getOriginalWorkbookLayout(datasetId, worksheet.worksheetId)
+        .then((response) => {
+          if (cancelled) return;
+          setLayout(response);
+          setStatus("success");
+        })
+        .catch((requestError) => {
+          if (cancelled) return;
+          setLayout(null);
+          setError(
+            requestError instanceof Error && requestError.message
+              ? requestError.message
+              : "Original workbook layout could not be loaded.",
+          );
+          setStatus("error");
+        });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(requestTimeout);
+    };
+  }, [datasetId, worksheet]);
+
+  if (!worksheet) {
+    return <p className="compact-empty">No worksheet is available for original workbook view.</p>;
+  }
+  if (worksheet.status !== "ready" && worksheet.status !== "empty") {
+    return <p className="compact-empty">This worksheet is not available for original workbook view.</p>;
+  }
+  if (status === "loading" || status === "idle") {
+    return <p className="compact-empty">Loading original workbook layout...</p>;
+  }
+  if (status === "error" || !layout) {
+    return <p className="compact-empty">{error || "Original workbook layout is unavailable."}</p>;
+  }
+  if (layout.is_empty) {
+    return <p className="compact-empty">This worksheet is empty in the original workbook.</p>;
+  }
+
+  const cells = new Map(layout.cells.map((cell) => [`${cell.row}:${cell.column}`, cell]));
+  const mergeAnchors = new Map(
+    layout.merged_ranges.map((range) => [`${range.start_row}:${range.start_column}`, range]),
+  );
+  const coveredCells = new Set<string>();
+  layout.merged_ranges.forEach((range) => {
+    for (let row = range.start_row; row <= range.end_row; row += 1) {
+      for (let column = range.start_column; column <= range.end_column; column += 1) {
+        if (row !== range.start_row || column !== range.start_column) {
+          coveredCells.add(`${row}:${column}`);
+        }
+      }
+    }
+  });
+
+  return (
+    <section className="original-workbook-reference" aria-label="Original workbook reference view">
+      <div className="original-workbook-reference-note">
+        <strong>Read-only reference view</strong>
+        <span>
+          Close representation of the uploaded XLSX layout. Analysis tables remain unchanged.
+        </span>
+        {layout.is_bounded && <small>Showing a bounded worksheet region.</small>}
+      </div>
+      <div className="original-workbook-grid-wrap">
+        <table className="original-workbook-grid">
+          <colgroup>
+            <col className="original-workbook-row-heading-column" />
+            {layout.columns.map((column) => (
+              <col
+                key={column.index}
+                className={column.hidden ? "is-hidden-dimension" : undefined}
+                style={{ width: `${Math.max(36, Math.round((column.width || 8.43) * 7 + 5))}px` }}
+              />
+            ))}
+          </colgroup>
+          <thead>
+            <tr>
+              <th className="original-workbook-corner" />
+              {layout.columns.map((column) => (
+                <th
+                  key={column.index}
+                  className={column.hidden ? "is-hidden-dimension" : undefined}
+                  title={column.hidden ? `Column ${column.letter} is hidden in the workbook` : undefined}
+                >
+                  {column.letter}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {layout.rows.map((row) => (
+              <tr
+                key={row.index}
+                className={row.hidden ? "is-hidden-dimension" : undefined}
+                style={{ height: row.height ? `${Math.round(row.height * 1.333)}px` : undefined }}
+              >
+                <th title={row.hidden ? `Row ${row.index} is hidden in the workbook` : undefined}>
+                  {row.index}
+                </th>
+                {layout.columns.map((column) => {
+                  const key = `${row.index}:${column.index}`;
+                  if (coveredCells.has(key)) return null;
+
+                  const cell = cells.get(key);
+                  const merge = mergeAnchors.get(key);
+                  return (
+                    <td
+                      key={column.index}
+                      colSpan={merge ? merge.end_column - merge.start_column + 1 : undefined}
+                      rowSpan={merge ? merge.end_row - merge.start_row + 1 : undefined}
+                      style={getOriginalCellStyle(cell?.style)}
+                      title={cell?.is_formula ? `${cell.coordinate}: formula shown without execution` : cell?.coordinate}
+                    >
+                      {cell?.display_value || ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function DatasetPreviewPage({
   dataset,
   worksheets,
@@ -525,11 +713,13 @@ function DatasetPreviewPage({
   onBack: () => void;
 }) {
   const hasWorkbook = worksheets.length > 0;
+  const supportsOriginalWorkbook = dataset.original_filename.toLowerCase().endsWith(".xlsx");
   const firstReadyWorksheet = worksheets.find((sheet) => sheet.status === "ready") || null;
   const initialWorksheet = worksheets.find(
     (sheet) => sheet.worksheetId === initialWorksheetId && sheet.status === "ready",
   );
   const [isWrapped, setIsWrapped] = useState(false);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("analysis");
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(
     initialWorksheet?.worksheetId || firstReadyWorksheet?.worksheetId || null,
@@ -591,10 +781,19 @@ function DatasetPreviewPage({
   const previewRowTotal = selectedWorksheet ? selectedWorksheet.rowCount : dataset.row_count;
 
   const selectPreviewWorksheet = (worksheetId: string) => {
-    setPreviewRows([]);
-    setPreviewStatus("loading");
-    setPreviewError(null);
+    if (previewMode === "analysis") {
+      setPreviewRows([]);
+      setPreviewStatus("loading");
+      setPreviewError(null);
+    }
     setSelectedWorksheetId(worksheetId);
+  };
+
+  const selectPreviewMode = (mode: PreviewMode) => {
+    if (mode === "analysis" && selectedWorksheet?.status !== "ready") {
+      setSelectedWorksheetId(firstReadyWorksheet?.worksheetId || null);
+    }
+    setPreviewMode(mode);
   };
 
   const formatCell = (value: unknown) => {
@@ -643,6 +842,7 @@ function DatasetPreviewPage({
       backLabel="Back to Data"
       onBack={onBack}
       actions={
+        previewMode === "analysis" ? (
         <button
           type="button"
           className="secondary-button dataset-preview-wrap-toggle"
@@ -650,8 +850,28 @@ function DatasetPreviewPage({
         >
           {isWrapped ? "Compact cells" : "Expand cells"}
         </button>
+        ) : null
       }
     >
+
+      {supportsOriginalWorkbook && (
+        <div className="dataset-preview-mode-switch" aria-label="Workbook preview mode">
+          <button
+            type="button"
+            className={previewMode === "analysis" ? "is-active" : ""}
+            onClick={() => selectPreviewMode("analysis")}
+          >
+            Analysis table
+          </button>
+          <button
+            type="button"
+            className={previewMode === "original" ? "is-active" : ""}
+            onClick={() => selectPreviewMode("original")}
+          >
+            Original workbook
+          </button>
+        </div>
+      )}
 
       {hasWorkbook && (
         <div className="dataset-preview-sheets" aria-label="Worksheets">
@@ -662,7 +882,11 @@ function DatasetPreviewPage({
               className={`dataset-preview-sheet${
                 sheet.worksheetId === selectedWorksheet?.worksheetId ? " active" : ""
               }`}
-              disabled={sheet.status !== "ready"}
+              disabled={
+                previewMode === "analysis"
+                  ? sheet.status !== "ready"
+                  : sheet.status !== "ready" && sheet.status !== "empty"
+              }
               onClick={() => selectPreviewWorksheet(sheet.worksheetId)}
               title={
                 sheet.status === "ready"
@@ -676,6 +900,9 @@ function DatasetPreviewPage({
         </div>
       )}
 
+      {previewMode === "original" && supportsOriginalWorkbook ? (
+        <OriginalWorkbookPreview datasetId={dataset.dataset_id} worksheet={selectedWorksheet} />
+      ) : (
       <div className="dataset-preview-table-wrap">
         {previewColumns.length === 0 ? (
           <p className="compact-empty">No columns are available for this worksheet.</p>
@@ -734,6 +961,7 @@ function DatasetPreviewPage({
           </table>
         )}
       </div>
+      )}
     </FocusedWorkspaceShell>
   );
 }
