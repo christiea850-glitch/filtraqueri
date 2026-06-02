@@ -13,6 +13,7 @@ import type {
   CandidateFieldMatch,
   SchemaAwareQuestionDraftPlan,
 } from "../../features/questionWorkspace/questionTranslatorTypes";
+import { CleanPrepareReviewPanel } from "./CleanPrepareReviewPanel";
 
 type QuestionDraftStatus = "idle" | "drafted";
 
@@ -768,6 +769,8 @@ function QuestionWorkspacePanel({
           </span>
         ))}
       </div>
+
+      <CleanPrepareReviewPanel dataset={dataset} sourceName={sourceName} />
 
       <label className="question-workspace-input">
         <span>Business question</span>

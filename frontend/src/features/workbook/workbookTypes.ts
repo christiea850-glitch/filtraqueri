@@ -22,6 +22,28 @@ export type WorksheetTableMapping = {
   originalIndex: number;
 };
 
+export type WorksheetTemplateStructureEvidenceType =
+  | "repeated_header"
+  | "date_title_row"
+  | "section_banner"
+  | "sparse_layout_gap"
+  | "serial_only_placeholder_rows"
+  | "side_note_region_candidate"
+  | "repeated_missing_pattern"
+  | "clean_table_counter_signal";
+
+export type WorksheetTemplateStructureEvidence = {
+  type: WorksheetTemplateStructureEvidenceType;
+  rowIndex: number | null;
+  rowRange: number[] | null;
+  rowIndexes: number[];
+  columnRange: number[] | null;
+  label: string | null;
+  previewValues: string[];
+  confidence: "low" | "medium" | "high";
+  explanation: string;
+};
+
 export type WorksheetMetadata = {
   worksheetId: WorksheetId;
   workbookId: WorkbookId;
@@ -53,6 +75,9 @@ export type WorksheetMetadata = {
     duplicateColumnCount: number;
     emptyColumnCount: number;
     warnings: string[];
+    templateStructureCandidate: boolean;
+    templateStructureConfidence: "low" | "medium" | "high";
+    templateStructureEvidence: WorksheetTemplateStructureEvidence[];
   };
 };
 

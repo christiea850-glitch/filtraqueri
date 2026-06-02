@@ -4,6 +4,8 @@ import type {
   AcceptedRelationshipContract,
   WorksheetMetadata,
   WorksheetRelationshipCandidate,
+  WorksheetTemplateStructureEvidence,
+  WorksheetTemplateStructureEvidenceType,
 } from "./workbookTypes";
 
 export const WORKBOOK_METADATA_NORMALIZATION_VERSION = 1;
@@ -29,6 +31,67 @@ const readArray = <T = unknown>(value: unknown): T[] => (Array.isArray(value) ? 
 
 const readObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+const templateStructureEvidenceTypes = new Set<WorksheetTemplateStructureEvidenceType>([
+  "repeated_header",
+  "date_title_row",
+  "section_banner",
+  "sparse_layout_gap",
+  "serial_only_placeholder_rows",
+  "side_note_region_candidate",
+  "repeated_missing_pattern",
+  "clean_table_counter_signal",
+]);
+
+const normalizeTemplateStructureConfidence = (
+  value: unknown,
+): WorksheetTemplateStructureEvidence["confidence"] =>
+  value === "high" || value === "medium" || value === "low" ? value : "low";
+
+const readNumberArray = (value: unknown) =>
+  readArray(value).filter(
+    (item): item is number => typeof item === "number" && Number.isFinite(item),
+  );
+
+const readOptionalNumberArray = (value: unknown) => {
+  const values = readNumberArray(value);
+  return values.length > 0 ? values : null;
+};
+
+const normalizeTemplateStructureEvidence = (
+  value: unknown,
+): WorksheetTemplateStructureEvidence | null => {
+  const evidence = readObject(value);
+  const type = evidence.type;
+  if (
+    typeof type !== "string" ||
+    !templateStructureEvidenceTypes.has(type as WorksheetTemplateStructureEvidenceType)
+  ) {
+    return null;
+  }
+
+  const rowIndex = evidence.rowIndex ?? evidence.row_index;
+
+  return {
+    type: type as WorksheetTemplateStructureEvidenceType,
+    rowIndex: typeof rowIndex === "number" && Number.isFinite(rowIndex) ? rowIndex : null,
+    rowRange: readOptionalNumberArray(evidence.rowRange ?? evidence.row_range),
+    rowIndexes: readNumberArray(evidence.rowIndexes ?? evidence.row_indexes),
+    columnRange: readOptionalNumberArray(evidence.columnRange ?? evidence.column_range),
+    label:
+      typeof evidence.label === "string" && evidence.label.trim() ? evidence.label : null,
+    previewValues: readArray<string>(evidence.previewValues ?? evidence.preview_values),
+    confidence: normalizeTemplateStructureConfidence(evidence.confidence),
+    explanation: readString(evidence.explanation, "Template structure signal detected."),
+  };
+};
+
+const normalizeTemplateStructureEvidenceList = (
+  value: unknown,
+): WorksheetTemplateStructureEvidence[] =>
+  readArray(value)
+    .map(normalizeTemplateStructureEvidence)
+    .filter((evidence): evidence is WorksheetTemplateStructureEvidence => Boolean(evidence));
 
 export const generateSafeWorksheetTableName = (
   sheetName: string,
@@ -88,6 +151,15 @@ export const normalizeWorksheetMetadata = (
       duplicateColumnCount: Math.max(0, worksheet.normalization?.duplicateColumnCount || 0),
       emptyColumnCount: Math.max(0, worksheet.normalization?.emptyColumnCount || 0),
       warnings: worksheet.normalization?.warnings || [],
+      templateStructureCandidate: Boolean(
+        worksheet.normalization?.templateStructureCandidate,
+      ),
+      templateStructureConfidence: normalizeTemplateStructureConfidence(
+        worksheet.normalization?.templateStructureConfidence,
+      ),
+      templateStructureEvidence: normalizeTemplateStructureEvidenceList(
+        worksheet.normalization?.templateStructureEvidence,
+      ),
     },
   };
 };
@@ -233,6 +305,18 @@ export const normalizeUnknownWorksheetMetadata = (
         duplicateColumnCount: readNumber(normalization.duplicateColumnCount ?? normalization.duplicate_column_count, 0),
         emptyColumnCount: readNumber(normalization.emptyColumnCount ?? normalization.empty_column_count, 0),
         warnings: readArray<string>(normalization.warnings),
+        templateStructureCandidate: Boolean(
+          normalization.templateStructureCandidate ??
+            normalization.template_structure_candidate,
+        ),
+        templateStructureConfidence: normalizeTemplateStructureConfidence(
+          normalization.templateStructureConfidence ??
+            normalization.template_structure_confidence,
+        ),
+        templateStructureEvidence: normalizeTemplateStructureEvidenceList(
+          normalization.templateStructureEvidence ??
+            normalization.template_structure_evidence,
+        ),
       },
     },
     workbookId,

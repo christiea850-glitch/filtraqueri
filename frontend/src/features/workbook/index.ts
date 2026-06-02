@@ -37,4 +37,6 @@ export type {
   WorksheetRelationshipId,
   WorksheetStatus,
   WorksheetTableMapping,
+  WorksheetTemplateStructureEvidence,
+  WorksheetTemplateStructureEvidenceType,
 } from "./workbookTypes";
