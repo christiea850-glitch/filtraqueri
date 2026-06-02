@@ -749,7 +749,12 @@ function DatasetPreviewPage({
 
   useEffect(() => {
     let cancelled = false;
-    if (hasWorkbook && !previewWorksheetId && !isViewingCleanedAnalysisSource) return undefined;
+    if (hasWorkbook && !previewWorksheetId && !isViewingCleanedAnalysisSource) {
+      setPreviewRows([]);
+      setPreviewStatus("idle");
+      setPreviewError(null);
+      return undefined;
+    }
 
     const requestTimeout = window.setTimeout(() => {
       setPreviewStatus("loading");

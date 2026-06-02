@@ -515,9 +515,9 @@ function WorkspaceShell({
           </nav>
           {activeDestination.id === "data" && (
             <div className="sidebar-bottom-stack" aria-label="Workspace and account">
-              <section className="sidebar-workspace-status-card" aria-label="Current workspace">
-                <span>Current workspace</span>
-                <strong>{dataset ? workspaceIdentityLabel : "No dataset open"}</strong>
+              <section className="sidebar-workspace-status-card" aria-label="Active analysis source">
+                <span>Active analysis source</span>
+                <strong>{dataset ? activeWorksheetLabel : "No dataset open"}</strong>
                 <small>{dataset ? datasetShapeLabel : "Choose a file to begin"}</small>
               </section>
               <section className="sidebar-profile-card" aria-label="Account status">
