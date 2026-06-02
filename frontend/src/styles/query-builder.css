@@ -233,6 +233,38 @@
   background: #fffbeb;
 }
 
+.clean-prepare-analysis-source,
+.clean-prepare-activation-area {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.clean-prepare-analysis-source span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.clean-prepare-analysis-source strong,
+.clean-prepare-activation-area strong {
+  color: #1e3a8a;
+  font-size: 13px;
+}
+
+.clean-prepare-activation-area .secondary-button {
+  justify-self: start;
+}
+
+.clean-prepare-activation-error {
+  color: #b91c1c !important;
+}
+
 .clean-prepare-apply-area {
   display: flex;
   flex-direction: column;
@@ -2033,4 +2065,3 @@
   box-shadow: none;
   transform: none;
 }
-

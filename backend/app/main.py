@@ -1751,6 +1751,16 @@ def apply_workbook_cleaning_recipe(
             status_code=400,
             detail="Only ready worksheets can have a cleaning recipe applied",
         )
+    active_analysis_source = workbook_metadata.get("active_analysis_source")
+    if (
+        isinstance(active_analysis_source, dict)
+        and active_analysis_source.get("type") == "cleaned_working_copy"
+        and active_analysis_source.get("worksheet_id") == worksheet_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Return to the original analysis table before recreating this cleaned working copy",
+        )
 
     result = apply_cleaning_recipe_to_working_copy(
         workbook_path=uploaded_path,
@@ -1802,6 +1812,150 @@ def apply_workbook_cleaning_recipe(
     return result
 
 
+def activate_workbook_analysis_table(
+    *,
+    dataset_id: str,
+    metadata: dict[str, Any],
+    workbook_metadata: dict[str, Any],
+    worksheet: dict[str, Any],
+    table_name: str,
+    source_type: str,
+) -> dict[str, Any]:
+    try:
+        with get_connection(dataset_id) as connection:
+            table_exists = connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'main' AND table_name = ?
+                """,
+                [table_name],
+            ).fetchone()[0]
+            if not table_exists:
+                raise HTTPException(status_code=404, detail="Analysis source table is missing")
+
+            connection.execute(
+                f"CREATE OR REPLACE VIEW {quote_identifier(TABLE_NAME)} AS SELECT * FROM {quote_identifier(table_name)}"
+            )
+            schema = profile_dataset(connection)
+            preview = fetch_preview(connection)
+            row_count, column_count = table_stats(connection)
+    except HTTPException:
+        raise
+    except duckdb.Error as error:
+        raise HTTPException(status_code=400, detail=f"Analysis source switch failed: {error}") from error
+
+    activated_at = datetime.now(timezone.utc).isoformat()
+    active_analysis_source = {
+        "type": source_type,
+        "worksheet_id": worksheet.get("worksheet_id"),
+        "table_name": table_name,
+        "original_table_name": worksheet.get("table_name"),
+        "activated_at": activated_at,
+    }
+    workbook_metadata["active_worksheet_id"] = worksheet.get("worksheet_id")
+    workbook_metadata["active_analysis_source"] = active_analysis_source
+    workbook_metadata["updated_at"] = activated_at
+    metadata.update(
+        {
+            "table_name": TABLE_NAME,
+            "schema": schema,
+            "row_count": row_count,
+            "column_count": column_count,
+            "workbook_metadata": workbook_metadata,
+        }
+    )
+    dataset_sessions[dataset_id] = metadata
+    persist_dataset_manifest_metadata(metadata)
+
+    return {
+        "dataset": metadata,
+        "preview": preview,
+        "workbook_metadata": workbook_metadata,
+        "active_analysis_source": active_analysis_source,
+    }
+
+
+@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/activate-cleaned-copy")
+def activate_cleaned_working_copy(
+    dataset_id: str,
+    worksheet_id: str,
+) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    worksheet = next(
+        (
+            candidate
+            for candidate in workbook_metadata.get("worksheets", [])
+            if candidate.get("worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not worksheet:
+        raise HTTPException(status_code=404, detail="Worksheet was not found")
+    if worksheet.get("status") != "ready":
+        raise HTTPException(status_code=400, detail="Only ready worksheets can use a cleaned working copy")
+
+    cleaned_copy = next(
+        (
+            candidate
+            for candidate in workbook_metadata.get("cleaned_working_copies", [])
+            if isinstance(candidate, dict) and candidate.get("source_worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not cleaned_copy or not cleaned_copy.get("cleaned_table_name"):
+        raise HTTPException(status_code=404, detail="Cleaned working copy was not found")
+
+    return activate_workbook_analysis_table(
+        dataset_id=dataset_id,
+        metadata=metadata,
+        workbook_metadata=workbook_metadata,
+        worksheet=worksheet,
+        table_name=str(cleaned_copy["cleaned_table_name"]),
+        source_type="cleaned_working_copy",
+    )
+
+
+@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/activate-original-copy")
+def activate_original_analysis_table(
+    dataset_id: str,
+    worksheet_id: str,
+) -> dict[str, Any]:
+    metadata = get_dataset_metadata(dataset_id)
+    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    if not workbook_metadata:
+        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+
+    worksheet = next(
+        (
+            candidate
+            for candidate in workbook_metadata.get("worksheets", [])
+            if candidate.get("worksheet_id") == worksheet_id
+        ),
+        None,
+    )
+    if not worksheet:
+        raise HTTPException(status_code=404, detail="Worksheet was not found")
+    if worksheet.get("status") != "ready":
+        raise HTTPException(status_code=400, detail="Only ready worksheets can be activated")
+    table_name = worksheet.get("table_name")
+    if not table_name:
+        raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
+
+    return activate_workbook_analysis_table(
+        dataset_id=dataset_id,
+        metadata=metadata,
+        workbook_metadata=workbook_metadata,
+        worksheet=worksheet,
+        table_name=str(table_name),
+        source_type="original",
+    )
+
+
 @app.post("/datasets/{dataset_id}/workbook/active-worksheet")
 def select_workbook_worksheet(
     dataset_id: str,
@@ -1829,49 +1983,14 @@ def select_workbook_worksheet(
     if not table_name:
         raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
 
-    try:
-        with get_connection(dataset_id) as connection:
-            table_exists = connection.execute(
-                """
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_schema = 'main' AND table_name = ?
-                """,
-                [table_name],
-            ).fetchone()[0]
-            if not table_exists:
-                raise HTTPException(status_code=404, detail="Worksheet table is missing")
-
-            connection.execute(
-                f"CREATE OR REPLACE VIEW {quote_identifier(TABLE_NAME)} AS SELECT * FROM {quote_identifier(table_name)}"
-            )
-            schema = profile_dataset(connection)
-            preview = fetch_preview(connection)
-            row_count, column_count = table_stats(connection)
-    except HTTPException:
-        raise
-    except duckdb.Error as error:
-        raise HTTPException(status_code=400, detail=f"Worksheet switch failed: {error}") from error
-
-    workbook_metadata["active_worksheet_id"] = request.worksheet_id
-    workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
-    metadata.update(
-        {
-            "table_name": TABLE_NAME,
-            "schema": schema,
-            "row_count": row_count,
-            "column_count": column_count,
-            "workbook_metadata": workbook_metadata,
-        }
+    return activate_workbook_analysis_table(
+        dataset_id=dataset_id,
+        metadata=metadata,
+        workbook_metadata=workbook_metadata,
+        worksheet=worksheet,
+        table_name=str(table_name),
+        source_type="original",
     )
-    dataset_sessions[dataset_id] = metadata
-    persist_dataset_manifest_metadata(metadata)
-
-    return {
-        "dataset": metadata,
-        "preview": preview,
-        "workbook_metadata": workbook_metadata,
-    }
 
 
 @app.post("/datasets/{dataset_id}/workbook/relationship-review")

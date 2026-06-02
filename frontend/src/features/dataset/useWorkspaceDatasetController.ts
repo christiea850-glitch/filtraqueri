@@ -1,6 +1,8 @@
 import { type ChangeEvent, useEffect, useState } from "react";
 import type { HumanIntent } from "../../components/dataset/DatasetSummaryPanel";
 import {
+  activateCleanedWorkingCopy,
+  activateOriginalAnalysisTable,
   deleteDataset,
   getDataset,
   getPreview,
@@ -257,6 +259,50 @@ function useWorkspaceDatasetController({
       setErrorMessage(
         error instanceof Error ? error.message : "Worksheet could not be selected.",
       );
+    } finally {
+      setIsSwitchingWorksheet(false);
+    }
+  };
+
+  const handleAnalysisSourceSelect = async (
+    worksheetId: string,
+    source: "cleaned" | "original",
+  ) => {
+    if (!dataset || isSwitchingWorksheet) return;
+
+    setIsSwitchingWorksheet(true);
+    setErrorMessage("");
+
+    try {
+      const selectionResult =
+        source === "cleaned"
+          ? await activateCleanedWorkingCopy(dataset.dataset_id, worksheetId)
+          : await activateOriginalAnalysisTable(dataset.dataset_id, worksheetId);
+      setDataset(selectionResult.dataset);
+      onDatasetContextChange?.();
+      applyPreviewDatasetResult(selectionResult.dataset, selectionResult.preview);
+      setFilteredResult(createEmptyResultState());
+      setQueriedResult(createEmptyResultState());
+      setFilterValues({});
+      resetQueryBuilder();
+      restoreQueryBuilder({
+        querySelectedColumns: selectionResult.dataset.schema
+          .slice(0, 4)
+          .map((column) => column.name),
+        queryGroupBy: [],
+        queryAggregations: [{ id: 1, function: "COUNT", column: "" }],
+        querySortColumn: "",
+        querySortDirection: "ASC",
+        queryLimit: "100",
+        hasRunQuery: false,
+      });
+      setActiveResultTab("preview");
+      updateDatasetSessionResultTab("preview");
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Analysis source could not be selected.",
+      );
+      throw error;
     } finally {
       setIsSwitchingWorksheet(false);
     }
@@ -630,6 +676,7 @@ function useWorkspaceDatasetController({
     openDatasetPicker,
     handleFileUpload,
     handleWorksheetSelect,
+    handleAnalysisSourceSelect,
     handleRelationshipReview,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,

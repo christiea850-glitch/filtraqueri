@@ -21,9 +21,15 @@ type ApplyState =
   | { status: "success"; result: CleaningRecipeApplyResponse }
   | { status: "error"; message: string };
 
+type ActivationState =
+  | { status: "idle" }
+  | { status: "switching"; worksheetId: string }
+  | { status: "error"; message: string };
+
 type CleanPrepareReviewPanelProps = {
   dataset: DatasetMetadata;
   sourceName: string;
+  onAnalysisSourceSelect?: (worksheetId: string, source: "cleaned" | "original") => Promise<void>;
 };
 
 type PreparationPriority = "low" | "medium" | "high";
@@ -295,6 +301,7 @@ const formatPreviewCell = (value: unknown) => {
 export function CleanPrepareReviewPanel({
   dataset,
   sourceName,
+  onAnalysisSourceSelect,
 }: CleanPrepareReviewPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(null);
@@ -306,6 +313,7 @@ export function CleanPrepareReviewPanel({
   const [applyStateByWorksheet, setApplyStateByWorksheet] = useState<
     Record<string, ApplyState>
   >({});
+  const [activationState, setActivationState] = useState<ActivationState>({ status: "idle" });
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
   const isPrioritized = review.priority !== "low";
   const workbook = useMemo(() => getWorkbookMetadata(dataset), [dataset]);
@@ -379,18 +387,27 @@ export function CleanPrepareReviewPanel({
     setSelectedWorksheetId(worksheet.worksheetId);
   };
 
-  // When the dataset changes (different upload), reset per-worksheet apply state.
-  // Worksheet IDs are dataset-scoped, so reusing the map between datasets would
-  // be incorrect; clearing here keeps the UI honest about which working copies
-  // exist for the dataset currently in view.
-  useEffect(() => {
-    setApplyStateByWorksheet({});
-  }, [dataset.dataset_id]);
-
   const selectedWorksheetApplyState: ApplyState =
     (selectedWorksheet && applyStateByWorksheet[selectedWorksheet.worksheetId]) || {
       status: "idle",
     };
+  const activeAnalysisSource = workbook?.activeAnalysisSource || null;
+  const selectedCleanedCopy = workbook?.cleanedWorkingCopies.find(
+    (copy) => copy.sourceWorksheetId === selectedWorksheet?.worksheetId,
+  );
+  const locallyCreatedCleanedCopy =
+    selectedWorksheetApplyState.status === "success" &&
+    selectedWorksheetApplyState.result.status === "applied_to_working_copy"
+      ? selectedWorksheetApplyState.result.cleaned_table_name
+      : null;
+  const hasCleanedWorkingCopy = Boolean(
+    selectedCleanedCopy?.cleanedTableName || locallyCreatedCleanedCopy,
+  );
+  const isSelectedWorksheetActive = activeAnalysisSource?.worksheetId === selectedWorksheet?.worksheetId;
+  const isUsingCleanedCopy =
+    isSelectedWorksheetActive && activeAnalysisSource?.type === "cleaned_working_copy";
+  const analysisSourceLabel =
+    activeAnalysisSource?.type === "cleaned_working_copy" ? "Cleaned working copy" : "Original";
   const hasActionableRecipe =
     recipePreview !== null &&
     recipePreview.recipe.length > 0 &&
@@ -430,6 +447,50 @@ export function CleanPrepareReviewPanel({
   const retryApply = () => {
     if (!selectedWorksheet) return;
     updateApplyState(selectedWorksheet.worksheetId, { status: "confirming" });
+  };
+
+  const useCleanedCopy = async () => {
+    if (!selectedWorksheet || !hasCleanedWorkingCopy || !onAnalysisSourceSelect) return;
+    const shouldActivate = window.confirm(
+      "Use this cleaned working copy for analysis? The original workbook and original analysis table will remain available.",
+    );
+    if (!shouldActivate) return;
+
+    setActivationState({ status: "switching", worksheetId: selectedWorksheet.worksheetId });
+    try {
+      await onAnalysisSourceSelect(selectedWorksheet.worksheetId, "cleaned");
+      setActivationState({ status: "idle" });
+    } catch (error) {
+      setActivationState({
+        status: "error",
+        message:
+          error instanceof Error && error.message
+            ? error.message
+            : "Cleaned working copy could not be activated.",
+      });
+    }
+  };
+
+  const returnToOriginal = async () => {
+    if (!selectedWorksheet || !onAnalysisSourceSelect) return;
+    const shouldActivate = window.confirm(
+      "Return to the original analysis table? The cleaned working copy will remain available.",
+    );
+    if (!shouldActivate) return;
+
+    setActivationState({ status: "switching", worksheetId: selectedWorksheet.worksheetId });
+    try {
+      await onAnalysisSourceSelect(selectedWorksheet.worksheetId, "original");
+      setActivationState({ status: "idle" });
+    } catch (error) {
+      setActivationState({
+        status: "error",
+        message:
+          error instanceof Error && error.message
+            ? error.message
+            : "Original analysis table could not be activated.",
+      });
+    }
   };
 
   const toggleReview = () => {
@@ -536,6 +597,12 @@ export function CleanPrepareReviewPanel({
                 ))}
               </div>
 
+              <div className="clean-prepare-analysis-source" aria-live="polite">
+                <span>Current analysis source</span>
+                <strong>{analysisSourceLabel}</strong>
+                <p>Original workbook preserved. You can switch back to the original analysis table.</p>
+              </div>
+
               {recipeStatus === "loading" ? (
                 <p className="clean-prepare-preview-state">Loading draft recipe preview...</p>
               ) : recipeStatus === "error" ? (
@@ -624,7 +691,9 @@ export function CleanPrepareReviewPanel({
                     </p>
                   )}
 
-                  {hasActionableRecipe && selectedWorksheet && (
+                  {hasActionableRecipe &&
+                    selectedWorksheet &&
+                    (!hasCleanedWorkingCopy || selectedWorksheetApplyState.status !== "idle") && (
                     <div
                       className={`clean-prepare-apply-area is-${selectedWorksheetApplyState.status}`}
                       aria-live="polite"
@@ -703,7 +772,7 @@ export function CleanPrepareReviewPanel({
                                 </p>
                               )}
                               <p className="clean-prepare-apply-activation-note">
-                                The active analysis table is unchanged. Activating the cleaned working copy will come in a later phase.
+                                The active analysis table is unchanged until you choose to use this copy.
                               </p>
                               {selectedWorksheetApplyState.result.preview_rows.length > 0 && (
                                 <div className="clean-prepare-preview-table-wrap">
@@ -749,6 +818,44 @@ export function CleanPrepareReviewPanel({
                       )}
                     </div>
                   )}
+
+                  {selectedWorksheet?.status === "ready" && hasCleanedWorkingCopy && (
+                    <div className="clean-prepare-activation-area" aria-live="polite">
+                      {isUsingCleanedCopy ? (
+                        <>
+                          <strong>Current analysis source: Cleaned working copy</strong>
+                          <p>Original workbook preserved. You can switch back to the original analysis table.</p>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={returnToOriginal}
+                            disabled={activationState.status === "switching"}
+                          >
+                            Return to original analysis table
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <strong>Cleaned working copy available</strong>
+                          <p>Original workbook preserved. Activation changes the analysis source only.</p>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={useCleanedCopy}
+                            disabled={activationState.status === "switching"}
+                          >
+                            Use cleaned copy for analysis
+                          </button>
+                        </>
+                      )}
+                      {activationState.status === "switching" && (
+                        <p>Switching analysis source...</p>
+                      )}
+                      {activationState.status === "error" && (
+                        <p className="clean-prepare-activation-error">{activationState.message}</p>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="clean-prepare-preview-state">
@@ -767,7 +874,7 @@ export function CleanPrepareReviewPanel({
                   Cleaned working copy created for {selectedWorksheetApplyState.result.worksheet_name}. Original workbook unchanged.
                 </strong>
                 <p>
-                  Other worksheets that have not been applied remain preview-only. Activation of cleaned working copies will come in a later phase.
+                  Other worksheets that have not been applied remain preview-only. Original workbook preserved.
                 </p>
               </>
             ) : (

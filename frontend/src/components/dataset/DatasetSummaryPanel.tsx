@@ -730,18 +730,26 @@ function DatasetPreviewPage({
   const selectedWorksheet = hasWorkbook
     ? worksheets.find((sheet) => sheet.worksheetId === selectedWorksheetId) || firstReadyWorksheet
     : null;
-  const previewColumns = selectedWorksheet
+  const activeAnalysisSource = dataset.workbook_metadata?.activeAnalysisSource;
+  const isViewingCleanedAnalysisSource =
+    activeAnalysisSource?.type === "cleaned_working_copy" &&
+    activeAnalysisSource.worksheetId === selectedWorksheet?.worksheetId;
+  const previewColumns = isViewingCleanedAnalysisSource
+    ? dataset.schema
+    : selectedWorksheet
     ? selectedWorksheet.schema
     : Array.isArray(dataset.schema)
       ? dataset.schema
       : [];
   const previewWorksheetId =
-    selectedWorksheet?.status === "ready" ? selectedWorksheet.worksheetId : undefined;
+    !isViewingCleanedAnalysisSource && selectedWorksheet?.status === "ready"
+      ? selectedWorksheet.worksheetId
+      : undefined;
   const visibleRowCount = previewRows.length;
 
   useEffect(() => {
     let cancelled = false;
-    if (hasWorkbook && !previewWorksheetId) return undefined;
+    if (hasWorkbook && !previewWorksheetId && !isViewingCleanedAnalysisSource) return undefined;
 
     const requestTimeout = window.setTimeout(() => {
       setPreviewStatus("loading");
@@ -774,11 +782,15 @@ function DatasetPreviewPage({
       cancelled = true;
       window.clearTimeout(requestTimeout);
     };
-  }, [dataset.dataset_id, hasWorkbook, previewWorksheetId]);
+  }, [dataset.dataset_id, hasWorkbook, isViewingCleanedAnalysisSource, previewWorksheetId]);
   const previewLabel = selectedWorksheet
     ? selectedWorksheet.displayName || selectedWorksheet.sheetName
     : dataset.original_filename;
-  const previewRowTotal = selectedWorksheet ? selectedWorksheet.rowCount : dataset.row_count;
+  const previewRowTotal = isViewingCleanedAnalysisSource
+    ? dataset.row_count
+    : selectedWorksheet
+      ? selectedWorksheet.rowCount
+      : dataset.row_count;
 
   const selectPreviewWorksheet = (worksheetId: string) => {
     if (previewMode === "analysis") {
@@ -871,6 +883,13 @@ function DatasetPreviewPage({
             Original workbook
           </button>
         </div>
+      )}
+
+      {previewMode === "analysis" && (
+        <p className="dataset-preview-analysis-source">
+          Current analysis source:{" "}
+          <strong>{isViewingCleanedAnalysisSource ? "Cleaned working copy" : "Original"}</strong>
+        </p>
       )}
 
       {hasWorkbook && (

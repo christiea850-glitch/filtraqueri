@@ -25,6 +25,8 @@ export {
 } from "./workbookMetadata";
 export type {
   AcceptedRelationshipContract,
+  CleanedWorkingCopy,
+  WorkbookAnalysisSource,
   WorkbookId,
   WorkbookIngestionProfile,
   WorkbookMetadata,

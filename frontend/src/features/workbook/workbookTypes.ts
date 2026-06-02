@@ -22,6 +22,22 @@ export type WorksheetTableMapping = {
   originalIndex: number;
 };
 
+export type WorkbookAnalysisSource = {
+  type: "original" | "cleaned_working_copy";
+  worksheetId: WorksheetId;
+  tableName: string;
+  originalTableName: string;
+  activatedAt: string;
+};
+
+export type CleanedWorkingCopy = {
+  cleanedCopyId: string;
+  sourceWorksheetId: WorksheetId;
+  sourceTableName: string;
+  cleanedTableName: string;
+  createdAt: string;
+};
+
 export type WorksheetTemplateStructureEvidenceType =
   | "repeated_header"
   | "date_title_row"
@@ -158,6 +174,8 @@ export type WorkbookMetadata = {
   sourceFile: WorkbookSourceFileMetadata;
   worksheetIds: WorksheetId[];
   activeWorksheetId: WorksheetId | null;
+  activeAnalysisSource: WorkbookAnalysisSource | null;
+  cleanedWorkingCopies: CleanedWorkingCopy[];
   worksheets: WorksheetMetadata[];
   tableMappings: WorksheetTableMapping[];
   relationshipCandidates: WorksheetRelationshipCandidate[];

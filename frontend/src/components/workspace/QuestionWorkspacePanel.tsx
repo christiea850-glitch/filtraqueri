@@ -29,6 +29,7 @@ type QuestionWorkspacePanelProps = {
   dataset: DatasetMetadata;
   sourceName: string;
   onApplyQueryBuilderRequestDraft?: (draft: GovernedQueryBuilderRequestDraft) => void;
+  onAnalysisSourceSelect?: (worksheetId: string, source: "cleaned" | "original") => Promise<void>;
 };
 
 type PlanningSelectionRole = "dimension" | "measure" | "date";
@@ -604,6 +605,7 @@ function QuestionWorkspacePanel({
   dataset,
   sourceName,
   onApplyQueryBuilderRequestDraft,
+  onAnalysisSourceSelect,
 }: QuestionWorkspacePanelProps) {
   const [rawQuestion, setRawQuestion] = useState("");
   const [draft, setDraft] = useState<WorkspaceQuestionDraft>(createInitialDraft);
@@ -770,7 +772,11 @@ function QuestionWorkspacePanel({
         ))}
       </div>
 
-      <CleanPrepareReviewPanel dataset={dataset} sourceName={sourceName} />
+      <CleanPrepareReviewPanel
+        dataset={dataset}
+        sourceName={sourceName}
+        onAnalysisSourceSelect={onAnalysisSourceSelect}
+      />
 
       <label className="question-workspace-input">
         <span>Business question</span>

@@ -2,6 +2,8 @@ import type {
   WorkbookIngestionProfile,
   WorkbookMetadata,
   AcceptedRelationshipContract,
+  CleanedWorkingCopy,
+  WorkbookAnalysisSource,
   WorksheetMetadata,
   WorksheetRelationshipCandidate,
   WorksheetTemplateStructureEvidence,
@@ -192,6 +194,8 @@ export const normalizeWorkbookMetadata = (
     },
     worksheetIds,
     activeWorksheetId,
+    activeAnalysisSource: workbook.activeAnalysisSource || null,
+    cleanedWorkingCopies: workbook.cleanedWorkingCopies || [],
     worksheets,
     tableMappings: worksheets.map((worksheet) => ({
       sheetName: worksheet.sheetName,
@@ -511,6 +515,50 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
     workbook.activeWorksheetId ?? workbook.active_worksheet_id,
     worksheetIds[0] || "",
   );
+  const activeAnalysisSourceRaw = readObject(
+    workbook.activeAnalysisSource ?? workbook.active_analysis_source,
+  );
+  const activeAnalysisSourceType =
+    activeAnalysisSourceRaw.type === "cleaned_working_copy" ? "cleaned_working_copy" : "original";
+  const activeAnalysisWorksheetId = readString(
+    activeAnalysisSourceRaw.worksheetId ?? activeAnalysisSourceRaw.worksheet_id,
+    "",
+  );
+  const activeAnalysisSource: WorkbookAnalysisSource | null = activeAnalysisWorksheetId
+    ? {
+        type: activeAnalysisSourceType,
+        worksheetId: activeAnalysisWorksheetId,
+        tableName: readString(
+          activeAnalysisSourceRaw.tableName ?? activeAnalysisSourceRaw.table_name,
+          "",
+        ),
+        originalTableName: readString(
+          activeAnalysisSourceRaw.originalTableName ?? activeAnalysisSourceRaw.original_table_name,
+          "",
+        ),
+        activatedAt: readString(
+          activeAnalysisSourceRaw.activatedAt ?? activeAnalysisSourceRaw.activated_at,
+          "",
+        ),
+      }
+    : null;
+  const cleanedWorkingCopies = readArray(
+    workbook.cleanedWorkingCopies ?? workbook.cleaned_working_copies,
+  )
+    .map((value): CleanedWorkingCopy | null => {
+      const copy = readObject(value);
+      const sourceWorksheetId = readString(copy.sourceWorksheetId ?? copy.source_worksheet_id, "");
+      const cleanedTableName = readString(copy.cleanedTableName ?? copy.cleaned_table_name, "");
+      if (!sourceWorksheetId || !cleanedTableName) return null;
+      return {
+        cleanedCopyId: readString(copy.cleanedCopyId ?? copy.cleaned_copy_id, ""),
+        sourceWorksheetId,
+        sourceTableName: readString(copy.sourceTableName ?? copy.source_table_name, ""),
+        cleanedTableName,
+        createdAt: readString(copy.createdAt ?? copy.created_at, ""),
+      };
+    })
+    .filter((copy): copy is CleanedWorkingCopy => Boolean(copy));
 
   return normalizeWorkbookMetadata({
     workbookId,
@@ -545,6 +593,8 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
     },
     worksheetIds,
     activeWorksheetId: worksheetIds.includes(activeWorksheetId) ? activeWorksheetId : worksheetIds[0] || null,
+    activeAnalysisSource,
+    cleanedWorkingCopies,
     worksheets,
     tableMappings: worksheets.map((worksheet) => ({
       sheetName: worksheet.sheetName,

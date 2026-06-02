@@ -4329,6 +4329,16 @@ body {
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
 
+.app .dataset-preview-analysis-source {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.app .dataset-preview-analysis-source strong {
+  color: #1e3a8a;
+}
+
 .app .dataset-preview-sheet {
   padding: 6px 12px;
   border: 1px solid #cbd5e1;

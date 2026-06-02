@@ -143,6 +143,7 @@ function App() {
     openDatasetPicker,
     handleFileUpload,
     handleWorksheetSelect,
+    handleAnalysisSourceSelect,
     clearCurrentDatasetSession,
     removeRecentDatasetWithConfirmation,
     confirmFutureDatasetDelete,
@@ -801,6 +802,7 @@ function App() {
                 dataset.table_name
               }
               onApplyQueryBuilderRequestDraft={applyGovernedQueryBuilderRequestForReview}
+              onAnalysisSourceSelect={handleAnalysisSourceSelect}
             />
           </div>
           <div hidden={humanAnalyzeStage !== "review"}>

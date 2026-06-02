@@ -354,6 +354,26 @@ export async function applyCleaningRecipe(
   );
 }
 
+export async function activateCleanedWorkingCopy(datasetId: string, worksheetId: string) {
+  return requestJson<Pick<UploadResponse, "dataset" | "preview" | "workbook_metadata">>(
+    `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/activate-cleaned-copy`,
+    {
+      method: "POST",
+    },
+    "Cleaned working copy could not be activated.",
+  );
+}
+
+export async function activateOriginalAnalysisTable(datasetId: string, worksheetId: string) {
+  return requestJson<Pick<UploadResponse, "dataset" | "preview" | "workbook_metadata">>(
+    `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/activate-original-copy`,
+    {
+      method: "POST",
+    },
+    "Original analysis table could not be activated.",
+  );
+}
+
 export async function getDataset(datasetId: string) {
   return requestJson<{ dataset: UploadResponse["dataset"] }>(
     `${API_BASE_URL}/datasets/${datasetId}`,
