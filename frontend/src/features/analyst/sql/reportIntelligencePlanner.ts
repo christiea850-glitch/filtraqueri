@@ -242,13 +242,6 @@ const isContactColumn = (column: SchemaColumn): boolean => {
   return includesAny(text, ["email", "phone", "mobile", "contact"]);
 };
 
-// First matching column wins. Used when a generator needs an exemplar column
-// of a particular kind (e.g., "any status column" or "any amount column").
-const findFirst = (
-  columns: SchemaColumn[],
-  predicate: (column: SchemaColumn) => boolean,
-): SchemaColumn | null => columns.find(predicate) || null;
-
 // "Virtual worksheet" — the minimal slice the planner needs. Workbook uploads
 // supply real WorksheetMetadata; CSV / single-table uploads supply a derived
 // instance built from the dataset's top-level schema. The planner never
