@@ -12,6 +12,8 @@ import {
   type SqlReportRecipe,
   type SqlReportRecipeDomain,
 } from "./sqlReportRecipes";
+// K9: multi-worksheet (join-aware) recipes for workbook uploads
+import { createMultiWorksheetRecipes } from "./multiWorksheetRecipes";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
 
 type SqlAssistantPanelProps = {
@@ -186,6 +188,18 @@ function SqlReportRecipeCard({
           {hiddenDomainCount > 0 && <span>+{hiddenDomainCount}</span>}
         </div>
       )}
+      {recipe.worksheetsUsed && recipe.worksheetsUsed.length > 0 && (
+        <div className="sql-assistant-worksheets-used" aria-label="Worksheets this recipe joins">
+          <span className="sql-assistant-worksheets-used-label">Worksheets used</span>
+          <div className="sql-assistant-worksheets-used-chips">
+            {recipe.worksheetsUsed.map((worksheet) => (
+              <span key={worksheet} className="sql-assistant-worksheet-chip">
+                {worksheet}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <p className={recipe.sql ? "sql-assistant-recipe-ready" : "sql-assistant-recipe-blocked"}>
         {readinessLine}
       </p>
@@ -250,6 +264,14 @@ function SqlAssistantPanel({
     () => createSqlReportRecipes(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
+  // K9: workbook-aware (multi-worksheet) recipes. Re-computed whenever the
+  // active dataset changes — so when the user makes a different worksheet
+  // active from SQL Context, the workbook recipes regenerate against the
+  // freshly-detected worksheet roles.
+  const multiWorksheetRecipes = useMemo(
+    () => createMultiWorksheetRecipes(dataset, selectedDialect),
+    [dataset, selectedDialect],
+  );
   const assistPlaceholder = useMemo(
     () => buildAssistPlaceholder(dataset, selectedDialect),
     [dataset, selectedDialect],
@@ -305,6 +327,39 @@ function SqlAssistantPanel({
   });
   const supportedRecipes = filteredRecipes.filter((recipe) => recipe.sql);
   const blockedRecipes = filteredRecipes.filter((recipe) => !recipe.sql);
+
+  // K9: filter the workbook-aware recipes through the same search + filter the
+  // user picked. We honour the All / Supported / Not supported filter but skip
+  // domain filtering (these recipes are workbook-scoped, not domain-tagged).
+  const filteredMultiWorksheetRecipes = multiWorksheetRecipes.filter((recipe) => {
+    const matchesFilter =
+      activeRecipeFilter === "All" ||
+      (activeRecipeFilter === "Supported" && Boolean(recipe.sql)) ||
+      (activeRecipeFilter === "Not supported" && !recipe.sql) ||
+      Boolean(recipe.domains?.includes(activeRecipeFilter as SqlReportRecipeDomain));
+    if (!matchesFilter) return false;
+    if (!normalizedRecipeQuery) return true;
+    return [
+      recipe.title,
+      recipe.businessPurpose,
+      recipe.requiredFieldRoles.join(" "),
+      recipe.sqlPatterns.join(" "),
+      recipe.dialectSupportNote,
+      recipe.supportSummary,
+      recipe.warnings.join(" "),
+      recipe.missingRequirements.join(" "),
+      (recipe.worksheetsUsed || []).join(" "),
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedRecipeQuery);
+  });
+  const supportedMultiWorksheetRecipes = filteredMultiWorksheetRecipes.filter(
+    (recipe) => recipe.sql,
+  );
+  const blockedMultiWorksheetRecipes = filteredMultiWorksheetRecipes.filter(
+    (recipe) => !recipe.sql,
+  );
   const emptyRecipeMessage = normalizedRecipeQuery
     ? "No recipes match this search. Try clearing the search or switching to All."
     : activeRecipeFilter === "Supported"
@@ -542,6 +597,54 @@ function SqlAssistantPanel({
           </div>
 
           <div className="sql-assistant-generated-list" aria-label="Report recipe drafts">
+            {/* K9: Workbook reports — multi-worksheet (join-aware) recipes.
+                Rendered above the single-table recipes so workbook users see
+                the cross-sheet options first. Empty when the upload is a CSV
+                or a single-sheet workbook with no joinable structure. */}
+            {filteredMultiWorksheetRecipes.length > 0 && (
+              <section
+                className="sql-assistant-workbook-reports"
+                aria-label="Workbook reports"
+              >
+                <div className="sql-helper-section-label">
+                  <span>Workbook reports</span>
+                  <small>
+                    {filteredMultiWorksheetRecipes.length.toLocaleString()} join-aware
+                  </small>
+                </div>
+                <p className="sql-assistant-recipe-note">
+                  Recipes that join multiple worksheets from this workbook. Detected
+                  from worksheet names and shared columns. Inserts into Monaco only.
+                </p>
+                {supportedMultiWorksheetRecipes.map((recipe) => (
+                  <SqlReportRecipeCard
+                    key={recipe.id}
+                    recipe={recipe}
+                    selectedDialectProfile={selectedDialectProfile}
+                    onInsertSql={onInsertSql}
+                  />
+                ))}
+                {blockedMultiWorksheetRecipes.length > 0 && (
+                  <section
+                    className="sql-assistant-blocked-recipes"
+                    aria-label="Unsupported workbook reports"
+                  >
+                    <div className="sql-helper-section-label">
+                      <span>Workbook reports not supported on this upload</span>
+                      <small>{blockedMultiWorksheetRecipes.length.toLocaleString()}</small>
+                    </div>
+                    {blockedMultiWorksheetRecipes.map((recipe) => (
+                      <SqlReportRecipeCard
+                        key={recipe.id}
+                        recipe={recipe}
+                        selectedDialectProfile={selectedDialectProfile}
+                        onInsertSql={onInsertSql}
+                      />
+                    ))}
+                  </section>
+                )}
+              </section>
+            )}
             <div className="sql-helper-section-label">
               <span>Available report recipes</span>
               <small>{filteredRecipes.length.toLocaleString()}</small>

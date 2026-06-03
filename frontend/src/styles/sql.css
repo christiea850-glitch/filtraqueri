@@ -1535,3 +1535,61 @@
     grid-column: 2;
   }
 }
+
+/* ============================================================
+   K9 — Workbook reports (multi-worksheet recipes) UI
+   ============================================================ */
+
+.sql-assistant-workbook-reports {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #f5f7ff;
+}
+
+.sql-assistant-workbook-reports > .sql-helper-section-label {
+  color: #312e81;
+}
+
+.sql-assistant-workbook-reports > .sql-helper-section-label small {
+  color: #4338ca;
+}
+
+.sql-assistant-worksheets-used {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 2px 0;
+}
+
+.sql-assistant-worksheets-used-label {
+  color: #4338ca;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sql-assistant-worksheets-used-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sql-assistant-worksheet-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #c7d2fe;
+  background: #ffffff;
+  color: #3730a3;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.2;
+}

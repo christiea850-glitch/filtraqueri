@@ -18,7 +18,13 @@ export type SqlReportRecipeId =
   | "ranking"
   | "threshold-having"
   | "multi-table-join"
-  | "vacancy-inventory";
+  | "vacancy-inventory"
+  // K9: workbook-aware (multi-worksheet) report recipes
+  | "tenant-access-behavior"
+  | "maintenance-requests-by-property"
+  | "rent-payment-summary"
+  | "vacant-units-by-property"
+  | "lease-expiration-watchlist";
 
 export type SqlReportRecipeDomain =
   | "Marketing"
@@ -43,6 +49,12 @@ export type SqlReportRecipe = {
   missingRequirements: string[];
   dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
   domains?: SqlReportRecipeDomain[];
+  /**
+   * K9: For workbook-aware multi-worksheet recipes, the display names of the
+   * worksheets the generated SQL will join. Surfaced as chips on the card so
+   * users see exactly which sheets are involved before inserting into Monaco.
+   */
+  worksheetsUsed?: string[];
 };
 
 const dialectDisplayNames: Record<string, string> = {
