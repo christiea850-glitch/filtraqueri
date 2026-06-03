@@ -42,6 +42,7 @@ export type ReportOpportunityDomain =
   | "inventory"
   | "payments"
   | "finance"
+  | "operations"
   | "hr"
   | "healthcare"
   | "logistics"
@@ -1084,6 +1085,52 @@ ${rowLimit};`,
 
 // ---------- Compiled-recipe forwarders (K9) ----------
 
+const addDomain = (
+  domains: Set<ReportOpportunityDomain>,
+  domain: ReportOpportunityDomain,
+) => {
+  domains.add(domain);
+};
+
+const deriveCompiledRecipeDomains = (recipe: SqlReportRecipe): ReportOpportunityDomain[] => {
+  const domains = new Set<ReportOpportunityDomain>(["property"]);
+  const text = normalize(
+    [
+      recipe.id,
+      recipe.title,
+      recipe.businessPurpose,
+      recipe.requiredFieldRoles.join(" "),
+      recipe.worksheetsUsed?.join(" ") || "",
+      recipe.domains?.join(" ") || "",
+    ].join(" "),
+  );
+
+  if (includesAny(text, ["payment", "rent", "invoice", "paid", "amount", "finance"])) {
+    addDomain(domains, "payments");
+    addDomain(domains, "finance");
+  }
+
+  if (includesAny(text, ["maintenance", "request", "ticket", "service", "issue"])) {
+    addDomain(domains, "support");
+    addDomain(domains, "operations");
+  }
+
+  if (includesAny(text, ["lease", "tenant", "occupancy", "vacant", "vacancy", "unit"])) {
+    addDomain(domains, "operations");
+  }
+
+  if (includesAny(text, ["access", "security", "entry", "code", "log"])) {
+    addDomain(domains, "operations");
+    addDomain(domains, "support");
+  }
+
+  if (includesAny(text, ["operations", "property", "portfolio"])) {
+    addDomain(domains, "operations");
+  }
+
+  return Array.from(domains);
+};
+
 const fromCompiledRecipe = (recipe: SqlReportRecipe): ReportOpportunity => {
   const ready = Boolean(recipe.sql);
   return {
@@ -1092,7 +1139,7 @@ const fromCompiledRecipe = (recipe: SqlReportRecipe): ReportOpportunity => {
     businessQuestion: recipe.businessPurpose,
     whyItMatters:
       "Compiled multi-worksheet recipe — joins detected automatically and emitted as DuckDB SQL.",
-    domains: ["property"],
+    domains: deriveCompiledRecipeDomains(recipe),
     confidence: ready ? 0.9 : 0.55,
     support: ready ? "can_generate_now" : "needs_missing_fields",
     method: "sql",

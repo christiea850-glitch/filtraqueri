@@ -112,6 +112,7 @@ const opportunityDomainLabels: Record<ReportOpportunityDomain, string> = {
   inventory: "Inventory",
   payments: "Payments",
   finance: "Finance",
+  operations: "Operations",
   hr: "HR",
   healthcare: "Healthcare",
   logistics: "Logistics",
