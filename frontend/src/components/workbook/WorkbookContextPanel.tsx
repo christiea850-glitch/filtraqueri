@@ -24,6 +24,14 @@ type WorkbookContextPanelProps = {
     reviewStatus: "pending" | "accepted" | "dismissed",
     notes?: string,
   ) => void;
+  /**
+   * Make the existing "Worksheet tables" list the single source of worksheet
+   * activation. When provided, every non-active row gets a "Make active" button
+   * that promotes the worksheet to the active analysis source (the right-rail
+   * duplicate has been removed).
+   */
+  onWorksheetSelect?: (worksheetId: string) => void;
+  isSwitchingWorksheet?: boolean;
 };
 
 const statusLabel = (status: WorksheetStatus) => (status === "error" ? "unsupported" : status);
@@ -590,6 +598,8 @@ function WorkbookContextPanel({
   dataset,
   variant = "results",
   onRelationshipReview,
+  onWorksheetSelect,
+  isSwitchingWorksheet,
 }: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
   const relationshipRegistry = useWorkbookRelationships(workbook);
@@ -683,16 +693,63 @@ function WorkbookContextPanel({
         <div className="workbook-mapping-list" aria-label="Worksheet table mappings">
           {workbook.worksheets.map((worksheet) => {
             const isActive = worksheet.worksheetId === workbook.activeWorksheetId;
+            const activeIsCleanedCopy =
+              isActive &&
+              workbook.activeAnalysisSource?.type === "cleaned_working_copy" &&
+              workbook.activeAnalysisSource?.worksheetId === worksheet.worksheetId;
+            const sourceStateLabel = activeIsCleanedCopy
+              ? "cleaned working copy"
+              : "original";
+            const canMakeActive =
+              Boolean(onWorksheetSelect) &&
+              !isActive &&
+              worksheet.status === "ready" &&
+              !isSwitchingWorksheet;
             return (
               <div
                 className={`workbook-mapping-row${isActive ? " active" : ""}`}
                 key={worksheet.worksheetId}
               >
-                <span title={worksheet.displayName}>{worksheet.displayName}</span>
-                <strong>{isActive ? dataset?.table_name || "data" : worksheet.tableName}</strong>
-                <small className={`worksheet-status ${worksheet.status}`}>
-                  {statusLabel(worksheet.status)}
-                </small>
+                <div className="workbook-mapping-row-meta">
+                  <span title={worksheet.displayName}>{worksheet.displayName}</span>
+                  <strong>
+                    {isActive ? dataset?.table_name || "data" : worksheet.tableName}
+                  </strong>
+                  <small className="workbook-mapping-row-counts">
+                    {worksheet.rowCount.toLocaleString()} rows
+                    {" · "}
+                    {worksheet.columnCount.toLocaleString()} cols
+                  </small>
+                </div>
+                <div className="workbook-mapping-row-actions">
+                  <small className={`worksheet-status ${worksheet.status}`}>
+                    {statusLabel(worksheet.status)}
+                  </small>
+                  {isActive ? (
+                    <span
+                      className={`workbook-mapping-active-badge is-${
+                        activeIsCleanedCopy ? "cleaned" : "original"
+                      }`}
+                      title={`Active analysis source · ${sourceStateLabel}. Report Recipes and generated SQL use this worksheet's schema.`}
+                    >
+                      Active · {sourceStateLabel}
+                    </span>
+                  ) : onWorksheetSelect ? (
+                    <button
+                      type="button"
+                      className="secondary-button workbook-mapping-make-active"
+                      onClick={() => onWorksheetSelect(worksheet.worksheetId)}
+                      disabled={!canMakeActive}
+                      title={
+                        worksheet.status === "ready"
+                          ? `Make ${worksheet.displayName} the active analysis source`
+                          : `${worksheet.displayName} is not ready for analysis`
+                      }
+                    >
+                      {isSwitchingWorksheet ? "Switching…" : "Make active"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             );
           })}

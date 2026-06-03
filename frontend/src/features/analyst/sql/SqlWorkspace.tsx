@@ -599,7 +599,12 @@ function SqlWorkspace({
                 </button>
               </div>
               <div className="sqlw-dock-body">
-                <WorkbookContextPanel dataset={dataset} variant="analyst" />
+                <WorkbookContextPanel
+                  dataset={dataset}
+                  variant="analyst"
+                  onWorksheetSelect={onWorksheetSelect}
+                  isSwitchingWorksheet={isSwitchingWorksheet}
+                />
               </div>
             </section>
             <div
@@ -688,8 +693,6 @@ function SqlWorkspace({
         collapsed={isRailCollapsed}
         onToggleCollapsed={() => setIsRailCollapsed((current) => !current)}
         onInsertSql={insertSql}
-        onWorksheetSelect={onWorksheetSelect}
-        isSwitchingWorksheet={isSwitchingWorksheet}
       />
     </section>
   );
