@@ -1593,3 +1593,102 @@
   white-space: nowrap;
   line-height: 1.2;
 }
+
+.sql-assistant-worksheet-chip.is-optional {
+  border-style: dashed;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+/* ============================================================
+   K10 — Opportunity card (dataset-adaptive report planner)
+   ============================================================ */
+
+.sql-assistant-opportunity-card {
+  border-left: 3px solid #6366f1;
+}
+
+.sql-assistant-opportunity-card.is-blocked {
+  border-left-color: #b45309;
+  background: #fffbeb;
+}
+
+.sql-assistant-opportunity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 2px 0;
+}
+
+.sql-assistant-opportunity-meta > span {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.sql-assistant-opportunity-domain {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #3730a3;
+}
+
+.sql-assistant-opportunity-confidence {
+  background: #ecfeff;
+  border: 1px solid #67e8f9;
+  color: #155e75;
+}
+
+.sql-assistant-opportunity-complexity {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+}
+
+.sql-assistant-opportunity-method {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.sql-assistant-opportunity-compiled {
+  background: #d1fae5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+}
+
+.sql-assistant-opportunity-why {
+  margin: 4px 0 0 0;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.sql-assistant-opportunity-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 4px 0 2px 0;
+}
+
+.sql-assistant-opportunity-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: lowercase;
+  white-space: nowrap;
+  line-height: 1.2;
+}

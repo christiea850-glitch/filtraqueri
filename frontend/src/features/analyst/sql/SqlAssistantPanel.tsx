@@ -12,8 +12,16 @@ import {
   type SqlReportRecipe,
   type SqlReportRecipeDomain,
 } from "./sqlReportRecipes";
-// K9: multi-worksheet (join-aware) recipes for workbook uploads
-import { createMultiWorksheetRecipes } from "./multiWorksheetRecipes";
+// K10: dataset-adaptive report intelligence planner. Subsumes K9 — when the
+// upload looks like a property workbook, the planner forwards the compiled
+// K9 recipes; otherwise it emits dynamic generic + domain-specific
+// opportunities. K9's createMultiWorksheetRecipes remains the source of the
+// compiled property recipes the planner reuses internally.
+import {
+  createReportOpportunities,
+  type ReportOpportunity,
+  type ReportOpportunityDomain,
+} from "./reportIntelligencePlanner";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
 
 type SqlAssistantPanelProps = {
@@ -150,6 +158,121 @@ function SqlTemplateCard({
   );
 }
 
+// K10: Opportunity card. Richer than SqlReportRecipeCard because opportunities
+// carry business-question / why-it-matters copy, confidence, method, joins/
+// aggregation/date-logic/anomaly tags, and a worksheet-usage chip strip.
+function ReportOpportunityCard({
+  opportunity,
+  selectedDialectProfile,
+  onInsertSql,
+}: {
+  opportunity: ReportOpportunity;
+  selectedDialectProfile: SqlDialectProfile;
+  onInsertSql: (sql: string) => void;
+}) {
+  const ready = opportunity.support === "can_generate_now" && Boolean(opportunity.sql);
+  const confidencePct = Math.round(opportunity.confidence * 100);
+  const tags: string[] = [];
+  if (opportunity.needsJoins) tags.push("joins");
+  if (opportunity.needsAggregation) tags.push("aggregation");
+  if (opportunity.needsDateLogic) tags.push("date logic");
+  if (opportunity.needsAnomalyDetection) tags.push("anomaly check");
+  const methodLabel: Record<ReportOpportunity["method"], string> = {
+    sql: "SQL",
+    excel: "Excel",
+    python: "Python",
+    future_optimization: "Future optimization",
+  };
+  return (
+    <article
+      className={`sql-assistant-generated-card sql-assistant-opportunity-card is-${
+        ready ? "ready" : "blocked"
+      }`}
+    >
+      <div className="sql-assistant-generated-head">
+        <div>
+          <strong>{opportunity.title}</strong>
+          <span>{opportunity.businessQuestion}</span>
+        </div>
+        <em>{selectedDialectProfile.displayName}</em>
+      </div>
+      <div className="sql-assistant-opportunity-meta" aria-label="Opportunity metadata">
+        {opportunity.domains.slice(0, 3).map((domain: ReportOpportunityDomain) => (
+          <span key={domain} className="sql-assistant-opportunity-domain">
+            {domain}
+          </span>
+        ))}
+        <span className="sql-assistant-opportunity-confidence">
+          confidence {confidencePct}%
+        </span>
+        <span className="sql-assistant-opportunity-complexity">
+          {opportunity.complexity}
+        </span>
+        <span className="sql-assistant-opportunity-method">
+          {methodLabel[opportunity.method]}
+        </span>
+        {opportunity.compiledRecipeId && (
+          <span className="sql-assistant-opportunity-compiled" title="Compiled recipe">
+            compiled
+          </span>
+        )}
+      </div>
+      <p className="sql-assistant-opportunity-why">{opportunity.whyItMatters}</p>
+      {opportunity.requiredTables.length > 0 && (
+        <div className="sql-assistant-worksheets-used">
+          <span className="sql-assistant-worksheets-used-label">
+            Required {opportunity.requiredTables.length === 1 ? "table" : "tables"}
+          </span>
+          <div className="sql-assistant-worksheets-used-chips">
+            {opportunity.requiredTables.map((table) => (
+              <span key={table} className="sql-assistant-worksheet-chip">
+                {table}
+              </span>
+            ))}
+            {opportunity.optionalTables.map((table) => (
+              <span
+                key={`opt:${table}`}
+                className="sql-assistant-worksheet-chip is-optional"
+                title="Optional — enriches the report when present"
+              >
+                {table} (optional)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {tags.length > 0 && (
+        <div className="sql-assistant-opportunity-tags" aria-label="Report shape">
+          {tags.map((tag) => (
+            <span key={tag} className="sql-assistant-opportunity-tag">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+      {ready ? (
+        <p className="sql-assistant-recipe-ready">
+          Can generate now. Safe draft below — insert into Monaco to review before running.
+        </p>
+      ) : (
+        <p className="sql-assistant-recipe-blocked">
+          Needs missing fields. {opportunity.missingRequirements.length > 0
+            ? `Add: ${opportunity.missingRequirements.join(", ")}.`
+            : "Required columns were not detected on this upload."}
+        </p>
+      )}
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() => opportunity.sql && onInsertSql(opportunity.sql)}
+        disabled={!ready}
+      >
+        {ready ? "Insert SQL into Monaco" : "Needs missing fields"}
+      </button>
+    </article>
+  );
+}
+
 function SqlReportRecipeCard({
   recipe,
   selectedDialectProfile,
@@ -264,12 +387,12 @@ function SqlAssistantPanel({
     () => createSqlReportRecipes(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
-  // K9: workbook-aware (multi-worksheet) recipes. Re-computed whenever the
-  // active dataset changes — so when the user makes a different worksheet
-  // active from SQL Context, the workbook recipes regenerate against the
-  // freshly-detected worksheet roles.
-  const multiWorksheetRecipes = useMemo(
-    () => createMultiWorksheetRecipes(dataset, selectedDialect),
+  // K10: dataset-adaptive report opportunities. The planner re-runs whenever
+  // the active dataset changes — so when the user switches the active
+  // worksheet in SQL Context, the opportunity list regenerates against the
+  // freshly-detected column shape across the workbook.
+  const reportOpportunities = useMemo(
+    () => createReportOpportunities(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
   const assistPlaceholder = useMemo(
@@ -328,37 +451,37 @@ function SqlAssistantPanel({
   const supportedRecipes = filteredRecipes.filter((recipe) => recipe.sql);
   const blockedRecipes = filteredRecipes.filter((recipe) => !recipe.sql);
 
-  // K9: filter the workbook-aware recipes through the same search + filter the
-  // user picked. We honour the All / Supported / Not supported filter but skip
-  // domain filtering (these recipes are workbook-scoped, not domain-tagged).
-  const filteredMultiWorksheetRecipes = multiWorksheetRecipes.filter((recipe) => {
+  // K10: filter dataset-adaptive opportunities through the same search + filter
+  // pipeline as single-table recipes. Opportunities expose richer metadata
+  // (domains, complexity, methods, joins/aggregation/date logic flags), so the
+  // search also matches against business question and "why it matters" copy.
+  const filteredOpportunities = reportOpportunities.filter((opportunity) => {
     const matchesFilter =
       activeRecipeFilter === "All" ||
-      (activeRecipeFilter === "Supported" && Boolean(recipe.sql)) ||
-      (activeRecipeFilter === "Not supported" && !recipe.sql) ||
-      Boolean(recipe.domains?.includes(activeRecipeFilter as SqlReportRecipeDomain));
+      (activeRecipeFilter === "Supported" && opportunity.support === "can_generate_now") ||
+      (activeRecipeFilter === "Not supported" && opportunity.support === "needs_missing_fields");
     if (!matchesFilter) return false;
     if (!normalizedRecipeQuery) return true;
     return [
-      recipe.title,
-      recipe.businessPurpose,
-      recipe.requiredFieldRoles.join(" "),
-      recipe.sqlPatterns.join(" "),
-      recipe.dialectSupportNote,
-      recipe.supportSummary,
-      recipe.warnings.join(" "),
-      recipe.missingRequirements.join(" "),
-      (recipe.worksheetsUsed || []).join(" "),
+      opportunity.title,
+      opportunity.businessQuestion,
+      opportunity.whyItMatters,
+      opportunity.domains.join(" "),
+      opportunity.requiredTables.join(" "),
+      opportunity.requiredColumns.join(" "),
+      opportunity.missingRequirements.join(" "),
+      opportunity.method,
+      opportunity.complexity,
     ]
       .join(" ")
       .toLowerCase()
       .includes(normalizedRecipeQuery);
   });
-  const supportedMultiWorksheetRecipes = filteredMultiWorksheetRecipes.filter(
-    (recipe) => recipe.sql,
+  const supportedOpportunities = filteredOpportunities.filter(
+    (opportunity) => opportunity.support === "can_generate_now",
   );
-  const blockedMultiWorksheetRecipes = filteredMultiWorksheetRecipes.filter(
-    (recipe) => !recipe.sql,
+  const blockedOpportunities = filteredOpportunities.filter(
+    (opportunity) => opportunity.support === "needs_missing_fields",
   );
   const emptyRecipeMessage = normalizedRecipeQuery
     ? "No recipes match this search. Try clearing the search or switching to All."
@@ -597,46 +720,47 @@ function SqlAssistantPanel({
           </div>
 
           <div className="sql-assistant-generated-list" aria-label="Report recipe drafts">
-            {/* K9: Workbook reports — multi-worksheet (join-aware) recipes.
-                Rendered above the single-table recipes so workbook users see
-                the cross-sheet options first. Empty when the upload is a CSV
-                or a single-sheet workbook with no joinable structure. */}
-            {filteredMultiWorksheetRecipes.length > 0 && (
+            {/* K10: Suggested business reports — dataset-adaptive opportunities
+                from the planner. Subsumes K9 — when the upload is a property
+                workbook the planner forwards K9's compiled recipes alongside
+                generic + other domain-specific opportunities. Empty only when
+                no dataset is open. */}
+            {filteredOpportunities.length > 0 && (
               <section
                 className="sql-assistant-workbook-reports"
-                aria-label="Workbook reports"
+                aria-label="Suggested business reports"
               >
                 <div className="sql-helper-section-label">
-                  <span>Workbook reports</span>
+                  <span>Suggested business reports</span>
                   <small>
-                    {filteredMultiWorksheetRecipes.length.toLocaleString()} join-aware
+                    {filteredOpportunities.length.toLocaleString()} for this dataset
                   </small>
                 </div>
                 <p className="sql-assistant-recipe-note">
-                  Recipes that join multiple worksheets from this workbook. Detected
-                  from worksheet names and shared columns. Inserts into Monaco only.
+                  Dynamic business-report opportunities detected from the upload's
+                  worksheets, column kinds, and likely keys. Inserts into Monaco only.
                 </p>
-                {supportedMultiWorksheetRecipes.map((recipe) => (
-                  <SqlReportRecipeCard
-                    key={recipe.id}
-                    recipe={recipe}
+                {supportedOpportunities.map((opportunity) => (
+                  <ReportOpportunityCard
+                    key={opportunity.id}
+                    opportunity={opportunity}
                     selectedDialectProfile={selectedDialectProfile}
                     onInsertSql={onInsertSql}
                   />
                 ))}
-                {blockedMultiWorksheetRecipes.length > 0 && (
+                {blockedOpportunities.length > 0 && (
                   <section
                     className="sql-assistant-blocked-recipes"
-                    aria-label="Unsupported workbook reports"
+                    aria-label="Opportunities needing more structure"
                   >
                     <div className="sql-helper-section-label">
-                      <span>Workbook reports not supported on this upload</span>
-                      <small>{blockedMultiWorksheetRecipes.length.toLocaleString()}</small>
+                      <span>Needs missing fields</span>
+                      <small>{blockedOpportunities.length.toLocaleString()}</small>
                     </div>
-                    {blockedMultiWorksheetRecipes.map((recipe) => (
-                      <SqlReportRecipeCard
-                        key={recipe.id}
-                        recipe={recipe}
+                    {blockedOpportunities.map((opportunity) => (
+                      <ReportOpportunityCard
+                        key={opportunity.id}
+                        opportunity={opportunity}
                         selectedDialectProfile={selectedDialectProfile}
                         onInsertSql={onInsertSql}
                       />
