@@ -1559,6 +1559,57 @@
   color: #4338ca;
 }
 
+.sql-assistant-most-relevant,
+.sql-assistant-more-opportunities {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sql-assistant-most-relevant {
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.sql-assistant-more-opportunities {
+  margin-top: 2px;
+}
+
+.sql-assistant-opportunity-family {
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.sql-assistant-opportunity-family summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  color: #312e81;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  list-style-position: inside;
+}
+
+.sql-assistant-opportunity-family summary small {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sql-assistant-opportunity-family-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 10px 10px;
+}
+
 .sql-assistant-worksheets-used {
   display: flex;
   flex-direction: column;
@@ -1658,9 +1709,9 @@
 }
 
 .sql-assistant-opportunity-compiled {
-  background: #d1fae5;
-  border: 1px solid #6ee7b7;
-  color: #065f46;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a3412;
 }
 
 .sql-assistant-opportunity-why {

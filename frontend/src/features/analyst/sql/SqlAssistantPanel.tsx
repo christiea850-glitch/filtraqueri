@@ -44,7 +44,20 @@ const categoryOrder: SqlTemplateCategory[] = [
 ];
 
 type SqlAssistantMode = "templates" | "assist" | "recipes";
-type SqlReportRecipeFilter = "All" | "Supported" | "Not supported" | SqlReportRecipeDomain;
+type SqlReportRecipeFilter =
+  | "All"
+  | "Supported"
+  | "Not supported"
+  | "Property"
+  | "Generic"
+  | "Payments"
+  | "Inventory"
+  | "HR"
+  | "Healthcare"
+  | "Logistics"
+  | "Education"
+  | "Support"
+  | SqlReportRecipeDomain;
 
 const modeCopy: Record<SqlAssistantMode, { title: string; description: string }> = {
   templates: {
@@ -65,15 +78,109 @@ const recipeFilters: SqlReportRecipeFilter[] = [
   "All",
   "Supported",
   "Not supported",
+  "Property",
+  "Generic",
   "Operations",
   "CRM",
   "Product",
   "Sales",
   "Finance",
+  "Payments",
   "Marketing",
   "Retail",
+  "Inventory",
+  "HR",
+  "Healthcare",
+  "Logistics",
+  "Education",
+  "Support",
   "Web",
 ];
+
+const normalizeFilterValue = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[_%()]+/g, " ")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const opportunityDomainLabels: Record<ReportOpportunityDomain, string> = {
+  property: "Property",
+  sales: "Sales",
+  retail: "Retail",
+  inventory: "Inventory",
+  payments: "Payments",
+  finance: "Finance",
+  hr: "HR",
+  healthcare: "Healthcare",
+  logistics: "Logistics",
+  education: "Education",
+  support: "Support",
+  marketing: "Marketing",
+  generic: "Generic",
+};
+
+const confidenceLabel = (confidence: number) => {
+  if (confidence >= 0.8) return "High";
+  if (confidence >= 0.6) return "Medium";
+  return "Low";
+};
+
+const getOpportunityFamily = (opportunity: ReportOpportunity) => {
+  if (opportunity.id.startsWith("status-summary:")) return "Status summaries";
+  if (opportunity.id.startsWith("top-categories-by-")) return "Top categories";
+  if (opportunity.id.startsWith("trend-over-time:")) return "Monthly trends";
+  if (opportunity.id.startsWith("completeness:")) return "Completeness reports";
+  if (opportunity.id.startsWith("entity-activity:")) return "Entity activity";
+  return "Other suggestions";
+};
+
+const familyOrder = [
+  "Status summaries",
+  "Top categories",
+  "Monthly trends",
+  "Completeness reports",
+  "Entity activity",
+  "Other suggestions",
+];
+
+const matchesDomainFilter = (
+  domains: string[] | undefined,
+  activeFilter: SqlReportRecipeFilter,
+) => {
+  if (!domains || domains.length === 0) return false;
+  const normalizedFilter = normalizeFilterValue(activeFilter);
+  return domains.some((domain) => normalizeFilterValue(domain) === normalizedFilter);
+};
+
+const matchesOpportunityFilter = (
+  opportunity: ReportOpportunity,
+  activeFilter: SqlReportRecipeFilter,
+) =>
+  activeFilter === "All" ||
+  (activeFilter === "Supported" && opportunity.support === "can_generate_now") ||
+  (activeFilter === "Not supported" && opportunity.support === "needs_missing_fields") ||
+  matchesDomainFilter(opportunity.domains, activeFilter);
+
+const matchesRecipeFilter = (
+  recipe: SqlReportRecipe,
+  activeFilter: SqlReportRecipeFilter,
+) =>
+  activeFilter === "All" ||
+  (activeFilter === "Supported" && Boolean(recipe.sql)) ||
+  (activeFilter === "Not supported" && !recipe.sql) ||
+  matchesDomainFilter(recipe.domains, activeFilter);
+
+const sortOpportunitiesByRelevance = (opportunities: ReportOpportunity[]) =>
+  [...opportunities].sort((a, b) => {
+    const supportDelta =
+      Number(b.support === "can_generate_now") - Number(a.support === "can_generate_now");
+    if (supportDelta !== 0) return supportDelta;
+    const confidenceDelta = b.confidence - a.confidence;
+    if (confidenceDelta !== 0) return confidenceDelta;
+    return a.title.localeCompare(b.title);
+  });
 
 const labelFromColumn = (columnName: string) =>
   columnName
@@ -172,6 +279,18 @@ function ReportOpportunityCard({
 }) {
   const ready = opportunity.support === "can_generate_now" && Boolean(opportunity.sql);
   const confidencePct = Math.round(opportunity.confidence * 100);
+  const displayDomains =
+    opportunity.domains.length === 1 && opportunity.domains[0] === "generic"
+      ? []
+      : opportunity.domains;
+  const visibleDomains = displayDomains.slice(0, 3);
+  const hiddenDomainCount = Math.max(0, displayDomains.length - visibleDomains.length);
+  const visibleRequiredTables =
+    opportunity.requiredTables.length === 1 &&
+    normalizeFilterValue(opportunity.title).includes(normalizeFilterValue(opportunity.requiredTables[0]))
+      ? []
+      : opportunity.requiredTables;
+  const showTableChips = visibleRequiredTables.length > 0 || opportunity.optionalTables.length > 0;
   const tags: string[] = [];
   if (opportunity.needsJoins) tags.push("joins");
   if (opportunity.needsAggregation) tags.push("aggregation");
@@ -197,20 +316,28 @@ function ReportOpportunityCard({
         <em>{selectedDialectProfile.displayName}</em>
       </div>
       <div className="sql-assistant-opportunity-meta" aria-label="Opportunity metadata">
-        {opportunity.domains.slice(0, 3).map((domain: ReportOpportunityDomain) => (
+        {visibleDomains.map((domain: ReportOpportunityDomain) => (
           <span key={domain} className="sql-assistant-opportunity-domain">
-            {domain}
+            {opportunityDomainLabels[domain]}
           </span>
         ))}
-        <span className="sql-assistant-opportunity-confidence">
-          confidence {confidencePct}%
+        {hiddenDomainCount > 0 && (
+          <span className="sql-assistant-opportunity-domain">+{hiddenDomainCount}</span>
+        )}
+        <span
+          className="sql-assistant-opportunity-confidence"
+          title={`Planner confidence: ${confidencePct}%`}
+        >
+          {confidenceLabel(opportunity.confidence)} confidence
         </span>
         <span className="sql-assistant-opportunity-complexity">
           {opportunity.complexity}
         </span>
-        <span className="sql-assistant-opportunity-method">
-          {methodLabel[opportunity.method]}
-        </span>
+        {opportunity.method !== "sql" && (
+          <span className="sql-assistant-opportunity-method">
+            {methodLabel[opportunity.method]}
+          </span>
+        )}
         {opportunity.compiledRecipeId && (
           <span className="sql-assistant-opportunity-compiled" title="Compiled recipe">
             compiled
@@ -218,13 +345,15 @@ function ReportOpportunityCard({
         )}
       </div>
       <p className="sql-assistant-opportunity-why">{opportunity.whyItMatters}</p>
-      {opportunity.requiredTables.length > 0 && (
+      {showTableChips && (
         <div className="sql-assistant-worksheets-used">
           <span className="sql-assistant-worksheets-used-label">
-            Required {opportunity.requiredTables.length === 1 ? "table" : "tables"}
+            {visibleRequiredTables.length > 0
+              ? `Required ${visibleRequiredTables.length === 1 ? "table" : "tables"}`
+              : "Related tables"}
           </span>
           <div className="sql-assistant-worksheets-used-chips">
-            {opportunity.requiredTables.map((table) => (
+            {visibleRequiredTables.map((table) => (
               <span key={table} className="sql-assistant-worksheet-chip">
                 {table}
               </span>
@@ -366,6 +495,61 @@ function SqlReportRecipeCard({
   );
 }
 
+function ReportOpportunityList({
+  opportunities,
+  selectedDialectProfile,
+  onInsertSql,
+}: {
+  opportunities: ReportOpportunity[];
+  selectedDialectProfile: SqlDialectProfile;
+  onInsertSql: (sql: string) => void;
+}) {
+  const grouped = familyOrder
+    .map((family) => ({
+      family,
+      opportunities: opportunities.filter((opportunity) => getOpportunityFamily(opportunity) === family),
+    }))
+    .filter((group) => group.opportunities.length > 0);
+
+  return (
+    <>
+      {grouped.map((group) =>
+        group.opportunities.length > 1 && group.family !== "Other suggestions" ? (
+          <details
+            className="sql-assistant-opportunity-family"
+            key={group.family}
+            open={false}
+          >
+            <summary>
+              <span>{group.family}</span>
+              <small>{group.opportunities.length.toLocaleString()}</small>
+            </summary>
+            <div className="sql-assistant-opportunity-family-list">
+              {group.opportunities.map((opportunity) => (
+                <ReportOpportunityCard
+                  key={opportunity.id}
+                  opportunity={opportunity}
+                  selectedDialectProfile={selectedDialectProfile}
+                  onInsertSql={onInsertSql}
+                />
+              ))}
+            </div>
+          </details>
+        ) : (
+          group.opportunities.map((opportunity) => (
+            <ReportOpportunityCard
+              key={opportunity.id}
+              opportunity={opportunity}
+              selectedDialectProfile={selectedDialectProfile}
+              onInsertSql={onInsertSql}
+            />
+          ))
+        ),
+      )}
+    </>
+  );
+}
+
 function SqlAssistantPanel({
   dataset,
   selectedDialect,
@@ -425,12 +609,7 @@ function SqlAssistantPanel({
     }))
     .filter((group) => group.templates.length > 0);
   const filteredRecipes = recipes.filter((recipe) => {
-    const matchesFilter =
-      activeRecipeFilter === "All" ||
-      (activeRecipeFilter === "Supported" && Boolean(recipe.sql)) ||
-      (activeRecipeFilter === "Not supported" && !recipe.sql) ||
-      Boolean(recipe.domains?.includes(activeRecipeFilter as SqlReportRecipeDomain));
-    if (!matchesFilter) return false;
+    if (!matchesRecipeFilter(recipe, activeRecipeFilter)) return false;
     if (!normalizedRecipeQuery) return true;
 
     return [
@@ -456,11 +635,7 @@ function SqlAssistantPanel({
   // (domains, complexity, methods, joins/aggregation/date logic flags), so the
   // search also matches against business question and "why it matters" copy.
   const filteredOpportunities = reportOpportunities.filter((opportunity) => {
-    const matchesFilter =
-      activeRecipeFilter === "All" ||
-      (activeRecipeFilter === "Supported" && opportunity.support === "can_generate_now") ||
-      (activeRecipeFilter === "Not supported" && opportunity.support === "needs_missing_fields");
-    if (!matchesFilter) return false;
+    if (!matchesOpportunityFilter(opportunity, activeRecipeFilter)) return false;
     if (!normalizedRecipeQuery) return true;
     return [
       opportunity.title,
@@ -477,11 +652,10 @@ function SqlAssistantPanel({
       .toLowerCase()
       .includes(normalizedRecipeQuery);
   });
-  const supportedOpportunities = filteredOpportunities.filter(
-    (opportunity) => opportunity.support === "can_generate_now",
-  );
-  const blockedOpportunities = filteredOpportunities.filter(
-    (opportunity) => opportunity.support === "needs_missing_fields",
+  const relevantOpportunities = sortOpportunitiesByRelevance(filteredOpportunities).slice(0, 5);
+  const relevantOpportunityIds = new Set(relevantOpportunities.map((opportunity) => opportunity.id));
+  const remainingOpportunities = filteredOpportunities.filter(
+    (opportunity) => !relevantOpportunityIds.has(opportunity.id),
   );
   const emptyRecipeMessage = normalizedRecipeQuery
     ? "No recipes match this search. Try clearing the search or switching to All."
@@ -740,24 +914,16 @@ function SqlAssistantPanel({
                   Dynamic business-report opportunities detected from the upload's
                   worksheets, column kinds, and likely keys. Inserts into Monaco only.
                 </p>
-                {supportedOpportunities.map((opportunity) => (
-                  <ReportOpportunityCard
-                    key={opportunity.id}
-                    opportunity={opportunity}
-                    selectedDialectProfile={selectedDialectProfile}
-                    onInsertSql={onInsertSql}
-                  />
-                ))}
-                {blockedOpportunities.length > 0 && (
+                {relevantOpportunities.length > 0 && (
                   <section
-                    className="sql-assistant-blocked-recipes"
-                    aria-label="Opportunities needing more structure"
+                    className="sql-assistant-most-relevant"
+                    aria-label="Most relevant suggested reports"
                   >
                     <div className="sql-helper-section-label">
-                      <span>Needs missing fields</span>
-                      <small>{blockedOpportunities.length.toLocaleString()}</small>
+                      <span>Most relevant</span>
+                      <small>{relevantOpportunities.length.toLocaleString()}</small>
                     </div>
-                    {blockedOpportunities.map((opportunity) => (
+                    {relevantOpportunities.map((opportunity) => (
                       <ReportOpportunityCard
                         key={opportunity.id}
                         opportunity={opportunity}
@@ -765,6 +931,22 @@ function SqlAssistantPanel({
                         onInsertSql={onInsertSql}
                       />
                     ))}
+                  </section>
+                )}
+                {remainingOpportunities.length > 0 && (
+                  <section
+                    className="sql-assistant-more-opportunities"
+                    aria-label="More suggested business reports"
+                  >
+                    <div className="sql-helper-section-label">
+                      <span>More suggestions</span>
+                      <small>{remainingOpportunities.length.toLocaleString()}</small>
+                    </div>
+                    <ReportOpportunityList
+                      opportunities={remainingOpportunities}
+                      selectedDialectProfile={selectedDialectProfile}
+                      onInsertSql={onInsertSql}
+                    />
                   </section>
                 )}
               </section>

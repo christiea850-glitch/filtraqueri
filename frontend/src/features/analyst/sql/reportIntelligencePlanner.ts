@@ -123,11 +123,12 @@ const isIdColumn = (column: SchemaColumn): boolean => {
 
 const isDateColumn = (column: SchemaColumn): boolean => {
   if (column.inferred_type === "date") return true;
+  const rawText = column.name.toLowerCase();
+  if (/(^|[^a-z0-9])[a-z0-9]+_at($|[^a-z0-9])/.test(rawText)) return true;
   const text = normalize(column.name);
   return includesAny(text, [
     "date",
     "time",
-    "_at",
     "timestamp",
     "created",
     "updated",
