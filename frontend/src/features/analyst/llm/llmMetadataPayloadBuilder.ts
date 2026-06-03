@@ -7,7 +7,9 @@ import {
   createReportOpportunities,
   type ReportOpportunity,
 } from "../sql/reportIntelligencePlanner";
+import { classifySensitiveColumn } from "./llmSensitiveColumnClassifier";
 import type {
+  AIColumnSensitivityCategory,
   AIColumnSummary,
   AIDataProfileSummary,
   AIDeterministicReportOpportunitySummary,
@@ -37,7 +39,12 @@ const missingRatio = (column: SchemaColumn, rowCount: number): number | null => 
   return Number((column.null_count / rowCount).toFixed(4));
 };
 
-const summarizeColumn = (column: SchemaColumn, rowCount: number): AIColumnSummary => ({
+const summarizeColumn = (
+  column: SchemaColumn,
+  rowCount: number,
+  worksheetName: string,
+  trustedTableName: string,
+): AIColumnSummary => ({
   name: column.name,
   type: column.type,
   inferredType: column.inferred_type,
@@ -51,6 +58,7 @@ const summarizeColumn = (column: SchemaColumn, rowCount: number): AIColumnSummar
     hasDateRange: Boolean(column.date_range),
     hasTextLengthStats: Boolean(column.text_length_stats),
   },
+  sensitivity: classifySensitiveColumn({ column, worksheetName, trustedTableName }),
 });
 
 const summarizeWorksheet = (worksheet: WorksheetMetadata): AIWorksheetTableSummary => ({
@@ -61,7 +69,9 @@ const summarizeWorksheet = (worksheet: WorksheetMetadata): AIWorksheetTableSumma
   status: worksheet.status,
   rowCount: worksheet.rowCount,
   columnCount: worksheet.columnCount,
-  columns: worksheet.schema.map((column) => summarizeColumn(column, worksheet.rowCount)),
+  columns: worksheet.schema.map((column) =>
+    summarizeColumn(column, worksheet.rowCount, worksheet.displayName || worksheet.sheetName, worksheet.tableName),
+  ),
   normalizationWarnings: [
     ...worksheet.normalization.warnings,
     worksheet.normalization.headerDetectionWarning,
@@ -77,7 +87,14 @@ const summarizeDatasetAsWorksheet = (dataset: DatasetMetadata): AIWorksheetTable
   status: "ready",
   rowCount: dataset.row_count,
   columnCount: dataset.column_count,
-  columns: dataset.schema.map((column) => summarizeColumn(column, dataset.row_count)),
+  columns: dataset.schema.map((column) =>
+    summarizeColumn(
+      column,
+      dataset.row_count,
+      dataset.original_filename || dataset.filename,
+      dataset.table_name,
+    ),
+  ),
   normalizationWarnings: [],
 });
 
@@ -216,16 +233,48 @@ export const buildAIMetadataContextPayload = ({
 
 export const summarizeAIMetadataPayloadCategories = (
   payload: AIMetadataContextPayload,
-): AIMetadataPayloadCategorySummary => ({
-  mode: payload.provenance.mode,
-  rawRowsIncluded: false,
-  sampleRowsIncluded: false,
-  promptTextIncluded: false,
-  datasetIncluded: Boolean(payload.dataset),
-  worksheetCount: payload.worksheets.length,
-  columnCount: payload.worksheets.reduce((sum, worksheet) => sum + worksheet.columns.length, 0),
-  relationshipCandidateCount: payload.relationships.length,
-  deterministicReportCount: payload.deterministicReports.length,
-  profileSummaryIncluded: Boolean(payload.dataProfile),
-  sqlDialect: payload.sqlDialect.id,
-});
+): AIMetadataPayloadCategorySummary => {
+  const sensitivity = payload.worksheets
+    .flatMap((worksheet) => worksheet.columns)
+    .reduce<{
+      safe: number;
+      caution: number;
+      sensitive: number;
+      restricted: number;
+      categories: Set<AIColumnSensitivityCategory>;
+    }>(
+      (summary, column) => {
+        summary[column.sensitivity.level] += 1;
+        summary.categories.add(column.sensitivity.category);
+        return summary;
+      },
+      {
+        safe: 0,
+        caution: 0,
+        sensitive: 0,
+        restricted: 0,
+        categories: new Set(),
+      },
+    );
+
+  return {
+    mode: payload.provenance.mode,
+    rawRowsIncluded: false,
+    sampleRowsIncluded: false,
+    promptTextIncluded: false,
+    datasetIncluded: Boolean(payload.dataset),
+    worksheetCount: payload.worksheets.length,
+    columnCount: payload.worksheets.reduce((sum, worksheet) => sum + worksheet.columns.length, 0),
+    relationshipCandidateCount: payload.relationships.length,
+    deterministicReportCount: payload.deterministicReports.length,
+    profileSummaryIncluded: Boolean(payload.dataProfile),
+    sqlDialect: payload.sqlDialect.id,
+    sensitivity: {
+      safe: sensitivity.safe,
+      caution: sensitivity.caution,
+      sensitive: sensitivity.sensitive,
+      restricted: sensitivity.restricted,
+      categories: Array.from(sensitivity.categories).sort(),
+    },
+  };
+};

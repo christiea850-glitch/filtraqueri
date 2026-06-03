@@ -32,12 +32,44 @@ export type AIColumnProfileSummary = {
   hasTextLengthStats: boolean;
 };
 
+export type AIColumnSensitivityCategory =
+  | "safe_business_metric"
+  | "identifier"
+  | "direct_personal_identifier"
+  | "contact_information"
+  | "address_or_location"
+  | "financial_or_payment"
+  | "access_or_security"
+  | "health_or_sensitive"
+  | "free_text_sensitive"
+  | "unknown_needs_review";
+
+export type AIColumnSensitivityLevel = "safe" | "caution" | "sensitive" | "restricted";
+
+export type AIRedactionPolicyLabel =
+  | "allowed_for_metadata_only"
+  | "allowed_for_sql_planning"
+  | "requires_user_consent_for_samples"
+  | "never_send_raw_values";
+
+export type AIColumnSensitivityClassification = {
+  category: AIColumnSensitivityCategory;
+  level: AIColumnSensitivityLevel;
+  policyLabels: AIRedactionPolicyLabel[];
+  allowedForMetadataOnly: true;
+  allowedForSqlPlanning: boolean;
+  requiresUserConsentForSamples: boolean;
+  neverSendRawValues: true;
+  reasons: string[];
+};
+
 export type AIColumnSummary = {
   name: string;
   type: string;
   inferredType: SchemaColumn["inferred_type"];
   missing: AIColumnMissingSummary;
   profile: AIColumnProfileSummary;
+  sensitivity: AIColumnSensitivityClassification;
 };
 
 export type AIWorksheetTableSummary = {
@@ -156,4 +188,11 @@ export type AIMetadataPayloadCategorySummary = {
   deterministicReportCount: number;
   profileSummaryIncluded: boolean;
   sqlDialect: SqlDialectId;
+  sensitivity: {
+    safe: number;
+    caution: number;
+    sensitive: number;
+    restricted: number;
+    categories: AIColumnSensitivityCategory[];
+  };
 };
