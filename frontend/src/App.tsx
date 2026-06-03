@@ -983,6 +983,9 @@ function App() {
     dataset,
     sqlWorkspaceMetadata,
     onSqlWorkspaceMetadataChange: setSqlWorkspaceMetadata,
+    onWorksheetSelect: handleWorksheetSelect,
+    isSwitchingWorksheet,
+
     onExecutionResult: (executionResult) => {
       const coordinationResult = coordinateExecutionResult({
         executionResult,

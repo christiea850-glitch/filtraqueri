@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import date
-from math import ceil
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +159,7 @@ def apply_missing_value_decisions_to_cleaned_copy(
                             f"CASE WHEN {_blank_predicate(column)} THEN 1 ELSE 0 END"
                             for column in usable_columns
                         )
-                        threshold = ceil(len(usable_columns) / 2)
+                        threshold = (len(usable_columns) // 2) + 1
                         rows_removed = connection.execute(
                             f"""
                             DELETE FROM {_quote_identifier(cleaned_table_name)}
@@ -174,7 +173,7 @@ def apply_missing_value_decisions_to_cleaned_copy(
                             {
                                 "strategy": worksheet_strategy,
                                 "scope": "worksheet",
-                                "explanation": "Rows with blanks in at least half of the cleaned working-copy fields were removed.",
+                                "explanation": "Rows with blanks in more than half of the cleaned working-copy fields were removed.",
                             }
                         )
 

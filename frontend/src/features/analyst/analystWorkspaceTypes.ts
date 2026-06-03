@@ -8,6 +8,8 @@ export type AnalystWorkspaceRenderContext = {
   onExecutionResult?: (result: WorkspaceExecutionResult) => void;
   sqlWorkspaceMetadata?: SqlWorkspaceMetadataSnapshot;
   onSqlWorkspaceMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
+  onWorksheetSelect?: (worksheetId: string) => void;
+  isSwitchingWorksheet?: boolean;
 };
 
 export type AnalystAiCapabilityFlags = {

@@ -74,12 +74,21 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
       plainEnglish: true,
       validation: true,
     },
-    renderer: ({ dataset, onExecutionResult, sqlWorkspaceMetadata, onSqlWorkspaceMetadataChange }) =>
+    renderer: ({
+      dataset,
+      onExecutionResult,
+      sqlWorkspaceMetadata,
+      onSqlWorkspaceMetadataChange,
+      onWorksheetSelect,
+      isSwitchingWorksheet,
+    }) =>
       createElement(SqlWorkspace, {
         dataset,
         onExecutionResult,
         metadata: sqlWorkspaceMetadata,
         onMetadataChange: onSqlWorkspaceMetadataChange,
+        onWorksheetSelect,
+        isSwitchingWorksheet,
       }),
   },
   ...placeholderWorkspaces.map((workspace) => ({

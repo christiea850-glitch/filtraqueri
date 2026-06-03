@@ -581,12 +581,13 @@ function WorkspaceShell({
             </section>
           </nav>
           {activeDestination.id === "data" && (
-            <div className="sidebar-bottom-stack" aria-label="Workspace and account">
-              <section className="sidebar-workspace-status-card" aria-label="Active analysis source">
-                <span>Active analysis source</span>
-                <strong>{dataset ? activeWorksheetLabel : "No dataset open"}</strong>
-                <small>{dataset ? datasetShapeLabel : "Choose a file to begin"}</small>
-              </section>
+            <div className="sidebar-bottom-stack" aria-label="Account">
+              {/*
+                K8A: the "Active analysis source" status card lived here as a duplicate
+                of the SQL Context worksheet picker. Removed. The single source of truth
+                for active worksheet + source is now SqlSchemaPanel's worksheet picker
+                (Analyst tab) and the active-source strip in Preview Dataset.
+              */}
               <section className="sidebar-profile-card" aria-label="Account status">
                 <span className="sidebar-profile-avatar" aria-hidden="true">LW</span>
                 <div>

@@ -706,11 +706,17 @@ function DatasetPreviewPage({
   dataset,
   worksheets,
   initialWorksheetId,
+  activeWorksheetId,
+  isSwitchingWorksheet,
+  onWorksheetSelect,
   onBack,
 }: {
   dataset: DatasetMetadata;
   worksheets: WorksheetMetadata[];
   initialWorksheetId: string | null;
+  activeWorksheetId: string | null;
+  isSwitchingWorksheet: boolean;
+  onWorksheetSelect: (worksheetId: string) => void;
   onBack: () => void;
 }) {
   const hasWorkbook = worksheets.length > 0;
@@ -891,17 +897,68 @@ function DatasetPreviewPage({
         </div>
       )}
 
-      {previewMode === "analysis" && (
-        <p className="dataset-preview-analysis-source">
-          Displayed analysis source:{" "}
-          <strong>{isViewingCleanedAnalysisSource ? "Cleaned working copy" : "Original"}</strong>
-          {selectedWorksheet && (
-            <span className="dataset-preview-analysis-source-scope">
-              {` for ${selectedWorksheet.displayName || selectedWorksheet.sheetName}`}
-            </span>
-          )}
-        </p>
-      )}
+      {previewMode === "analysis" && hasWorkbook && (() => {
+        const activeWorksheet =
+          worksheets.find((sheet) => sheet.worksheetId === activeWorksheetId) || null;
+        const activeWorksheetName =
+          activeWorksheet?.displayName || activeWorksheet?.sheetName || "—";
+        const activeSourceIsCleaned =
+          activeAnalysisSource?.type === "cleaned_working_copy" &&
+          activeAnalysisSource?.worksheetId === activeWorksheetId;
+        const activeSourceLabel = activeSourceIsCleaned
+          ? "cleaned working copy"
+          : "original";
+        const isPreviewingActive =
+          selectedWorksheet?.worksheetId === activeWorksheetId;
+        const canPromoteSelected =
+          Boolean(selectedWorksheet) &&
+          selectedWorksheet?.status === "ready" &&
+          !isPreviewingActive &&
+          !isSwitchingWorksheet;
+        const selectedWorksheetName =
+          selectedWorksheet?.displayName || selectedWorksheet?.sheetName || "this worksheet";
+        return (
+          <div className="dataset-active-source-strip" aria-live="polite">
+            <div className="dataset-active-source-info">
+              <span className="dataset-active-source-label">Active analysis source</span>
+              <strong className="dataset-active-source-name">{activeWorksheetName}</strong>
+              <span
+                className={`dataset-active-source-badge is-${
+                  activeSourceIsCleaned ? "cleaned" : "original"
+                }`}
+              >
+                {activeSourceLabel}
+              </span>
+              <span className="dataset-active-source-help">
+                Analyst, Query Builder, and Report Recipes use this worksheet.
+              </span>
+            </div>
+            <div className="dataset-active-source-action">
+              {isPreviewingActive ? (
+                <span className="dataset-active-source-confirm">
+                  ✓ You are previewing the active analysis source
+                </span>
+              ) : selectedWorksheet ? (
+                <button
+                  type="button"
+                  className="primary-button dataset-active-source-cta"
+                  onClick={() => onWorksheetSelect(selectedWorksheet.worksheetId)}
+                  disabled={!canPromoteSelected}
+                  title={
+                    canPromoteSelected
+                      ? `Make ${selectedWorksheetName} the active analysis source`
+                      : "This worksheet is not ready for analysis yet"
+                  }
+                >
+                  {isSwitchingWorksheet
+                    ? "Switching…"
+                    : `Use ${selectedWorksheetName} for analysis`}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        );
+      })()}
 
       {hasWorkbook && (
         <div className="dataset-preview-sheets" aria-label="Worksheets">
@@ -1378,6 +1435,9 @@ function DatasetSummaryPanel({
         dataset={dataset}
         worksheets={workbookWorksheets}
         initialWorksheetId={requestedPreviewWorksheetId || activeWorksheet?.worksheetId || null}
+        activeWorksheetId={activeWorksheet?.worksheetId || null}
+        isSwitchingWorksheet={isSwitchingWorksheet}
+        onWorksheetSelect={onWorksheetSelect}
         onBack={() => {
           if (previewOrigin?.type === "cleanPrepare") {
             onPreviewBackToCleanPrepare?.(previewOrigin.worksheetId, previewOrigin.scrollY);

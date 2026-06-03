@@ -14,6 +14,8 @@ type SqlWorkspaceProps = {
   onExecutionResult?: (result: WorkspaceExecutionResult) => void;
   metadata?: SqlWorkspaceMetadataSnapshot;
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
+  onWorksheetSelect?: (worksheetId: string) => void;
+  isSwitchingWorksheet?: boolean;
 };
 
 type BottomTab = "guidance";
@@ -334,7 +336,14 @@ function DraftDetailPage({
   );
 }
 
-function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }: SqlWorkspaceProps) {
+function SqlWorkspace({
+  dataset,
+  onExecutionResult,
+  metadata,
+  onMetadataChange,
+  onWorksheetSelect,
+  isSwitchingWorksheet,
+}: SqlWorkspaceProps) {
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
@@ -679,6 +688,8 @@ function SqlWorkspace({ dataset, onExecutionResult, metadata, onMetadataChange }
         collapsed={isRailCollapsed}
         onToggleCollapsed={() => setIsRailCollapsed((current) => !current)}
         onInsertSql={insertSql}
+        onWorksheetSelect={onWorksheetSelect}
+        isSwitchingWorksheet={isSwitchingWorksheet}
       />
     </section>
   );
