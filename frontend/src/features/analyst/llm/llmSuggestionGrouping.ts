@@ -1,4 +1,5 @@
 import type { ReportOpportunityDomain } from "../sql/reportIntelligencePlanner";
+import type { AIColumnSensitivityLevel } from "./llmGovernanceTypes";
 import type {
   AIGovernedMetaReportSuggestion,
   AIGovernedSuggestionReadiness,
@@ -12,6 +13,8 @@ export type AIGovernedSuggestionGroups = {
   blockedSensitive: AIGovernedMetaReportSuggestion[];
   unsupported: AIGovernedMetaReportSuggestion[];
   byDomain: Partial<Record<ReportOpportunityDomain, AIGovernedMetaReportSuggestion[]>>;
+  byCategory: Record<string, AIGovernedMetaReportSuggestion[]>;
+  bySensitivity: Record<AIColumnSensitivityLevel, AIGovernedMetaReportSuggestion[]>;
 };
 
 export const groupAIGovernedSuggestions = (
@@ -24,6 +27,13 @@ export const groupAIGovernedSuggestions = (
     blockedSensitive: [],
     unsupported: [],
     byDomain: {},
+    byCategory: {},
+    bySensitivity: {
+      safe: [],
+      caution: [],
+      sensitive: [],
+      restricted: [],
+    },
   };
 
   suggestions.forEach((suggestion) => {
@@ -36,6 +46,11 @@ export const groupAIGovernedSuggestions = (
     suggestion.domains.forEach((domain) => {
       groups.byDomain[domain] = [...(groups.byDomain[domain] || []), suggestion];
     });
+    groups.byCategory[suggestion.category] = [
+      ...(groups.byCategory[suggestion.category] || []),
+      suggestion,
+    ];
+    groups.bySensitivity[suggestion.sensitivity.highestLevel].push(suggestion);
   });
 
   return groups;
