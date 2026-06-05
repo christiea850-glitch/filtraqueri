@@ -36,6 +36,7 @@ export {
   type AIGovernedSuggestionValidationResult,
   type AISuggestionConfidenceLevel,
   type AISuggestionProvenance,
+  type AISuggestionProvenanceSource,
   type AISuggestionSensitivitySummary,
   type AISuggestionSqlDraftStatus,
 } from "./llmSuggestionContract";
@@ -74,3 +75,16 @@ export {
   summarizeAISqlSafetyValidationResult,
   validateAISqlSafety,
 } from "./llmSqlSafetyValidator";
+export {
+  createMockAISuggestionCandidatesFromMetadata,
+  type MockAIMetadataSuggestionCandidate,
+} from "./llmMockSuggestionGenerator";
+export {
+  createMockGovernedAISuggestionsFromMetadata,
+  summarizeMockAISuggestionRun,
+  type MockAISuggestionRunSummary,
+  type MockAISuggestionSqlEligibility,
+  type MockAISuggestionSqlEligibilityStatus,
+  type MockAISuggestionValidationRecord,
+  type MockGovernedAISuggestionAdapterResult,
+} from "./llmSuggestionAdapter";

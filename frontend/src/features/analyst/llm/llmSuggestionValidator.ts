@@ -17,6 +17,7 @@ import {
   type AIGovernedSuggestionValidationResult,
   type AISuggestionConfidenceLevel,
   type AISuggestionProvenance,
+  type AISuggestionProvenanceSource,
   type AISuggestionSensitivitySummary,
   type AISuggestionSqlDraftStatus,
 } from "./llmSuggestionContract";
@@ -100,6 +101,11 @@ const normalizeReadiness = (value: unknown): AIGovernedSuggestionReadiness => {
     : "needs_user_review";
 };
 
+const normalizeProvenanceSource = (value: unknown): AISuggestionProvenanceSource => {
+  if (value === "mock_metadata_generator") return "mock_metadata_generator";
+  return "future_ai_suggestion";
+};
+
 const isValidConfidenceInput = (value: unknown): boolean => {
   if (value === undefined || value === null) return true;
   const normalized = normalizeText(value, 20).toLowerCase();
@@ -119,7 +125,17 @@ const isValidSqlDraftStatusInput = (value: unknown): boolean => {
 };
 
 const hasRawValueField = (record: RawSuggestionRecord): string[] =>
-  Object.keys(record).filter((key) => RAW_VALUE_FIELD_NAMES.has(key));
+  Object.keys(record).filter((key) => {
+    if (!RAW_VALUE_FIELD_NAMES.has(key)) return false;
+    const normalizedKey = key.toLowerCase();
+    if (
+      (normalizedKey === "sqldraftincluded" || normalizedKey === "sql_draft_included") &&
+      record[key] === false
+    ) {
+      return false;
+    }
+    return true;
+  });
 
 const buildWorksheetIndex = (payload: AIMetadataContextPayload) => {
   const byTable = new Map<string, AIWorksheetTableSummary>();
@@ -221,8 +237,12 @@ export const sanitizeAIGovernedSuggestionCandidate = (
   const requestedReadiness = normalizeReadiness(record.readiness ?? record.readinessStatus);
   const readiness = readinessFromValidation(requestedReadiness, missingRequirements, sensitivity);
   const sqlDraftStatus = sqlDraftStatusFromReadiness(readiness);
+  const candidateProvenance =
+    record.provenance && typeof record.provenance === "object"
+      ? record.provenance as RawSuggestionRecord
+      : {};
   const provenance: AISuggestionProvenance = {
-    source: "future_ai_suggestion",
+    source: normalizeProvenanceSource(candidateProvenance.source ?? record.provenanceSource),
     mode: payload.provenance.mode,
     metadataPayloadSchemaVersion: payload.schemaVersion,
     rawRowsIncluded: false,

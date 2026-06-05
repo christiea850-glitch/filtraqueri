@@ -16,8 +16,10 @@ export type AISuggestionConfidenceLevel = "Low" | "Medium" | "High";
 
 export type AISuggestionSqlDraftStatus = "not_requested" | "blocked" | "eligible_later";
 
+export type AISuggestionProvenanceSource = "future_ai_suggestion" | "mock_metadata_generator";
+
 export type AISuggestionProvenance = {
-  source: "future_ai_suggestion";
+  source: AISuggestionProvenanceSource;
   mode: AIMetadataContextPayload["provenance"]["mode"];
   metadataPayloadSchemaVersion: AIMetadataContextPayload["schemaVersion"];
   rawRowsIncluded: false;
