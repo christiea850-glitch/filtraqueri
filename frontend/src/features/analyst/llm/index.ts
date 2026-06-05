@@ -53,3 +53,24 @@ export {
   summarizeAIMetadataPayloadCategories,
   type BuildAIMetadataContextPayloadInput,
 } from "./llmMetadataPayloadBuilder";
+export type {
+  AISqlSafetyIssue,
+  AISqlSafetyIssueCode,
+  AISqlSafetyIssueSeverity,
+  AISqlSafetyReferencedColumn,
+  AISqlSafetyReferencedTable,
+  AISqlSafetyStatus,
+  AISqlSafetyTrustedColumn,
+  AISqlSafetyTrustedMetadata,
+  AISqlSafetyValidationInput,
+  AISqlSafetyValidationResult,
+} from "./llmSqlSafetyTypes";
+export {
+  buildAISqlSafetyTrustedMetadata,
+  detectAISqlBlockedKeywords,
+  detectAISqlMultiStatementRisks,
+  extractAISqlReferencedColumnNames,
+  extractAISqlReferencedTableNames,
+  summarizeAISqlSafetyValidationResult,
+  validateAISqlSafety,
+} from "./llmSqlSafetyValidator";
