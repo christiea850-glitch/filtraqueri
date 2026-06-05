@@ -1,5 +1,11 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import {
+  buildAIMetadataContextPayload,
+  createMockGovernedAISuggestionsFromMetadata,
+  type AIGovernedMetaReportSuggestion,
+  type MockAISuggestionSqlEligibility,
+} from "../llm";
 import type { SqlDialectId, SqlDialectProfile } from "../../sqlIntelligence";
 import {
   createSqlAssistantGenerationContext,
@@ -122,6 +128,21 @@ const opportunityDomainLabels: Record<ReportOpportunityDomain, string> = {
   generic: "Generic",
 };
 
+const aiReadinessLabels: Record<AIGovernedMetaReportSuggestion["readiness"], string> = {
+  can_generate_now: "Can generate",
+  needs_missing_fields: "Needs fields",
+  needs_user_review: "Needs review",
+  blocked_sensitive_fields: "Blocked",
+  unsupported: "Not supported",
+};
+
+const aiSensitivityLabels: Record<AIGovernedMetaReportSuggestion["sensitivity"]["highestLevel"], string> = {
+  safe: "Safe metadata",
+  caution: "Needs review",
+  sensitive: "Needs review",
+  restricted: "Blocked",
+};
+
 const confidenceLabel = (confidence: number) => {
   if (confidence >= 0.8) return "High";
   if (confidence >= 0.6) return "Medium";
@@ -163,6 +184,15 @@ const matchesOpportunityFilter = (
   (activeFilter === "Supported" && opportunity.support === "can_generate_now") ||
   (activeFilter === "Not supported" && opportunity.support === "needs_missing_fields") ||
   matchesDomainFilter(opportunity.domains, activeFilter);
+
+const matchesAISuggestionFilter = (
+  suggestion: AIGovernedMetaReportSuggestion,
+  activeFilter: SqlReportRecipeFilter,
+) =>
+  activeFilter === "All" ||
+  (activeFilter === "Supported" && suggestion.readiness === "can_generate_now") ||
+  (activeFilter === "Not supported" && suggestion.readiness !== "can_generate_now") ||
+  matchesDomainFilter(suggestion.domains, activeFilter);
 
 const matchesRecipeFilter = (
   recipe: SqlReportRecipe,
@@ -403,6 +433,94 @@ function ReportOpportunityCard({
   );
 }
 
+function AISuggestedReportCard({
+  suggestion,
+  sqlEligibility,
+}: {
+  suggestion: AIGovernedMetaReportSuggestion;
+  sqlEligibility: MockAISuggestionSqlEligibility | undefined;
+}) {
+  const visibleDomains = suggestion.domains.slice(0, 3);
+  const hiddenDomainCount = Math.max(0, suggestion.domains.length - visibleDomains.length);
+  const requiredTables = suggestion.requiredTables.slice(0, 4);
+  const requiredWorksheets = suggestion.requiredWorksheets.slice(0, 3);
+  const missingRequirements = suggestion.missingRequirements.slice(0, 3);
+  const sensitivityLevel = suggestion.sensitivity.highestLevel;
+  const isBlocked = suggestion.readiness === "blocked_sensitive_fields" || sensitivityLevel === "restricted";
+  const needsReview =
+    suggestion.readiness === "needs_user_review" ||
+    sensitivityLevel === "caution" ||
+    sensitivityLevel === "sensitive";
+  const readinessClass = isBlocked ? "is-blocked" : needsReview ? "is-review" : "is-ready";
+  const sqlEligibilityLabel =
+    sqlEligibility?.status === "eligible_later"
+      ? "Eligible later"
+      : sqlEligibility?.status === "blocked"
+        ? "Blocked"
+        : "Not requested";
+
+  return (
+    <article className={`sql-assistant-ai-card ${readinessClass}`}>
+      <div className="sql-assistant-generated-head">
+        <div>
+          <strong>{suggestion.title}</strong>
+          <span>{suggestion.businessQuestion}</span>
+        </div>
+        <em>Mock metadata generator</em>
+      </div>
+      <p className="sql-assistant-opportunity-why">{suggestion.whyItMatters}</p>
+      <div className="sql-assistant-opportunity-meta" aria-label="AI suggestion governance">
+        <span className="sql-assistant-opportunity-domain">Metadata only</span>
+        <span className="sql-assistant-opportunity-domain">No real LLM call</span>
+        <span className="sql-assistant-opportunity-method">No SQL draft</span>
+        <span className="sql-assistant-opportunity-confidence">
+          {suggestion.confidenceLevel} confidence
+        </span>
+        <span className="sql-assistant-opportunity-complexity">
+          {aiReadinessLabels[suggestion.readiness]}
+        </span>
+        <span className="sql-assistant-opportunity-compiled">
+          {aiSensitivityLabels[sensitivityLevel]}
+        </span>
+        {visibleDomains.map((domain) => (
+          <span key={domain} className="sql-assistant-opportunity-domain">
+            {opportunityDomainLabels[domain]}
+          </span>
+        ))}
+        {hiddenDomainCount > 0 && (
+          <span className="sql-assistant-opportunity-domain">+{hiddenDomainCount}</span>
+        )}
+      </div>
+      <dl className="sql-assistant-ai-details">
+        <div>
+          <dt>Category</dt>
+          <dd>{suggestion.category}</dd>
+        </div>
+        <div>
+          <dt>SQL eligibility</dt>
+          <dd>{sqlEligibilityLabel}</dd>
+        </div>
+        <div>
+          <dt>Required tables</dt>
+          <dd>{requiredTables.length > 0 ? requiredTables.join(", ") : "No table requirement"}</dd>
+        </div>
+        <div>
+          <dt>Worksheets</dt>
+          <dd>{requiredWorksheets.length > 0 ? requiredWorksheets.join(", ") : "Metadata only"}</dd>
+        </div>
+      </dl>
+      {missingRequirements.length > 0 && (
+        <p className="sql-assistant-recipe-blocked">
+          Missing requirements: {missingRequirements.join(", ")}
+        </p>
+      )}
+      <p className="sql-assistant-ai-footnote">
+        No SQL draft yet. Preview-only suggestion from local metadata governance.
+      </p>
+    </article>
+  );
+}
+
 function SqlReportRecipeCard({
   recipe,
   selectedDialectProfile,
@@ -580,6 +698,14 @@ function SqlAssistantPanel({
     () => createReportOpportunities(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
+  const aiMetadataPayload = useMemo(
+    () => buildAIMetadataContextPayload({ dataset, selectedDialect }),
+    [dataset, selectedDialect],
+  );
+  const mockAISuggestionRun = useMemo(
+    () => createMockGovernedAISuggestionsFromMetadata(aiMetadataPayload),
+    [aiMetadataPayload],
+  );
   const assistPlaceholder = useMemo(
     () => buildAssistPlaceholder(dataset, selectedDialect),
     [dataset, selectedDialect],
@@ -658,6 +784,31 @@ function SqlAssistantPanel({
   const remainingOpportunities = filteredOpportunities.filter(
     (opportunity) => !relevantOpportunityIds.has(opportunity.id),
   );
+  const sqlEligibilityBySuggestionId = new Map(
+    mockAISuggestionRun.sqlEligibility.map((eligibility) => [eligibility.suggestionId, eligibility]),
+  );
+  const filteredAISuggestions = mockAISuggestionRun.validatedSuggestions.filter((suggestion) => {
+    if (!matchesAISuggestionFilter(suggestion, activeRecipeFilter)) return false;
+    if (!normalizedRecipeQuery) return true;
+    return [
+      suggestion.title,
+      suggestion.businessQuestion,
+      suggestion.whyItMatters,
+      suggestion.domains.join(" "),
+      suggestion.category,
+      suggestion.requiredTables.join(" "),
+      suggestion.requiredWorksheets.join(" "),
+      suggestion.requiredColumns.join(" "),
+      suggestion.missingRequirements.join(" "),
+      suggestion.readiness,
+      suggestion.sensitivity.highestLevel,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedRecipeQuery);
+  });
+  const visibleAISuggestions = filteredAISuggestions.slice(0, 3);
+  const remainingAISuggestions = filteredAISuggestions.slice(3);
   const emptyRecipeMessage = normalizedRecipeQuery
     ? "No recipes match this search. Try clearing the search or switching to All."
     : activeRecipeFilter === "Supported"
@@ -949,6 +1100,51 @@ function SqlAssistantPanel({
                       onInsertSql={onInsertSql}
                     />
                   </section>
+                )}
+              </section>
+            )}
+            {filteredAISuggestions.length > 0 && (
+              <section
+                className="sql-assistant-ai-reports"
+                aria-label="AI-suggested business reports"
+              >
+                <div className="sql-helper-section-label">
+                  <span>AI-suggested business reports</span>
+                  <small>{filteredAISuggestions.length.toLocaleString()} metadata-only</small>
+                </div>
+                <p className="sql-assistant-recipe-note">
+                  Local metadata-only preview — no real LLM call yet.
+                </p>
+                <div className="sql-assistant-ai-badges" aria-label="AI suggestion safety labels">
+                  <span>Metadata only</span>
+                  <span>No real LLM call</span>
+                  <span>No SQL draft</span>
+                </div>
+                <div className="sql-assistant-ai-list">
+                  {visibleAISuggestions.map((suggestion) => (
+                    <AISuggestedReportCard
+                      key={suggestion.id}
+                      suggestion={suggestion}
+                      sqlEligibility={sqlEligibilityBySuggestionId.get(suggestion.id)}
+                    />
+                  ))}
+                </div>
+                {remainingAISuggestions.length > 0 && (
+                  <details className="sql-assistant-ai-more">
+                    <summary>
+                      <span>More AI suggestions</span>
+                      <small>{remainingAISuggestions.length.toLocaleString()}</small>
+                    </summary>
+                    <div className="sql-assistant-ai-list">
+                      {remainingAISuggestions.map((suggestion) => (
+                        <AISuggestedReportCard
+                          key={suggestion.id}
+                          suggestion={suggestion}
+                          sqlEligibility={sqlEligibilityBySuggestionId.get(suggestion.id)}
+                        />
+                      ))}
+                    </div>
+                  </details>
                 )}
               </section>
             )}
