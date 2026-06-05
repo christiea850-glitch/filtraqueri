@@ -18,6 +18,7 @@ export type AISqlSafetyIssueCode =
   | "unknown_table"
   | "unknown_column"
   | "ambiguous_column_validation"
+  | "unqualified_multitable_column"
   | "restricted_column"
   | "sensitive_column_review"
   | "caution_column_review"

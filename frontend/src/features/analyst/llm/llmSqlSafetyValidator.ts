@@ -433,6 +433,49 @@ const resolveSingleTableBareColumns = (
   return Array.from(columns.values());
 };
 
+const extractPotentialBareColumnNames = (
+  sqlText: string,
+  referencedTables: string[],
+  tableAliases: Map<string, string>,
+): string[] => {
+  if (referencedTables.length <= 1) return [];
+
+  const ignoredIdentifiers = new Set([
+    ...referencedTables,
+    ...Array.from(tableAliases.keys()),
+    ...Array.from(tableAliases.values()),
+  ]);
+  const maskedSql = maskSqlLiteralsAndComments(sqlText);
+  const bareColumns = new Set<string>();
+  const identifierPattern = /\b[A-Za-z_][\w$]*\b/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = identifierPattern.exec(maskedSql)) !== null) {
+    const identifier = normalizeIdentifier(match[0]);
+    const beforeIdentifier = maskedSql.slice(0, match.index);
+    const afterIdentifier = maskedSql.slice(identifierPattern.lastIndex);
+    const previousToken = beforeIdentifier.match(/([A-Za-z_][\w$]*|\))\s*$/)?.[1]?.toLowerCase() || "";
+    const previousNonSpace = beforeIdentifier.match(/(\S)\s*$/)?.[1] || "";
+    const nextNonSpace = afterIdentifier.match(/^\s*(.)/)?.[1] || "";
+    if (
+      SQL_CLAUSE_KEYWORDS.has(identifier) ||
+      SQL_FUNCTION_NAMES.has(identifier) ||
+      ignoredIdentifiers.has(identifier) ||
+      previousToken === "as" ||
+      previousToken === ")" ||
+      previousNonSpace === "." ||
+      nextNonSpace === "." ||
+      nextNonSpace === "("
+    ) {
+      continue;
+    }
+
+    bareColumns.add(identifier);
+  }
+
+  return Array.from(bareColumns).sort();
+};
+
 const compareSensitivity = (left: AIColumnSensitivityLevel, right: AIColumnSensitivityLevel) => {
   const order: Record<AIColumnSensitivityLevel, number> = {
     safe: 0,
@@ -658,6 +701,14 @@ export const validateAISqlSafety = ({
       message: "SQL references multiple tables without table-qualified columns; column validation is conservative and requires review.",
     });
   }
+  extractPotentialBareColumnNames(sqlText, referencedTableNames, tableAliases).forEach((columnName) => {
+    warnings.push({
+      severity: "warning",
+      code: "unqualified_multitable_column",
+      message: `SQL references possible unqualified column ${columnName} across multiple tables; review is required before insertion.`,
+      token: columnName,
+    });
+  });
 
   const highestSensitivityLevel =
     highestSensitivity([
