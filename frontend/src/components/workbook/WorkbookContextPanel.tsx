@@ -15,6 +15,10 @@ import {
   type WorksheetStatus,
 } from "../../features/workbook";
 import { useWorkbookRelationships, type WorkbookJoinPlanPreview } from "../../features/workbookRelationships";
+import {
+  inferWorkbookRelationshipReadiness,
+  type WorkbookRelationshipReadinessMatch,
+} from "./workbookRelationshipReadiness";
 
 type WorkbookContextPanelProps = {
   dataset: DatasetMetadata | null;
@@ -105,6 +109,46 @@ function JoinPlanPreviewList({ previews }: { previews: WorkbookJoinPlanPreview[]
             ))}
           </div>
         </div>
+      ))}
+    </div>
+  );
+}
+
+function RelationshipReadinessList({
+  matches,
+  appliedCount,
+}: {
+  matches: WorkbookRelationshipReadinessMatch[];
+  appliedCount: number;
+}) {
+  if (appliedCount < 2) {
+    return (
+      <p className="workbook-analysis-scope-empty">
+        Select at least two tables to review possible relationships.
+      </p>
+    );
+  }
+
+  return (
+    <div className="workbook-relationship-readiness-list" aria-label="Relationship readiness">
+      {matches.map((match) => (
+        <article
+          className={`workbook-relationship-readiness-card ${match.confidence}`}
+          key={match.id}
+        >
+          <div>
+            <strong>
+              {match.sourceDisplayName} to {match.targetDisplayName}
+            </strong>
+            <span>{match.label}</span>
+          </div>
+          {match.sourceColumnName && match.targetColumnName && (
+            <small>
+              {match.sourceColumnName} to {match.targetColumnName}
+            </small>
+          )}
+          <p>{match.explanation}</p>
+        </article>
       ))}
     </div>
   );
@@ -677,6 +721,8 @@ function WorkbookContextPanel({
   const activeSourceSummary = activeWorksheet
     ? `${activeWorksheet.displayName} - ${activeWorksheet.rowCount.toLocaleString()} rows - ${activeWorksheet.columnCount.toLocaleString()} columns`
     : "No active SQL source";
+  const relationshipReadinessMatches =
+    inferWorkbookRelationshipReadiness(appliedScopeWorksheets);
 
   const addScopeWorksheet = (worksheetId: string) => {
     setSelectedScopeWorksheetIds((current) =>
@@ -828,6 +874,23 @@ function WorkbookContextPanel({
               {appliedScopeWorksheets.map((worksheet) => worksheet.displayName).join(", ")}.
             </p>
           )}
+          <section className="workbook-relationship-readiness" aria-label="Join readiness">
+            <div className="builder-block-header">
+              <span>Relationship readiness</span>
+              <small>
+                {appliedScopeWorksheets.length < 2
+                  ? "Needs scope"
+                  : `${relationshipReadinessMatches.length.toLocaleString()} pairs`}
+              </small>
+            </div>
+            <RelationshipReadinessList
+              matches={relationshipReadinessMatches}
+              appliedCount={appliedScopeWorksheets.length}
+            />
+            <p className="workbook-relationship-readiness-note">
+              Relationship readiness is based on metadata only. Review before using these tables in a report or query.
+            </p>
+          </section>
         </section>
       ) : (
         <p className="workbook-analysis-scope-bridge">
