@@ -1128,6 +1128,7 @@ function App() {
             onWorksheetSelect={handleWorksheetSelect}
             isSwitchingWorksheet={isSwitchingWorksheet}
             onPreviewBackToCleanPrepare={returnToCleanPrepare}
+            onContinueInAnalyst={handleContinueInAnalyst}
             selectedTaskId={runtimePersistence.selectedTaskId}
             onSelectedTaskIdChange={(selectedTaskId) =>
               setRuntimePersistence((currentState) => ({
