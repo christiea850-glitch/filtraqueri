@@ -396,8 +396,8 @@ function App() {
 
   // E-2 Ask handler: flip the existing humanAnalyzeStage to "review". The
   // E-1 observational effect catches that flip and forwards the room from
-  // compose → refine. No query runs here — Run query in the existing builder
-  // is still the only execution trigger.
+  // compose → refine. No query runs here — Explore is discovery only.
+  // Manual Run Query lives in Analyst.
   const handleExploreComposeAsk = useCallback(() => {
     if (!dataset || !exploreComposeQuestion.trim()) return;
     setHumanAnalyzeStage("review");
@@ -532,10 +532,10 @@ function App() {
     setExecutedPreparedQuestionContext(null);
   };
 
-  // E-3: Refine room — deterministic, frontend-only summaries of state that
-  // already lives in App.tsx. No analysis runs here; we read the same query
-  // builder state the legacy VisualQueryBuilderPanel reads from. Row edit
-  // icons route to the advanced builder rather than inline-editing in E-3.
+  // E-3 (corrected): Refine room — deterministic, frontend-only summaries
+  // of state that already lives in App.tsx. No analysis runs here; we read
+  // the same query builder state the legacy VisualQueryBuilderPanel reads
+  // from. Field-level edits route to Analyst — Explore stays discovery-only.
   const refineFieldChoicesSummary = useMemo<string>(() => {
     const parts: string[] = [];
     if (querySelectedColumns.length > 0) {
@@ -554,7 +554,7 @@ function App() {
       );
     }
     if (parts.length === 0) {
-      return "Choose fields in the advanced builder.";
+      return "Field choices will be detected when this opens in Analyst.";
     }
     return parts.join(" · ");
   }, [querySelectedColumns, queryGroupBy, queryAggregations]);
@@ -589,13 +589,13 @@ function App() {
         label: "Interpretation",
         summary: "A focused answer based on your question and active scope.",
         detail:
-          "FiltraQueri prepares a preview from the existing builder. Nothing runs until you click Run query.",
+          "FiltraQueri previews the path. Nothing runs in Explore — continue in Analyst to build and run.",
       },
       {
         id: "fields",
         label: "Field choices",
         summary: refineFieldChoicesSummary,
-        detail: "Edit in the advanced builder if you want to change them.",
+        detail: "Adjust in Analyst if you want to change them.",
       },
       {
         id: "filters",
@@ -1129,6 +1129,10 @@ function App() {
             isSwitchingWorksheet={isSwitchingWorksheet}
             onPreviewBackToCleanPrepare={returnToCleanPrepare}
             onContinueInAnalyst={handleContinueInAnalyst}
+            onAnalysisSourceSelect={handleAnalysisSourceSelect}
+            onPreviewWorksheet={openDatasetPreview}
+            cleanPrepareRestoreContext={cleanPrepareRestoreContext}
+            onCleanPrepareRestoreConsumed={consumeCleanPrepareRestoreContext}
             selectedTaskId={runtimePersistence.selectedTaskId}
             onSelectedTaskIdChange={(selectedTaskId) =>
               setRuntimePersistence((currentState) => ({

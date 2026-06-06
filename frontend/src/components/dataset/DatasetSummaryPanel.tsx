@@ -36,6 +36,7 @@ import {
   WORKBOOK_HEADER_WARNING_COPY,
   getStructuralColumnNotice,
   getDatasetActiveWorksheet,
+  getWorkbookMetadata,
   hasSuspiciousWorkbookHeaders,
   listWorkbookWorksheets,
   type WorksheetMetadata,
@@ -62,6 +63,7 @@ import {
   WorkspaceHeader,
 } from "../workspace";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
+import { CleanPrepareReviewPanel } from "../workspace/CleanPrepareReviewPanel";
 
 export type HumanIntent =
   | "summary"
@@ -87,6 +89,27 @@ type DatasetSummaryPanelProps = {
   onPreviewBackToCleanPrepare?: (worksheetId: string, scrollY: number) => void;
   selectedTaskId?: string | null;
   onSelectedTaskIdChange?: (taskId: string | null) => void;
+  // M-2: Continue in Analyst handoff. The App-level handler switches mode
+  // to "analyst" and routes to the existing SQL workspace. Optional so any
+  // legacy call site continues to render without the handoff button.
+  onContinueInAnalyst?: () => void;
+  // M-2 follow-up: Clean / Prepare surface props. Moves the existing
+  // CleanPrepareReviewPanel from the (now-hidden) legacy Explore stack onto
+  // the Data tab where dataset preparation belongs. Optional so call sites
+  // that don't need cleaning can still render. The panel is exposure-only
+  // until the user explicitly opens it — no auto-clean, no destructive
+  // mutation, no backend call originates from rendering it.
+  onAnalysisSourceSelect?: (
+    worksheetId: string,
+    source: "cleaned" | "original",
+  ) => Promise<void>;
+  onPreviewWorksheet?: (worksheetId: string) => void;
+  cleanPrepareRestoreContext?: {
+    worksheetId: string;
+    scrollY: number;
+    requestId: number;
+  } | null;
+  onCleanPrepareRestoreConsumed?: () => void;
 };
 
 type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
@@ -712,6 +735,7 @@ function DatasetPreviewPage({
   isSwitchingWorksheet,
   onWorksheetSelect,
   onBack,
+  onContinueInAnalyst,
 }: {
   dataset: DatasetMetadata;
   worksheets: WorksheetMetadata[];
@@ -720,6 +744,12 @@ function DatasetPreviewPage({
   isSwitchingWorksheet: boolean;
   onWorksheetSelect: (worksheetId: string) => void;
   onBack: () => void;
+  // M-2: Optional handoff to the Analyst SQL workspace. The handler at the
+  // App level switches workspace mode and routes to the existing SQL
+  // workspace — no query is run here, no SQL is generated, no backend is
+  // contacted. Optional so the preview page renders without it for unit
+  // tests / legacy call sites.
+  onContinueInAnalyst?: () => void;
 }) {
   const hasWorkbook = worksheets.length > 0;
   const supportsOriginalWorkbook = dataset.original_filename.toLowerCase().endsWith(".xlsx");
@@ -890,15 +920,27 @@ function DatasetPreviewPage({
       backLabel="Back to Data"
       onBack={onBack}
       actions={
-        previewMode === "analysis" ? (
-        <button
-          type="button"
-          className="secondary-button dataset-preview-wrap-toggle"
-          onClick={() => setIsWrapped((current) => !current)}
-        >
-          {isWrapped ? "Compact cells" : "Expand cells"}
-        </button>
-        ) : null
+        <>
+          {previewMode === "analysis" && (
+            <button
+              type="button"
+              className="secondary-button dataset-preview-wrap-toggle"
+              onClick={() => setIsWrapped((current) => !current)}
+            >
+              {isWrapped ? "Compact cells" : "Expand cells"}
+            </button>
+          )}
+          {onContinueInAnalyst && (
+            <button
+              type="button"
+              className="primary-button dataset-preview-continue-in-analyst"
+              onClick={onContinueInAnalyst}
+              title="Use this worksheet in Analyst to build reports, templates, or SQL. Nothing runs until you click Run Query."
+            >
+              Continue in Analyst &rarr;
+            </button>
+          )}
+        </>
       }
     >
 
@@ -1038,6 +1080,29 @@ function DatasetPreviewPage({
         />
       )}
 
+      {/*
+        M-2: Continue in Analyst handoff strip. Compact one-line helper sits
+        between the worksheet switcher and the preview table. The button
+        only appears when the handler is wired (the App-level
+        handleContinueInAnalyst is passed through DatasetSummaryPanel).
+        Nothing here generates SQL, runs a query, or contacts a backend.
+      */}
+      {onContinueInAnalyst && (
+        <div className="dataset-preview-handoff" aria-label="Continue this worksheet in Analyst">
+          <p className="dataset-preview-handoff-copy">
+            Use this worksheet in Analyst to build reports, templates, or SQL.{" "}
+            <strong>Nothing runs until you click Run Query.</strong>
+          </p>
+          <button
+            type="button"
+            className="text-button dataset-preview-handoff-link"
+            onClick={onContinueInAnalyst}
+          >
+            Continue in Analyst &rarr;
+          </button>
+        </div>
+      )}
+
       {previewMode === "original" && supportsOriginalWorkbook ? (
         <OriginalWorkbookPreview datasetId={dataset.dataset_id} worksheet={selectedWorksheet} />
       ) : (
@@ -1077,6 +1142,123 @@ function DatasetPreviewPage({
   );
 }
 
+/**
+ * Dedicated Clean / Prepare page — uses FocusedWorkspaceShell like
+ * DatasetPreviewPage. Wraps the existing CleanPrepareReviewPanel with a calm
+ * page-level header that explains what cleaning does, surfaces the overall
+ * preparation priority, and offers a Continue in Analyst handoff alongside
+ * the panel's own Activate / Apply actions.
+ *
+ * No new execution path is introduced: this page renders the same
+ * CleanPrepareReviewPanel with an `embedded` flag that hides the panel's
+ * internal toggle pill (since the page chrome already explains what we're
+ * looking at). All cleaning behavior — recipe preview, missing-value
+ * decisions, cleaned-working-copy activation — flows through the same K1/K2
+ * handlers that already existed.
+ */
+function DataCleanPreparePage({
+  dataset,
+  sourceName,
+  onAnalysisSourceSelect,
+  onPreviewWorksheet,
+  cleanPrepareRestoreContext,
+  onCleanPrepareRestoreConsumed,
+  onContinueInAnalyst,
+  onBack,
+}: {
+  dataset: DatasetMetadata;
+  sourceName: string;
+  onAnalysisSourceSelect: (
+    worksheetId: string,
+    source: "cleaned" | "original",
+  ) => Promise<void>;
+  onPreviewWorksheet?: (worksheetId: string) => void;
+  cleanPrepareRestoreContext?: {
+    worksheetId: string;
+    scrollY: number;
+    requestId: number;
+  } | null;
+  onCleanPrepareRestoreConsumed?: () => void;
+  onContinueInAnalyst?: () => void;
+  onBack: () => void;
+}) {
+  // Deterministic page-header summary. The detailed signal counts and per-
+  // worksheet issue breakdown surface inside the embedded
+  // CleanPrepareReviewPanel below — the page chrome stays compact with just
+  // the worksheet count, cleaned-copy count, and source file context.
+  const workbook = getWorkbookMetadata(dataset);
+  const worksheetCount = workbook?.worksheets.length || 0;
+  const cleanedSheetCount = workbook?.cleanedWorkingCopies.length || 0;
+  const totalNullCount = dataset.schema.reduce(
+    (total, column) => total + (column.null_count || 0),
+    0,
+  );
+  const headerSummary =
+    totalNullCount === 0
+      ? "No missing cells detected at the column level. Review the dataset signals below."
+      : `${totalNullCount.toLocaleString()} missing cell${totalNullCount === 1 ? "" : "s"} across ${
+          worksheetCount.toLocaleString()
+        } worksheet${worksheetCount === 1 ? "" : "s"}.`;
+
+  return (
+    <FocusedWorkspaceShell
+      className="data-clean-prepare-page"
+      eyebrow="Dataset preparation"
+      title={`Clean / Prepare · ${sourceName}`}
+      summary={headerSummary}
+      backLabel="Back to Data"
+      onBack={onBack}
+      actions={
+        onContinueInAnalyst ? (
+          <button
+            type="button"
+            className="primary-button data-clean-prepare-continue"
+            onClick={onContinueInAnalyst}
+            title="Use this dataset in Analyst to build reports, templates, or SQL. Nothing runs until you click Run Query."
+          >
+            Continue in Analyst &rarr;
+          </button>
+        ) : null
+      }
+    >
+      <section className="data-clean-prepare-page-intro" aria-label="What cleaning does">
+        <div className="data-clean-prepare-page-stats">
+          <div>
+            <p className="section-label">Missing cells</p>
+            <strong>{totalNullCount.toLocaleString()}</strong>
+            <small>across {worksheetCount} worksheet{worksheetCount === 1 ? "" : "s"}</small>
+          </div>
+          <div>
+            <p className="section-label">Cleaned copies</p>
+            <strong>{cleanedSheetCount.toLocaleString()}</strong>
+            <small>{cleanedSheetCount === 0 ? "none created yet" : "available for activation"}</small>
+          </div>
+          <div>
+            <p className="section-label">Source</p>
+            <strong title={dataset.original_filename}>{dataset.original_filename}</strong>
+            <small>{dataset.row_count.toLocaleString()} rows · {dataset.column_count.toLocaleString()} columns</small>
+          </div>
+        </div>
+        <p className="data-clean-prepare-page-helper">
+          Review missing values, field types, layout issues, and cleanup suggestions
+          before analysis. Nothing here runs automatically — you choose what to apply
+          and when to activate a cleaned working copy. Run Query stays in Analyst.
+        </p>
+      </section>
+
+      <CleanPrepareReviewPanel
+        dataset={dataset}
+        sourceName={sourceName}
+        onAnalysisSourceSelect={onAnalysisSourceSelect}
+        onPreviewDataset={onPreviewWorksheet}
+        restoreContext={cleanPrepareRestoreContext}
+        onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
+        embedded
+      />
+    </FocusedWorkspaceShell>
+  );
+}
+
 function DatasetSummaryPanel({
   dataset,
   onOpenDataset,
@@ -1084,6 +1266,11 @@ function DatasetSummaryPanel({
   onWorksheetSelect,
   isSwitchingWorksheet,
   onPreviewBackToCleanPrepare,
+  onContinueInAnalyst,
+  onAnalysisSourceSelect,
+  onPreviewWorksheet,
+  cleanPrepareRestoreContext,
+  onCleanPrepareRestoreConsumed,
 }: DatasetSummaryPanelProps) {
   const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
@@ -1092,6 +1279,10 @@ function DatasetSummaryPanel({
     useState<FocusedOperationalWorkspace | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
   const [isDatasetPreviewOpen, setIsDatasetPreviewOpen] = useState(false);
+  // Clean / Prepare now opens as a dedicated FocusedWorkspaceShell page
+  // (mirrors the Preview dataset pattern). The Data tab stays calm; the page
+  // gives the cleaning workspace its own room with a Back-to-Data button.
+  const [isCleanPreparePageOpen, setIsCleanPreparePageOpen] = useState(false);
   const [requestedPreviewWorksheetId, setRequestedPreviewWorksheetId] = useState<string | null>(null);
   const [previewOrigin, setPreviewOrigin] = useState<{
     type: "cleanPrepare";
@@ -1437,6 +1628,26 @@ function DatasetSummaryPanel({
           setRequestedPreviewWorksheetId(null);
           setIsDatasetPreviewOpen(false);
         }}
+        onContinueInAnalyst={onContinueInAnalyst}
+      />
+    );
+  }
+
+  if (dataset && isCleanPreparePageOpen && onAnalysisSourceSelect) {
+    return (
+      <DataCleanPreparePage
+        dataset={dataset}
+        sourceName={
+          activeWorksheet?.displayName ||
+          activeWorksheet?.sheetName ||
+          dataset.table_name
+        }
+        onAnalysisSourceSelect={onAnalysisSourceSelect}
+        onPreviewWorksheet={onPreviewWorksheet}
+        cleanPrepareRestoreContext={cleanPrepareRestoreContext}
+        onCleanPrepareRestoreConsumed={onCleanPrepareRestoreConsumed}
+        onContinueInAnalyst={onContinueInAnalyst}
+        onBack={() => setIsCleanPreparePageOpen(false)}
       />
     );
   }
@@ -1731,6 +1942,28 @@ function DatasetSummaryPanel({
                   </svg>
                   Preview dataset
                 </button>
+                {onAnalysisSourceSelect && (
+                  <button
+                    type="button"
+                    className="secondary-button data-action-btn data-clean-prepare-toggle"
+                    onClick={() => setIsCleanPreparePageOpen(true)}
+                    title="Review missing values, field types, and cleanup suggestions before analysis."
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M3 6h18M3 12h18M3 18h12" />
+                      <path d="m17 17 2 2 4-4" />
+                    </svg>
+                    Clean / Prepare
+                  </button>
+                )}
                 <button
                   type="button"
                   className="text-button danger-text-button data-action-btn"

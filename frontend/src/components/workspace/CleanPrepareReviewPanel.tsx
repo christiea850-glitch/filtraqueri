@@ -57,6 +57,11 @@ type CleanPrepareReviewPanelProps = {
     requestId: number;
   } | null;
   onRestoreContextConsumed?: () => void;
+  // When true, the panel is mounted inside a dedicated page (FocusedWorkspaceShell)
+  // that already provides intro framing and Back navigation. We then skip the
+  // internal "Intelligence Assistant" intro header and the toggle pill, and
+  // render the review section directly. No execution change.
+  embedded?: boolean;
 };
 
 type PreparationPriority = "low" | "medium" | "high";
@@ -353,9 +358,12 @@ export function CleanPrepareReviewPanel({
   onPreviewDataset,
   restoreContext,
   onRestoreContextConsumed,
+  embedded = false,
 }: CleanPrepareReviewPanelProps) {
   const reviewRef = useRef<HTMLDivElement | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  // When embedded, the review is the whole reason the dedicated page exists,
+  // so start open.
+  const [isOpen, setIsOpen] = useState(embedded);
   const [selectedWorksheetId, setSelectedWorksheetId] = useState<string | null>(null);
   const [recipePreview, setRecipePreview] = useState<CleaningRecipePreview | null>(null);
   const [recipeStatus, setRecipeStatus] = useState<"idle" | "loading" | "success" | "error">(
@@ -751,30 +759,32 @@ export function CleanPrepareReviewPanel({
 
   return (
     <section
-      className={`clean-prepare-assistant${isPrioritized ? " is-prioritized" : ""}`}
+      className={`clean-prepare-assistant${isPrioritized ? " is-prioritized" : ""}${embedded ? " is-embedded" : ""}`}
       aria-label="Intelligence Assistant clean and prepare guidance"
     >
-      <div className="clean-prepare-assistant-header">
-        <div>
-          <p className="section-label">Intelligence Assistant</p>
-          <strong>Prepare your data before analysis</strong>
-          <p>
-            {review.priority === "low"
-              ? "No urgent preparation signals were detected. A read-only review remains available."
-              : `${review.issues.length} preparation signal${review.issues.length === 1 ? "" : "s"} detected for ${sourceName}.`}
-          </p>
+      {!embedded && (
+        <div className="clean-prepare-assistant-header">
+          <div>
+            <p className="section-label">Intelligence Assistant</p>
+            <strong>Prepare your data before analysis</strong>
+            <p>
+              {review.priority === "low"
+                ? "No urgent preparation signals were detected. A read-only review remains available."
+                : `${review.issues.length} preparation signal${review.issues.length === 1 ? "" : "s"} detected for ${sourceName}.`}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="clean-prepare-pill"
+            onClick={toggleReview}
+            aria-expanded={isOpen}
+            aria-controls="clean-prepare-review"
+          >
+            <span>Clean &amp; Prepare Data</span>
+            <small>{priorityLabel[review.priority]}</small>
+          </button>
         </div>
-        <button
-          type="button"
-          className="clean-prepare-pill"
-          onClick={toggleReview}
-          aria-expanded={isOpen}
-          aria-controls="clean-prepare-review"
-        >
-          <span>Clean &amp; Prepare Data</span>
-          <small>{priorityLabel[review.priority]}</small>
-        </button>
-      </div>
+      )}
 
       {isOpen && (
         <div
@@ -783,15 +793,17 @@ export function CleanPrepareReviewPanel({
           ref={reviewRef}
           tabIndex={-1}
         >
-          <div className="clean-prepare-review-heading">
-            <div>
-              <p className="section-label">Read-only preparation review</p>
-              <h3>Clean &amp; Prepare Data</h3>
+          {!embedded && (
+            <div className="clean-prepare-review-heading">
+              <div>
+                <p className="section-label">Read-only preparation review</p>
+                <h3>Clean &amp; Prepare Data</h3>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => setIsOpen(false)}>
+                Close review
+              </button>
             </div>
-            <button type="button" className="secondary-button" onClick={() => setIsOpen(false)}>
-              Close review
-            </button>
-          </div>
+          )}
 
           <section className="clean-prepare-issue-groups">
             <div className="clean-prepare-compact-heading">

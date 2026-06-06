@@ -3491,3 +3491,157 @@
 .workbook-mapping-row strong {
   color: #334155;
 }
+
+/* ============================================================
+ * M-2 — Continue in Analyst handoff (Data Preview)
+ * ============================================================ */
+
+.dataset-preview-continue-in-analyst {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dataset-preview-handoff {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  margin: 4px 0 14px;
+  border-radius: 10px;
+  background: #F8F7FF;
+  border: 1px dashed #DDD9FF;
+  flex-wrap: wrap;
+}
+
+.dataset-preview-handoff-copy {
+  margin: 0;
+  flex: 1;
+  min-width: 240px;
+  font-size: 12.5px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.dataset-preview-handoff-copy strong {
+  color: #0F172A;
+  font-weight: 600;
+}
+
+.dataset-preview-handoff-link {
+  background: transparent;
+  border: 0;
+  color: #4F46C9;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.dataset-preview-handoff-link:hover {
+  background: #EEEDFF;
+  text-decoration: underline;
+}
+
+/* ============================================================
+ * Clean / Prepare dedicated page (DataCleanPreparePage)
+ * ============================================================ */
+
+.data-clean-prepare-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.data-clean-prepare-page-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 8px 0 18px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: #F8F7FF;
+  border: 1px solid #DDD9FF;
+}
+
+.data-clean-prepare-page-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.data-clean-prepare-page-stats > div {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.data-clean-prepare-page-stats .section-label {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4F46C9;
+}
+
+.data-clean-prepare-page-stats strong {
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  color: #0F172A;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-clean-prepare-page-stats small {
+  color: #64748B;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.data-clean-prepare-page-helper {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #475569;
+}
+
+.data-clean-prepare-continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Embedded variant of CleanPrepareReviewPanel — when mounted inside the
+ * dedicated page, drop the top assistant header and any redundant card
+ * chrome since the page already provides the framing. */
+.clean-prepare-assistant.is-embedded {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.clean-prepare-assistant.is-embedded .clean-prepare-review {
+  margin-top: 0;
+  padding-top: 0;
+}
