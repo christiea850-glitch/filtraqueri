@@ -1893,6 +1893,44 @@
   overflow-wrap: anywhere;
 }
 
+/* K11H.2 — quiet single-line safety summary in the section header. Replaces
+   the three repeated "Metadata only / No real LLM call / No SQL draft" chips
+   that used to live on every card. */
+.sql-assistant-ai-badges .sql-assistant-ai-safety-line {
+  flex: 1 1 auto;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+/* K11H.2 — per-card "Needed before report can be created" block replaces the
+   bare missing-requirements paragraph. Label is small and quiet; the joined
+   list keeps the existing recipe-blocked styling. */
+.sql-assistant-ai-needed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0 0;
+}
+
+.sql-assistant-ai-needed-label {
+  margin: 0;
+  color: #92400e;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sql-assistant-ai-needed .sql-assistant-recipe-blocked {
+  margin: 0;
+}
+
 .sql-assistant-ai-footnote {
   margin: 0;
   color: #64748b;

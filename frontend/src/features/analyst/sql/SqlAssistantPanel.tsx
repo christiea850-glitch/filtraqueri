@@ -183,6 +183,73 @@ const visibleProviderBoundaryReasons = (
   return reasons.filter((reason) => reason.code !== "samples_blocked_by_policy");
 };
 
+const titleCaseWords = (value: string): string =>
+  value
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => {
+      const upper = word.toUpperCase();
+      if (upper === "HR" || upper === "ID" || upper === "SQL") return upper;
+      return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
+    })
+    .join(" ");
+
+const formatInternalLabel = (value: string): string => {
+  const cleaned = value
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/^(ws|tbl|table)_\d+_/i, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned ? titleCaseWords(cleaned) : "Metadata";
+};
+
+const formatAIFieldLabel = (value: string): string =>
+  formatInternalLabel(value).toLowerCase();
+
+const formatAICategoryLabel = (category: string): string => {
+  const normalized = normalizeFilterValue(category);
+  // K11H.2: avoid backend-y "Analysis method" / "Future optimization" wording
+  // on the user-facing card. Map them to plain business language.
+  if (normalized === "sql") return "Report idea";
+  if (normalized === "future optimization") return "Future report idea";
+  return formatInternalLabel(category);
+};
+
+const formatAIMissingRequirement = (requirement: string): string => {
+  const tableMatch = requirement.match(/^missing\s+table:\s*(.+)$/i);
+  if (tableMatch?.[1]) {
+    return `Needs ${formatInternalLabel(tableMatch[1])} worksheet`;
+  }
+
+  const columnMatch = requirement.match(/^missing\s+column:\s*(.+)$/i);
+  if (columnMatch?.[1]) {
+    return `Needs ${formatAIFieldLabel(columnMatch[1])} field`;
+  }
+
+  return `Needs ${formatInternalLabel(requirement)}`;
+};
+
+const formatAISqlEligibilityLabel = (
+  status: MockAISuggestionSqlEligibility["status"] | undefined,
+): string => {
+  // K11H.2: business-friendly wording for the per-card draft state.
+  if (status === "eligible_later") return "Draft can be created later";
+  if (status === "blocked") return "Draft blocked";
+  return "Draft not created yet";
+};
+
+const formatAIBusinessCopy = (value: string): string => {
+  const normalized = value.toLowerCase();
+  if (
+    normalized.includes("compiled multi-worksheet recipe") &&
+    normalized.includes("emitted as duckdb sql")
+  ) {
+    return "Multi-worksheet report idea based on detected joins. No SQL draft is shown here.";
+  }
+  return value;
+};
+
 const confidenceLabel = (confidence: number) => {
   if (confidence >= 0.8) return "High";
   if (confidence >= 0.6) return "Medium";
@@ -482,9 +549,9 @@ function AISuggestedReportCard({
 }) {
   const visibleDomains = suggestion.domains.slice(0, 3);
   const hiddenDomainCount = Math.max(0, suggestion.domains.length - visibleDomains.length);
-  const requiredTables = suggestion.requiredTables.slice(0, 4);
-  const requiredWorksheets = suggestion.requiredWorksheets.slice(0, 3);
-  const missingRequirements = suggestion.missingRequirements.slice(0, 3);
+  const requiredTables = suggestion.requiredTables.slice(0, 4).map(formatInternalLabel);
+  const requiredWorksheets = suggestion.requiredWorksheets.slice(0, 3).map(formatInternalLabel);
+  const missingRequirements = suggestion.missingRequirements.slice(0, 3).map(formatAIMissingRequirement);
   const sensitivityLevel = suggestion.sensitivity.highestLevel;
   const isBlocked = suggestion.readiness === "blocked_sensitive_fields" || sensitivityLevel === "restricted";
   const needsReview =
@@ -492,12 +559,9 @@ function AISuggestedReportCard({
     sensitivityLevel === "caution" ||
     sensitivityLevel === "sensitive";
   const readinessClass = isBlocked ? "is-blocked" : needsReview ? "is-review" : "is-ready";
-  const sqlEligibilityLabel =
-    sqlEligibility?.status === "eligible_later"
-      ? "Eligible later"
-      : sqlEligibility?.status === "blocked"
-        ? "Blocked"
-        : "Not requested";
+  const sqlEligibilityLabel = formatAISqlEligibilityLabel(sqlEligibility?.status);
+  const categoryLabel = formatAICategoryLabel(suggestion.category);
+  const whyItMatters = formatAIBusinessCopy(suggestion.whyItMatters);
 
   return (
     <article className={`sql-assistant-ai-card ${readinessClass}`}>
@@ -506,13 +570,14 @@ function AISuggestedReportCard({
           <strong>{suggestion.title}</strong>
           <span>{suggestion.businessQuestion}</span>
         </div>
-        <em>Mock metadata generator</em>
+        <em>Local metadata preview</em>
       </div>
-      <p className="sql-assistant-opportunity-why">{suggestion.whyItMatters}</p>
-      <div className="sql-assistant-opportunity-meta" aria-label="AI suggestion governance">
-        <span className="sql-assistant-opportunity-domain">Metadata only</span>
-        <span className="sql-assistant-opportunity-domain">No real LLM call</span>
-        <span className="sql-assistant-opportunity-method">No SQL draft</span>
+      <p className="sql-assistant-opportunity-why">{whyItMatters}</p>
+      {/* K11H.2: the repeated "Metadata only / No real LLM call / No SQL draft"
+          chips moved up to a single section-header line. Per card we now keep
+          only the meaningful business signals: confidence, status, sensitivity
+          handling, and detected domains. */}
+      <div className="sql-assistant-opportunity-meta" aria-label="AI suggestion status">
         <span className="sql-assistant-opportunity-confidence">
           {suggestion.confidenceLevel} confidence
         </span>
@@ -533,30 +598,34 @@ function AISuggestedReportCard({
       </div>
       <dl className="sql-assistant-ai-details">
         <div>
-          <dt>Category</dt>
-          <dd>{suggestion.category}</dd>
+          <dt>Report type</dt>
+          <dd>{categoryLabel}</dd>
         </div>
         <div>
-          <dt>SQL eligibility</dt>
+          <dt>Uses</dt>
+          <dd>
+            {requiredWorksheets.length > 0
+              ? requiredWorksheets.join(", ")
+              : requiredTables.length > 0
+                ? requiredTables.join(", ")
+                : "Uses workbook structure only"}
+          </dd>
+        </div>
+        <div>
+          <dt>Draft status</dt>
           <dd>{sqlEligibilityLabel}</dd>
-        </div>
-        <div>
-          <dt>Required tables</dt>
-          <dd>{requiredTables.length > 0 ? requiredTables.join(", ") : "No table requirement"}</dd>
-        </div>
-        <div>
-          <dt>Worksheets</dt>
-          <dd>{requiredWorksheets.length > 0 ? requiredWorksheets.join(", ") : "Metadata only"}</dd>
         </div>
       </dl>
       {missingRequirements.length > 0 && (
-        <p className="sql-assistant-recipe-blocked">
-          Missing requirements: {missingRequirements.join(", ")}
-        </p>
+        <div className="sql-assistant-ai-needed" role="note">
+          <p className="sql-assistant-ai-needed-label">
+            Needed before report can be created
+          </p>
+          <p className="sql-assistant-recipe-blocked">
+            {missingRequirements.join(", ")}
+          </p>
+        </div>
       )}
-      <p className="sql-assistant-ai-footnote">
-        No SQL draft yet. Preview-only suggestion from local metadata governance.
-      </p>
     </article>
   );
 }
@@ -863,11 +932,13 @@ function SqlAssistantPanel({
   const aiProviderBoundaryReason = primaryProviderBoundaryReason(
     aiProviderBoundaryReasons,
   );
-  const aiProviderBoundaryChip = [
-    `Provider: ${aiProviderBoundarySummary.status}`,
-    aiProviderModeLabels[aiProviderBoundarySummary.mode],
-    aiConsentStatusLabels[aiProviderBoundarySummary.consentStatus],
-  ].join(" - ");
+  // K11H.2: friendly provider chip — internal enum values (provider_disabled,
+  // consent_not_requested, …) are kept inside the collapsed "Why no real
+  // provider call?" details below. Visible chip stays calm.
+  const aiProviderBoundaryChip =
+    aiProviderBoundarySummary.status === "closed"
+      ? "Provider closed · local preview only"
+      : "Provider open · metadata only";
   const emptyRecipeMessage = normalizedRecipeQuery
     ? "No recipes match this search. Try clearing the search or switching to All."
     : activeRecipeFilter === "Supported"
@@ -1169,20 +1240,21 @@ function SqlAssistantPanel({
               >
                 <div className="sql-helper-section-label">
                   <span>AI-suggested business reports</span>
-                  <small>{filteredAISuggestions.length.toLocaleString()} metadata-only</small>
+                  <small>{filteredAISuggestions.length.toLocaleString()} for this dataset</small>
                 </div>
-                <p className="sql-assistant-recipe-note">
-                  Local metadata-only preview — no real LLM call yet.
-                </p>
-                <div className="sql-assistant-ai-badges" aria-label="AI suggestion safety labels">
-                  <span>Metadata only</span>
-                  <span>No real LLM call</span>
-                  <span>No SQL draft</span>
+                {/* K11H.2: single quiet safety line replaces the three
+                    repeated per-card chips (Metadata only / No real LLM call /
+                    No SQL draft). The provider-boundary chip stays alongside
+                    so users see at a glance that nothing has been sent. */}
+                <div className="sql-assistant-ai-badges" aria-label="AI suggestion safety summary">
+                  <span className="sql-assistant-ai-safety-line">
+                    Local preview only · No real AI call · No query created
+                  </span>
                   <span className="sql-assistant-ai-provider-chip">{aiProviderBoundaryChip}</span>
                 </div>
                 <details className="sql-assistant-ai-boundary-note">
                   <summary>
-                    <span>Why no real provider call?</span>
+                    <span>Why no real provider call yet?</span>
                     <small>{aiProviderBoundaryReason}</small>
                   </summary>
                   <ul>
@@ -1191,9 +1263,14 @@ function SqlAssistantPanel({
                     ))}
                   </ul>
                   <p>
-                    Boundary is {aiProviderBoundarySummary.status}; allowed categories:{" "}
-                    {aiProviderBoundarySummary.allowedCategoryCount}; blocked categories:{" "}
-                    {aiProviderBoundarySummary.blockedCategoryCount}.
+                    {/* K11H.2: collapsed-only governance summary. Kept here
+                        for users who want to dig in, hidden by default. */}
+                    Provider is {aiProviderBoundarySummary.status}.{" "}
+                    {aiProviderBoundarySummary.allowedCategoryCount} safe metadata
+                    categories are allowed for a future local review;{" "}
+                    {aiProviderBoundarySummary.blockedCategoryCount} categories
+                    (raw rows, sample values, prompts, SQL drafts, credentials)
+                    are never sent.
                   </p>
                 </details>
                 <div className="sql-assistant-ai-list">
