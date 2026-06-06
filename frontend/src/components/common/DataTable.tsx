@@ -37,6 +37,8 @@ type DataTableProps = {
   rowNumberHeaderClassName?: string;
   rowNumberHeaderTitle?: string;
   rowNumberColumnWidth?: number | string;
+  emptyRowContent?: ReactNode;
+  emptyRowClassName?: string;
   renderCell: (row: DataTableRow, column: DataTableColumn) => ReactNode;
   getCellClassName?: (row: DataTableRow, column: DataTableColumn) => string;
   getCellTitle?: (row: DataTableRow, column: DataTableColumn) => string;
@@ -56,6 +58,8 @@ function DataTable({
   rowNumberHeaderClassName,
   rowNumberHeaderTitle,
   rowNumberColumnWidth,
+  emptyRowContent,
+  emptyRowClassName,
   renderCell,
   getCellClassName,
   getCellTitle,
@@ -92,36 +96,42 @@ function DataTable({
         </thead>
 
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.key}
-              className={row.className}
-              tabIndex={row.tabIndex}
-              onKeyDown={row.onKeyDown}
-              aria-label={row.ariaLabel}
-            >
-              {showRowNumbers && (
-                <th
-                  className={row.rowHeaderClassName}
-                  scope="row"
-                  title={row.rowHeaderTitle}
-                  onClick={row.onRowHeaderClick}
-                >
-                  {row.rowHeaderContent ?? row.rowNumber}
-                </th>
-              )}
-              {columns.map((column) => (
-                <td
-                  key={column.key}
-                  className={getCellClassName?.(row, column)}
-                  title={getCellTitle?.(row, column)}
-                  onClick={() => onCellClick?.(row, column)}
-                >
-                  {renderCell(row, column)}
-                </td>
-              ))}
+          {rows.length === 0 && emptyRowContent !== undefined ? (
+            <tr className={emptyRowClassName}>
+              <td colSpan={columns.length + (showRowNumbers ? 1 : 0)}>{emptyRowContent}</td>
             </tr>
-          ))}
+          ) : (
+            rows.map((row) => (
+              <tr
+                key={row.key}
+                className={row.className}
+                tabIndex={row.tabIndex}
+                onKeyDown={row.onKeyDown}
+                aria-label={row.ariaLabel}
+              >
+                {showRowNumbers && (
+                  <th
+                    className={row.rowHeaderClassName}
+                    scope="row"
+                    title={row.rowHeaderTitle}
+                    onClick={row.onRowHeaderClick}
+                  >
+                    {row.rowHeaderContent ?? row.rowNumber}
+                  </th>
+                )}
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={getCellClassName?.(row, column)}
+                    title={getCellTitle?.(row, column)}
+                    onClick={() => onCellClick?.(row, column)}
+                  >
+                    {renderCell(row, column)}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

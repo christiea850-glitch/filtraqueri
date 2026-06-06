@@ -2,6 +2,10 @@ import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "rea
 import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
+import DataTable, {
+  type DataTableColumn,
+  type DataTableRow,
+} from "../../../components/common/DataTable";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
 import type { SqlAssistantMode } from "./SqlAssistantPanel";
 import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
@@ -89,6 +93,28 @@ function SqlFocusedResultPreview({
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onRelease);
   };
+  const sqlResultColumns: DataTableColumn[] = previewResult.columns.map((column) => ({
+    key: column,
+    width: getColumnWidth(column),
+    header: (
+      <>
+        <span className="dataset-preview-cell">{column}</span>
+        <span
+          className="dataset-preview-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${column} column`}
+          onPointerDown={(event) => startColumnResize(event, column)}
+        />
+      </>
+    ),
+  }));
+  const sqlResultRows: DataTableRow[] = previewResult.rows.map((row, rowIndex) => ({
+    key: rowIndex,
+    values: row,
+    rowNumber: rowIndex + 1,
+    rowHeaderClassName: "dataset-preview-rownum",
+  }));
 
   return (
     <section className="sql-result-page" aria-label="SQL result preview">
@@ -119,61 +145,26 @@ function SqlFocusedResultPreview({
       </div>
 
       {hasColumns ? (
-        <div className="dataset-preview-table-wrap sql-result-table-wrap">
-          <table
-            className={["dataset-preview-table", "sql-result-table", isWrapped ? "is-wrapped" : ""]
-              .filter(Boolean)
-              .join(" ")}
-            style={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
-            aria-label="SQL result data grid"
-          >
-            <colgroup>
-              <col style={{ width: "52px" }} />
-              {previewResult.columns.map((column) => (
-                <col key={column} style={{ width: `${getColumnWidth(column)}px` }} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th className="dataset-preview-rownum" scope="col">
-                  #
-                </th>
-                {previewResult.columns.map((column) => (
-                  <th key={column} scope="col">
-                    <span className="dataset-preview-cell">{column}</span>
-                    <span
-                      className="dataset-preview-resizer"
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label={`Resize ${column} column`}
-                      onPointerDown={(event) => startColumnResize(event, column)}
-                    />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {hasRows ? (
-                previewResult.rows.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    <td className="dataset-preview-rownum">
-                      {rowIndex + 1}
-                    </td>
-                    {previewResult.columns.map((column) => (
-                      <td key={column} title={String(row[column] ?? "")}>
-                        <span className="dataset-preview-cell">{String(row[column] ?? "")}</span>
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={previewResult.columns.length + 1}>The query returned no rows.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          variant="sqlResult"
+          ariaLabel="SQL result data grid"
+          wrapperClassName="dataset-preview-table-wrap sql-result-table-wrap"
+          tableClassName={["dataset-preview-table", "sql-result-table", isWrapped ? "is-wrapped" : ""]
+            .filter(Boolean)
+            .join(" ")}
+          tableStyle={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
+          columns={sqlResultColumns}
+          rows={sqlResultRows}
+          showRowNumbers
+          rowNumberHeader="#"
+          rowNumberHeaderClassName="dataset-preview-rownum"
+          rowNumberColumnWidth={52}
+          emptyRowContent={hasRows ? undefined : "The query returned no rows."}
+          renderCell={(row, column) => (
+            <span className="dataset-preview-cell">{String(row.values[column.key] ?? "")}</span>
+          )}
+          getCellTitle={(row, column) => String(row.values[column.key] ?? "")}
+        />
       ) : (
         <div className="empty-state compact-empty">
           <p className="section-label">No result</p>
