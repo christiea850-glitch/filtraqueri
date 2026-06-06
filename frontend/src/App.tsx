@@ -25,6 +25,7 @@ import type { DataQualityAlertAction } from "./features/dataQuality/dataQualityA
 import useExecutionRegistry from "./features/execution/executionRegistry";
 import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatasetController";
 import useExportController from "./features/export/useExportController";
+import useExploreRoom from "./features/explore/useExploreRoom";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
 import type { GovernedQueryBuilderRequestDraft } from "./features/questionWorkspace/questionQueryBuilderRequestTypes";
@@ -279,12 +280,46 @@ function App() {
 
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
 
+  // E-1: Explore Three-Room state machine (compose / refine / answer).
+  // Infrastructure only — read-only state today, used for the future
+  // E-2/E-3/E-4 redesign. No UI is gated on these values yet.
+  const {
+    currentRoom: currentExploreRoom,
+    isComposeRoom: isExploreComposeRoom,
+    isRefineRoom: isExploreRefineRoom,
+    isAnswerRoom: isExploreAnswerRoom,
+    goToRefine: goToExploreRefineRoom,
+    goToAnswer: goToExploreAnswerRoom,
+    resetExploreRoom,
+  } = useExploreRoom();
+
   useEffect(() => {
     setPreparedQuestionContext(null);
     setExecutedPreparedQuestionContext(null);
     setQueryBuilderReviewNotice("");
     setHumanAnalyzeStage("investigate");
   }, [dataset?.dataset_id]);
+
+  // E-1 observational sync: derive room from existing events. These effects
+  // only forward-transition Compose → Refine → Answer; reverse transitions
+  // are deferred to E-2+ (which will wire explicit room navigation UI).
+  useEffect(() => {
+    if (humanAnalyzeStage === "review" && isExploreComposeRoom) {
+      goToExploreRefineRoom();
+    }
+  }, [humanAnalyzeStage, isExploreComposeRoom, goToExploreRefineRoom]);
+
+  useEffect(() => {
+    if (hasQueryResults && !isExploreAnswerRoom) {
+      goToExploreAnswerRoom();
+    }
+  }, [hasQueryResults, isExploreAnswerRoom, goToExploreAnswerRoom]);
+
+  useEffect(() => {
+    if (!dataset) {
+      resetExploreRoom();
+    }
+  }, [dataset, resetExploreRoom]);
 
   const {
     isFiltering,
@@ -936,6 +971,20 @@ function App() {
     queryBuilder: () =>
       dataset ? (
         <>
+          {/*
+            E-1: Three-Room state machine marker. No layout impact (hidden span).
+            Future E-2/E-3/E-4 work will conditionally render Compose/Refine/Answer
+            sections based on currentExploreRoom; for E-1 this is observational
+            only and the existing humanAnalyzeStage gating below is unchanged.
+          */}
+          <span
+            hidden
+            aria-hidden="true"
+            data-explore-room={currentExploreRoom}
+            data-explore-room-active-compose={isExploreComposeRoom ? "true" : "false"}
+            data-explore-room-active-refine={isExploreRefineRoom ? "true" : "false"}
+            data-explore-room-active-answer={isExploreAnswerRoom ? "true" : "false"}
+          />
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
           <div hidden={humanAnalyzeStage !== "investigate"}>
