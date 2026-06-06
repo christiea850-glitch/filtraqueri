@@ -6,9 +6,7 @@ import {
   createMockGovernedAISuggestionsFromMetadata,
   summarizeAIProviderBoundary,
   type AIGovernedMetaReportSuggestion,
-  type AIFutureProviderMode,
   type AIProviderBoundaryBlockReason,
-  type AIProviderConsentStatus,
   type MockAISuggestionSqlEligibility,
 } from "../llm";
 import type { SqlDialectId, SqlDialectProfile } from "../../sqlIntelligence";
@@ -146,19 +144,6 @@ const aiSensitivityLabels: Record<AIGovernedMetaReportSuggestion["sensitivity"][
   caution: "Needs review",
   sensitive: "Needs review",
   restricted: "Blocked",
-};
-
-const aiProviderModeLabels: Record<AIFutureProviderMode, string> = {
-  provider_disabled: "provider disabled",
-  local_mock: "local mock only",
-  metadata_only_provider_ready: "metadata-only ready",
-};
-
-const aiConsentStatusLabels: Record<AIProviderConsentStatus, string> = {
-  not_requested: "consent not requested",
-  granted: "consent granted",
-  denied: "consent denied",
-  revoked: "consent revoked",
 };
 
 const primaryProviderBoundaryReason = (
