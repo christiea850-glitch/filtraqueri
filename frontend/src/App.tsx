@@ -86,6 +86,7 @@ function App() {
   const [queryBuilderReviewNotice, setQueryBuilderReviewNotice] = useState("");
   const [humanAnalyzeStage, setHumanAnalyzeStage] =
     useState<HumanAnalyzeStage>("investigate");
+  const [isInvestigateHistoryOpen, setIsInvestigateHistoryOpen] = useState(false);
   const [preparedQuestionContext, setPreparedQuestionContext] =
     useState<PreparedQuestionContext | null>(null);
   const [executedPreparedQuestionContext, setExecutedPreparedQuestionContext] =
@@ -804,6 +805,33 @@ function App() {
     );
   };
 
+  const renderInlineInvestigateFilters = () => {
+    if (!dataset) return null;
+
+    return (
+      <details className="investigate-inline-filters">
+        <summary>
+          <span>
+            <strong>Filters</strong>
+            <small>Narrow the answer before running the query.</small>
+          </span>
+          <em>{activeFilterLabels.length.toLocaleString()} active</em>
+        </summary>
+        <DynamicFiltersPanel
+          schema={dataset.schema}
+          filterValues={filterValues}
+          applying={isFiltering}
+          workspaceMode={workspaceMode}
+          investigationReport={investigationReport}
+          errorMessage={errorMessage}
+          onFilterChange={updateFilter}
+          onApplyFilters={applyFilters}
+          onResetFilters={resetFilters}
+        />
+      </details>
+    );
+  };
+
   const renderInvestigateAnswerPanel = () => {
     if (!hasQueryResults || !activeResultModel) return null;
 
@@ -815,7 +843,25 @@ function App() {
             <h2>Answer from this run</h2>
             <p>Review the takeaway, evidence, and result table from the question you just ran.</p>
           </div>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setIsInvestigateHistoryOpen((currentValue) => !currentValue)}
+            aria-expanded={isInvestigateHistoryOpen}
+          >
+            History
+          </button>
         </div>
+        {isInvestigateHistoryOpen && (
+          <section className="investigate-history-panel" aria-label="Recent run history">
+            <div className="investigate-history-copy">
+              <p className="section-label">History</p>
+              <h3>Recent runs</h3>
+              <p>Review recent runs from this workspace.</p>
+            </div>
+            <QueryHistoryPanel history={queryHistory} />
+          </section>
+        )}
         <div className="results-workspace">
           {renderActiveResultPanel()}
         </div>
@@ -909,6 +955,7 @@ function App() {
           </div>
           <div hidden={humanAnalyzeStage !== "review"}>
             {renderHumanAnalyzeStageHeader()}
+            {renderInlineInvestigateFilters()}
             <VisualQueryBuilderPanel
               schema={dataset.schema}
               datasetName={dataset.original_filename}
