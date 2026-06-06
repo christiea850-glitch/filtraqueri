@@ -2,8 +2,13 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import {
   buildAIMetadataContextPayload,
+  checkAIProviderBoundary,
   createMockGovernedAISuggestionsFromMetadata,
+  summarizeAIProviderBoundary,
   type AIGovernedMetaReportSuggestion,
+  type AIFutureProviderMode,
+  type AIProviderBoundaryBlockReason,
+  type AIProviderConsentStatus,
   type MockAISuggestionSqlEligibility,
 } from "../llm";
 import type { SqlDialectId, SqlDialectProfile } from "../../sqlIntelligence";
@@ -141,6 +146,41 @@ const aiSensitivityLabels: Record<AIGovernedMetaReportSuggestion["sensitivity"][
   caution: "Needs review",
   sensitive: "Needs review",
   restricted: "Blocked",
+};
+
+const aiProviderModeLabels: Record<AIFutureProviderMode, string> = {
+  provider_disabled: "provider disabled",
+  local_mock: "local mock only",
+  metadata_only_provider_ready: "metadata-only ready",
+};
+
+const aiConsentStatusLabels: Record<AIProviderConsentStatus, string> = {
+  not_requested: "consent not requested",
+  granted: "consent granted",
+  denied: "consent denied",
+  revoked: "consent revoked",
+};
+
+const primaryProviderBoundaryReason = (
+  reasons: AIProviderBoundaryBlockReason[],
+): string => {
+  const primary = reasons.find((reason) =>
+    reason.code === "provider_disabled" ||
+    reason.code === "local_mock_only" ||
+    reason.code === "consent_not_granted" ||
+    reason.code === "restricted_columns_present",
+  );
+  return primary?.message || reasons[0]?.message || "Provider boundary is open for metadata-only review.";
+};
+
+const visibleProviderBoundaryReasons = (
+  reasons: AIProviderBoundaryBlockReason[],
+): AIProviderBoundaryBlockReason[] => {
+  const hasMetadataOnlyRequirement = reasons.some(
+    (reason) => reason.code === "metadata_only_required",
+  );
+  if (!hasMetadataOnlyRequirement) return reasons;
+  return reasons.filter((reason) => reason.code !== "samples_blocked_by_policy");
 };
 
 const confidenceLabel = (confidence: number) => {
@@ -706,6 +746,14 @@ function SqlAssistantPanel({
     () => createMockGovernedAISuggestionsFromMetadata(aiMetadataPayload),
     [aiMetadataPayload],
   );
+  const aiProviderBoundary = useMemo(
+    () => checkAIProviderBoundary({ metadataPayload: aiMetadataPayload }),
+    [aiMetadataPayload],
+  );
+  const aiProviderBoundarySummary = useMemo(
+    () => summarizeAIProviderBoundary(aiProviderBoundary),
+    [aiProviderBoundary],
+  );
   const assistPlaceholder = useMemo(
     () => buildAssistPlaceholder(dataset, selectedDialect),
     [dataset, selectedDialect],
@@ -809,6 +857,17 @@ function SqlAssistantPanel({
   });
   const visibleAISuggestions = filteredAISuggestions.slice(0, 3);
   const remainingAISuggestions = filteredAISuggestions.slice(3);
+  const aiProviderBoundaryReasons = visibleProviderBoundaryReasons(
+    aiProviderBoundary.blockingReasons,
+  );
+  const aiProviderBoundaryReason = primaryProviderBoundaryReason(
+    aiProviderBoundaryReasons,
+  );
+  const aiProviderBoundaryChip = [
+    `Provider: ${aiProviderBoundarySummary.status}`,
+    aiProviderModeLabels[aiProviderBoundarySummary.mode],
+    aiConsentStatusLabels[aiProviderBoundarySummary.consentStatus],
+  ].join(" - ");
   const emptyRecipeMessage = normalizedRecipeQuery
     ? "No recipes match this search. Try clearing the search or switching to All."
     : activeRecipeFilter === "Supported"
@@ -1119,7 +1178,24 @@ function SqlAssistantPanel({
                   <span>Metadata only</span>
                   <span>No real LLM call</span>
                   <span>No SQL draft</span>
+                  <span className="sql-assistant-ai-provider-chip">{aiProviderBoundaryChip}</span>
                 </div>
+                <details className="sql-assistant-ai-boundary-note">
+                  <summary>
+                    <span>Why no real provider call?</span>
+                    <small>{aiProviderBoundaryReason}</small>
+                  </summary>
+                  <ul>
+                    {aiProviderBoundaryReasons.map((reason) => (
+                      <li key={reason.code}>{reason.message}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    Boundary is {aiProviderBoundarySummary.status}; allowed categories:{" "}
+                    {aiProviderBoundarySummary.allowedCategoryCount}; blocked categories:{" "}
+                    {aiProviderBoundarySummary.blockedCategoryCount}.
+                  </p>
+                </details>
                 <div className="sql-assistant-ai-list">
                   {visibleAISuggestions.map((suggestion) => (
                     <AISuggestedReportCard
