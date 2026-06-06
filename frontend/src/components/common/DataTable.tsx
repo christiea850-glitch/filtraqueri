@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 
 type DataTableVariant = "workbookPreview" | "queryResult" | "sqlResult";
 
@@ -6,6 +6,7 @@ type DataTableColumn = {
   key: string;
   className?: string;
   title?: string;
+  width?: number | string;
   header: ReactNode;
 };
 
@@ -30,10 +31,12 @@ type DataTableProps = {
   rows: DataTableRow[];
   wrapperClassName: string;
   tableClassName?: string;
+  tableStyle?: CSSProperties;
   showRowNumbers?: boolean;
   rowNumberHeader?: ReactNode;
   rowNumberHeaderClassName?: string;
   rowNumberHeaderTitle?: string;
+  rowNumberColumnWidth?: number | string;
   renderCell: (row: DataTableRow, column: DataTableColumn) => ReactNode;
   getCellClassName?: (row: DataTableRow, column: DataTableColumn) => string;
   getCellTitle?: (row: DataTableRow, column: DataTableColumn) => string;
@@ -47,18 +50,32 @@ function DataTable({
   rows,
   wrapperClassName,
   tableClassName,
+  tableStyle,
   showRowNumbers = false,
   rowNumberHeader = "Row",
   rowNumberHeaderClassName,
   rowNumberHeaderTitle,
+  rowNumberColumnWidth,
   renderCell,
   getCellClassName,
   getCellTitle,
   onCellClick,
 }: DataTableProps) {
+  const shouldRenderColgroup = Boolean(rowNumberColumnWidth) || columns.some((column) => column.width);
+  const formatWidth = (width: number | string | undefined) =>
+    typeof width === "number" ? `${width}px` : width;
+
   return (
     <div className={wrapperClassName} data-table-variant={variant}>
-      <table className={tableClassName} aria-label={ariaLabel}>
+      <table className={tableClassName} style={tableStyle} aria-label={ariaLabel}>
+        {shouldRenderColgroup && (
+          <colgroup>
+            {showRowNumbers && <col style={{ width: formatWidth(rowNumberColumnWidth) }} />}
+            {columns.map((column) => (
+              <col key={column.key} style={{ width: formatWidth(column.width) }} />
+            ))}
+          </colgroup>
+        )}
         <thead>
           <tr>
             {showRowNumbers && (
@@ -67,7 +84,7 @@ function DataTable({
               </th>
             )}
             {columns.map((column) => (
-              <th key={column.key} className={column.className} title={column.title}>
+              <th key={column.key} className={column.className} title={column.title} scope="col">
                 {column.header}
               </th>
             ))}

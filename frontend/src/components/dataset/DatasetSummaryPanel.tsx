@@ -14,6 +14,7 @@ import {
   type OriginalWorkbookLayout,
 } from "../../services/api";
 import ColumnDistributionCard from "./ColumnDistributionCard";
+import DataTable, { type DataTableColumn, type DataTableRow } from "../common/DataTable";
 import MissingValuesOverview from "./MissingValuesOverview";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
@@ -856,6 +857,28 @@ function DatasetPreviewPage({
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onRelease);
   };
+  const previewTableColumns: DataTableColumn[] = previewColumns.map((column) => ({
+    key: column.name,
+    width: getColumnWidth(column.name),
+    header: (
+      <>
+        <span className="dataset-preview-cell">{column.name}</span>
+        <small>{column.inferred_type}</small>
+        <span
+          className="dataset-preview-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${column.name} column`}
+          onPointerDown={(event) => startColumnResize(event, column.name)}
+        />
+      </>
+    ),
+  }));
+  const previewTableRows: DataTableRow[] = previewRows.map((row, rowIndex) => ({
+    key: rowIndex,
+    values: row,
+    rowNumber: rowIndex + 1,
+  }));
 
   return (
     <FocusedWorkspaceShell
@@ -1033,52 +1056,25 @@ function DatasetPreviewPage({
         ) : visibleRowCount === 0 ? (
           <p className="compact-empty">No rows to preview.</p>
         ) : (
-          <table
-            className={["dataset-preview-table", isWrapped ? "is-wrapped" : ""]
+          <DataTable
+            variant="workbookPreview"
+            ariaLabel="Dataset preview table"
+            wrapperClassName="dataset-preview-table-inner"
+            tableClassName={["dataset-preview-table", isWrapped ? "is-wrapped" : ""]
               .filter(Boolean)
               .join(" ")}
-            style={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
-          >
-            <colgroup>
-              <col style={{ width: "52px" }} />
-              {previewColumns.map((column) => (
-                <col key={column.name} style={{ width: `${getColumnWidth(column.name)}px` }} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th className="dataset-preview-rownum">#</th>
-                {previewColumns.map((column) => (
-                  <th key={column.name}>
-                    <span className="dataset-preview-cell">{column.name}</span>
-                    <small>{column.inferred_type}</small>
-                    <span
-                      className="dataset-preview-resizer"
-                      role="separator"
-                      aria-orientation="vertical"
-                      aria-label={`Resize ${column.name} column`}
-                      onPointerDown={(event) => startColumnResize(event, column.name)}
-                    />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {previewRows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
-                  <td className="dataset-preview-rownum">{rowIndex + 1}</td>
-                  {previewColumns.map((column) => {
-                    const cellText = formatCell(row[column.name]);
-                    return (
-                      <td key={column.name} title={cellText}>
-                        <span className="dataset-preview-cell">{cellText}</span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            tableStyle={{ width: `${totalTableWidth}px`, minWidth: "100%" }}
+            columns={previewTableColumns}
+            rows={previewTableRows}
+            showRowNumbers
+            rowNumberHeader="#"
+            rowNumberHeaderClassName="dataset-preview-rownum"
+            rowNumberColumnWidth={52}
+            renderCell={(row, column) => (
+              <span className="dataset-preview-cell">{formatCell(row.values[column.key])}</span>
+            )}
+            getCellTitle={(row, column) => formatCell(row.values[column.key])}
+          />
         )}
       </div>
       )}
