@@ -760,6 +760,69 @@ function App() {
     );
   };
 
+  const renderActiveResultPanel = () => {
+    if (!activeResultModel) return null;
+
+    return (
+      <>
+        {renderResultsInvestigationSurface()}
+        <ResultsGrid
+          title={
+            activeResultModel.sourceType === "query"
+              ? "Query results"
+              : activeResultModel.sourceType === "filtered"
+                ? "Filtered results"
+                : "Preview"
+          }
+          label="Results"
+          activeResultModel={activeResultModel}
+          loading={isFiltering || isRunningQuery}
+          activeSortColumn={activeResultModel.sorting.column}
+          activeSortDirection={activeResultModel.sorting.direction}
+          hiddenColumns={resultHiddenColumns}
+          emptyTitle="No findings yet."
+          emptyDescription="Choose an investigation or shape a business question to create findings."
+          onHiddenColumnsChange={setResultHiddenColumns}
+          onSortColumn={sortWorkspaceColumn}
+          onPageChange={changeWorkspacePage}
+          onRowsPerPageChange={changeWorkspaceRowsPerPage}
+          toolbarActions={
+            <div className="workspace-actions">
+              <ResultTabs
+                activeTab={activeResultTab}
+                hasFilteredResults={hasFilteredResults}
+                hasQueryResults={hasQueryResults}
+                onTabChange={handleResultTabChange}
+              />
+              <button type="button" className="secondary-button" onClick={exportCurrentResults}>
+                {isExporting ? "Exporting..." : "Export CSV"}
+              </button>
+            </div>
+          }
+        />
+      </>
+    );
+  };
+
+  const renderInvestigateAnswerPanel = () => {
+    if (!hasQueryResults || !activeResultModel) return null;
+
+    return (
+      <section className="investigate-answer-section" aria-label="Answer from this run">
+        <div className="investigate-answer-header">
+          <div>
+            <p className="section-label">Answer</p>
+            <h2>Answer from this run</h2>
+            <p>Review the takeaway, evidence, and result table from the question you just ran.</p>
+          </div>
+        </div>
+        <div className="results-workspace">
+          {renderActiveResultPanel()}
+        </div>
+      </section>
+    );
+  };
+
   const humanViewRegistry: Partial<Record<ActiveView, () => ReactNode>> = {
     welcome: () => (
       <UploadPanel
@@ -883,6 +946,7 @@ function App() {
               onRunQuery={runReviewedQueryBuilder}
             />
           </div>
+          {renderInvestigateAnswerPanel()}
         </>
       ) : null,
     results: () =>
@@ -891,45 +955,7 @@ function App() {
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
           <section className="results-workspace" aria-label="Data exploration workspace">
-            {activeResultModel && (
-              <>
-                {renderResultsInvestigationSurface()}
-                <ResultsGrid
-                  title={
-                    activeResultModel.sourceType === "query"
-                      ? "Query results"
-                      : activeResultModel.sourceType === "filtered"
-                        ? "Filtered results"
-                        : "Preview"
-                  }
-                  label="Results"
-                  activeResultModel={activeResultModel}
-                  loading={isFiltering || isRunningQuery}
-                  activeSortColumn={activeResultModel.sorting.column}
-                  activeSortDirection={activeResultModel.sorting.direction}
-                  hiddenColumns={resultHiddenColumns}
-                  emptyTitle="No findings yet."
-                  emptyDescription="Choose an investigation or shape a business question to create findings."
-                  onHiddenColumnsChange={setResultHiddenColumns}
-                  onSortColumn={sortWorkspaceColumn}
-                  onPageChange={changeWorkspacePage}
-                  onRowsPerPageChange={changeWorkspaceRowsPerPage}
-                  toolbarActions={
-                    <div className="workspace-actions">
-                      <ResultTabs
-                        activeTab={activeResultTab}
-                        hasFilteredResults={hasFilteredResults}
-                        hasQueryResults={hasQueryResults}
-                        onTabChange={handleResultTabChange}
-                      />
-                      <button type="button" className="secondary-button" onClick={exportCurrentResults}>
-                        {isExporting ? "Exporting..." : "Export CSV"}
-                      </button>
-                    </div>
-                  }
-                />
-              </>
-            )}
+            {renderActiveResultPanel()}
           </section>
         </>
       ) : null,
