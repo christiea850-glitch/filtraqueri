@@ -42,6 +42,15 @@ const countByStatus = (worksheets: WorksheetMetadata[], status: WorksheetStatus)
 const formatProfileValue = (value: number | string) =>
   typeof value === "number" ? value.toLocaleString() : value;
 
+const formatWorkbookColumnPreview = (worksheet: WorksheetMetadata) =>
+  worksheet.schema.slice(0, 6).map((column) =>
+    column.name
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+
 function WorkbookProfileList({ profile }: { profile: WorkbookIngestionProfile }) {
   const profileItems = [
     ["Max sheets", profile.maxWorksheets],
@@ -605,6 +614,9 @@ function WorkbookContextPanel({
   const relationshipRegistry = useWorkbookRelationships(workbook);
   const [diagnostics, setDiagnostics] =
     useState<RelationshipContractDiagnosticsResponse | null>(null);
+  const [selectedScopeWorksheetIds, setSelectedScopeWorksheetIds] = useState<string[]>([]);
+  const [appliedScopeWorksheetIds, setAppliedScopeWorksheetIds] = useState<string[]>([]);
+  const [isSqlSourceExpanded, setIsSqlSourceExpanded] = useState(false);
 
   useEffect(() => {
     if (!dataset || !workbook || workbook.acceptedRelationshipContracts.length === 0) {
@@ -626,14 +638,59 @@ function WorkbookContextPanel({
     };
   }, [dataset?.dataset_id, workbook?.updatedAt, workbook?.acceptedRelationshipContracts.length]);
 
+  useEffect(() => {
+    const availableWorksheetIds = new Set(
+      (workbook?.worksheets || [])
+        .filter((worksheet) => worksheet.status === "ready" || worksheet.status === "empty")
+        .map((worksheet) => worksheet.worksheetId),
+    );
+    setSelectedScopeWorksheetIds((current) => {
+      const next = current.filter((worksheetId) => availableWorksheetIds.has(worksheetId));
+      return next.length === current.length ? current : next;
+    });
+    setAppliedScopeWorksheetIds((current) => {
+      const next = current.filter((worksheetId) => availableWorksheetIds.has(worksheetId));
+      return next.length === current.length ? current : next;
+    });
+  }, [workbook?.workbookId, workbook?.updatedAt]);
+
   if (!workbook) return null;
 
   const activeWorksheet = getActiveWorksheet(workbook);
+  const scopeEligibleWorksheets = workbook.worksheets.filter(
+    (worksheet) => worksheet.status === "ready" || worksheet.status === "empty",
+  );
+  const selectedScopeWorksheets = selectedScopeWorksheetIds
+    .map((worksheetId) => scopeEligibleWorksheets.find((worksheet) => worksheet.worksheetId === worksheetId))
+    .filter((worksheet): worksheet is WorksheetMetadata => Boolean(worksheet));
+  const appliedScopeWorksheets = appliedScopeWorksheetIds
+    .map((worksheetId) => scopeEligibleWorksheets.find((worksheet) => worksheet.worksheetId === worksheetId))
+    .filter((worksheet): worksheet is WorksheetMetadata => Boolean(worksheet));
+  const selectableScopeWorksheets = scopeEligibleWorksheets.filter(
+    (worksheet) => !selectedScopeWorksheetIds.includes(worksheet.worksheetId),
+  );
   const readyCount = countByStatus(workbook.worksheets, "ready");
   const skippedCount = countByStatus(workbook.worksheets, "skipped");
   const emptyCount = countByStatus(workbook.worksheets, "empty");
   const unsupportedCount = countByStatus(workbook.worksheets, "error");
   const activeIndex = activeWorksheet ? activeWorksheet.originalIndex + 1 : null;
+  const activeSourceSummary = activeWorksheet
+    ? `${activeWorksheet.displayName} - ${activeWorksheet.rowCount.toLocaleString()} rows - ${activeWorksheet.columnCount.toLocaleString()} columns`
+    : "No active SQL source";
+
+  const addScopeWorksheet = (worksheetId: string) => {
+    setSelectedScopeWorksheetIds((current) =>
+      current.includes(worksheetId) ? current : [...current, worksheetId],
+    );
+  };
+
+  const removeScopeWorksheet = (worksheetId: string) => {
+    setSelectedScopeWorksheetIds((current) => current.filter((id) => id !== worksheetId));
+  };
+
+  const applySelectedScope = () => {
+    setAppliedScopeWorksheetIds(selectedScopeWorksheetIds);
+  };
 
   return (
     <div className={`workbook-context-panel ${variant}`} aria-label="Workbook context">
@@ -685,11 +742,123 @@ function WorkbookContextPanel({
         </span>
       </div>
 
-      <div className="workbook-mapping-section">
+      {variant === "analyst" ? (
+        <section className="workbook-analysis-scope" aria-label="Analysis workspace">
+          <div className="builder-block-header">
+            <span>Analysis workspace</span>
+            <small>{selectedScopeWorksheets.length.toLocaleString()} selected</small>
+          </div>
+          <p className="workbook-analysis-scope-copy">
+            Choose the tables or sheets that belong to this analysis. FiltraQueri will use this scope to prepare safer suggestions and reports.
+          </p>
+          <div className="workbook-analysis-scope-layout">
+            <div className="workbook-analysis-scope-options" aria-label="Available analysis entities">
+              {selectableScopeWorksheets.length > 0 ? (
+                selectableScopeWorksheets.map((worksheet) => {
+                  const columns = formatWorkbookColumnPreview(worksheet);
+                  return (
+                    <button
+                      type="button"
+                      key={worksheet.worksheetId}
+                      className="workbook-analysis-scope-option"
+                      onClick={() => addScopeWorksheet(worksheet.worksheetId)}
+                    >
+                      <strong>{worksheet.displayName}</strong>
+                      <span>
+                        {worksheet.rowCount.toLocaleString()} rows /{" "}
+                        {worksheet.columnCount.toLocaleString()} columns
+                      </span>
+                      {columns.length > 0 && <small>{columns.join(", ")}</small>}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="workbook-analysis-scope-empty">
+                  All available tables and sheets are already selected for this analysis.
+                </p>
+              )}
+            </div>
+            <div className="workbook-analysis-scope-selected" aria-label="Selected analysis scope">
+              {selectedScopeWorksheets.length === 0 ? (
+                <p className="workbook-analysis-scope-empty">
+                  No tables or sheets selected yet. Add multiple entities here for one analysis task.
+                </p>
+              ) : (
+                selectedScopeWorksheets.map((worksheet) => {
+                  const columns = formatWorkbookColumnPreview(worksheet);
+                  return (
+                    <article className="workbook-analysis-scope-chip" key={worksheet.worksheetId}>
+                      <div>
+                        <strong>{worksheet.displayName}</strong>
+                        <span>
+                          {worksheet.rowCount.toLocaleString()} rows /{" "}
+                          {worksheet.columnCount.toLocaleString()} columns
+                        </span>
+                      </div>
+                      {columns.length > 0 && <small>{columns.join(", ")}</small>}
+                      <button
+                        type="button"
+                        onClick={() => removeScopeWorksheet(worksheet.worksheetId)}
+                        aria-label={`Remove ${worksheet.displayName} from analysis scope`}
+                      >
+                        Remove
+                      </button>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </div>
+          <div className="workbook-analysis-scope-actions">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={applySelectedScope}
+              disabled={selectedScopeWorksheets.length === 0}
+            >
+              Apply selected scope
+            </button>
+            <small>
+              Metadata-only confirmation. This does not change the active SQL source or run a query.
+            </small>
+          </div>
+          {appliedScopeWorksheets.length > 0 && (
+            <p className="workbook-analysis-scope-confirmation">
+              Analysis scope set:{" "}
+              {appliedScopeWorksheets.map((worksheet) => worksheet.displayName).join(", ")}.
+            </p>
+          )}
+        </section>
+      ) : (
+        <p className="workbook-analysis-scope-bridge">
+          Need to analyze multiple tables? Use Analysis workspace in Analyst mode.
+        </p>
+      )}
+
+      <div className={`workbook-mapping-section${variant === "analyst" ? " is-secondary-source" : ""}`}>
         <div className="builder-block-header">
-          <span>Worksheet tables</span>
+          <span>{variant === "analyst" ? "Active SQL source" : "Worksheet tables"}</span>
           <small>{workbook.worksheets.length.toLocaleString()} sheets</small>
         </div>
+        {variant === "analyst" && (
+          <>
+            <div className="workbook-active-source-summary">
+              <span>{activeSourceSummary}</span>
+              <button
+                type="button"
+                className="secondary-button workbook-mapping-make-active"
+                onClick={() => setIsSqlSourceExpanded((expanded) => !expanded)}
+                aria-expanded={isSqlSourceExpanded}
+              >
+                {isSqlSourceExpanded ? "Hide single-table source options" : "Change active SQL source"}
+              </button>
+            </div>
+            <p className="workbook-mapping-helper">
+              Use this only when you want one table to be the active SQL source for SQL editing and Run Query. This is separate from the multi-table Analysis workspace.
+            </p>
+          </>
+        )}
+        {(variant !== "analyst" || isSqlSourceExpanded) && (
         <div className="workbook-mapping-list" aria-label="Worksheet table mappings">
           {workbook.worksheets.map((worksheet) => {
             const isActive = worksheet.worksheetId === workbook.activeWorksheetId;
@@ -754,6 +923,7 @@ function WorkbookContextPanel({
             );
           })}
         </div>
+        )}
       </div>
 
       {variant !== "analyst" && (

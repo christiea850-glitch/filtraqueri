@@ -2304,10 +2304,213 @@
   gap: 6px;
 }
 
+.workbook-analysis-scope {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.workbook-analysis-scope-copy {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.workbook-analysis-scope-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.85fr);
+  gap: 8px;
+}
+
+.workbook-analysis-scope-options,
+.workbook-analysis-scope-selected {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.workbook-analysis-scope-option,
+.workbook-analysis-scope-chip {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  text-align: left;
+}
+
+.workbook-analysis-scope-option {
+  cursor: pointer;
+}
+
+.workbook-analysis-scope-option:hover {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.workbook-analysis-scope-option strong,
+.workbook-analysis-scope-chip strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbook-analysis-scope-option span,
+.workbook-analysis-scope-chip span {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.workbook-analysis-scope-option small,
+.workbook-analysis-scope-chip small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.workbook-analysis-scope-chip {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.workbook-analysis-scope-chip > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.workbook-analysis-scope-chip small {
+  grid-column: 1 / -1;
+}
+
+.workbook-analysis-scope-chip button {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.workbook-analysis-scope-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.workbook-analysis-scope-actions .primary-button {
+  min-height: 30px;
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.workbook-analysis-scope-actions .primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workbook-analysis-scope-actions small {
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.workbook-analysis-scope-confirmation,
+.workbook-analysis-scope-bridge,
+.workbook-mapping-helper {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.workbook-analysis-scope-confirmation {
+  padding: 8px 10px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.workbook-analysis-scope-bridge {
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.workbook-analysis-scope-empty {
+  margin: 0;
+  padding: 9px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+@media (max-width: 760px) {
+  .workbook-analysis-scope-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .workbook-mapping-section {
   display: grid;
   gap: 8px;
   min-width: 0;
+}
+
+.workbook-mapping-section.is-secondary-source {
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.workbook-active-source-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workbook-active-source-summary span {
+  overflow: hidden;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workbook-mapping-list,
@@ -3104,4 +3307,3 @@
 .workbook-mapping-row strong {
   color: #334155;
 }
-
