@@ -88,3 +88,30 @@ export {
   type MockAISuggestionValidationRecord,
   type MockGovernedAISuggestionAdapterResult,
 } from "./llmSuggestionAdapter";
+export type {
+  AIFutureProviderMode,
+  AIProviderBoundaryBlockReason,
+  AIProviderBoundaryBlockReasonCode,
+  AIProviderBoundaryCheckInput,
+  AIProviderBoundaryCheckResult,
+  AIProviderBoundaryPolicy,
+  AIProviderBoundaryPolicyInput,
+  AIProviderBoundarySensitivitySummary,
+  AIProviderBoundaryStatus,
+  AIProviderBoundarySummary,
+  AIProviderConsentProvenance,
+  AIProviderConsentRecord,
+  AIProviderConsentStatus,
+  AIProviderPayloadCategory,
+  AIProviderPayloadScope,
+} from "./llmProviderBoundaryTypes";
+export {
+  AI_PROVIDER_BLOCKED_PAYLOAD_CATEGORIES,
+  AI_PROVIDER_METADATA_ONLY_CATEGORIES,
+  createAIProviderBoundaryPolicy,
+  createAIProviderConsentRecord,
+} from "./llmConsentPolicy";
+export {
+  checkAIProviderBoundary,
+  summarizeAIProviderBoundary,
+} from "./llmProviderBoundary";
