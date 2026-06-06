@@ -21,13 +21,30 @@ export type WorkbookRelationshipReadinessMatch = {
 type NormalizedColumn = {
   originalName: string;
   normalizedName: string;
+  tokens: string[];
   compactName: string;
   baseName: string;
   inferredType: string;
   idLike: boolean;
+  keyLike: boolean;
+  generic: boolean;
 };
 
 const idTerms = new Set(["id", "code", "key", "number", "num"]);
+const genericColumnNames = new Set([
+  "createdat",
+  "date",
+  "description",
+  "email",
+  "name",
+  "note",
+  "notes",
+  "phone",
+  "status",
+  "type",
+  "updatedat",
+]);
+const usefulGenericColumnNames = new Set(["email", "phone"]);
 
 const normalizeText = (value: string) =>
   value
@@ -49,6 +66,22 @@ const formatBusinessToken = (value: string) => {
   return normalized || normalizeText(value) || "key";
 };
 
+const isGenericColumnName = (columnName: string) =>
+  genericColumnNames.has(normalizeText(columnName).replace(/\s+/g, ""));
+
+const isKeyLikeColumnName = (columnName: string) => {
+  const normalizedName = normalizeText(columnName);
+  const tokens = normalizedName.split(" ").filter(Boolean);
+  const compactName = tokens.join("");
+  const nonIdTokens = tokens.filter((token) => !idTerms.has(token));
+
+  return (
+    nonIdTokens.length > 0 &&
+    !isGenericColumnName(columnName) &&
+    (tokens.includes("id") || tokens.includes("key") || compactName.endsWith("id"))
+  );
+};
+
 const normalizeEntityTokens = (worksheet: WorksheetMetadata) =>
   [worksheet.displayName, worksheet.sheetName, worksheet.tableName]
     .flatMap((name) => normalizeText(name).split(" "))
@@ -66,14 +99,19 @@ const normalizeColumn = (column: WorksheetMetadata["schema"][number]): Normalize
     compactName.endsWith("id") ||
     compactName.endsWith("code") ||
     compactName.endsWith("key");
+  const generic = isGenericColumnName(column.name);
+  const keyLike = isKeyLikeColumnName(column.name);
 
   return {
     originalName: column.name,
     normalizedName,
+    tokens,
     compactName,
     baseName,
     inferredType: column.inferred_type,
     idLike,
+    keyLike,
+    generic,
   };
 };
 
@@ -108,7 +146,14 @@ const scoreColumnPair = (
     (left.baseName === "access" || right.baseName === "access") &&
     (left.normalizedName.includes("code") || right.normalizedName.includes("code"));
 
-  if (exactShared && compatible) return { score: left.idLike ? 100 : 88, reason: "exact_shared" };
+  if (exactShared && compatible && left.keyLike && right.keyLike) {
+    return { score: 100, reason: "exact_key_shared" };
+  }
+  if (exactShared && compatible && (left.generic || right.generic)) {
+    const useful = usefulGenericColumnNames.has(left.compactName);
+    return { score: useful ? 60 : 52, reason: "generic_shared" };
+  }
+  if (exactShared && compatible) return { score: 66, reason: "exact_shared" };
   if ((sharedBase || codeAlias) && compatible) return { score: 76, reason: "similar_key" };
   if ((leftNamesRightEntity || rightNamesLeftEntity) && compatible) {
     return { score: 64, reason: "entity_key" };
@@ -134,7 +179,11 @@ const createExplanation = (
   const businessToken = formatBusinessToken(match.sourceColumnName || match.targetColumnName);
 
   if (match.confidence === "strong_match") {
-    return `Both tables share ${match.sourceColumnName}, so these may connect by ${businessToken}.`;
+    return `Both tables share ${match.sourceColumnName}, a key-style column, so these may connect by ${businessToken}.`;
+  }
+
+  if (match.reason === "generic_shared") {
+    return `Both tables share ${match.sourceColumnName}, but this is a common field and should be reviewed before joining.`;
   }
 
   if (match.reason === "review_type") {
@@ -145,7 +194,7 @@ const createExplanation = (
     return `These tables have similar ID-style columns (${match.sourceColumnName} and ${match.targetColumnName}), so the relationship should be reviewed.`;
   }
 
-  return `${sourceName} and ${targetName} do not show a clear shared key from metadata.`;
+  return `${sourceName} and ${targetName} do not show a clear key-style relationship from metadata.`;
 };
 
 export const inferWorkbookRelationshipReadiness = (
