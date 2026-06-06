@@ -107,6 +107,35 @@ const getIssueCategory = (issue: PreparationIssue) => {
   return "Structure issues";
 };
 
+const issueCategoryCardCopy: Record<string, { title: string; description: string }> = {
+  "Side-note regions": {
+    title: "Side-note regions",
+    description: "Separated note areas may not belong in the analysis table.",
+  },
+  "Missing values": {
+    title: "Missing values",
+    description: "Blank cells may be real missing values or intentional template space.",
+  },
+  "Generated columns": {
+    title: "Generated columns",
+    description: "Some fields still need clearer business names before analysis.",
+  },
+  "Template/layout rows": {
+    title: "Template / layout rows",
+    description: "Headers, banners, or spacing rows may need to stay out of the working copy.",
+  },
+  "Structure issues": {
+    title: "Other detected issues",
+    description: "Additional structure signals are available for review.",
+  },
+};
+
+const getIssueCategoryCardCopy = (category: string) =>
+  issueCategoryCardCopy[category] || {
+    title: category,
+    description: "Detected data-shape signals are available for review.",
+  };
+
 const columnIndexToLabel = (index: number) => {
   let remaining = index + 1;
   let label = "";
@@ -860,29 +889,71 @@ export function CleanPrepareReviewPanel({
             hidden={embedded && activeStep !== "review"}
           >
             <section className="clean-prepare-issue-groups">
-              <div className="clean-prepare-compact-heading">
-                <h4>{embedded ? "Step 1: Issues detected" : "Issues found"}</h4>
-                <span>{pluralise(review.issues.length, "issue")}</span>
-              </div>
-              {review.issues.length > 0 ? (
-                issueGroups.map(([category, issues]) => (
-                  <details className="clean-prepare-disclosure" key={category} open={embedded}>
-                    <summary>
-                      <strong>{category}</strong>
-                      <span>{pluralise(issues.length, "issue")}</span>
-                    </summary>
-                    <ul>
-                      {issues.map((issue) => (
-                        <li key={issue.id}>
-                          <strong>{issue.title}</strong>
-                          <span>{issue.detail}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                ))
+              {embedded ? (
+                <>
+                  <div className="clean-prepare-review-step-heading">
+                    <p className="section-label">Step 1 · Review</p>
+                    <h4>Scan what we noticed</h4>
+                    <p>Here's what we noticed about your data. No decisions yet - just scan.</p>
+                    <small>Click any card to see the specific issues underneath.</small>
+                  </div>
+                  {review.issues.length > 0 ? (
+                    <div className="clean-prepare-issue-card-grid">
+                      {issueGroups.map(([category, issues]) => {
+                        const cardCopy = getIssueCategoryCardCopy(category);
+                        return (
+                          <details className="clean-prepare-issue-card" key={category}>
+                            <summary>
+                              <span className="clean-prepare-issue-card-status">
+                                {review.priority === "low" ? "Optional" : "Review"}
+                              </span>
+                              <strong>{cardCopy.title}</strong>
+                              <span>{cardCopy.description}</span>
+                              <small>{pluralise(issues.length, "issue")}</small>
+                            </summary>
+                            <ul>
+                              {issues.map((issue) => (
+                                <li key={issue.id}>
+                                  <strong>{issue.title}</strong>
+                                  <span>{issue.detail}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p>No urgent preparation issues were detected from the current dataset profile.</p>
+                  )}
+                </>
               ) : (
-                <p>No urgent preparation issues were detected from the current dataset profile.</p>
+                <>
+                  <div className="clean-prepare-compact-heading">
+                    <h4>Issues found</h4>
+                    <span>{pluralise(review.issues.length, "issue")}</span>
+                  </div>
+                  {review.issues.length > 0 ? (
+                    issueGroups.map(([category, issues]) => (
+                      <details className="clean-prepare-disclosure" key={category}>
+                        <summary>
+                          <strong>{category}</strong>
+                          <span>{pluralise(issues.length, "issue")}</span>
+                        </summary>
+                        <ul>
+                          {issues.map((issue) => (
+                            <li key={issue.id}>
+                              <strong>{issue.title}</strong>
+                              <span>{issue.detail}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    ))
+                  ) : (
+                    <p>No urgent preparation issues were detected from the current dataset profile.</p>
+                  )}
+                </>
               )}
             </section>
           </div>

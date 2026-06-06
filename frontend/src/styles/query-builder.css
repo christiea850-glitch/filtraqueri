@@ -390,6 +390,135 @@
   font-size: 11px;
 }
 
+.clean-prepare-review-step-heading {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.clean-prepare-review-step-heading h4 {
+  margin: 0;
+  color: #172033;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.clean-prepare-review-step-heading p,
+.clean-prepare-review-step-heading small {
+  margin: 0;
+}
+
+.clean-prepare-review-step-heading small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.clean-prepare-issue-card-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.clean-prepare-issue-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.clean-prepare-issue-card > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.clean-prepare-issue-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.clean-prepare-issue-card > summary::after {
+  content: "+";
+  justify-self: end;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.clean-prepare-issue-card[open] > summary::after {
+  content: "-";
+}
+
+.clean-prepare-issue-card > summary strong {
+  grid-column: 1;
+  color: #172033;
+  font-size: 14px;
+}
+
+.clean-prepare-issue-card > summary span:not(.clean-prepare-issue-card-status) {
+  grid-column: 1;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.clean-prepare-issue-card > summary small {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.clean-prepare-issue-card-status {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.clean-prepare-issue-card > ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0 13px 13px;
+}
+
+.clean-prepare-issue-card > ul li {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.clean-prepare-issue-card > ul li::before {
+  content: none;
+}
+
+.clean-prepare-issue-card > ul strong {
+  color: #334155;
+  font-size: 12.5px;
+}
+
+.clean-prepare-issue-card > ul span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .clean-prepare-missing-decisions {
   padding: 11px;
   border: 1px solid #cbd5e1;
