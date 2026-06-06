@@ -104,7 +104,7 @@ const productDestinations: ProductDestination[] = [
   },
   {
     id: "analyze",
-    label: "Investigate",
+    label: "Explore",
     icon: "analyze",
     defaultView: "queryBuilder",
     mode: "human",
@@ -284,9 +284,9 @@ function WorkspaceShell({
   const workflowLabel = isLoadedHome
     ? "Continue"
     : activeView === "filters"
-      ? "Choose business question"
+      ? "Explore filters"
       : activeView === "queryBuilder"
-        ? "Explore question"
+        ? "Explore"
         : activeView === "results"
           ? "Review result"
             : activeView === "sqlWorkspace"
@@ -299,13 +299,13 @@ function WorkspaceShell({
   const analystToolCount = analystViews.length;
   const workflowDescription =
     isLoadedHome
-      ? "Pick up the current investigation or open another file."
+      ? "Pick up the current exploration or open another file."
       : activeView === "filters"
-        ? "Start with a business question, then narrow the rows that matter."
+        ? "Narrow the answer before running the query."
         : activeView === "queryBuilder"
-          ? "Choose business fields and shape the result only when it helps the investigation."
-          : activeView === "results"
-            ? "Review what the result means, then choose the next investigation move."
+          ? "Ask a question, refine the setup, run the query, and review the answer in one workspace."
+        : activeView === "results"
+            ? "Review what the result means, then choose the next exploration move."
             : activeView === "sqlWorkspace"
               ? "Inspect SQL, schema, context, and warnings before running anything."
               : activeView === "sqlTemplates"
@@ -313,7 +313,7 @@ function WorkspaceShell({
                 : activeView === "sqlReports"
                   ? "Review deterministic report recipes and local metadata-only AI previews."
               : activeView === "settings"
-                ? "Manage preferences and system choices away from the investigation workspace."
+                ? "Manage preferences and system choices away from the exploration workspace."
       : workspaceMode === "analyst"
       ? `SQL and technical context stay inspectable across ${analystToolCount.toLocaleString()} tool surfaces.`
       : "Business questions, findings, and next steps stay connected.";
