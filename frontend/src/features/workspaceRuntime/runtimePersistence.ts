@@ -27,6 +27,8 @@ const activeViews: ActiveView[] = [
   "export",
   "settings",
   "sqlWorkspace",
+  "sqlTemplates",
+  "sqlReports",
   "savedQueries",
   "queryExplain",
   "dataCleaning",

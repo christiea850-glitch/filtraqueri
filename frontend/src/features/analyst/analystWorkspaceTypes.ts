@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { ActiveView, DatasetMetadata } from "../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../sqlWorkspacePersistence";
+import type { SqlAssistantMode } from "./sql/SqlAssistantPanel";
 
 export type AnalystWorkspaceRenderContext = {
   dataset: DatasetMetadata | null;
@@ -10,6 +11,9 @@ export type AnalystWorkspaceRenderContext = {
   onSqlWorkspaceMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
   onWorksheetSelect?: (worksheetId: string) => void;
   isSwitchingWorksheet?: boolean;
+  onAnalystViewChange?: (view: ActiveView) => void;
+  requestedSqlAssistantMode?: SqlAssistantMode | null;
+  onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
 };
 
 export type AnalystAiCapabilityFlags = {

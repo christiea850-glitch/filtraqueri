@@ -80,6 +80,8 @@ export type ActiveView =
   | "export"
   | "settings"
   | "sqlWorkspace"
+  | "sqlTemplates"
+  | "sqlReports"
   | "savedQueries"
   | "queryExplain"
   | "dataCleaning"

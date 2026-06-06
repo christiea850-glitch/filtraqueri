@@ -17,6 +17,7 @@ import {
   createAnalystWorkspaceRenderers,
 } from "./features/analyst/analystWorkspaceHelpers";
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
+import type { SqlAssistantMode } from "./features/analyst/sql/SqlAssistantPanel";
 import type {
   ActiveView,
 } from "./features/dataset/datasetTypes";
@@ -92,6 +93,8 @@ function App() {
   const [humanIntent, setHumanIntent] = useState<HumanIntent | null>(null);
   const [cleanPrepareRestoreContext, setCleanPrepareRestoreContext] =
     useState<CleanPrepareRestoreContext | null>(null);
+  const [requestedSqlAssistantMode, setRequestedSqlAssistantMode] =
+    useState<SqlAssistantMode | null>(null);
   const consumeCleanPrepareRestoreContext = useCallback(
     () => setCleanPrepareRestoreContext(null),
     [],
@@ -448,6 +451,7 @@ function App() {
 
   const openAnalystCommand = (target: "editor" | "result" | "drafts" = "editor") => {
     setWorkspaceMode("analyst");
+    setRequestedSqlAssistantMode(null);
     updateDatasetSessionView("sqlWorkspace");
     dispatchDeferredWorkspaceCommand("filtraqueri:sql-workspace-command", { target });
   };
@@ -985,6 +989,12 @@ function App() {
     onSqlWorkspaceMetadataChange: setSqlWorkspaceMetadata,
     onWorksheetSelect: handleWorksheetSelect,
     isSwitchingWorksheet,
+    onAnalystViewChange: (view) => {
+      setWorkspaceMode("analyst");
+      updateDatasetSessionView(view);
+    },
+    requestedSqlAssistantMode,
+    onSqlAssistantModeChange: setRequestedSqlAssistantMode,
 
     onExecutionResult: (executionResult) => {
       const coordinationResult = coordinateExecutionResult({
@@ -1118,11 +1128,35 @@ function App() {
     commands.push(
       {
         id: "analyst:sql",
-        title: "Open SQL Workspace",
+        title: "Open Inspect SQL",
         description: "Write and run SELECT-only SQL against the active dataset.",
         category: "Analyst",
         keywords: ["sql", "duckdb", "monaco"],
         onRun: () => openAnalystCommand("editor"),
+      },
+      {
+        id: "analyst:templates",
+        title: "Browse SQL Templates",
+        description: "Open deterministic SQL templates and Complex SQL Assist.",
+        category: "Analyst",
+        keywords: ["template", "pattern", "complex sql assist"],
+        onRun: () => {
+          setWorkspaceMode("analyst");
+          setRequestedSqlAssistantMode("templates");
+          updateDatasetSessionView("sqlTemplates");
+        },
+      },
+      {
+        id: "analyst:reports",
+        title: "Browse Report Recipes",
+        description: "Open deterministic report recipes and local AI preview suggestions.",
+        category: "Analyst",
+        keywords: ["reports", "recipes", "ai preview"],
+        onRun: () => {
+          setWorkspaceMode("analyst");
+          setRequestedSqlAssistantMode("recipes");
+          updateDatasetSessionView("sqlReports");
+        },
       },
       {
         id: "analyst:drafts",

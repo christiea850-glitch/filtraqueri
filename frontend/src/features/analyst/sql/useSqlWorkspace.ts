@@ -183,11 +183,19 @@ function useSqlWorkspace(
   };
 
   const insertSql = (sql: string) => {
-    setSqlDraft((currentSql) => {
-      const trimmedCurrentSql = currentSql.trimEnd();
-      const separator = trimmedCurrentSql ? "\n\n" : "";
-      return `${trimmedCurrentSql}${separator}${sql}`;
-    });
+    const trimmedCurrentSql = sqlDraft.trimEnd();
+    const separator = trimmedCurrentSql ? "\n\n" : "";
+    const nextSql = `${trimmedCurrentSql}${separator}${sql}`;
+
+    setSqlDraft(nextSql);
+    onMetadataChange?.(
+      upsertActiveSqlDraftSnapshot(normalizedMetadata, {
+        sql: nextSql,
+        selectedDialect,
+        id: normalizedMetadata.activeDraftId || restoredActiveDraft?.id || "active-draft",
+        label: restoredActiveDraft?.label || "Query draft",
+      }),
+    );
     updateStatus("idle");
   };
 

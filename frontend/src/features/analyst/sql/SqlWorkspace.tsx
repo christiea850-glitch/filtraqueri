@@ -1,9 +1,9 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
-import SqlAssistantPanel, { type SqlAssistantMode } from "./SqlAssistantPanel";
+import type { SqlAssistantMode } from "./SqlAssistantPanel";
 import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
@@ -16,6 +16,8 @@ type SqlWorkspaceProps = {
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
   onWorksheetSelect?: (worksheetId: string) => void;
   isSwitchingWorksheet?: boolean;
+  onAnalystViewChange?: (view: ActiveView) => void;
+  onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
 };
 
 type BottomTab = "guidance";
@@ -343,17 +345,15 @@ function SqlWorkspace({
   onMetadataChange,
   onWorksheetSelect,
   isSwitchingWorksheet,
+  onAnalystViewChange,
+  onSqlAssistantModeChange,
 }: SqlWorkspaceProps) {
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
-  const [requestedAssistantMode, setRequestedAssistantMode] =
-    useState<SqlAssistantMode | null>(null);
   const [focusedView, setFocusedView] = useState<FocusedSqlView>("editor");
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
-  const [assistantHeight, setAssistantHeight] = useState(320);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
   const {
@@ -379,8 +379,8 @@ function SqlWorkspace({
     setBottomTab((current) => (current === tab ? null : tab));
   };
   const openSqlAssistantMode = (mode: SqlAssistantMode) => {
-    setRequestedAssistantMode(mode);
-    setIsAssistantOpen(true);
+    onSqlAssistantModeChange?.(mode);
+    onAnalystViewChange?.(mode === "recipes" ? "sqlReports" : "sqlTemplates");
   };
   const openDraftDetail = (draft: SqlQueryDraft) => {
     setActiveDraftId(draft.id);
@@ -449,7 +449,7 @@ function SqlWorkspace({
 
   const startDockResize = (
     event: ReactPointerEvent<HTMLDivElement>,
-    dock: "assistant" | "context" | "bottom",
+    dock: "context" | "bottom",
   ) => {
     event.preventDefault();
     const handle = event.currentTarget;
@@ -457,14 +457,8 @@ function SqlWorkspace({
     handle.classList.add("is-dragging");
     const startY = event.clientY;
     const direction = dock === "bottom" ? -1 : 1;
-    const startHeight =
-      dock === "assistant" ? assistantHeight : dock === "context" ? contextHeight : bottomHeight;
-    const applyHeight =
-      dock === "assistant"
-        ? setAssistantHeight
-        : dock === "context"
-          ? setContextHeight
-          : setBottomHeight;
+    const startHeight = dock === "context" ? contextHeight : bottomHeight;
+    const applyHeight = dock === "context" ? setContextHeight : setBottomHeight;
 
     const onMove = (moveEvent: PointerEvent) => {
       const next = startHeight + (moveEvent.clientY - startY) * direction;
@@ -529,16 +523,17 @@ function SqlWorkspace({
         .join(" ")}
       aria-label="SQL workspace"
     >
+      <div className="analyst-page-banner">
+        <p className="section-label">Analyst workspace</p>
+        <h2>Inspect SQL</h2>
+        <p>
+          Write, review, and run SQL safely from one focused workspace. Use templates or reports
+          when you need a starting point - Run Query always stays manual.
+        </p>
+      </div>
+
       <div className="sqlw-main">
         <div className="sqlw-dockbar">
-          <button
-            type="button"
-            className={["sqlw-pill", isAssistantOpen ? "is-on" : ""].filter(Boolean).join(" ")}
-            aria-expanded={isAssistantOpen}
-            onClick={() => setIsAssistantOpen((current) => !current)}
-          >
-            Assistant
-          </button>
           <button
             type="button"
             className={["sqlw-pill", isContextOpen ? "is-on" : ""].filter(Boolean).join(" ")}
@@ -548,44 +543,6 @@ function SqlWorkspace({
             SQL context
           </button>
         </div>
-
-        {isAssistantOpen && (
-          <>
-            <section
-              className="sqlw-dock sqlw-dock-top"
-              aria-label="SQL Assistant"
-              style={{ height: assistantHeight }}
-            >
-              <div className="sqlw-dock-head">
-                <span>SQL Assistant</span>
-                <button
-                  type="button"
-                  className="sqlw-dock-x"
-                  onClick={() => setIsAssistantOpen(false)}
-                  aria-label="Close SQL Assistant"
-                >
-                  Close
-                </button>
-              </div>
-              <div className="sqlw-dock-body">
-                <SqlAssistantPanel
-                  dataset={dataset}
-                  selectedDialect={selectedDialect}
-                  selectedDialectProfile={selectedDialectProfile}
-                  onInsertSql={insertSql}
-                  requestedMode={requestedAssistantMode}
-                />
-              </div>
-            </section>
-            <div
-              className="sqlw-split"
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label="Resize SQL Assistant panel"
-              onPointerDown={(event) => startDockResize(event, "assistant")}
-            />
-          </>
-        )}
 
         {isContextOpen && (
           <>

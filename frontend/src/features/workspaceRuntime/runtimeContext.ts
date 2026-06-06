@@ -54,7 +54,9 @@ export const getStableTrailItemId = ({
 export const getContextualObjectIdForView = (view: RuntimeContextReference["view"]) => {
   if (view === "results" || view === "history" || view === "export") return "context:result";
   if (view === "queryBuilder" || view === "filters") return "context:query-builder";
-  if (view === "sqlWorkspace") return "context:sql-workspace";
+  if (view === "sqlWorkspace" || view === "sqlTemplates" || view === "sqlReports") {
+    return "context:sql-workspace";
+  }
   return "context:dataset";
 };
 

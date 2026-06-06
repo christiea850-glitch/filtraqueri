@@ -690,6 +690,46 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.analyst-page-banner {
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  padding: clamp(24px, 3.5vw, 38px);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.22), transparent 30%),
+    linear-gradient(135deg, #4f46e5 0%, #7c3aed 42%, #db2777 100%);
+  box-shadow: 0 24px 50px rgba(79, 70, 229, 0.2);
+  color: #ffffff;
+}
+
+.analyst-page-banner h2,
+.analyst-page-banner p {
+  margin: 0;
+}
+
+.analyst-page-banner .section-label {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+.analyst-page-banner h2 {
+  max-width: 760px;
+  color: #ffffff;
+  font-size: clamp(29px, 3.8vw, 42px);
+  font-weight: 760;
+  line-height: 1.08;
+}
+
+.analyst-page-banner p:not(.section-label) {
+  max-width: 820px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  line-height: 1.58;
+}
+
 .sqlw-main {
   display: flex;
   flex-direction: column;
@@ -709,6 +749,10 @@
   align-items: center;
   gap: 7px;
   min-width: 0;
+}
+
+.sqlw-main > .sqlw-dockbar:first-child {
+  justify-content: flex-end;
 }
 
 .sqlw-dockbar-bottom {
@@ -852,6 +896,79 @@
   min-width: 0;
 }
 
+.sql-assistant-route-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sql-assistant-route-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+  color: #64748b;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.sql-route-source-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sql-route-source-pill.is-active {
+  background: var(--fq-accent-soft, #ebeafb);
+  color: var(--fq-accent-ink, #312a8f);
+}
+
+.sql-assistant-route-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sql-assistant-route-header h2,
+.sql-assistant-route-header p {
+  margin: 0;
+}
+
+.sql-assistant-route-header h2 {
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 760;
+  line-height: 1.18;
+}
+
+.sql-assistant-route-header p:not(.section-label) {
+  max-width: 760px;
+  color: #64748b;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.sql-assistant-route-page .sql-assistant-panel {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.06);
+}
+
 .sql-assistant-intro {
   display: flex;
   align-items: start;
@@ -867,25 +984,26 @@
 
 .sql-assistant-intro h3 {
   color: #111827;
-  font-size: 18px;
-  font-weight: 750;
+  font-size: 17px;
+  font-weight: 720;
+  line-height: 1.22;
 }
 
 .sql-assistant-intro p {
   color: #64748b;
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
 .sql-assistant-intro > span {
   flex: none;
-  padding: 5px 9px;
+  padding: 4px 8px;
   border: 1px solid #dbe4ef;
   border-radius: 999px;
   background: #f8fafc;
   color: #475569;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11.5px;
+  font-weight: 650;
 }
 
 .sql-assistant-controls {
@@ -899,19 +1017,19 @@
 .sql-assistant-mode-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
 }
 
 .sql-assistant-mode-tabs button {
-  padding: 7px 12px;
+  padding: 6px 11px;
   border: 1px solid #dbe4ef;
   border-radius: 999px;
   background: #ffffff;
   color: #475569;
   font: inherit;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 680;
   cursor: pointer;
 }
 

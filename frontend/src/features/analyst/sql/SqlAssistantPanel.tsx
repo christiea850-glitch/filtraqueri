@@ -39,6 +39,7 @@ type SqlAssistantPanelProps = {
   selectedDialectProfile: SqlDialectProfile;
   onInsertSql: (sql: string) => void;
   requestedMode?: SqlAssistantMode | null;
+  allowedModes?: SqlAssistantMode[];
 };
 
 const categoryOrder: SqlTemplateCategory[] = [
@@ -54,6 +55,13 @@ const categoryOrder: SqlTemplateCategory[] = [
 ];
 
 export type SqlAssistantMode = "templates" | "assist" | "recipes";
+const sqlAssistantModes: SqlAssistantMode[] = ["templates", "assist", "recipes"];
+const sqlAssistantModeLabels: Record<SqlAssistantMode, string> = {
+  templates: "Template Library",
+  assist: "Complex SQL Assist",
+  recipes: "Report Recipes",
+};
+
 type SqlReportRecipeFilter =
   | "All"
   | "Supported"
@@ -382,7 +390,7 @@ function SqlTemplateCard({
           className="secondary-button"
           onClick={() => onInsertSql(template.sql)}
         >
-          Insert into editor
+          Use template
         </button>
       </div>
     </article>
@@ -520,7 +528,7 @@ function ReportOpportunityCard({
         onClick={() => opportunity.sql && onInsertSql(opportunity.sql)}
         disabled={!ready}
       >
-        {ready ? "Insert SQL into Monaco" : "Needs missing fields"}
+        {ready ? "Use report" : "Needs missing fields"}
       </button>
     </article>
   );
@@ -697,14 +705,14 @@ function SqlReportRecipeCard({
           </div>
         </dl>
       </details>
-      <button
-        type="button"
-        className="secondary-button"
-        onClick={() => recipe.sql && onInsertSql(recipe.sql)}
-        disabled={!recipe.sql}
-      >
-        {recipe.sql ? "Insert into Monaco" : "Needs more structure"}
-      </button>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => recipe.sql && onInsertSql(recipe.sql)}
+          disabled={!recipe.sql}
+        >
+          {recipe.sql ? "Use report" : "Needs more structure"}
+        </button>
     </article>
   );
 }
@@ -770,6 +778,7 @@ function SqlAssistantPanel({
   selectedDialectProfile,
   onInsertSql,
   requestedMode,
+  allowedModes,
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -786,10 +795,21 @@ function SqlAssistantPanel({
     () => createSqlReportRecipes(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
+  const availableModes = allowedModes?.length ? allowedModes : sqlAssistantModes;
+  const activeAssistantMode = availableModes.includes(assistantMode)
+    ? assistantMode
+    : availableModes[0] || "templates";
 
   useEffect(() => {
-    if (requestedMode) setAssistantMode(requestedMode);
-  }, [requestedMode]);
+    if (requestedMode && availableModes.includes(requestedMode)) {
+      setAssistantMode(requestedMode);
+      return;
+    }
+
+    if (!availableModes.includes(assistantMode)) {
+      setAssistantMode(availableModes[0] || "templates");
+    }
+  }, [assistantMode, availableModes, requestedMode]);
   // K10: dataset-adaptive report opportunities. The planner re-runs whenever
   // the active dataset changes — so when the user switches the active
   // worksheet in SQL Context, the opportunity list regenerates against the
@@ -965,40 +985,29 @@ function SqlAssistantPanel({
       <div className="sql-assistant-intro">
         <div>
           <p className="section-label">SQL Assistant</p>
-          <h3>{modeCopy[assistantMode].title}</h3>
-          <p>{modeCopy[assistantMode].description}</p>
+          <h3>{modeCopy[activeAssistantMode].title}</h3>
+          <p>{modeCopy[activeAssistantMode].description}</p>
         </div>
         <span>{selectedDialectProfile.displayName}</span>
       </div>
 
-      <div className="sql-assistant-mode-tabs" aria-label="SQL Assistant options">
-        <button
-          type="button"
-          className={assistantMode === "templates" ? "is-active" : ""}
-          aria-pressed={assistantMode === "templates"}
-          onClick={() => setAssistantMode("templates")}
-        >
-          Template Library
-        </button>
-        <button
-          type="button"
-          className={assistantMode === "assist" ? "is-active" : ""}
-          aria-pressed={assistantMode === "assist"}
-          onClick={() => setAssistantMode("assist")}
-        >
-          Complex SQL Assist
-        </button>
-        <button
-          type="button"
-          className={assistantMode === "recipes" ? "is-active" : ""}
-          aria-pressed={assistantMode === "recipes"}
-          onClick={() => setAssistantMode("recipes")}
-        >
-          Report Recipes
-        </button>
-      </div>
+      {availableModes.length > 1 && (
+        <div className="sql-assistant-mode-tabs" aria-label="SQL Assistant options">
+          {availableModes.map((mode) => (
+            <button
+              type="button"
+              key={mode}
+              className={activeAssistantMode === mode ? "is-active" : ""}
+              aria-pressed={activeAssistantMode === mode}
+              onClick={() => setAssistantMode(mode)}
+            >
+              {sqlAssistantModeLabels[mode]}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {assistantMode === "templates" ? (
+      {activeAssistantMode === "templates" ? (
         <section className="sql-assistant-mode-panel" aria-label="Template Library">
           <div className="sql-assistant-controls">
             <label className="sql-assistant-search">
@@ -1051,7 +1060,7 @@ function SqlAssistantPanel({
             )}
           </div>
         </section>
-      ) : assistantMode === "assist" ? (
+      ) : activeAssistantMode === "assist" ? (
         <section className="sql-assistant-mode-panel sql-assistant-complex" aria-label="Complex SQL Assist">
           <label className="sql-assistant-task-input">
             <span>Describe the task you want SQL to perform</span>

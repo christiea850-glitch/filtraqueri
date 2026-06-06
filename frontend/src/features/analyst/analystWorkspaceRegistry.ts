@@ -1,4 +1,5 @@
 import { createElement } from "react";
+import SqlAssistantRoutePage from "./sql/SqlAssistantRoutePage";
 import SqlWorkspace from "./sql/SqlWorkspace";
 import { createAnalystPlaceholderRenderer } from "./analystWorkspaceHelpers";
 import type { AnalystWorkspaceDefinition } from "./analystWorkspaceTypes";
@@ -64,8 +65,8 @@ const placeholderWorkspaces = [
 export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
   {
     id: "sqlWorkspace",
-    title: "SQL Workspace",
-    description: "Write, generate, organize, and review analyst-level SQL before running it manually.",
+    title: "Inspect SQL",
+    description: "Write, inspect, save, and manually run analyst-level SQL against the active source.",
     capabilities: ["SELECT workflows", "CTEs and subqueries", "Window functions"],
     modeRequirement: "analyst",
     requiresDataset: false,
@@ -81,6 +82,8 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
       onSqlWorkspaceMetadataChange,
       onWorksheetSelect,
       isSwitchingWorksheet,
+      onAnalystViewChange,
+      onSqlAssistantModeChange,
     }) =>
       createElement(SqlWorkspace, {
         dataset,
@@ -89,6 +92,63 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
         onMetadataChange: onSqlWorkspaceMetadataChange,
         onWorksheetSelect,
         isSwitchingWorksheet,
+        onAnalystViewChange,
+        onSqlAssistantModeChange,
+      }),
+  },
+  {
+    id: "sqlTemplates",
+    title: "Browse Templates",
+    description: "Find deterministic SQL patterns and Complex SQL Assist before returning to Inspect SQL.",
+    capabilities: ["Template Library", "Complex SQL Assist", "Manual review"],
+    modeRequirement: "analyst",
+    requiresDataset: false,
+    previewBadge: "Preview",
+    aiCapabilities: {
+      plainEnglish: true,
+      validation: true,
+    },
+    renderer: ({
+      dataset,
+      sqlWorkspaceMetadata,
+      onSqlWorkspaceMetadataChange,
+      onAnalystViewChange,
+      requestedSqlAssistantMode,
+    }) =>
+      createElement(SqlAssistantRoutePage, {
+        dataset,
+        metadata: sqlWorkspaceMetadata,
+        onMetadataChange: onSqlWorkspaceMetadataChange,
+        kind: "templates",
+        requestedMode: requestedSqlAssistantMode,
+        onAnalystViewChange,
+      }),
+  },
+  {
+    id: "sqlReports",
+    title: "Browse Reports",
+    description: "Review deterministic report recipes and governed local metadata-only AI previews.",
+    capabilities: ["Report Recipes", "AI local preview", "Manual review"],
+    modeRequirement: "analyst",
+    requiresDataset: false,
+    previewBadge: "Preview",
+    aiCapabilities: {
+      plainEnglish: true,
+      validation: true,
+    },
+    renderer: ({
+      dataset,
+      sqlWorkspaceMetadata,
+      onSqlWorkspaceMetadataChange,
+      onAnalystViewChange,
+    }) =>
+      createElement(SqlAssistantRoutePage, {
+        dataset,
+        metadata: sqlWorkspaceMetadata,
+        onMetadataChange: onSqlWorkspaceMetadataChange,
+        kind: "reports",
+        requestedMode: "recipes",
+        onAnalystViewChange,
       }),
   },
   ...placeholderWorkspaces.map((workspace) => ({

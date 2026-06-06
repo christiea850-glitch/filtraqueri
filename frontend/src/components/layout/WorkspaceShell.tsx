@@ -142,6 +142,8 @@ const destinationByActiveView: Record<ActiveView, ProductDestinationId> = {
   export: "insights",
   settings: "settings",
   sqlWorkspace: "analyst",
+  sqlTemplates: "analyst",
+  sqlReports: "analyst",
   savedQueries: "analyst",
   queryExplain: "analyst",
   dataCleaning: "analyst",
@@ -255,6 +257,9 @@ function WorkspaceShell({
   const activeDestination =
     productDestinations.find((destination) => destination.id === activeDestinationId) ||
     productDestinations[0];
+  const primaryAnalystViews = analystViews.filter((item) =>
+    item.view === "sqlWorkspace" || item.view === "sqlTemplates" || item.view === "sqlReports",
+  );
   const investigationFocusLabel =
     runtimeContext.selectedContextualObject?.label || activeDestination.label;
   const isSettingsView = activeDestination.id === "settings";
@@ -280,8 +285,12 @@ function WorkspaceShell({
         ? "Explore question"
         : activeView === "results"
           ? "Review result"
-          : activeView === "sqlWorkspace"
-            ? "Inspect SQL"
+            : activeView === "sqlWorkspace"
+              ? "Inspect SQL"
+              : activeView === "sqlTemplates"
+                ? "Browse Templates"
+                : activeView === "sqlReports"
+                  ? "Browse Reports"
         : activeDestination.label;
   const analystToolCount = analystViews.length;
   const workflowDescription =
@@ -295,6 +304,10 @@ function WorkspaceShell({
             ? "Review what the result means, then choose the next investigation move."
             : activeView === "sqlWorkspace"
               ? "Inspect SQL, schema, context, and warnings before running anything."
+              : activeView === "sqlTemplates"
+                ? "Browse deterministic SQL patterns and Complex SQL Assist before returning to Inspect SQL."
+                : activeView === "sqlReports"
+                  ? "Review deterministic report recipes and local metadata-only AI previews."
               : activeView === "settings"
                 ? "Manage preferences and system choices away from the investigation workspace."
       : workspaceMode === "analyst"
@@ -551,18 +564,39 @@ function WorkspaceShell({
               {!isSidebarCollapsed && <p>Destinations</p>}
               <div>
                 {productDestinations.map((destination) => (
-                  <button
-                    type="button"
-                    key={destination.id}
-                    className={activeDestination.id === destination.id ? "is-active" : ""}
-                    onClick={() => changeDestination(destination)}
-                    title={destination.label}
-                  >
-                    <span className="nav-icon" aria-hidden="true">
-                      <WorkspaceIcon name={destination.icon} />
-                    </span>
-                    <span className="nav-label">{destination.label}</span>
-                  </button>
+                  <div className="hub-nav-item-group" key={destination.id}>
+                    <button
+                      type="button"
+                      className={activeDestination.id === destination.id ? "is-active" : ""}
+                      onClick={() => changeDestination(destination)}
+                      title={destination.label}
+                    >
+                      <span className="nav-icon" aria-hidden="true">
+                        <WorkspaceIcon name={destination.icon} />
+                      </span>
+                      <span className="nav-label">{destination.label}</span>
+                    </button>
+                    {destination.id === "analyst" &&
+                      activeDestination.id === "analyst" &&
+                      !isSidebarCollapsed &&
+                      primaryAnalystViews.length > 0 && (
+                        <div className="analyst-subnav" aria-label="Analyst pages">
+                          {primaryAnalystViews.map((analystView) => (
+                            <button
+                              type="button"
+                              key={analystView.view}
+                              className={activeView === analystView.view ? "is-active" : ""}
+                              onClick={() => {
+                                if (workspaceMode !== "analyst") onModeChange("analyst");
+                                onViewChange(analystView.view);
+                              }}
+                            >
+                              {analystView.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                 ))}
                 {activeDestination.id === "data" && (
                   <button
