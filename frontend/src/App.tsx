@@ -29,6 +29,9 @@ import useExploreRoom from "./features/explore/useExploreRoom";
 import ExploreComposeRoom, {
   type ExploreComposeStarterPrompt,
 } from "./features/explore/ExploreComposeRoom";
+import ExploreRefineRoom, {
+  type ExploreRefineSetupRow,
+} from "./features/explore/ExploreRefineRoom";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
 import type { GovernedQueryBuilderRequestDraft } from "./features/questionWorkspace/questionQueryBuilderRequestTypes";
@@ -292,6 +295,7 @@ function App() {
     isComposeRoom: isExploreComposeRoom,
     isRefineRoom: isExploreRefineRoom,
     isAnswerRoom: isExploreAnswerRoom,
+    goToCompose: goToExploreComposeRoom,
     goToRefine: goToExploreRefineRoom,
     goToAnswer: goToExploreAnswerRoom,
     resetExploreRoom,
@@ -405,6 +409,19 @@ function App() {
     if (!dataset) return;
     setHumanAnalyzeStage("review");
   }, [dataset]);
+
+  // E-3: Refine room — advanced-builder disclosure state. When true, the
+  // Refine card is hidden and the legacy review stack (which contains the
+  // existing VisualQueryBuilderPanel) becomes visible — same Run Query path.
+  const [isExploreRefineAdvancedOpen, setIsExploreRefineAdvancedOpen] = useState(false);
+
+  // Reset the disclosure whenever the user returns to Compose so the next
+  // Compose → Ask cycle lands on the calm Suggested setup card by default.
+  useEffect(() => {
+    if (isExploreComposeRoom) {
+      setIsExploreRefineAdvancedOpen(false);
+    }
+  }, [isExploreComposeRoom]);
 
   const {
     isFiltering,
@@ -523,6 +540,109 @@ function App() {
 
     setExecutedPreparedQuestionContext(null);
   };
+
+  // E-3: Refine room — deterministic, frontend-only summaries of state that
+  // already lives in App.tsx. No analysis runs here; we read the same query
+  // builder state the legacy VisualQueryBuilderPanel reads from. Row edit
+  // icons route to the advanced builder rather than inline-editing in E-3.
+  const refineFieldChoicesSummary = useMemo<string>(() => {
+    const parts: string[] = [];
+    if (querySelectedColumns.length > 0) {
+      parts.push(
+        `${querySelectedColumns.length} field${querySelectedColumns.length === 1 ? "" : "s"} selected`,
+      );
+    }
+    if (queryGroupBy.length > 0) {
+      const groupNames = queryGroupBy.slice(0, 2).join(", ");
+      const remainder = queryGroupBy.length > 2 ? ` + ${queryGroupBy.length - 2}` : "";
+      parts.push(`grouped by ${groupNames}${remainder}`);
+    }
+    if (queryAggregations.length > 0) {
+      parts.push(
+        `${queryAggregations.length} aggregation${queryAggregations.length === 1 ? "" : "s"}`,
+      );
+    }
+    if (parts.length === 0) {
+      return "Choose fields in the advanced builder.";
+    }
+    return parts.join(" · ");
+  }, [querySelectedColumns, queryGroupBy, queryAggregations]);
+
+  const refineFiltersSummary = useMemo<string>(() => {
+    if (activeFilterLabels.length === 0) {
+      return "No filters yet — covers the whole scope.";
+    }
+    const head = activeFilterLabels.slice(0, 2).join(" · ");
+    const remainder =
+      activeFilterLabels.length > 2 ? ` + ${activeFilterLabels.length - 2} more` : "";
+    return `${head}${remainder}`;
+  }, [activeFilterLabels]);
+
+  const refineSortLimitSummary = useMemo<string>(() => {
+    const parts: string[] = [];
+    if (querySortColumn) {
+      parts.push(`Sorted by ${querySortColumn} (${querySortDirection})`);
+    } else {
+      parts.push("Default order");
+    }
+    if (queryLimit) {
+      parts.push(`Limit ${queryLimit}`);
+    }
+    return parts.join(" · ");
+  }, [querySortColumn, querySortDirection, queryLimit]);
+
+  const exploreRefineSetupRows = useMemo<ExploreRefineSetupRow[]>(
+    () => [
+      {
+        id: "interpretation",
+        label: "Interpretation",
+        summary: "A focused answer based on your question and active scope.",
+        detail:
+          "FiltraQueri prepares a preview from the existing builder. Nothing runs until you click Run query.",
+      },
+      {
+        id: "fields",
+        label: "Field choices",
+        summary: refineFieldChoicesSummary,
+        detail: "Edit in the advanced builder if you want to change them.",
+      },
+      {
+        id: "filters",
+        label: "Filters",
+        summary: refineFiltersSummary,
+      },
+      {
+        id: "sort-limit",
+        label: "Sort / limit",
+        summary: refineSortLimitSummary,
+      },
+    ],
+    [refineFieldChoicesSummary, refineFiltersSummary, refineSortLimitSummary],
+  );
+
+  const exploreRefineCanRun = Boolean(dataset && !isRunningQuery);
+  const exploreRefineRunDisabledReason = !dataset
+    ? "Open a dataset first"
+    : isRunningQuery
+      ? "Query is running…"
+      : undefined;
+
+  // E-3 Edit question handler: reverse the legacy stage flip and route the
+  // room back to Compose. The Compose question text is preserved at the App
+  // level so the user lands on their prior wording.
+  const handleExploreRefineEditQuestion = useCallback(() => {
+    setHumanAnalyzeStage("investigate");
+    setIsExploreRefineAdvancedOpen(false);
+    goToExploreComposeRoom();
+  }, [goToExploreComposeRoom]);
+
+  // E-3 Open advanced builder: route the user to the existing legacy review
+  // stack (which already contains VisualQueryBuilderPanel and the existing
+  // Run Query wiring). No new builder is created; same execution path.
+  const handleExploreRefineOpenAdvanced = useCallback(() => {
+    setHumanAnalyzeStage("review");
+    setIsExploreRefineAdvancedOpen(true);
+  }, []);
 
   const openDataCommand = (target?: string) => {
     openHumanView("dataset");
@@ -1094,7 +1214,44 @@ function App() {
             />
           </div>
 
-          <div hidden={isExploreComposeRoom}>
+          {/*
+            E-3: Refine room. Visible only when the room is "refine" AND the
+            user has not opened the advanced builder. When advanced is open,
+            the legacy review stack below becomes visible instead (same
+            VisualQueryBuilderPanel + same Run Query path).
+          */}
+          <div hidden={!isExploreRefineRoom || isExploreRefineAdvancedOpen}>
+            <ExploreRefineRoom
+              question={exploreComposeQuestion}
+              activeScopeLabel={exploreComposeActiveScopeLabel}
+              setupRows={exploreRefineSetupRows}
+              readinessLabel="Ready · review and run"
+              canRun={exploreRefineCanRun}
+              isRunning={isRunningQuery}
+              runDisabledReason={exploreRefineRunDisabledReason}
+              onEditQuestion={handleExploreRefineEditQuestion}
+              onRunQuery={runReviewedQueryBuilder}
+              onOpenAdvancedBuilder={handleExploreRefineOpenAdvanced}
+            />
+          </div>
+
+          {/*
+            E-3: Legacy review stack. Hidden when in compose, and also hidden
+            when in refine without the advanced disclosure open. Visible for
+            answer-room state and for the refine-advanced state — the latter
+            gets a small "Back to Suggested setup" pill so the user can
+            collapse back to the calm Refine card.
+          */}
+          <div hidden={isExploreComposeRoom || (isExploreRefineRoom && !isExploreRefineAdvancedOpen)}>
+          {isExploreRefineRoom && isExploreRefineAdvancedOpen && (
+            <button
+              type="button"
+              className="explore-refine-back-to-card"
+              onClick={() => setIsExploreRefineAdvancedOpen(false)}
+            >
+              &larr; Back to Suggested setup
+            </button>
+          )}
           <div hidden={humanAnalyzeStage !== "investigate"}>
             <QuestionWorkspacePanel
               dataset={dataset}
