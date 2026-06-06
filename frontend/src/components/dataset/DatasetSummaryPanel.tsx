@@ -8,6 +8,11 @@ import {
 } from "react";
 import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
 import {
+  cleanPrepareSteps,
+  type CleanPrepareStep,
+  useCleanPrepareStep,
+} from "../../features/cleanPrepare/useCleanPrepareStep";
+import {
   getOriginalWorkbookLayout,
   getPreview,
   type OriginalWorkbookCellStyle,
@@ -1182,6 +1187,7 @@ function DataCleanPreparePage({
   onContinueInAnalyst?: () => void;
   onBack: () => void;
 }) {
+  const { step, goToReview, goToDecide, goToApply } = useCleanPrepareStep();
   // Deterministic page-header summary. The detailed signal counts and per-
   // worksheet issue breakdown surface inside the embedded
   // CleanPrepareReviewPanel below — the page chrome stays compact with just
@@ -1199,6 +1205,12 @@ function DataCleanPreparePage({
       : `${totalNullCount.toLocaleString()} missing cell${totalNullCount === 1 ? "" : "s"} across ${
           worksheetCount.toLocaleString()
         } worksheet${worksheetCount === 1 ? "" : "s"}.`;
+  const stepLabels: Record<CleanPrepareStep, string> = {
+    review: "Review",
+    decide: "Decide",
+    apply: "Apply",
+  };
+  const activeStepIndex = cleanPrepareSteps.indexOf(step);
 
   return (
     <FocusedWorkspaceShell
@@ -1246,6 +1258,38 @@ function DataCleanPreparePage({
         </p>
       </section>
 
+      <nav className="data-clean-prepare-step-bar" aria-label="Clean and prepare steps">
+        {cleanPrepareSteps.map((stepItem, index) => {
+          const stateClass =
+            index < activeStepIndex
+              ? "is-complete"
+              : stepItem === step
+                ? "is-current"
+                : "is-future";
+          const goToStep =
+            stepItem === "review"
+              ? goToReview
+              : stepItem === "decide"
+                ? goToDecide
+                : goToApply;
+
+          return (
+            <button
+              type="button"
+              key={stepItem}
+              className={stateClass}
+              onClick={goToStep}
+              aria-current={stepItem === step ? "step" : undefined}
+            >
+              <span className="data-clean-prepare-step-marker" aria-hidden="true">
+                {index < activeStepIndex ? "✓" : index + 1}
+              </span>
+              <span>{stepLabels[stepItem]}</span>
+            </button>
+          );
+        })}
+      </nav>
+
       <CleanPrepareReviewPanel
         dataset={dataset}
         sourceName={sourceName}
@@ -1253,8 +1297,32 @@ function DataCleanPreparePage({
         onPreviewDataset={onPreviewWorksheet}
         restoreContext={cleanPrepareRestoreContext}
         onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
+        activeStep={step}
         embedded
       />
+
+      <div className="data-clean-prepare-step-actions" aria-label="Clean and prepare step navigation">
+        {step === "review" && (
+          <button type="button" className="primary-button" onClick={goToDecide}>
+            Next: Decide
+          </button>
+        )}
+        {step === "decide" && (
+          <>
+            <button type="button" className="secondary-button" onClick={goToReview}>
+              Back: Review
+            </button>
+            <button type="button" className="primary-button" onClick={goToApply}>
+              Next: Apply
+            </button>
+          </>
+        )}
+        {step === "apply" && (
+          <button type="button" className="secondary-button" onClick={goToDecide}>
+            Back: Decide
+          </button>
+        )}
+      </div>
     </FocusedWorkspaceShell>
   );
 }

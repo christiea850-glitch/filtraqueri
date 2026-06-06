@@ -3631,6 +3631,70 @@
   font-weight: 600;
 }
 
+.data-clean-prepare-step-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 8px;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  background: #FFFFFF;
+}
+
+.data-clean-prepare-step-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.data-clean-prepare-step-bar button.is-current {
+  border-color: #DDD6FE;
+  background: #F5F3FF;
+  color: #5B21B6;
+}
+
+.data-clean-prepare-step-bar button.is-complete {
+  color: #047857;
+}
+
+.data-clean-prepare-step-marker {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #F1F5F9;
+  color: #64748B;
+  font-size: 12px;
+}
+
+.data-clean-prepare-step-bar button.is-current .data-clean-prepare-step-marker {
+  background: #7C3AED;
+  color: #FFFFFF;
+}
+
+.data-clean-prepare-step-bar button.is-complete .data-clean-prepare-step-marker {
+  background: #D1FAE5;
+  color: #047857;
+}
+
+.data-clean-prepare-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 /* Embedded variant of CleanPrepareReviewPanel — when mounted inside the
  * dedicated page, drop the top assistant header and any redundant card
  * chrome since the page already provides the framing. */

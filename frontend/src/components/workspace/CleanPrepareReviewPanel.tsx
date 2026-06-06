@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
+import type { CleanPrepareStep } from "../../features/cleanPrepare/useCleanPrepareStep";
 import { buildPreparationSignalReport } from "../../features/dataPreparation/preparationSignals";
 import {
   createMissingValueDecision,
@@ -62,6 +63,7 @@ type CleanPrepareReviewPanelProps = {
   // internal "Intelligence Assistant" intro header and the toggle pill, and
   // render the review section directly. No execution change.
   embedded?: boolean;
+  activeStep?: CleanPrepareStep;
 };
 
 type PreparationPriority = "low" | "medium" | "high";
@@ -359,6 +361,7 @@ export function CleanPrepareReviewPanel({
   restoreContext,
   onRestoreContextConsumed,
   embedded = false,
+  activeStep = "review",
 }: CleanPrepareReviewPanelProps) {
   const reviewRef = useRef<HTMLDivElement | null>(null);
   // When embedded, the review is the whole reason the dedicated page exists,
@@ -805,34 +808,43 @@ export function CleanPrepareReviewPanel({
             </div>
           )}
 
-          <section className="clean-prepare-issue-groups">
-            <div className="clean-prepare-compact-heading">
-              <h4>{embedded ? "Step 1: Issues detected" : "Issues found"}</h4>
-              <span>{pluralise(review.issues.length, "issue")}</span>
-            </div>
-            {review.issues.length > 0 ? (
-              issueGroups.map(([category, issues]) => (
-                <details className="clean-prepare-disclosure" key={category} open={embedded}>
-                  <summary>
-                    <strong>{category}</strong>
-                    <span>{pluralise(issues.length, "issue")}</span>
-                  </summary>
-                  <ul>
-                    {issues.map((issue) => (
-                      <li key={issue.id}>
-                        <strong>{issue.title}</strong>
-                        <span>{issue.detail}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              ))
-            ) : (
-              <p>No urgent preparation issues were detected from the current dataset profile.</p>
-            )}
-          </section>
+          <div
+            className="clean-prepare-step-pane"
+            hidden={embedded && activeStep !== "review"}
+          >
+            <section className="clean-prepare-issue-groups">
+              <div className="clean-prepare-compact-heading">
+                <h4>{embedded ? "Step 1: Issues detected" : "Issues found"}</h4>
+                <span>{pluralise(review.issues.length, "issue")}</span>
+              </div>
+              {review.issues.length > 0 ? (
+                issueGroups.map(([category, issues]) => (
+                  <details className="clean-prepare-disclosure" key={category} open={embedded}>
+                    <summary>
+                      <strong>{category}</strong>
+                      <span>{pluralise(issues.length, "issue")}</span>
+                    </summary>
+                    <ul>
+                      {issues.map((issue) => (
+                        <li key={issue.id}>
+                          <strong>{issue.title}</strong>
+                          <span>{issue.detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ))
+              ) : (
+                <p>No urgent preparation issues were detected from the current dataset profile.</p>
+              )}
+            </section>
+          </div>
 
-          <details className="clean-prepare-disclosure" open={embedded}>
+          <div
+            className="clean-prepare-step-pane"
+            hidden={embedded && activeStep !== "decide"}
+          >
+            <details className="clean-prepare-disclosure" open={embedded}>
             <summary>
               <strong>{embedded ? "Step 2: Choose cleaning fixes" : "Choose cleaning fixes"}</strong>
               <span>{pluralise(review.suggestedFixes.length, "draft recommendation")}</span>
@@ -854,9 +866,9 @@ export function CleanPrepareReviewPanel({
             ) : (
               <p>No draft fixes are suggested yet.</p>
             )}
-          </details>
+            </details>
 
-          {missingValueColumns.length > 0 && (
+            {missingValueColumns.length > 0 && (
             <section className="clean-prepare-missing-decisions">
               <div className="clean-prepare-section-heading">
                 <div>
@@ -1087,10 +1099,15 @@ export function CleanPrepareReviewPanel({
                   )}
                 </div>
               )}
-            </section>
-          )}
+              </section>
+            )}
+          </div>
 
-          {supportsRecipePreview && worksheets.length > 0 && (
+          <div
+            className="clean-prepare-step-pane"
+            hidden={embedded && activeStep !== "apply"}
+          >
+            {supportsRecipePreview && worksheets.length > 0 && (
             <section className="clean-prepare-recipe-preview">
               <div className="clean-prepare-section-heading">
                 <div>
@@ -1458,10 +1475,10 @@ export function CleanPrepareReviewPanel({
                   Choose a ready worksheet to preview its draft cleaning recipe.
                 </p>
               )}
-            </section>
-          )}
+              </section>
+            )}
 
-          <section className="clean-prepare-draft-status">
+            <section className="clean-prepare-draft-status">
             <h4>Draft recipe status</h4>
             {selectedWorksheetApplyState.status === "success" &&
             selectedWorksheetApplyState.result.status === "applied_to_working_copy" ? (
@@ -1483,7 +1500,8 @@ export function CleanPrepareReviewPanel({
                 <p>Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original.</p>
               </>
             )}
-          </section>
+            </section>
+          </div>
         </div>
       )}
     </section>
