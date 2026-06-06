@@ -1,18 +1,16 @@
 /**
- * E-2 — Explore Compose room.
+ * E-2 — Explore Compose room (E-3-corrected).
  *
- * The calm entry state for the Three Rooms Explore redesign. This component is
- * purely presentational; it does not fetch, does not call any backend, does
- * not generate SQL, does not auto-run anything, and does not call any LLM /
- * provider. All inputs and event handlers come from props — the App-level
- * caller owns the question text and the transition into the legacy review
- * stage when the user clicks Ask. Starter prompts only populate the input.
+ * The calm entry state for the Explore understanding workspace. This
+ * component is purely presentational; it does not fetch, does not call any
+ * backend, does not generate SQL, does not auto-run anything, and does not
+ * call any LLM / provider. Starter prompts only populate the input.
  *
- * The Compose room is rendered when the E-1 state machine reports
- * `isComposeRoom === true`. The legacy QuestionWorkspacePanel +
- * VisualQueryBuilderPanel + answer panel stacks continue to live in App.tsx
- * and are gated with the `hidden` attribute so their mount state survives the
- * room flip. E-3 will redesign the Refine room and condense those stacks.
+ * After the post-E-3 product-direction correction, Explore is dataset
+ * understanding, not query execution. Ask routes the user to the calm
+ * Refine room which previews the recommended Analyst path and hands them
+ * off. The advanced escape hatch routes directly to Analyst — there is no
+ * "Open Query Builder" surface inside Explore anymore.
  */
 
 import { type ChangeEvent, type FormEvent } from "react";
@@ -32,7 +30,7 @@ type ExploreComposeRoomProps = {
   isAskDisabledReason?: string;
   onQuestionChange: (value: string) => void;
   onAsk: () => void;
-  onOpenAdvancedBuilder: () => void;
+  onContinueInAnalyst: () => void;
 };
 
 function ExploreComposeRoom({
@@ -43,7 +41,7 @@ function ExploreComposeRoom({
   isAskDisabledReason,
   onQuestionChange,
   onAsk,
-  onOpenAdvancedBuilder,
+  onContinueInAnalyst,
 }: ExploreComposeRoomProps) {
   const handleQuestionInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
     onQuestionChange(event.target.value);
@@ -147,11 +145,11 @@ function ExploreComposeRoom({
         <button
           type="button"
           className="text-button explore-compose-room-advanced"
-          onClick={onOpenAdvancedBuilder}
+          onClick={onContinueInAnalyst}
         >
-          Open Query Builder &rarr;
+          Continue in Analyst &rarr;
         </button>
-        <small>For when you want manual control without natural-language prep.</small>
+        <small>Skip the recommended path and build manually in Analyst.</small>
       </div>
     </section>
   );

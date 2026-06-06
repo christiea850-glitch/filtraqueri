@@ -403,25 +403,16 @@ function App() {
     setHumanAnalyzeStage("review");
   }, [dataset, exploreComposeQuestion]);
 
-  // Escape-hatch handler for the "Open Query Builder" link. Skips the
-  // natural-language prep and routes straight to the existing review stage.
-  const handleOpenAdvancedBuilderFromCompose = useCallback(() => {
+  // E-3 (corrected): Continue-in-Analyst handoff. Used from both the Compose
+  // room's escape hatch and the Refine room's primary action. Explore is the
+  // dataset understanding workspace; Analyst is the only execution surface.
+  // This handler routes the user to the existing Analyst SQL workspace,
+  // where Run Query already lives. No execution path is created here.
+  const handleContinueInAnalyst = useCallback(() => {
     if (!dataset) return;
-    setHumanAnalyzeStage("review");
-  }, [dataset]);
-
-  // E-3: Refine room — advanced-builder disclosure state. When true, the
-  // Refine card is hidden and the legacy review stack (which contains the
-  // existing VisualQueryBuilderPanel) becomes visible — same Run Query path.
-  const [isExploreRefineAdvancedOpen, setIsExploreRefineAdvancedOpen] = useState(false);
-
-  // Reset the disclosure whenever the user returns to Compose so the next
-  // Compose → Ask cycle lands on the calm Suggested setup card by default.
-  useEffect(() => {
-    if (isExploreComposeRoom) {
-      setIsExploreRefineAdvancedOpen(false);
-    }
-  }, [isExploreComposeRoom]);
+    setWorkspaceMode("analyst");
+    updateDatasetSessionView("sqlWorkspace");
+  }, [dataset, setWorkspaceMode, updateDatasetSessionView]);
 
   const {
     isFiltering,
@@ -620,29 +611,20 @@ function App() {
     [refineFieldChoicesSummary, refineFiltersSummary, refineSortLimitSummary],
   );
 
-  const exploreRefineCanRun = Boolean(dataset && !isRunningQuery);
-  const exploreRefineRunDisabledReason = !dataset
+  // E-3 (corrected): The Refine room is read-only — no execution. The only
+  // primary action is Continue in Analyst.
+  const exploreRefineCanContinueInAnalyst = Boolean(dataset);
+  const exploreRefineContinueDisabledReason = !dataset
     ? "Open a dataset first"
-    : isRunningQuery
-      ? "Query is running…"
-      : undefined;
+    : undefined;
 
   // E-3 Edit question handler: reverse the legacy stage flip and route the
   // room back to Compose. The Compose question text is preserved at the App
   // level so the user lands on their prior wording.
   const handleExploreRefineEditQuestion = useCallback(() => {
     setHumanAnalyzeStage("investigate");
-    setIsExploreRefineAdvancedOpen(false);
     goToExploreComposeRoom();
   }, [goToExploreComposeRoom]);
-
-  // E-3 Open advanced builder: route the user to the existing legacy review
-  // stack (which already contains VisualQueryBuilderPanel and the existing
-  // Run Query wiring). No new builder is created; same execution path.
-  const handleExploreRefineOpenAdvanced = useCallback(() => {
-    setHumanAnalyzeStage("review");
-    setIsExploreRefineAdvancedOpen(true);
-  }, []);
 
   const openDataCommand = (target?: string) => {
     openHumanView("dataset");
@@ -1210,48 +1192,39 @@ function App() {
               isAskDisabledReason={exploreComposeAskDisabledReason}
               onQuestionChange={setExploreComposeQuestion}
               onAsk={handleExploreComposeAsk}
-              onOpenAdvancedBuilder={handleOpenAdvancedBuilderFromCompose}
+              onContinueInAnalyst={handleContinueInAnalyst}
             />
           </div>
 
           {/*
-            E-3: Refine room. Visible only when the room is "refine" AND the
-            user has not opened the advanced builder. When advanced is open,
-            the legacy review stack below becomes visible instead (same
-            VisualQueryBuilderPanel + same Run Query path).
+            E-3 (corrected): Refine room is the non-execution Recommended
+            path preview. No Run Query here, no advanced-builder disclosure,
+            no VisualQueryBuilderPanel on this canvas. The primary action is
+            Continue in Analyst — which routes to the existing Analyst SQL
+            workspace where Run Query already lives.
           */}
-          <div hidden={!isExploreRefineRoom || isExploreRefineAdvancedOpen}>
+          <div hidden={!isExploreRefineRoom}>
             <ExploreRefineRoom
               question={exploreComposeQuestion}
               activeScopeLabel={exploreComposeActiveScopeLabel}
               setupRows={exploreRefineSetupRows}
-              readinessLabel="Ready · review and run"
-              canRun={exploreRefineCanRun}
-              isRunning={isRunningQuery}
-              runDisabledReason={exploreRefineRunDisabledReason}
+              readinessLabel="Preview · build in Analyst"
+              canContinueInAnalyst={exploreRefineCanContinueInAnalyst}
+              continueDisabledReason={exploreRefineContinueDisabledReason}
               onEditQuestion={handleExploreRefineEditQuestion}
-              onRunQuery={runReviewedQueryBuilder}
-              onOpenAdvancedBuilder={handleExploreRefineOpenAdvanced}
+              onContinueInAnalyst={handleContinueInAnalyst}
             />
           </div>
 
           {/*
-            E-3: Legacy review stack. Hidden when in compose, and also hidden
-            when in refine without the advanced disclosure open. Visible for
-            answer-room state and for the refine-advanced state — the latter
-            gets a small "Back to Suggested setup" pill so the user can
-            collapse back to the calm Refine card.
+            Legacy review stack. Hidden when in compose or refine — Explore
+            is no longer an execution surface. The stack remains mounted so
+            answer-room state (after a Human Mode Run Query from anywhere
+            else in the existing fallback views) keeps working without
+            changes. Nothing inside the stack is reachable from Compose or
+            Refine in the corrected flow.
           */}
-          <div hidden={isExploreComposeRoom || (isExploreRefineRoom && !isExploreRefineAdvancedOpen)}>
-          {isExploreRefineRoom && isExploreRefineAdvancedOpen && (
-            <button
-              type="button"
-              className="explore-refine-back-to-card"
-              onClick={() => setIsExploreRefineAdvancedOpen(false)}
-            >
-              &larr; Back to Suggested setup
-            </button>
-          )}
+          <div hidden={isExploreComposeRoom || isExploreRefineRoom}>
           <div hidden={humanAnalyzeStage !== "investigate"}>
             <QuestionWorkspacePanel
               dataset={dataset}
