@@ -807,12 +807,12 @@ export function CleanPrepareReviewPanel({
 
           <section className="clean-prepare-issue-groups">
             <div className="clean-prepare-compact-heading">
-              <h4>Issues found</h4>
+              <h4>{embedded ? "Step 1: Issues detected" : "Issues found"}</h4>
               <span>{pluralise(review.issues.length, "issue")}</span>
             </div>
             {review.issues.length > 0 ? (
               issueGroups.map(([category, issues]) => (
-                <details className="clean-prepare-disclosure" key={category}>
+                <details className="clean-prepare-disclosure" key={category} open={embedded}>
                   <summary>
                     <strong>{category}</strong>
                     <span>{pluralise(issues.length, "issue")}</span>
@@ -832,11 +832,16 @@ export function CleanPrepareReviewPanel({
             )}
           </section>
 
-          <details className="clean-prepare-disclosure">
+          <details className="clean-prepare-disclosure" open={embedded}>
             <summary>
-              <strong>Suggested fixes</strong>
+              <strong>{embedded ? "Step 2: Choose cleaning fixes" : "Choose cleaning fixes"}</strong>
               <span>{pluralise(review.suggestedFixes.length, "draft recommendation")}</span>
             </summary>
+            {embedded && (
+              <p>
+                Choose fixes first. Nothing changes until you create or activate a cleaned working copy.
+              </p>
+            )}
             {review.suggestedFixes.length > 0 ? (
               <ul>
                 {review.suggestedFixes.map((fix) => (
@@ -855,10 +860,12 @@ export function CleanPrepareReviewPanel({
             <section className="clean-prepare-missing-decisions">
               <div className="clean-prepare-section-heading">
                 <div>
-                  <h4>Missing value decisions</h4>
+                  <h4>{embedded ? "Step 2: Choose missing-value decisions" : "Missing value decisions"}</h4>
                   <p>
                     Blanks may be intentional layout space, empty future-entry rows, real missing
                     values, unknown values, or fields that should be completed later.
+                    {embedded &&
+                      " Choose fixes first. Nothing changes until you create or activate a cleaned working copy."}
                   </p>
                 </div>
                 <strong>{missingValueDecisionStatus}</strong>
@@ -904,7 +911,7 @@ export function CleanPrepareReviewPanel({
                 </select>
               </label>
 
-              <details className="clean-prepare-disclosure">
+              <details className="clean-prepare-disclosure" open={embedded}>
                 <summary>
                   <strong>Worst blank-rate fields</strong>
                   <span>{pluralise(worstBlankColumns.length, "field")}</span>
@@ -1087,10 +1094,10 @@ export function CleanPrepareReviewPanel({
             <section className="clean-prepare-recipe-preview">
               <div className="clean-prepare-section-heading">
                 <div>
-                  <h4>Draft cleaning recipe</h4>
+                  <h4>{embedded ? "Step 3: Preview cleaned working copy" : "Preview cleaned working copy"}</h4>
                   <p>Review a proposed analysis shape for one worksheet at a time.</p>
                 </div>
-                <strong>Preview only</strong>
+                <strong>{embedded ? "No changes applied yet" : "Preview only"}</strong>
               </div>
 
               <div className="clean-prepare-worksheet-tabs" aria-label="Cleaning recipe worksheets">
@@ -1106,7 +1113,7 @@ export function CleanPrepareReviewPanel({
                       disabled={worksheet.status !== "ready" && worksheet.status !== "empty"}
                       onClick={() => selectWorksheet(worksheet)}
                       aria-label={`${worksheetLabel}, ${statusLabel}`}
-                      title={`${worksheetLabel} — ${statusLabel}`}
+                      title={`${worksheetLabel} - ${statusLabel}`}
                     >
                       <span className="clean-prepare-worksheet-tab-label">{worksheetLabel}</span>
                       <span
@@ -1126,12 +1133,31 @@ export function CleanPrepareReviewPanel({
                   <span>
                     {workbookCleanedCount > 0 &&
                       `${pluralise(workbookCleanedCount, "cleaned working copy", "cleaned working copies")} available`}
-                    {workbookCleanedCount > 0 && workbookActiveCleanedCount > 0 && " · 1 active"}
-                    {workbookCleanedCount > 0 && workbookNeedsReviewCount > 0 && " · "}
+                    {workbookCleanedCount > 0 && workbookActiveCleanedCount > 0 && " - 1 active"}
+                    {workbookCleanedCount > 0 && workbookNeedsReviewCount > 0 && " - "}
                     {workbookNeedsReviewCount > 0 &&
                       `${pluralise(workbookNeedsReviewCount, "worksheet")} needs review`}
                   </span>
                   <p>Each worksheet keeps its own original data and its own cleaned working copy.</p>
+                </div>
+              )}
+
+              {embedded && selectedWorksheet && (
+                <div className="clean-prepare-workbook-summary" aria-live="polite">
+                  <strong>
+                    {isUsingCleanedCopy
+                      ? "Using cleaned copy"
+                      : hasCleanedWorkingCopy
+                        ? "Cleaned copy available"
+                        : "No cleaned working copy yet."}
+                  </strong>
+                  <p>
+                    {isUsingCleanedCopy
+                      ? "This worksheet's cleaned working copy is active for analysis."
+                      : hasCleanedWorkingCopy
+                        ? "You can activate the cleaned copy when you are ready to use it for analysis."
+                        : "Create a cleaned working copy after reviewing the preview. The original workbook remains unchanged."}
+                  </p>
                 </div>
               )}
 
@@ -1161,7 +1187,7 @@ export function CleanPrepareReviewPanel({
                   </div>
 
                   {recipePreview.recipe.length > 0 ? (
-                    <details className="clean-prepare-disclosure">
+                    <details className="clean-prepare-disclosure" open={embedded}>
                       <summary>
                         <strong>Draft recipe steps</strong>
                         <span>{pluralise(recipePreview.recipe.length, "step")}</span>
@@ -1182,7 +1208,7 @@ export function CleanPrepareReviewPanel({
                   )}
 
                   {excludedEntries.length > 0 && (
-                    <details className="clean-prepare-disclosure">
+                    <details className="clean-prepare-disclosure" open={embedded}>
                       <summary>
                         <strong>Proposed exclusions</strong>
                         <span>{pluralise(excludedEntries.length, "category", "categories")}</span>
@@ -1200,7 +1226,7 @@ export function CleanPrepareReviewPanel({
                   )}
 
                   {recipePreview.after_preview.rows.length > 0 ? (
-                    <details className="clean-prepare-disclosure">
+                    <details className="clean-prepare-disclosure" open={embedded}>
                       <summary>
                         <strong>Preview cleaned rows</strong>
                         <span>{pluralise(recipePreview.after_preview.rows.length, "sample row")}</span>
@@ -1249,6 +1275,9 @@ export function CleanPrepareReviewPanel({
                     >
                       {selectedWorksheetApplyState.status === "idle" && (
                         <>
+                          {embedded && (
+                            <h4>Step 4: Create / activate cleaned working copy</h4>
+                          )}
                           <p className="clean-prepare-apply-helper">
                             The original workbook will not be changed. A new cleaned table is created alongside the existing analysis table.
                           </p>
@@ -1261,7 +1290,6 @@ export function CleanPrepareReviewPanel({
                           </button>
                         </>
                       )}
-
                       {selectedWorksheetApplyState.status === "confirming" && (
                         <div className="clean-prepare-apply-confirm" role="group" aria-label="Confirm create cleaned working copy">
                           <p>
@@ -1288,7 +1316,7 @@ export function CleanPrepareReviewPanel({
 
                       {selectedWorksheetApplyState.status === "applying" && (
                         <p className="clean-prepare-apply-progress">
-                          Creating cleaned working copy…
+                          Creating cleaned working copy...
                         </p>
                       )}
 
@@ -1447,7 +1475,11 @@ export function CleanPrepareReviewPanel({
               </>
             ) : (
               <>
-                <strong>Preview only — no changes have been applied to this worksheet yet.</strong>
+                <strong>
+                  {embedded
+                    ? "No changes applied yet."
+                    : "Preview only - no changes have been applied to this worksheet yet."}
+                </strong>
                 <p>Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original.</p>
               </>
             )}
