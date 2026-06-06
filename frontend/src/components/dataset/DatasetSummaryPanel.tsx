@@ -15,6 +15,7 @@ import {
 } from "../../services/api";
 import ColumnDistributionCard from "./ColumnDistributionCard";
 import DataTable, { type DataTableColumn, type DataTableRow } from "../common/DataTable";
+import WorksheetSwitcher, { type WorksheetSwitcherOption } from "../common/WorksheetSwitcher";
 import MissingValuesOverview from "./MissingValuesOverview";
 import { useDataIntelligence } from "../../features/dataIntelligence";
 import { createDatasetIntelligencePreviewViewModel } from "../../features/runtimeBridgeConsumers";
@@ -984,8 +985,15 @@ function DatasetPreviewPage({
       })()}
 
       {hasWorkbook && (
-        <div className="dataset-preview-sheets" aria-label="Worksheets">
-          {worksheets.map((sheet) => {
+        <WorksheetSwitcher
+          variant="dataPreview"
+          ariaLabel="Worksheets"
+          className="dataset-preview-sheets"
+          optionClassName="dataset-preview-sheet"
+          activeClassName="active"
+          labelClassName="dataset-preview-sheet-label"
+          badgeClassName="dataset-preview-sheet-badge"
+          options={worksheets.map<WorksheetSwitcherOption>((sheet) => {
             const sheetCleanedCopy = dataset.workbook_metadata?.cleanedWorkingCopies?.find(
               (copy) => copy.sourceWorksheetId === sheet.worksheetId,
             );
@@ -1004,43 +1012,30 @@ function DatasetPreviewPage({
             const sheetName = sheet.displayName || sheet.sheetName;
             const shouldShowBadge =
               previewMode === "analysis" && sheetBadgeStatus !== "original";
-            return (
-              <button
-                type="button"
-                key={sheet.worksheetId}
-                className={`dataset-preview-sheet${
-                  sheet.worksheetId === selectedWorksheet?.worksheetId ? " active" : ""
-                }`}
-                disabled={
-                  previewMode === "analysis"
-                    ? sheet.status !== "ready"
-                    : sheet.status !== "ready" && sheet.status !== "empty"
-                }
-                onClick={() => selectPreviewWorksheet(sheet.worksheetId)}
-                title={
-                  sheet.status === "ready"
-                    ? `${sheetName}${shouldShowBadge ? ` — ${sheetBadgeLabel}` : ""}`
-                    : `${sheetName} is not ready for preview`
-                }
-                aria-label={
-                  shouldShowBadge
-                    ? `${sheetName}, ${sheetBadgeLabel}`
-                    : sheetName
-                }
-              >
-                <span className="dataset-preview-sheet-label">{sheetName}</span>
-                {shouldShowBadge && (
-                  <span
-                    className={`dataset-preview-sheet-badge is-${sheetBadgeStatus}`}
-                    aria-hidden="true"
-                  >
-                    {sheetBadgeLabel}
-                  </span>
-                )}
-              </button>
-            );
+            return {
+              worksheet: sheet,
+              label: sheetName,
+              isActive: sheet.worksheetId === selectedWorksheet?.worksheetId,
+              disabled:
+                previewMode === "analysis"
+                  ? sheet.status !== "ready"
+                  : sheet.status !== "ready" && sheet.status !== "empty",
+              title:
+                sheet.status === "ready"
+                  ? `${sheetName}${shouldShowBadge ? ` — ${sheetBadgeLabel}` : ""}`
+                  : `${sheetName} is not ready for preview`,
+              ariaLabel: shouldShowBadge ? `${sheetName}, ${sheetBadgeLabel}` : sheetName,
+              badge: shouldShowBadge
+                ? {
+                    label: sheetBadgeLabel,
+                    status: sheetBadgeStatus,
+                    ariaHidden: true,
+                  }
+                : undefined,
+            };
           })}
-        </div>
+          onSelect={selectPreviewWorksheet}
+        />
       )}
 
       {previewMode === "original" && supportsOriginalWorkbook ? (
