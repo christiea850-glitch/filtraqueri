@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata, SchemaColumn } from "../../features/dataset/datasetTypes";
 import { buildControlledLogicDraft } from "../../features/questionWorkspace/questionLogicDraftBuilder";
 import { buildGovernedQueryBuilderRequestDraft } from "../../features/questionWorkspace/questionQueryBuilderRequestBuilder";
@@ -13,6 +13,10 @@ import type {
   CandidateFieldMatch,
   SchemaAwareQuestionDraftPlan,
 } from "../../features/questionWorkspace/questionTranslatorTypes";
+import {
+  listWorkbookWorksheets,
+  type WorksheetMetadata,
+} from "../../features/workbook";
 import { CleanPrepareReviewPanel } from "./CleanPrepareReviewPanel";
 
 type QuestionDraftStatus = "idle" | "drafted";
@@ -40,6 +44,17 @@ type QuestionWorkspacePanelProps = {
 };
 
 type PlanningSelectionRole = "dimension" | "measure" | "date";
+
+type AnalysisScopeEntity = {
+  id: string;
+  displayName: string;
+  sourceName: string;
+  tableName: string;
+  rowCount: number;
+  columnCount: number;
+  columns: SchemaColumn[];
+  status: "ready" | "empty" | "single_table";
+};
 
 type QuestionReviewHints = {
   possibleFocus: string;
@@ -608,6 +623,50 @@ const formatRequestFilter = (filter: FilterDefinition) => {
   return `${displayColumn}: reviewed filter`;
 };
 
+const entityFromWorksheet = (worksheet: WorksheetMetadata): AnalysisScopeEntity => ({
+  id: worksheet.worksheetId,
+  displayName: worksheet.displayName || worksheet.sheetName,
+  sourceName: worksheet.sheetName,
+  tableName: worksheet.tableName,
+  rowCount: worksheet.rowCount,
+  columnCount: worksheet.columnCount,
+  columns: worksheet.schema,
+  status: worksheet.status === "empty" ? "empty" : "ready",
+});
+
+const entityFromDataset = (
+  dataset: DatasetMetadata,
+  sourceName: string,
+): AnalysisScopeEntity => ({
+  id: "dataset",
+  displayName: sourceName || dataset.original_filename || dataset.filename,
+  sourceName: sourceName || dataset.original_filename || dataset.filename,
+  tableName: dataset.table_name,
+  rowCount: dataset.row_count,
+  columnCount: dataset.column_count,
+  columns: dataset.schema,
+  status: "single_table",
+});
+
+const createAnalysisScopeEntities = (
+  dataset: DatasetMetadata,
+  sourceName: string,
+): AnalysisScopeEntity[] => {
+  const worksheets = listWorkbookWorksheets(dataset).filter(
+    (worksheet) => worksheet.status === "ready" || worksheet.status === "empty",
+  );
+  if (worksheets.length > 0) return worksheets.map(entityFromWorksheet);
+  return [entityFromDataset(dataset, sourceName)];
+};
+
+const formatEntityColumnPreview = (columns: SchemaColumn[]) =>
+  columns.length > 0
+    ? columns.slice(0, 6).map((column) => formatDisplayLabel(column.name))
+    : [];
+
+const formatEntityMeta = (entity: AnalysisScopeEntity) =>
+  `${entity.rowCount.toLocaleString()} rows / ${entity.columnCount.toLocaleString()} columns`;
+
 function QuestionWorkspacePanel({
   dataset,
   sourceName,
@@ -623,6 +682,7 @@ function QuestionWorkspacePanel({
   const [selectedDimension, setSelectedDimension] = useState<string | null>(null);
   const [selectedMeasure, setSelectedMeasure] = useState<string | null>(null);
   const [selectedDateField, setSelectedDateField] = useState<string | null>(null);
+  const [selectedAnalysisEntityIds, setSelectedAnalysisEntityIds] = useState<string[]>([]);
 
   const datasetContext = useMemo(
     () => [
@@ -637,6 +697,37 @@ function QuestionWorkspacePanel({
     () => createDatasetAwareStarterPrompts(dataset),
     [dataset],
   );
+  const analysisScopeEntities = useMemo(
+    () => createAnalysisScopeEntities(dataset, sourceName),
+    [dataset, sourceName],
+  );
+  const selectedAnalysisEntities = useMemo(
+    () =>
+      selectedAnalysisEntityIds
+        .map((entityId) => analysisScopeEntities.find((entity) => entity.id === entityId))
+        .filter((entity): entity is AnalysisScopeEntity => Boolean(entity)),
+    [analysisScopeEntities, selectedAnalysisEntityIds],
+  );
+  const selectableAnalysisEntities = analysisScopeEntities.filter(
+    (entity) => !selectedAnalysisEntityIds.includes(entity.id),
+  );
+
+  useEffect(() => {
+    const availableEntityIds = new Set(analysisScopeEntities.map((entity) => entity.id));
+    setSelectedAnalysisEntityIds((current) =>
+      current.filter((entityId) => availableEntityIds.has(entityId)),
+    );
+  }, [analysisScopeEntities]);
+
+  const addAnalysisEntity = (entityId: string) => {
+    setSelectedAnalysisEntityIds((current) =>
+      current.includes(entityId) ? current : [...current, entityId],
+    );
+  };
+
+  const removeAnalysisEntity = (entityId: string) => {
+    setSelectedAnalysisEntityIds((current) => current.filter((id) => id !== entityId));
+  };
 
   const activeReviewQuestion = draft.draftStatus === "drafted" ? draft.rawQuestion : rawQuestion;
   const reviewHints = useMemo(
@@ -781,6 +872,86 @@ function QuestionWorkspacePanel({
           </span>
         ))}
       </div>
+
+      <section className="question-workspace-analysis-scope" aria-label="Analysis scope">
+        <div className="question-workspace-section-heading">
+          <p className="section-label">Analysis workspace</p>
+          <h3>Choose analysis scope</h3>
+        </div>
+        <p className="question-workspace-scope-copy">
+          Choose the tables or sheets that belong to this analysis. FiltraQueri will use this scope to prepare safer suggestions and reports.
+        </p>
+
+        <div className="question-workspace-scope-layout">
+          <div className="question-workspace-scope-picker" aria-label="Available entities">
+            <div className="question-workspace-scope-label">
+              <span>Available tables and sheets</span>
+              <small>{analysisScopeEntities.length.toLocaleString()}</small>
+            </div>
+            <div className="question-workspace-scope-options">
+              {selectableAnalysisEntities.length > 0 ? (
+                selectableAnalysisEntities.map((entity) => {
+                  const columns = formatEntityColumnPreview(entity.columns);
+                  return (
+                    <button
+                      type="button"
+                      key={entity.id}
+                      className="question-workspace-scope-option"
+                      onClick={() => addAnalysisEntity(entity.id)}
+                    >
+                      <strong>{entity.displayName}</strong>
+                      <span>{formatEntityMeta(entity)}</span>
+                      {columns.length > 0 && (
+                        <small>{columns.join(", ")}</small>
+                      )}
+                    </button>
+                  );
+                })
+              ) : (
+                <p className="question-workspace-scope-empty">
+                  All available entities are already in this analysis scope.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="question-workspace-scope-selected" aria-label="Selected analysis entities">
+            <div className="question-workspace-scope-label">
+              <span>Selected for this analysis</span>
+              <small>{selectedAnalysisEntities.length.toLocaleString()}</small>
+            </div>
+            {selectedAnalysisEntities.length === 0 ? (
+              <p className="question-workspace-scope-empty">
+                No tables or sheets selected yet. Choose one or more entities to define the analysis scope.
+              </p>
+            ) : (
+              <div className="question-workspace-scope-chips">
+                {selectedAnalysisEntities.map((entity) => {
+                  const columns = formatEntityColumnPreview(entity.columns);
+                  return (
+                    <article key={entity.id} className="question-workspace-scope-chip">
+                      <div>
+                        <strong>{entity.displayName}</strong>
+                        <span>{formatEntityMeta(entity)}</span>
+                      </div>
+                      {columns.length > 0 && (
+                        <small>{columns.join(", ")}</small>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeAnalysisEntity(entity.id)}
+                        aria-label={`Remove ${entity.displayName} from analysis scope`}
+                      >
+                        Remove
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       <CleanPrepareReviewPanel
         dataset={dataset}
