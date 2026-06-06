@@ -24,6 +24,7 @@ import {
   type WorkbookTaskAssistAction,
   type WorkbookTaskAssistRecommendation,
 } from "./workbookTaskAssist";
+import WorksheetSwitcher, { type WorksheetSwitcherOption } from "../common/WorksheetSwitcher";
 
 type WorkbookContextPanelProps = {
   dataset: DatasetMetadata | null;
@@ -891,6 +892,90 @@ function WorkbookContextPanel({
   const applySelectedScope = () => {
     setAppliedScopeWorksheetIds(selectedScopeWorksheetIds);
   };
+  const sqlContextSourceOptions: WorksheetSwitcherOption[] = workbook.worksheets.map((worksheet) => {
+    const isActive = worksheet.worksheetId === workbook.activeWorksheetId;
+    const activeIsCleanedCopy =
+      isActive &&
+      workbook.activeAnalysisSource?.type === "cleaned_working_copy" &&
+      workbook.activeAnalysisSource?.worksheetId === worksheet.worksheetId;
+    const sourceStateLabel = activeIsCleanedCopy ? "cleaned working copy" : "original";
+    const canMakeActive =
+      Boolean(onWorksheetSelect) &&
+      !isActive &&
+      worksheet.status === "ready" &&
+      !isSwitchingWorksheet;
+
+    return {
+      id: worksheet.worksheetId,
+      label: worksheet.displayName,
+      isActive,
+      disabled: !canMakeActive,
+      title:
+        worksheet.status === "ready"
+          ? `Make ${worksheet.displayName} the active analysis source`
+          : `${worksheet.displayName} is not ready for analysis`,
+      content: (
+        <>
+          <div className="workbook-mapping-row-meta">
+            <span title={worksheet.displayName}>{worksheet.displayName}</span>
+            <strong>{isActive ? dataset?.table_name || "data" : worksheet.tableName}</strong>
+            <small className="workbook-mapping-row-counts">
+              {worksheet.rowCount.toLocaleString()} rows
+              {" \u00b7 "}
+              {worksheet.columnCount.toLocaleString()} cols
+            </small>
+          </div>
+          <div className="workbook-mapping-row-actions">
+            <small className={`worksheet-status ${worksheet.status}`}>
+              {statusLabel(worksheet.status)}
+            </small>
+            {isActive ? (
+              <span
+                className={`workbook-mapping-active-badge is-${
+                  activeIsCleanedCopy ? "cleaned" : "original"
+                }`}
+                title={`Active analysis source \u00b7 ${sourceStateLabel}. Report Recipes and generated SQL use this worksheet's schema.`}
+              >
+                Active {"\u00b7"} {sourceStateLabel}
+              </span>
+            ) : onWorksheetSelect ? (
+              <button
+                type="button"
+                className="secondary-button workbook-mapping-make-active"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onWorksheetSelect(worksheet.worksheetId);
+                }}
+                disabled={!canMakeActive}
+                title={
+                  worksheet.status === "ready"
+                    ? `Make ${worksheet.displayName} the active analysis source`
+                    : `${worksheet.displayName} is not ready for analysis`
+                }
+              >
+                {isSwitchingWorksheet ? "Switching\u2026" : "Make active"}
+              </button>
+            ) : null}
+          </div>
+        </>
+      ),
+    };
+  });
+
+  const selectSqlContextSource = (worksheetId: string) => {
+    const worksheet = workbook.worksheets.find(
+      (currentWorksheet) => currentWorksheet.worksheetId === worksheetId,
+    );
+    if (
+      onWorksheetSelect &&
+      worksheet &&
+      worksheet.worksheetId !== workbook.activeWorksheetId &&
+      worksheet.status === "ready" &&
+      !isSwitchingWorksheet
+    ) {
+      onWorksheetSelect(worksheetId);
+    }
+  };
 
   return (
     <div className={`workbook-context-panel ${variant}`} aria-label="Workbook context">
@@ -1081,70 +1166,15 @@ function WorkbookContextPanel({
           </>
         )}
         {(variant !== "analyst" || isSqlSourceExpanded) && (
-        <div className="workbook-mapping-list" aria-label="Worksheet table mappings">
-          {workbook.worksheets.map((worksheet) => {
-            const isActive = worksheet.worksheetId === workbook.activeWorksheetId;
-            const activeIsCleanedCopy =
-              isActive &&
-              workbook.activeAnalysisSource?.type === "cleaned_working_copy" &&
-              workbook.activeAnalysisSource?.worksheetId === worksheet.worksheetId;
-            const sourceStateLabel = activeIsCleanedCopy
-              ? "cleaned working copy"
-              : "original";
-            const canMakeActive =
-              Boolean(onWorksheetSelect) &&
-              !isActive &&
-              worksheet.status === "ready" &&
-              !isSwitchingWorksheet;
-            return (
-              <div
-                className={`workbook-mapping-row${isActive ? " active" : ""}`}
-                key={worksheet.worksheetId}
-              >
-                <div className="workbook-mapping-row-meta">
-                  <span title={worksheet.displayName}>{worksheet.displayName}</span>
-                  <strong>
-                    {isActive ? dataset?.table_name || "data" : worksheet.tableName}
-                  </strong>
-                  <small className="workbook-mapping-row-counts">
-                    {worksheet.rowCount.toLocaleString()} rows
-                    {" · "}
-                    {worksheet.columnCount.toLocaleString()} cols
-                  </small>
-                </div>
-                <div className="workbook-mapping-row-actions">
-                  <small className={`worksheet-status ${worksheet.status}`}>
-                    {statusLabel(worksheet.status)}
-                  </small>
-                  {isActive ? (
-                    <span
-                      className={`workbook-mapping-active-badge is-${
-                        activeIsCleanedCopy ? "cleaned" : "original"
-                      }`}
-                      title={`Active analysis source · ${sourceStateLabel}. Report Recipes and generated SQL use this worksheet's schema.`}
-                    >
-                      Active · {sourceStateLabel}
-                    </span>
-                  ) : onWorksheetSelect ? (
-                    <button
-                      type="button"
-                      className="secondary-button workbook-mapping-make-active"
-                      onClick={() => onWorksheetSelect(worksheet.worksheetId)}
-                      disabled={!canMakeActive}
-                      title={
-                        worksheet.status === "ready"
-                          ? `Make ${worksheet.displayName} the active analysis source`
-                          : `${worksheet.displayName} is not ready for analysis`
-                      }
-                    >
-                      {isSwitchingWorksheet ? "Switching…" : "Make active"}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          <WorksheetSwitcher
+            variant="sqlContext"
+            ariaLabel="Worksheet table mappings"
+            className="workbook-mapping-list"
+            optionClassName="workbook-mapping-row"
+            activeClassName="active"
+            options={sqlContextSourceOptions}
+            onSelect={selectSqlContextSource}
+          />
         )}
       </div>
 
