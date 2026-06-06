@@ -1013,7 +1013,7 @@ function DatasetPreviewPage({
             const shouldShowBadge =
               previewMode === "analysis" && sheetBadgeStatus !== "original";
             return {
-              worksheet: sheet,
+              id: sheet.worksheetId,
               label: sheetName,
               isActive: sheet.worksheetId === selectedWorksheet?.worksheetId,
               disabled:

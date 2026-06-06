@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
-import type { WorksheetMetadata } from "../../features/workbook";
 
 type WorksheetSwitcherVariant = "dataPreview" | "exploreScope" | "sqlContext";
 
 type WorksheetSwitcherOption = {
-  worksheet: WorksheetMetadata;
-  label: string;
+  id: string;
+  label: ReactNode;
   isActive: boolean;
   disabled?: boolean;
   title?: string;
   ariaLabel?: string;
+  content?: ReactNode;
   badge?: {
     label: ReactNode;
     status: string;
@@ -46,24 +46,28 @@ function WorksheetSwitcher({
   return (
     <div className={className} aria-label={ariaLabel} data-worksheet-switcher-variant={variant}>
       {options.map(
-        ({ worksheet, label, isActive, disabled, title, ariaLabel: optionAriaLabel, badge }) => (
+        ({ id, label, isActive, disabled, title, ariaLabel: optionAriaLabel, content, badge }) => (
           <button
             type="button"
-            key={worksheet.worksheetId}
+            key={id}
             className={`${optionClassName}${isActive ? ` ${activeClassName}` : ""}`}
             disabled={disabled}
-            onClick={() => onSelect(worksheet.worksheetId)}
+            onClick={() => onSelect(id)}
             title={title}
             aria-label={optionAriaLabel}
           >
-            <span className={labelClassName}>{label}</span>
-            {badge && (
-              <span
-                className={badge.className || `${badgeClassName || ""} is-${badge.status}`.trim()}
-                aria-hidden={badge.ariaHidden}
-              >
-                {badge.label}
-              </span>
+            {content ?? (
+              <>
+                <span className={labelClassName}>{label}</span>
+                {badge && (
+                  <span
+                    className={badge.className || `${badgeClassName || ""} is-${badge.status}`.trim()}
+                    aria-hidden={badge.ariaHidden}
+                  >
+                    {badge.label}
+                  </span>
+                )}
+              </>
             )}
           </button>
         ),

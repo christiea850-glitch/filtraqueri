@@ -17,6 +17,7 @@ import {
   listWorkbookWorksheets,
   type WorksheetMetadata,
 } from "../../features/workbook";
+import WorksheetSwitcher, { type WorksheetSwitcherOption } from "../common/WorksheetSwitcher";
 import { CleanPrepareReviewPanel } from "./CleanPrepareReviewPanel";
 
 type QuestionDraftStatus = "idle" | "drafted";
@@ -888,31 +889,37 @@ function QuestionWorkspacePanel({
               <span>Available tables and sheets</span>
               <small>{analysisScopeEntities.length.toLocaleString()}</small>
             </div>
-            <div className="question-workspace-scope-options">
-              {selectableAnalysisEntities.length > 0 ? (
-                selectableAnalysisEntities.map((entity) => {
+            {selectableAnalysisEntities.length > 0 ? (
+              <WorksheetSwitcher
+                variant="exploreScope"
+                ariaLabel="Available entities"
+                className="question-workspace-scope-options"
+                optionClassName="question-workspace-scope-option"
+                activeClassName="is-selected"
+                options={selectableAnalysisEntities.map<WorksheetSwitcherOption>((entity) => {
                   const columns = formatEntityColumnPreview(entity.columns);
-                  return (
-                    <button
-                      type="button"
-                      key={entity.id}
-                      className="question-workspace-scope-option"
-                      onClick={() => addAnalysisEntity(entity.id)}
-                    >
-                      <strong>{entity.displayName}</strong>
-                      <span>{formatEntityMeta(entity)}</span>
-                      {columns.length > 0 && (
-                        <small>{columns.join(", ")}</small>
-                      )}
-                    </button>
-                  );
-                })
-              ) : (
+                  return {
+                    id: entity.id,
+                    label: entity.displayName,
+                    isActive: false,
+                    content: (
+                      <>
+                        <strong>{entity.displayName}</strong>
+                        <span>{formatEntityMeta(entity)}</span>
+                        {columns.length > 0 && <small>{columns.join(", ")}</small>}
+                      </>
+                    ),
+                  };
+                })}
+                onSelect={addAnalysisEntity}
+              />
+            ) : (
+              <div className="question-workspace-scope-options">
                 <p className="question-workspace-scope-empty">
                   All available entities are already in this analysis scope.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="question-workspace-scope-selected" aria-label="Selected analysis entities">
