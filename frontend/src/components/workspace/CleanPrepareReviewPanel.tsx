@@ -844,22 +844,32 @@ export function CleanPrepareReviewPanel({
             className="clean-prepare-step-pane"
             hidden={embedded && activeStep !== "decide"}
           >
-            <details className="clean-prepare-disclosure" open={embedded}>
+            {embedded && (
+              <div className="clean-prepare-decide-heading">
+                <p className="section-label">Step 2 · Decide</p>
+                <h4>Choose cleaning decisions</h4>
+                <p>Tell us how you want to handle the messy bits. Nothing applies yet.</p>
+              </div>
+            )}
+
+            <details className="clean-prepare-disclosure clean-prepare-decision-card" open={embedded}>
             <summary>
-              <strong>{embedded ? "Step 2: Choose cleaning fixes" : "Choose cleaning fixes"}</strong>
+              <strong>{embedded ? "Suggested cleaning fixes" : "Choose cleaning fixes"}</strong>
               <span>{pluralise(review.suggestedFixes.length, "draft recommendation")}</span>
             </summary>
             {embedded && (
               <p>
-                Choose fixes first. Nothing changes until you create or activate a cleaned working copy.
+                Pick the fixes that match your intent. Each fix is a draft - review it before applying.
               </p>
             )}
             {review.suggestedFixes.length > 0 ? (
-              <ul>
+              <ul className={embedded ? "clean-prepare-decision-rows" : undefined}>
                 {review.suggestedFixes.map((fix) => (
                   <li key={fix.id}>
+                    {embedded && <span className="clean-prepare-draft-indicator" aria-hidden="true" />}
                     <strong>{fix.title}</strong>
                     <span>{fix.detail}</span>
+                    {embedded && <small>Draft decision</small>}
                   </li>
                 ))}
               </ul>
@@ -869,15 +879,14 @@ export function CleanPrepareReviewPanel({
             </details>
 
             {missingValueColumns.length > 0 && (
-            <section className="clean-prepare-missing-decisions">
+            <section className="clean-prepare-missing-decisions clean-prepare-decision-card">
               <div className="clean-prepare-section-heading">
                 <div>
-                  <h4>{embedded ? "Step 2: Choose missing-value decisions" : "Missing value decisions"}</h4>
+                  <h4>{embedded ? "Missing-value handling" : "Missing value decisions"}</h4>
                   <p>
-                    Blanks may be intentional layout space, empty future-entry rows, real missing
-                    values, unknown values, or fields that should be completed later.
-                    {embedded &&
-                      " Choose fixes first. Nothing changes until you create or activate a cleaned working copy."}
+                    {embedded
+                      ? "Choose one worksheet-wide strategy, or customize per column."
+                      : "Blanks may be intentional layout space, empty future-entry rows, real missing values, unknown values, or fields that should be completed later."}
                   </p>
                 </div>
                 <strong>{missingValueDecisionStatus}</strong>
@@ -944,9 +953,9 @@ export function CleanPrepareReviewPanel({
               </details>
 
               {isPerColumnDecision && (
-                <details className="clean-prepare-disclosure" open>
+                <details className="clean-prepare-disclosure" open={!embedded}>
                   <summary>
-                    <strong>Decide per column</strong>
+                    <strong>Customize per column</strong>
                     <span>{pluralise(missingValueColumns.length, "field")}</span>
                   </summary>
                   <div className="clean-prepare-missing-columns">
