@@ -592,6 +592,51 @@ export function CleanPrepareReviewPanel({
     recipePreview.recipe.length > 0 &&
     recipeStatus === "success" &&
     selectedWorksheet?.status === "ready";
+  type StatusChecklistState = "complete" | "active" | "available" | "pending" | "needs-decision";
+  const hasDraftDecisions = Boolean(worksheetDecision) || decidedColumnCount > 0;
+  const statusChecklistItems: Array<{
+    id: "review" | "decisions" | "cleaned-copy" | "active-source";
+    label: string;
+    state: StatusChecklistState;
+    copy: string;
+    step?: CleanPrepareStep;
+  }> = [
+    {
+      id: "review",
+      label: "Review",
+      state: "complete",
+      copy:
+        issueGroups.length > 0
+          ? `${pluralise(issueGroups.length, "category", "categories")} detected`
+          : "Issues reviewed",
+      step: "review",
+    },
+    {
+      id: "decisions",
+      label: "Decisions",
+      state: hasDraftDecisions ? "complete" : activeStep === "decide" ? "needs-decision" : "pending",
+      copy: hasDraftDecisions ? "Draft decisions selected" : "Not reviewed yet",
+      step: "decide",
+    },
+    {
+      id: "cleaned-copy",
+      label: "Cleaned copy",
+      state: isUsingCleanedCopy ? "active" : hasCleanedWorkingCopy ? "available" : "pending",
+      copy: isUsingCleanedCopy
+        ? "Using cleaned copy"
+        : hasCleanedWorkingCopy
+          ? "Cleaned copy available"
+          : "Not created",
+      step: "apply",
+    },
+    {
+      id: "active-source",
+      label: "Active source",
+      state: isUsingCleanedCopy ? "complete" : "pending",
+      copy: isUsingCleanedCopy ? "Cleaned copy" : "Original",
+      step: "apply",
+    },
+  ];
 
   const updateApplyState = (worksheetId: string, next: ApplyState) => {
     setApplyStateByWorksheet((current) => ({ ...current, [worksheetId]: next }));
@@ -808,6 +853,8 @@ export function CleanPrepareReviewPanel({
             </div>
           )}
 
+          <div className={embedded ? "clean-prepare-embedded-layout" : "clean-prepare-standard-layout"}>
+            <div className="clean-prepare-step-content">
           <div
             className="clean-prepare-step-pane"
             hidden={embedded && activeStep !== "review"}
@@ -1510,6 +1557,33 @@ export function CleanPrepareReviewPanel({
               </>
             )}
             </section>
+          </div>
+            </div>
+
+            {embedded && (
+              <aside className="clean-prepare-status-sidebar" aria-label="Status checklist">
+                <h4>Status checklist</h4>
+                <ul>
+                  {statusChecklistItems.map((item) => (
+                    <li
+                      key={item.id}
+                      className={[
+                        `is-${item.state}`,
+                        item.step === activeStep ? "is-current" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <span className="clean-prepare-status-dot" aria-hidden="true" />
+                      <div>
+                        <strong>{item.label}</strong>
+                        <small>{item.copy}</small>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </aside>
+            )}
           </div>
         </div>
       )}
