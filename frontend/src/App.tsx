@@ -26,6 +26,9 @@ import useExecutionRegistry from "./features/execution/executionRegistry";
 import useWorkspaceDatasetController from "./features/dataset/useWorkspaceDatasetController";
 import useExportController from "./features/export/useExportController";
 import useExploreRoom from "./features/explore/useExploreRoom";
+import ExploreComposeRoom, {
+  type ExploreComposeStarterPrompt,
+} from "./features/explore/ExploreComposeRoom";
 import useFilterController from "./features/filters/useFilterController";
 import useQueryHistory from "./features/history/useQueryHistory";
 import type { GovernedQueryBuilderRequestDraft } from "./features/questionWorkspace/questionQueryBuilderRequestTypes";
@@ -47,6 +50,7 @@ import useActiveResultModel, {
 import useResultExecutionCoordinator from "./features/results/useResultExecutionCoordinator";
 import useResults from "./features/results/useResults";
 import "./App.css";
+import "./styles/explore.css";
 
 const analystNavItems = createAnalystNavItems(analystWorkspaceRegistry);
 
@@ -320,6 +324,87 @@ function App() {
       resetExploreRoom();
     }
   }, [dataset, resetExploreRoom]);
+
+  // E-2: Compose room state. The question text is held at the App level so it
+  // survives if the room is hidden/shown (the Compose room uses controlled
+  // input). It is NOT shared with QuestionWorkspacePanel's internal rawQuestion
+  // by design — E-3 will lift state into a shared composer when the Refine
+  // room redesign lands.
+  const [exploreComposeQuestion, setExploreComposeQuestion] = useState("");
+
+  // Reset the Compose question when the dataset changes so a new workbook
+  // starts with a calm empty state.
+  useEffect(() => {
+    setExploreComposeQuestion("");
+  }, [dataset?.dataset_id]);
+
+  // E-2: Static starter prompts. Frontend-only, no backend lookup; these are
+  // illustrative business-question prompts that populate the textarea — they
+  // do NOT auto-run, generate SQL, or call any provider.
+  const exploreComposeStarterPrompts = useMemo<ExploreComposeStarterPrompt[]>(
+    () => [
+      {
+        id: "rent-trend",
+        title: "Rent payment trend by property",
+        description: "Look at how rent collection changes month-by-month across properties.",
+        prompt: "What was the rent payment trend by property in 2025?",
+      },
+      {
+        id: "lease-expirations",
+        title: "Lease expirations in the next 90 days",
+        description: "List leases ending soon with tenant and property context.",
+        prompt: "Which leases expire in the next 90 days?",
+      },
+      {
+        id: "maintenance-backlog",
+        title: "Maintenance backlog by property",
+        description: "Count open maintenance requests grouped by property and type.",
+        prompt: "How many open maintenance requests does each property have?",
+      },
+      {
+        id: "top-tenants",
+        title: "Top tenants by payment volume",
+        description: "Rank tenants by total payments — high earners first.",
+        prompt: "Which tenants paid the most in 2025?",
+      },
+    ],
+    [],
+  );
+
+  // Active scope chip label for the Compose room. Falls back through
+  // displayName → sheetName → table_name, then null if none are available.
+  const exploreComposeActiveScopeLabel = useMemo<string | null>(() => {
+    if (!dataset) return null;
+    return (
+      activeWorkbookWorksheet?.displayName ||
+      activeWorkbookWorksheet?.sheetName ||
+      dataset.table_name ||
+      null
+    );
+  }, [dataset, activeWorkbookWorksheet]);
+
+  const exploreComposeCanAsk = Boolean(dataset && exploreComposeQuestion.trim());
+  const exploreComposeAskDisabledReason = !dataset
+    ? "Open a dataset first"
+    : !exploreComposeQuestion.trim()
+      ? "Type a question to continue"
+      : undefined;
+
+  // E-2 Ask handler: flip the existing humanAnalyzeStage to "review". The
+  // E-1 observational effect catches that flip and forwards the room from
+  // compose → refine. No query runs here — Run query in the existing builder
+  // is still the only execution trigger.
+  const handleExploreComposeAsk = useCallback(() => {
+    if (!dataset || !exploreComposeQuestion.trim()) return;
+    setHumanAnalyzeStage("review");
+  }, [dataset, exploreComposeQuestion]);
+
+  // Escape-hatch handler for the "Open Query Builder" link. Skips the
+  // natural-language prep and routes straight to the existing review stage.
+  const handleOpenAdvancedBuilderFromCompose = useCallback(() => {
+    if (!dataset) return;
+    setHumanAnalyzeStage("review");
+  }, [dataset]);
 
   const {
     isFiltering,
@@ -987,6 +1072,29 @@ function App() {
           />
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
+
+          {/*
+            E-2: Compose room visibility gate. When isExploreComposeRoom is
+            true we show the calm composer. The legacy stacks below are kept
+            mounted (via the hidden attribute) so their internal state
+            survives the room flip — this is the same pattern the existing
+            humanAnalyzeStage gating uses on QuestionWorkspacePanel and
+            VisualQueryBuilderPanel. No existing component is deleted.
+          */}
+          <div hidden={!isExploreComposeRoom}>
+            <ExploreComposeRoom
+              question={exploreComposeQuestion}
+              activeScopeLabel={exploreComposeActiveScopeLabel}
+              starterPrompts={exploreComposeStarterPrompts}
+              canAsk={exploreComposeCanAsk}
+              isAskDisabledReason={exploreComposeAskDisabledReason}
+              onQuestionChange={setExploreComposeQuestion}
+              onAsk={handleExploreComposeAsk}
+              onOpenAdvancedBuilder={handleOpenAdvancedBuilderFromCompose}
+            />
+          </div>
+
+          <div hidden={isExploreComposeRoom}>
           <div hidden={humanAnalyzeStage !== "investigate"}>
             <QuestionWorkspacePanel
               dataset={dataset}
@@ -1043,6 +1151,7 @@ function App() {
             />
           </div>
           {renderInvestigateAnswerPanel()}
+          </div>
         </>
       ) : null,
     results: () =>

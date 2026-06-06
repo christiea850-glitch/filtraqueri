@@ -1,0 +1,247 @@
+/* E-2 — Explore Compose room minimal styling.
+ *
+ * Coastal Pro palette (violet #635BFF, mint #10B981) with hex fallbacks so
+ * this file works even when global CSS variables are not loaded. Single file,
+ * no media queries needed for the calm centered layout — grid auto-fit
+ * collapses the starter cards on narrow viewports.
+ */
+
+.explore-compose-room {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 40px 16px 32px;
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.explore-compose-room-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #EEEDFF;
+  color: #4F46C9;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.explore-compose-room-badge span {
+  opacity: 0.7;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.explore-compose-room-header h1 {
+  margin: 4px 0 4px;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0F172A;
+}
+
+.explore-compose-room-header p {
+  margin: 0;
+  color: #64748B;
+  font-size: 14.5px;
+  line-height: 1.55;
+  max-width: 56ch;
+}
+
+.explore-compose-room-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.explore-compose-room-scope strong {
+  color: #0F172A;
+  font-weight: 600;
+}
+
+.explore-compose-room-scope-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10B981;
+  display: inline-block;
+}
+
+.explore-compose-room-composer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.explore-compose-room-input {
+  display: block;
+  width: 100%;
+  position: relative;
+}
+
+.explore-compose-room-input-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.explore-compose-room-input textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid #E5E7EB;
+  background: #FFFFFF;
+  resize: vertical;
+  color: #0F172A;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.explore-compose-room-input textarea::placeholder {
+  color: #94A3B8;
+}
+
+.explore-compose-room-input textarea:focus {
+  outline: none;
+  border-color: #635BFF;
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.15);
+}
+
+.explore-compose-room-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.explore-compose-room-ask {
+  padding: 10px 22px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.explore-compose-room-starters {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.explore-compose-room-starters-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+  text-align: left;
+  gap: 16px;
+}
+
+.explore-compose-room-starters-heading .section-label {
+  margin: 0;
+}
+
+.explore-compose-room-starters-heading small {
+  color: #64748B;
+  font-size: 11.5px;
+}
+
+.explore-compose-room-starter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.explore-compose-room-starter {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: inherit;
+  color: #0F172A;
+  transition: border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.explore-compose-room-starter:hover {
+  border-color: #635BFF;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.explore-compose-room-starter:focus-visible {
+  outline: none;
+  border-color: #635BFF;
+  box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.15);
+}
+
+.explore-compose-room-starter-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4F46C9;
+}
+
+.explore-compose-room-starter strong {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: #0F172A;
+  line-height: 1.35;
+}
+
+.explore-compose-room-starter small {
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.explore-compose-room-power-user {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.explore-compose-room-advanced {
+  background: transparent;
+  border: 0;
+  color: #4F46C9;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.explore-compose-room-advanced:hover {
+  text-decoration: underline;
+}
+
+.explore-compose-room-power-user small {
+  color: #64748B;
+  font-size: 11.5px;
+}
