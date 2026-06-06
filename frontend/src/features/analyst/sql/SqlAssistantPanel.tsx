@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import {
   buildAIMetadataContextPayload,
@@ -38,6 +38,7 @@ type SqlAssistantPanelProps = {
   selectedDialect: SqlDialectId;
   selectedDialectProfile: SqlDialectProfile;
   onInsertSql: (sql: string) => void;
+  requestedMode?: SqlAssistantMode | null;
 };
 
 const categoryOrder: SqlTemplateCategory[] = [
@@ -52,7 +53,7 @@ const categoryOrder: SqlTemplateCategory[] = [
   "Dialect examples",
 ];
 
-type SqlAssistantMode = "templates" | "assist" | "recipes";
+export type SqlAssistantMode = "templates" | "assist" | "recipes";
 type SqlReportRecipeFilter =
   | "All"
   | "Supported"
@@ -768,6 +769,7 @@ function SqlAssistantPanel({
   selectedDialect,
   selectedDialectProfile,
   onInsertSql,
+  requestedMode,
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -784,6 +786,10 @@ function SqlAssistantPanel({
     () => createSqlReportRecipes(dataset, selectedDialect),
     [dataset, selectedDialect],
   );
+
+  useEffect(() => {
+    if (requestedMode) setAssistantMode(requestedMode);
+  }, [requestedMode]);
   // K10: dataset-adaptive report opportunities. The planner re-runs whenever
   // the active dataset changes — so when the user switches the active
   // worksheet in SQL Context, the opportunity list regenerates against the

@@ -3,7 +3,7 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
-import SqlAssistantPanel from "./SqlAssistantPanel";
+import SqlAssistantPanel, { type SqlAssistantMode } from "./SqlAssistantPanel";
 import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
@@ -347,6 +347,8 @@ function SqlWorkspace({
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
+  const [requestedAssistantMode, setRequestedAssistantMode] =
+    useState<SqlAssistantMode | null>(null);
   const [focusedView, setFocusedView] = useState<FocusedSqlView>("editor");
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
@@ -375,6 +377,10 @@ function SqlWorkspace({
   const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
+  };
+  const openSqlAssistantMode = (mode: SqlAssistantMode) => {
+    setRequestedAssistantMode(mode);
+    setIsAssistantOpen(true);
   };
   const openDraftDetail = (draft: SqlQueryDraft) => {
     setActiveDraftId(draft.id);
@@ -567,6 +573,7 @@ function SqlWorkspace({
                   selectedDialect={selectedDialect}
                   selectedDialectProfile={selectedDialectProfile}
                   onInsertSql={insertSql}
+                  requestedMode={requestedAssistantMode}
                 />
               </div>
             </section>
@@ -604,6 +611,7 @@ function SqlWorkspace({
                   variant="analyst"
                   onWorksheetSelect={onWorksheetSelect}
                   isSwitchingWorksheet={isSwitchingWorksheet}
+                  onOpenSqlAssistantMode={openSqlAssistantMode}
                 />
               </div>
             </section>

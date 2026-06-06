@@ -19,6 +19,11 @@ import {
   inferWorkbookRelationshipReadiness,
   type WorkbookRelationshipReadinessMatch,
 } from "./workbookRelationshipReadiness";
+import {
+  recommendWorkbookTaskAssistPath,
+  type WorkbookTaskAssistAction,
+  type WorkbookTaskAssistRecommendation,
+} from "./workbookTaskAssist";
 
 type WorkbookContextPanelProps = {
   dataset: DatasetMetadata | null;
@@ -36,6 +41,7 @@ type WorkbookContextPanelProps = {
    */
   onWorksheetSelect?: (worksheetId: string) => void;
   isSwitchingWorksheet?: boolean;
+  onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
 };
 
 const statusLabel = (status: WorksheetStatus) => (status === "error" ? "unsupported" : status);
@@ -151,6 +157,129 @@ function RelationshipReadinessList({
         </article>
       ))}
     </div>
+  );
+}
+
+function TaskAssistShell({
+  appliedWorksheets,
+  relationshipMatches,
+  onOpenSqlAssistantMode,
+}: {
+  appliedWorksheets: WorksheetMetadata[];
+  relationshipMatches: WorkbookRelationshipReadinessMatch[];
+  onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
+}) {
+  const [taskText, setTaskText] = useState("");
+  const [recommendation, setRecommendation] =
+    useState<WorkbookTaskAssistRecommendation | null>(null);
+  const canFindPath = taskText.trim().length > 0;
+
+  const findBestPath = () => {
+    if (!canFindPath) return;
+    setRecommendation(
+      recommendWorkbookTaskAssistPath({
+        taskText,
+        appliedWorksheets,
+        relationshipMatches,
+      }),
+    );
+  };
+
+  const clearTask = () => {
+    setTaskText("");
+    setRecommendation(null);
+  };
+
+  return (
+    <section className="workbook-task-assist" aria-label="Task Assist">
+      <div className="builder-block-header">
+        <span>Task Assist</span>
+        <small>Deterministic</small>
+      </div>
+      <p className="workbook-task-assist-copy">
+        Describe what you want to find, compare, summarize, or report. FiltraQueri will look for the safest matching template, recipe, or assist path.
+      </p>
+      <label className="workbook-task-assist-input">
+        <span>Describe your analysis task</span>
+        <textarea
+          value={taskText}
+          onChange={(event) => setTaskText(event.target.value)}
+          placeholder="Find tenants with active leases but no recent payment"
+          rows={3}
+        />
+      </label>
+      <div className="workbook-task-assist-actions">
+        <button
+          type="button"
+          className="primary-button"
+          onClick={findBestPath}
+          disabled={!canFindPath}
+        >
+          Find best path
+        </button>
+        <button type="button" className="secondary-button" onClick={clearTask}>
+          Clear
+        </button>
+      </div>
+
+      {recommendation && (
+        <article className={`workbook-task-assist-result ${recommendation.path}`}>
+          <div>
+            <span>Recommended path</span>
+            <strong>{recommendation.pathLabel}</strong>
+          </div>
+          {recommendation.closestMatch && (
+            <p>
+              <strong>Closest match:</strong> {recommendation.closestMatch}
+            </p>
+          )}
+          <p>
+            <strong>Reason:</strong> {recommendation.reason}
+          </p>
+          <p>
+            <strong>Selected scope:</strong> {recommendation.selectedScopeLabel}
+          </p>
+          <p>
+            <strong>Relationship readiness:</strong> {recommendation.relationshipReadiness}
+          </p>
+          <p>
+            <strong>Next step:</strong> {recommendation.nextStep}
+          </p>
+          <div className="workbook-task-assist-actions">
+            {recommendation.action === "templates" && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onOpenSqlAssistantMode?.("templates")}
+              >
+                Open Template Library
+              </button>
+            )}
+            {recommendation.action === "recipes" && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onOpenSqlAssistantMode?.("recipes")}
+              >
+                Open Report Recipes
+              </button>
+            )}
+            {recommendation.action === "assist" && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onOpenSqlAssistantMode?.("assist")}
+              >
+                Open Complex SQL Assist
+              </button>
+            )}
+            <button type="button" className="text-button" onClick={() => setRecommendation(null)}>
+              Edit task
+            </button>
+          </div>
+        </article>
+      )}
+    </section>
   );
 }
 
@@ -653,6 +782,7 @@ function WorkbookContextPanel({
   onRelationshipReview,
   onWorksheetSelect,
   isSwitchingWorksheet,
+  onOpenSqlAssistantMode,
 }: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
   const relationshipRegistry = useWorkbookRelationships(workbook);
@@ -891,6 +1021,11 @@ function WorkbookContextPanel({
               Relationship readiness is based on metadata only. Review before using these tables in a report or query.
             </p>
           </section>
+          <TaskAssistShell
+            appliedWorksheets={appliedScopeWorksheets}
+            relationshipMatches={relationshipReadinessMatches}
+            onOpenSqlAssistantMode={onOpenSqlAssistantMode}
+          />
         </section>
       ) : (
         <p className="workbook-analysis-scope-bridge">
