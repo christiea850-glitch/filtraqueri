@@ -230,7 +230,31 @@ function TaskAssistShell({
           </div>
           {recommendation.closestMatch && (
             <p>
-              <strong>Closest match:</strong> {recommendation.closestMatch}
+              <strong>
+                {recommendation.path === "template_library"
+                  ? recommendation.templateMatchConfidence === "confident"
+                    ? "Best template match:"
+                    : "Possible template match:"
+                  : "Closest match:"}
+              </strong>{" "}
+              {recommendation.closestMatch}
+            </p>
+          )}
+          {recommendation.templateMatchReason && (
+            <p>
+              <strong>Why this matches:</strong> {recommendation.templateMatchReason}
+            </p>
+          )}
+          {recommendation.path === "template_library" &&
+            recommendation.templateMatchConfidence === "none" && (
+              <p>
+                <strong>Template match:</strong> No confident template match yet.
+              </p>
+            )}
+          {recommendation.suggestedMetadata.length > 0 && (
+            <p>
+              <strong>Suggested columns/entities:</strong>{" "}
+              {recommendation.suggestedMetadata.join(", ")}
             </p>
           )}
           <p>

@@ -17,11 +17,20 @@ export type WorkbookTaskAssistRecommendation = {
   relationshipReadiness: string;
   nextStep: string;
   closestMatch: string | null;
+  templateMatchConfidence: "confident" | "possible" | "none";
+  templateMatchReason: string | null;
+  suggestedMetadata: string[];
   action: WorkbookTaskAssistAction | null;
 };
 
 type TaskSignals = {
   missing: boolean;
+  duplicate: boolean;
+  blank: boolean;
+  filter: boolean;
+  topN: boolean;
+  sum: boolean;
+  count: boolean;
   summary: boolean;
   dateCondition: boolean;
   report: boolean;
@@ -57,6 +66,12 @@ const getTaskSignals = (taskText: string, entitySearchText: string): TaskSignals
       "gap",
       "orphan",
     ]),
+    duplicate: hasAny(searchText, ["duplicate", "duplicates", "same id", "repeated"]),
+    blank: hasAny(searchText, ["blank", "null", "empty", "missing email", "missing value"]),
+    filter: hasAny(searchText, ["filter", "where", "active", "inactive", "equals", "is "]),
+    topN: hasAny(searchText, ["top", "highest", "largest", "most", "bottom", "lowest"]),
+    sum: hasAny(searchText, ["total", "sum", "amount", "revenue", "payment amount"]),
+    count: hasAny(searchText, ["count", "how many", "number of"]),
     summary: hasAny(searchText, [
       "summarize",
       "summary",
@@ -140,6 +155,125 @@ const chooseClosestReport = (signals: TaskSignals) => {
   return "Dataset report recipe";
 };
 
+const formatColumnLabel = (columnName: string) =>
+  normalizeText(columnName).replace(/\bid\b/g, "ID");
+
+const findRelevantMetadata = (taskText: string, worksheets: WorksheetMetadata[]) => {
+  const normalizedTask = normalizeText(taskText);
+  const matches: string[] = [];
+
+  worksheets.forEach((worksheet) => {
+    if (normalizeText(worksheet.displayName) && normalizedTask.includes(normalizeText(worksheet.displayName))) {
+      matches.push(worksheet.displayName);
+    }
+
+    worksheet.schema.forEach((column) => {
+      const columnLabel = normalizeText(column.name);
+      if (columnLabel && normalizedTask.includes(columnLabel)) {
+        matches.push(`${worksheet.displayName}.${formatColumnLabel(column.name)}`);
+      }
+    });
+  });
+
+  return [...new Set(matches)].slice(0, 6);
+};
+
+const createTemplateMatch = (
+  signals: TaskSignals,
+  taskText: string,
+  appliedWorksheets: WorksheetMetadata[],
+) => {
+  const suggestedMetadata = findRelevantMetadata(taskText, appliedWorksheets);
+
+  if (signals.missing && appliedWorksheets.length > 1) {
+    return {
+      match: "Missing/unmatched records - left join missing match",
+      confidence: "confident" as const,
+      reason: "The task asks for records present in one table but missing from another.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.duplicate) {
+    return {
+      match: "Duplicate records - duplicate key check",
+      confidence: "confident" as const,
+      reason: "The task asks for repeated values or duplicate identifiers.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.blank) {
+    return {
+      match: "Null or missing values check",
+      confidence: "confident" as const,
+      reason: "The task asks for blank, null, empty, or missing field values.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.topN && (signals.sum || signals.count || signals.summary)) {
+    return {
+      match: "Top N by aggregate - order by summary value",
+      confidence: "confident" as const,
+      reason: "The task asks for top or highest entities by a summarized value.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.sum && signals.summary) {
+    return {
+      match: "Grouped sum - aggregate amount by category",
+      confidence: "confident" as const,
+      reason: "The task asks for totals by an entity or category.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.count && signals.summary) {
+    return {
+      match: "Grouped count - count records by category",
+      confidence: "confident" as const,
+      reason: "The task asks for counts grouped by a category or entity.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.dateCondition) {
+    return {
+      match: "Date filter - recent or overdue records",
+      confidence: signals.payment ? ("confident" as const) : ("possible" as const),
+      reason: "The task includes recent, overdue, expired, or date-range language.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.filter) {
+    return {
+      match: "Where/filter condition",
+      confidence: "possible" as const,
+      reason: "The task asks for records matching a condition such as active status.",
+      suggestedMetadata,
+    };
+  }
+
+  if (signals.summary) {
+    return {
+      match: "Grouped summary or comparison",
+      confidence: "possible" as const,
+      reason: "The task asks for a summary, comparison, or breakdown.",
+      suggestedMetadata,
+    };
+  }
+
+  return {
+    match: null,
+    confidence: "none" as const,
+    reason: null,
+    suggestedMetadata,
+  };
+};
+
 export const recommendWorkbookTaskAssistPath = ({
   taskText,
   appliedWorksheets,
@@ -165,20 +299,26 @@ export const recommendWorkbookTaskAssistPath = ({
   const hasMultiEntityScope = appliedWorksheets.length > 1;
   const hasReportDomain =
     signals.payment || signals.lease || signals.tenant || signals.property || signals.manager;
+  const templateMatch = createTemplateMatch(signals, taskText, appliedWorksheets);
+  const hasRelationshipCandidate = relationshipMatches.some(
+    (match) => match.confidence !== "needs_review",
+  );
 
-  if (signals.missing) {
-    const path = hasMultiEntityScope ? "complex_sql_assist" : "template_library";
+  if (signals.missing && (!hasMultiEntityScope || hasRelationshipCandidate)) {
     return {
-      path,
-      pathLabel: path === "complex_sql_assist" ? "Complex SQL Assist" : "Template Library",
+      path: "template_library",
+      pathLabel: "Template Library",
       reason: hasMultiEntityScope
-        ? "Your request involves missing or unmatched records across the applied analysis scope."
+        ? "Your request asks for missing records between related tables, which matches a left-join missing-match template pattern."
         : "Your request looks like a missing-record check that can start from a data-quality template.",
       selectedScopeLabel,
       relationshipReadiness,
-      nextStep: path === "complex_sql_assist" ? "Open Complex SQL Assist." : "Open Template Library.",
-      closestMatch: path === "template_library" ? "Missing or unmatched records" : null,
-      action: path === "complex_sql_assist" ? "assist" : "templates",
+      nextStep: "Open Template Library.",
+      closestMatch: templateMatch.match,
+      templateMatchConfidence: templateMatch.confidence,
+      templateMatchReason: templateMatch.reason,
+      suggestedMetadata: templateMatch.suggestedMetadata,
+      action: "templates",
     };
   }
 
@@ -192,32 +332,43 @@ export const recommendWorkbookTaskAssistPath = ({
       relationshipReadiness,
       nextStep: "Open Report Recipes.",
       closestMatch,
+      templateMatchConfidence: "none",
+      templateMatchReason: null,
+      suggestedMetadata: templateMatch.suggestedMetadata,
       action: "recipes",
     };
   }
 
-  if (signals.summary) {
+  if (templateMatch.match && !hasMultiEntityScope) {
     return {
       path: "template_library",
       pathLabel: "Template Library",
-      reason: "Your request looks like a grouped summary, total, comparison, or breakdown.",
+      reason: templateMatch.reason || "Your request matches a reusable Template Library pattern.",
       selectedScopeLabel,
       relationshipReadiness,
       nextStep: "Open Template Library.",
-      closestMatch: "Group totals or summary template",
+      closestMatch: templateMatch.match,
+      templateMatchConfidence: templateMatch.confidence,
+      templateMatchReason: templateMatch.reason,
+      suggestedMetadata: templateMatch.suggestedMetadata,
       action: "templates",
     };
   }
 
-  if (hasMultiEntityScope || signals.multiEntityIntent) {
+  if (hasMultiEntityScope || signals.multiEntityIntent || signals.missing) {
     return {
       path: "complex_sql_assist",
       pathLabel: "Complex SQL Assist",
-      reason: "Your request appears to involve multiple tables or relationships.",
+      reason: signals.missing
+        ? "Your request involves missing or unmatched records across multiple tables."
+        : "Your request appears to involve multiple tables or relationships.",
       selectedScopeLabel,
       relationshipReadiness,
       nextStep: "Open Complex SQL Assist.",
-      closestMatch: null,
+      closestMatch: templateMatch.match,
+      templateMatchConfidence: templateMatch.confidence,
+      templateMatchReason: templateMatch.reason,
+      suggestedMetadata: templateMatch.suggestedMetadata,
       action: "assist",
     };
   }
@@ -229,7 +380,10 @@ export const recommendWorkbookTaskAssistPath = ({
     selectedScopeLabel,
     relationshipReadiness,
     nextStep: "Edit the task or open Complex SQL Assist for a manual review path.",
-    closestMatch: null,
+    closestMatch: templateMatch.match,
+    templateMatchConfidence: templateMatch.confidence,
+    templateMatchReason: templateMatch.reason,
+    suggestedMetadata: templateMatch.suggestedMetadata,
     action: "assist",
   };
 };
