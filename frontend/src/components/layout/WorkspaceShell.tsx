@@ -132,6 +132,10 @@ const productDestinations: ProductDestination[] = [
   },
 ];
 
+const visibleProductDestinations = productDestinations.filter(
+  (destination) => destination.id !== "insights",
+);
+
 const destinationByActiveView: Record<ActiveView, ProductDestinationId> = {
   welcome: "home",
   dataset: "data",
@@ -563,7 +567,7 @@ function WorkspaceShell({
             <section className="sidebar-nav-section">
               {!isSidebarCollapsed && <p>Destinations</p>}
               <div>
-                {productDestinations.map((destination) => (
+                {visibleProductDestinations.map((destination) => (
                   <div className="hub-nav-item-group" key={destination.id}>
                     <button
                       type="button"
