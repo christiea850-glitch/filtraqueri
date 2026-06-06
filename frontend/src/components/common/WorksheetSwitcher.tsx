@@ -46,31 +46,50 @@ function WorksheetSwitcher({
   return (
     <div className={className} aria-label={ariaLabel} data-worksheet-switcher-variant={variant}>
       {options.map(
-        ({ id, label, isActive, disabled, title, ariaLabel: optionAriaLabel, content, badge }) => (
-          <button
-            type="button"
-            key={id}
-            className={`${optionClassName}${isActive ? ` ${activeClassName}` : ""}`}
-            disabled={disabled}
-            onClick={() => onSelect(id)}
-            title={title}
-            aria-label={optionAriaLabel}
-          >
-            {content ?? (
-              <>
-                <span className={labelClassName}>{label}</span>
-                {badge && (
-                  <span
-                    className={badge.className || `${badgeClassName || ""} is-${badge.status}`.trim()}
-                    aria-hidden={badge.ariaHidden}
-                  >
-                    {badge.label}
-                  </span>
-                )}
-              </>
-            )}
-          </button>
-        ),
+        ({ id, label, isActive, disabled, title, ariaLabel: optionAriaLabel, content, badge }) => {
+          const classNameForOption = `${optionClassName}${isActive ? ` ${activeClassName}` : ""}`;
+          const renderedContent = content ?? (
+            <>
+              <span className={labelClassName}>{label}</span>
+              {badge && (
+                <span
+                  className={badge.className || `${badgeClassName || ""} is-${badge.status}`.trim()}
+                  aria-hidden={badge.ariaHidden}
+                >
+                  {badge.label}
+                </span>
+              )}
+            </>
+          );
+
+          if (variant === "sqlContext") {
+            return (
+              <div
+                key={id}
+                className={classNameForOption}
+                title={title}
+                aria-label={optionAriaLabel}
+                data-disabled={disabled ? "true" : undefined}
+              >
+                {renderedContent}
+              </div>
+            );
+          }
+
+          return (
+            <button
+              type="button"
+              key={id}
+              className={classNameForOption}
+              disabled={disabled}
+              onClick={() => onSelect(id)}
+              title={title}
+              aria-label={optionAriaLabel}
+            >
+              {renderedContent}
+            </button>
+          );
+        },
       )}
     </div>
   );
