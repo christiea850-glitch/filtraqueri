@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import DataTable, { type DataTableColumn, type DataTableRow } from "../common/DataTable";
 import type { ActiveResultModel } from "../../features/results/activeResultModel";
 import type { SortDirection } from "../../features/results/resultTypes";
 import {
@@ -226,6 +227,55 @@ function ResultsGrid({
     if (nextRow instanceof HTMLElement) nextRow.focus();
   };
 
+  const tableColumns: DataTableColumn[] = visibleColumns.map((column, columnIndex) => {
+    const displayName = getFriendlyColumnName(column);
+
+    return {
+      key: column,
+      className: matchingColumns.has(column) ? "is-column-match" : "",
+      header: (
+        <button type="button" onClick={() => onSortColumn(column)}>
+          <span
+            className="column-letter"
+            aria-label={`Column ${getColumnLetter(columnIndex)}`}
+            title={`Column ${getColumnLetter(columnIndex)}`}
+          >
+            {getColumnLetter(columnIndex)}
+          </span>
+          <span className="column-name" title={displayName !== column ? `${displayName} (${column})` : column}>
+            {displayName}
+            {activeSortColumn === column && <span> {activeSortDirection}</span>}
+          </span>
+          {displayName !== column && <span className="source-column-name">{column}</span>}
+        </button>
+      ),
+    };
+  });
+
+  const tableRows: DataTableRow[] = rows.map((row, rowIndex) => {
+    const rowNumber = firstVisibleRowNumber + rowIndex;
+    const structuralRow = classifyStructuralRow(row, visibleColumns);
+
+    return {
+      key: rowIndex,
+      values: row,
+      className: structuralRow.isStructural ? `is-structural-row is-${structuralRow.type}` : "",
+      tabIndex: 0,
+      onKeyDown: (event) => focusSiblingRow(event, row, rowNumber),
+      ariaLabel: `Row ${rowNumber}. ${structuralRow.label}. Press Enter to copy visible row values.`,
+      rowNumber,
+      rowHeaderClassName: `row-number-cell ${copiedCellKey === `row-${rowNumber}` ? "is-copied" : ""}`,
+      rowHeaderTitle: `${structuralRow.label}. Click to copy visible row values`,
+      rowHeaderContent: (
+        <>
+          {rowNumber}
+          {structuralRow.isStructural && <span className="row-structure-label">Report</span>}
+        </>
+      ),
+      onRowHeaderClick: () => copyVisibleRow(row, rowNumber),
+    };
+  });
+
   return (
     <section className="data-grid-section">
       <div className="data-grid-toolbar">
@@ -323,88 +373,32 @@ function ResultsGrid({
           <p>{emptyDescription}</p>
         </div>
       ) : (
-        <div className="table-container data-grid-table">
-          <table aria-label={`${title} data grid`}>
-            <thead>
-              <tr>
-                <th
-                  className="row-number-cell row-number-header"
-                  scope="col"
-                  title="Visible row number"
-                >
-                  Row
-                </th>
-                {visibleColumns.map((column, columnIndex) => {
-                  const displayName = getFriendlyColumnName(column);
-
-                  return (
-                  <th
-                    key={column}
-                    className={matchingColumns.has(column) ? "is-column-match" : ""}
-                  >
-                    <button type="button" onClick={() => onSortColumn(column)}>
-                      <span
-                        className="column-letter"
-                        aria-label={`Column ${getColumnLetter(columnIndex)}`}
-                        title={`Column ${getColumnLetter(columnIndex)}`}
-                      >
-                        {getColumnLetter(columnIndex)}
-                      </span>
-                      <span className="column-name" title={displayName !== column ? `${displayName} (${column})` : column}>
-                        {displayName}
-                        {activeSortColumn === column && <span> {activeSortDirection}</span>}
-                      </span>
-                      {displayName !== column && <span className="source-column-name">{column}</span>}
-                    </button>
-                  </th>
-                  );
-                })}
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.map((row, rowIndex) => {
-                const rowNumber = firstVisibleRowNumber + rowIndex;
-                const structuralRow = classifyStructuralRow(row, visibleColumns);
-
-                return (
-                  <tr
-                    key={rowIndex}
-                    className={structuralRow.isStructural ? `is-structural-row is-${structuralRow.type}` : ""}
-                    tabIndex={0}
-                    onKeyDown={(event) => focusSiblingRow(event, row, rowNumber)}
-                    aria-label={`Row ${rowNumber}. ${structuralRow.label}. Press Enter to copy visible row values.`}
-                  >
-                    <th
-                      className={`row-number-cell ${copiedCellKey === `row-${rowNumber}` ? "is-copied" : ""}`}
-                      scope="row"
-                      title={`${structuralRow.label}. Click to copy visible row values`}
-                      onClick={() => copyVisibleRow(row, rowNumber)}
-                    >
-                      {rowNumber}
-                      {structuralRow.isStructural && <span className="row-structure-label">Report</span>}
-                    </th>
-                    {visibleColumns.map((column) => (
-                      <td
-                        key={column}
-                        className={[
-                          matchingColumns.has(column) ? "is-column-match" : "",
-                          copiedCellKey === `${rowIndex}-${column}` ? "is-copied" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        title={`${getFriendlyColumnName(column)} (${column}): ${String(row[column] ?? "")}. Click to copy.`}
-                        onClick={() => copyCellValue(column, rowIndex, row[column])}
-                      >
-                        {String(row[column] ?? "")}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          variant="queryResult"
+          ariaLabel={`${title} data grid`}
+          wrapperClassName="table-container data-grid-table"
+          columns={tableColumns}
+          rows={tableRows}
+          showRowNumbers
+          rowNumberHeader="Row"
+          rowNumberHeaderClassName="row-number-cell row-number-header"
+          rowNumberHeaderTitle="Visible row number"
+          getCellClassName={(row, column) =>
+            [
+              matchingColumns.has(column.key) ? "is-column-match" : "",
+              copiedCellKey === `${row.key}-${column.key}` ? "is-copied" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          }
+          getCellTitle={(row, column) =>
+            `${getFriendlyColumnName(column.key)} (${column.key}): ${String(row.values[column.key] ?? "")}. Click to copy.`
+          }
+          onCellClick={(row, column) =>
+            copyCellValue(column.key, Number(row.key), row.values[column.key])
+          }
+          renderCell={(row, column) => String(row.values[column.key] ?? "")}
+        />
       )}
 
       <div className="pagination-bar">
