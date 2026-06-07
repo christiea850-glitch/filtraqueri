@@ -828,6 +828,148 @@
   box-shadow: 0 0 0 3px rgba(99, 91, 255, 0.15);
 }
 
+/* ============================================================
+ * C-7B — Worksheet-wide vs. customize-by-column toggle and
+ * type-grouped fill sub-cards
+ * ============================================================ */
+
+.clean-prepare-missing-mode-toggle {
+  display: inline-flex;
+  margin: 4px 0 14px 0;
+  padding: 4px;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.clean-prepare-missing-mode-toggle button {
+  border: 0;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.clean-prepare-missing-mode-toggle button.is-active {
+  background: #ffffff;
+  color: #4f46c9;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.clean-prepare-missing-mode-toggle button:hover:not(.is-active) {
+  color: #334155;
+}
+
+.clean-prepare-missing-type-groups {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.clean-prepare-missing-type-group {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 0;
+}
+
+.clean-prepare-missing-type-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.clean-prepare-missing-type-head strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.clean-prepare-missing-type-head span {
+  display: block;
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.clean-prepare-missing-type-status {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.clean-prepare-missing-type-status.is-pending {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.clean-prepare-missing-type-status.is-ready {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.clean-prepare-missing-type-group .clean-prepare-missing-strategy-control {
+  margin: 0;
+}
+
+.clean-prepare-missing-draft-note {
+  margin: 4px 0 12px 0;
+  padding: 8px 12px;
+  background: #f8f7ff;
+  border: 1px dashed #ddd9ff;
+  border-radius: 8px;
+  color: #4f46c9;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.clean-prepare-missing-per-column {
+  margin-top: 12px;
+}
+
+.clean-prepare-missing-per-column-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.clean-prepare-missing-per-column-head strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.clean-prepare-missing-per-column-head span {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.visually-hidden-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .clean-prepare-standard-layout {
   display: block;
 }
