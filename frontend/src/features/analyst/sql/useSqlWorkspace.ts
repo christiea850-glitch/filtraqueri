@@ -19,6 +19,7 @@ import {
   type SqlDialectId,
 } from "../../sqlIntelligence";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
+import { explainSqlQuery } from "./sqlQueryExplainer";
 import { formatRowLimitClause } from "./sqlTemplateLibrary";
 import type {
   SqlEditorInterface,
@@ -110,6 +111,24 @@ function useSqlWorkspace(
   const sqlAnalysis = useMemo(
     () => analyzeSqlWorkspaceDraft(sqlDraft, selectedDialect),
     [selectedDialect, sqlDraft],
+  );
+  const activeWorkbookWorksheet = dataset?.workbook_metadata?.worksheets.find(
+    (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
+  );
+  const activeSourceLabel = dataset
+    ? activeWorkbookWorksheet?.displayName ||
+      activeWorkbookWorksheet?.sheetName ||
+      dataset.table_name ||
+      null
+    : null;
+  const queryExplanation = useMemo(
+    () =>
+      explainSqlQuery(sqlDraft, {
+        dataset,
+        activeSourceLabel,
+        selectedDialect,
+      }),
+    [activeSourceLabel, dataset, selectedDialect, sqlDraft],
   );
   const characterCount = sqlDraft.trim().length;
 
@@ -401,6 +420,7 @@ function useSqlWorkspace(
     suggestions,
     keywordSuggestions: sqlKeywordSuggestions,
     sqlAnalysis,
+    queryExplanation,
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,

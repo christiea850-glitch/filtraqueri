@@ -56,6 +56,23 @@ export type SqlEditorInterface = {
 
 export type SqlGuidanceCard = SqlWorkspaceAnalysis["explanationCards"][number];
 
+export type SqlQueryExplanation = {
+  title: string;
+  summary: string;
+  intent: string;
+  source: string;
+  fields: string[];
+  filters: string[];
+  grouping: string[];
+  sorting: string[];
+  joins: string[];
+  outputShape: string;
+  businessMeaning: string;
+  safetyNote: string;
+  isComplex: boolean;
+  fallbackMessage: string | null;
+};
+
 export type SqlDialectOption = Pick<SqlDialectProfile, "id" | "displayName">;
 
 export type SqlDialectContext = {

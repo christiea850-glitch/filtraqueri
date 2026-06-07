@@ -358,6 +358,7 @@ function SqlWorkspace({
     editorStatus,
     previewResult,
     sqlAnalysis,
+    queryExplanation,
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,
@@ -642,6 +643,7 @@ function SqlWorkspace({
               <div className="sqlw-dock-body">
                 {bottomTab === "guidance" && (
                   <SqlGuidancePanel
+                    queryExplanation={queryExplanation}
                     diagnostics={sqlAnalysis.diagnostics}
                     guidanceCards={sqlAnalysis.explanationCards}
                     dialectContext={{ selectedDialectProfile }}

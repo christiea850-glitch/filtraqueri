@@ -4,6 +4,7 @@ import type {
   SqlDialectContext,
   SqlExecutionStatus,
   SqlGuidanceCard,
+  SqlQueryExplanation,
   SqlValidationSummary,
 } from "./sqlTypes";
 
@@ -132,6 +133,7 @@ function SqlEditorPanel({
 }
 
 type SqlGuidancePanelProps = {
+  queryExplanation: SqlQueryExplanation;
   diagnostics: SqlEditorInterface["diagnostics"];
   guidanceCards: SqlGuidanceCard[];
   dialectContext: Pick<SqlDialectContext, "selectedDialectProfile">;
@@ -139,6 +141,7 @@ type SqlGuidancePanelProps = {
 };
 
 export function SqlGuidancePanel({
+  queryExplanation,
   diagnostics,
   guidanceCards,
   dialectContext,
@@ -153,9 +156,69 @@ export function SqlGuidancePanel({
 
   return (
     <section className="sql-draft-panel" aria-label="SQL diagnostics">
-      <div className="sql-draft-list" aria-label="SQL diagnostic notes">
+      <div className="sql-guidance-sections" aria-label="SQL diagnostic notes">
         <div className="builder-block-header">
-          <span>SQL diagnostics</span>
+          <span>What this query does</span>
+          <small>{queryExplanation.isComplex ? "Review needed" : "Draft explanation"}</small>
+        </div>
+        <div
+          className={[
+            "sql-query-explanation-card",
+            queryExplanation.isComplex ? "is-complex" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <div className="sql-query-explanation-summary">
+            <strong>{queryExplanation.title}</strong>
+            <span>{queryExplanation.fallbackMessage || queryExplanation.summary}</span>
+          </div>
+          <div className="sql-query-explanation-grid">
+            <article>
+              <strong>Intent</strong>
+              <span>{queryExplanation.intent}</span>
+            </article>
+            <article>
+              <strong>Source</strong>
+              <span>{queryExplanation.source}</span>
+            </article>
+            <article>
+              <strong>Fields</strong>
+              <span>{queryExplanation.fields.join(" ")}</span>
+            </article>
+            <article>
+              <strong>Filters</strong>
+              <span>{queryExplanation.filters.join(" ")}</span>
+            </article>
+            <article>
+              <strong>Grouping / aggregation</strong>
+              <span>{queryExplanation.grouping.join(" ")}</span>
+            </article>
+            <article>
+              <strong>Sorting / limit</strong>
+              <span>{queryExplanation.sorting.join(" ")}</span>
+            </article>
+            <article>
+              <strong>Joins</strong>
+              <span>{queryExplanation.joins.join(" ")}</span>
+            </article>
+            <article>
+              <strong>Output shape</strong>
+              <span>{queryExplanation.outputShape}</span>
+            </article>
+            <article className="sql-query-explanation-wide">
+              <strong>Business meaning</strong>
+              <span>{queryExplanation.businessMeaning}</span>
+            </article>
+            <article className="sql-query-explanation-wide">
+              <strong>Safety</strong>
+              <span>{queryExplanation.safetyNote}</span>
+            </article>
+          </div>
+        </div>
+
+        <div className="builder-block-header sql-technical-diagnostics-header">
+          <span>Technical diagnostics</span>
           <small>{diagnostics.length} notes</small>
         </div>
         <div className="sql-guidance-context">
@@ -164,24 +227,26 @@ export function SqlGuidancePanel({
             {functionCount} functions | {conceptCount} concepts | {safetyCount} safety
           </span>
         </div>
-        {visibleDiagnostics.length === 0 && guidanceCards.length === 0 ? (
-          <p>No SQL diagnostics yet.</p>
-        ) : (
-          <>
-            {visibleDiagnostics.map((diagnostic) => (
-              <article key={diagnostic.id}>
-                <strong>{diagnostic.title}</strong>
-                <span>{diagnostic.message}</span>
-              </article>
-            ))}
-            {guidanceCards.map((card) => (
-              <article key={card.id}>
-                <strong>{card.title}</strong>
-                <span>{card.detail || card.summary}</span>
-              </article>
-            ))}
-          </>
-        )}
+        <div className="sql-draft-list">
+          {visibleDiagnostics.length === 0 && guidanceCards.length === 0 ? (
+            <p>No SQL diagnostics yet.</p>
+          ) : (
+            <>
+              {visibleDiagnostics.map((diagnostic) => (
+                <article key={diagnostic.id}>
+                  <strong>{diagnostic.title}</strong>
+                  <span>{diagnostic.message}</span>
+                </article>
+              ))}
+              {guidanceCards.map((card) => (
+                <article key={card.id}>
+                  <strong>{card.title}</strong>
+                  <span>{card.detail || card.summary}</span>
+                </article>
+              ))}
+            </>
+          )}
+        </div>
       </div>
     </section>
   );
