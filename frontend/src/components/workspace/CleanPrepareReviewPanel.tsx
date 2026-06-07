@@ -586,14 +586,19 @@ export function CleanPrepareReviewPanel({
         (!isPerColumnDecision || decidedColumnCount === missingValueColumns.length))
       || worksheetTypeGroupDecisionsReady
     );
-  // C-7 tri-state status for the Decisions checklist row. Combines whether a
-  // worksheet-wide decision exists with whether per-column decisions are
-  // complete (when the user opted into per-column).
-  const missingValueDecisionStatus = !worksheetDecision
-    ? "Not reviewed yet"
-    : missingValueDecisionReady
-      ? "Decisions ready"
-      : "Some decisions made";
+  // C-7C tri-state status for the Missing-value section's strong tag.
+  // Mirrors the composite logic the sidebar uses (decisionStatusCopy), but
+  // scoped to missing-value decisions specifically so the heading badge and
+  // the sidebar never disagree. The "Some decisions made" branch fires when
+  // the user has saved any worksheet-level, type-group, or per-column
+  // decision but hasn't reached the ready threshold yet.
+  const missingValueDecisionStatus = missingValueDecisionReady
+    ? "Decisions ready"
+    : Boolean(worksheetDecision) ||
+        decidedColumnCount > 0 ||
+        worksheetTypeGroupDecisionCount > 0
+      ? "Some decisions made"
+      : "Not reviewed yet";
   const worstBlankColumns = missingValueColumns.slice(0, 3);
   const selectedMissingValueApplyState: MissingValueApplyState =
     missingValueApplyStateByWorksheet[decisionWorksheetId] || { status: "idle" };
@@ -764,8 +769,11 @@ export function CleanPrepareReviewPanel({
   ).length;
   const allSuggestedFixesDecided =
     review.suggestedFixes.length > 0 && fixDecisionCount === review.suggestedFixes.length;
+  // C-7C — Include type-scoped worksheet decisions (numeric / text / date /
+  // unknown) in the draft count so the sidebar reflects partial type-group
+  // input as "Some decisions made" instead of "Not reviewed yet".
   const missingValueDraftDecisionCount =
-    (worksheetDecision ? 1 : 0) + decidedColumnCount;
+    (worksheetDecision ? 1 : 0) + decidedColumnCount + worksheetTypeGroupDecisionCount;
   const hasDraftDecisions = fixDecisionCount > 0 || missingValueDraftDecisionCount > 0;
   const decisionsReady =
     (review.suggestedFixes.length === 0 || allSuggestedFixesDecided) &&
