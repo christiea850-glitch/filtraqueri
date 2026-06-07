@@ -195,8 +195,9 @@ function SqlAssistantRoutePage({
         <span>{copy.note}</span>
       </div>
       <p className="sql-route-scope-helper">
-        Templates use the active SQL tab's applied scope. To use different
-        worksheets, switch tabs or update this tab's SQL Context.{" "}
+        Templates use the active SQL tab's applied scope and insert into the active tab only.
+        Reports follow the same active-tab context. To use different worksheets, switch tabs or
+        update this tab's SQL Context.{" "}
         {appliedScopeLabel
           ? `Current applied scope: ${appliedScopeLabel}.`
           : "No scope applied yet; using the active tab source."}{" "}

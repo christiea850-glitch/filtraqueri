@@ -2298,6 +2298,79 @@
   text-align: left;
 }
 
+.sql-tab-task-scope {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+}
+
+.sql-tab-task-scope-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sql-tab-task-scope-head span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sql-tab-task-scope-head strong {
+  min-width: 0;
+  color: #312e81;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-tab-task-scope p {
+  margin: 0;
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.sql-tab-task-scope-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sql-tab-task-scope-meta span {
+  display: inline-flex;
+  align-items: center;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-tab-task-scope small {
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
 .sql-workspace-tab-title {
   min-width: 0;
   overflow: hidden;

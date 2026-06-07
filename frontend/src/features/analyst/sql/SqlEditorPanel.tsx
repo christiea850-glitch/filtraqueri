@@ -28,6 +28,9 @@ type SqlEditorPanelProps = {
   activeSourceKindLabel?: string | null;
   selectedScopeSummary?: string | null;
   appliedScopeSummary?: string | null;
+  selectedScopeCount?: number;
+  appliedScopeCount?: number;
+  selectedTemplateLabel?: string | null;
   isContextOpen?: boolean;
   onToggleContext?: () => void;
   // Option C — Optional execution-mismatch warning. When the active SQL
@@ -63,10 +66,16 @@ function SqlEditorPanel({
   activeSourceKindLabel,
   selectedScopeSummary,
   appliedScopeSummary,
+  selectedScopeCount = 0,
+  appliedScopeCount = 0,
+  selectedTemplateLabel,
   isContextOpen,
   onToggleContext,
   sourceMismatchWarning,
 }: SqlEditorPanelProps) {
+  const hasUnappliedSelection =
+    selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
+
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
       <div className="sql-workspace-tabbar" aria-label="Open SQL tabs">
@@ -109,6 +118,29 @@ function SqlEditorPanel({
         <button type="button" className="sql-workspace-new-tab" onClick={sqlTabs.onNewTab}>
           + New tab
         </button>
+      </div>
+
+      <div className="sql-tab-task-scope" aria-label="This tab's task scope">
+        <div className="sql-tab-task-scope-head">
+          <span>This tab's task scope</span>
+          <strong>{sqlTabs.activeTabTitle || "Active SQL tab"}</strong>
+        </div>
+        <p>
+          {appliedScopeSummary
+            ? `This tab uses: ${appliedScopeSummary}`
+            : "No worksheet scope applied to this tab yet. Use SQL Context to choose worksheets for this tab."}
+        </p>
+        <div className="sql-tab-task-scope-meta" aria-label="Active tab scope status">
+          <span>{appliedScopeCount} applied</span>
+          {hasUnappliedSelection && (
+            <span>{selectedScopeCount} selected, not applied</span>
+          )}
+          {selectedTemplateLabel && <span>Template: {selectedTemplateLabel}</span>}
+        </div>
+        <small>
+          Each SQL tab keeps its own worksheets, template, and SQL draft. You do not need to
+          remove worksheets from another tab.
+        </small>
       </div>
 
       <div className="sql-editor-toolbar sql-command-bar">

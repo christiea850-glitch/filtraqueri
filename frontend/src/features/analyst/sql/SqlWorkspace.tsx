@@ -643,6 +643,9 @@ function SqlWorkspace({
           }
           selectedScopeSummary={selectedTabScopeSummary}
           appliedScopeSummary={appliedTabScopeSummary}
+          selectedScopeCount={sqlTabs.selectedScopeSelections.length}
+          appliedScopeCount={sqlTabs.appliedScopeSelections.length}
+          selectedTemplateLabel={sqlTabs.selectedTemplateLabel}
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((current) => !current)}
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}

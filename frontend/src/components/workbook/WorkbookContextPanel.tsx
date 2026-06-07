@@ -1256,7 +1256,7 @@ function WorkbookContextPanel({
               onClick={applySelectedScope}
               disabled={selectedScopeWorksheets.length === 0}
             >
-              Apply selected scope
+              {isTabControlledScope ? "Apply scope to this tab" : "Apply selected scope"}
             </button>
             <small>
               {isTabControlledScope
