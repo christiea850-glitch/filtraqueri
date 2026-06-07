@@ -14,7 +14,13 @@ import type {
   SchemaAwareQuestionDraftPlan,
 } from "../../features/questionWorkspace/questionTranslatorTypes";
 import {
+  createAnalysisScopeSelection,
+  getAnalysisScopeSourceBadge,
+  getAnalysisScopeSourceOptions,
+  getWorkbookMetadata,
   listWorkbookWorksheets,
+  type AnalysisScopeSelection,
+  type AnalysisScopeSourceType,
   type WorksheetMetadata,
 } from "../../features/workbook";
 import WorksheetSwitcher, { type WorksheetSwitcherOption } from "../common/WorksheetSwitcher";
@@ -36,6 +42,8 @@ type QuestionWorkspacePanelProps = {
   onApplyQueryBuilderRequestDraft?: (draft: GovernedQueryBuilderRequestDraft) => void;
   onAnalysisSourceSelect?: (worksheetId: string, source: "cleaned" | "original") => Promise<void>;
   onPreviewDataset?: (worksheetId: string) => void;
+  analysisScopeSelections?: AnalysisScopeSelection[];
+  onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
   cleanPrepareRestoreContext?: {
     worksheetId: string;
     scrollY: number;
@@ -674,6 +682,8 @@ function QuestionWorkspacePanel({
   onApplyQueryBuilderRequestDraft,
   onAnalysisSourceSelect,
   onPreviewDataset,
+  analysisScopeSelections,
+  onAnalysisScopeSelectionsChange,
   cleanPrepareRestoreContext,
   onCleanPrepareRestoreConsumed,
 }: QuestionWorkspacePanelProps) {
@@ -683,7 +693,11 @@ function QuestionWorkspacePanel({
   const [selectedDimension, setSelectedDimension] = useState<string | null>(null);
   const [selectedMeasure, setSelectedMeasure] = useState<string | null>(null);
   const [selectedDateField, setSelectedDateField] = useState<string | null>(null);
-  const [selectedAnalysisEntityIds, setSelectedAnalysisEntityIds] = useState<string[]>([]);
+  const [localAnalysisScopeSelections, setLocalAnalysisScopeSelections] = useState<
+    AnalysisScopeSelection[]
+  >([]);
+  const selectedAnalysisScopeSelections =
+    analysisScopeSelections ?? localAnalysisScopeSelections;
 
   const datasetContext = useMemo(
     () => [
@@ -702,12 +716,23 @@ function QuestionWorkspacePanel({
     () => createAnalysisScopeEntities(dataset, sourceName),
     [dataset, sourceName],
   );
+  const workbook = useMemo(() => getWorkbookMetadata(dataset), [dataset]);
+  const updateAnalysisScopeSelections = (next: AnalysisScopeSelection[]) => {
+    if (onAnalysisScopeSelectionsChange) {
+      onAnalysisScopeSelectionsChange(next);
+      return;
+    }
+    setLocalAnalysisScopeSelections(next);
+  };
   const selectedAnalysisEntities = useMemo(
     () =>
-      selectedAnalysisEntityIds
-        .map((entityId) => analysisScopeEntities.find((entity) => entity.id === entityId))
+      selectedAnalysisScopeSelections
+        .map((selection) => analysisScopeEntities.find((entity) => entity.id === selection.worksheetId))
         .filter((entity): entity is AnalysisScopeEntity => Boolean(entity)),
-    [analysisScopeEntities, selectedAnalysisEntityIds],
+    [analysisScopeEntities, selectedAnalysisScopeSelections],
+  );
+  const selectedAnalysisEntityIds = selectedAnalysisScopeSelections.map(
+    (selection) => selection.worksheetId,
   );
   const selectableAnalysisEntities = analysisScopeEntities.filter(
     (entity) => !selectedAnalysisEntityIds.includes(entity.id),
@@ -715,19 +740,51 @@ function QuestionWorkspacePanel({
 
   useEffect(() => {
     const availableEntityIds = new Set(analysisScopeEntities.map((entity) => entity.id));
-    setSelectedAnalysisEntityIds((current) =>
-      current.filter((entityId) => availableEntityIds.has(entityId)),
+    const nextSelections = selectedAnalysisScopeSelections.filter((selection) =>
+      availableEntityIds.has(selection.worksheetId),
     );
-  }, [analysisScopeEntities]);
+    if (nextSelections.length !== selectedAnalysisScopeSelections.length) {
+      updateAnalysisScopeSelections(nextSelections);
+    }
+  }, [analysisScopeEntities, selectedAnalysisScopeSelections]);
 
   const addAnalysisEntity = (entityId: string) => {
-    setSelectedAnalysisEntityIds((current) =>
-      current.includes(entityId) ? current : [...current, entityId],
-    );
+    if (selectedAnalysisEntityIds.includes(entityId)) return;
+    const entity = analysisScopeEntities.find((currentEntity) => currentEntity.id === entityId);
+    if (!entity) return;
+    const worksheet = workbook?.worksheets.find((currentWorksheet) => currentWorksheet.worksheetId === entityId);
+    const nextSelection = worksheet
+      ? createAnalysisScopeSelection(workbook, worksheet)
+      : {
+          worksheetId: entity.id,
+          sourceType: "original" as const,
+          tableName: entity.tableName,
+          originalTableName: entity.tableName,
+        };
+    updateAnalysisScopeSelections([...selectedAnalysisScopeSelections, nextSelection]);
   };
 
   const removeAnalysisEntity = (entityId: string) => {
-    setSelectedAnalysisEntityIds((current) => current.filter((id) => id !== entityId));
+    updateAnalysisScopeSelections(
+      selectedAnalysisScopeSelections.filter((selection) => selection.worksheetId !== entityId),
+    );
+  };
+
+  const changeAnalysisEntitySource = (
+    entityId: string,
+    sourceType: AnalysisScopeSourceType,
+  ) => {
+    const worksheet = workbook?.worksheets.find(
+      (currentWorksheet) => currentWorksheet.worksheetId === entityId,
+    );
+    if (!worksheet) return;
+    updateAnalysisScopeSelections(
+      selectedAnalysisScopeSelections.map((selection) =>
+        selection.worksheetId === entityId
+          ? createAnalysisScopeSelection(workbook, worksheet, sourceType)
+          : selection,
+      ),
+    );
   };
 
   const activeReviewQuestion = draft.draftStatus === "drafted" ? draft.rawQuestion : rawQuestion;
@@ -935,14 +992,67 @@ function QuestionWorkspacePanel({
               <div className="question-workspace-scope-chips">
                 {selectedAnalysisEntities.map((entity) => {
                   const columns = formatEntityColumnPreview(entity.columns);
+                  const selection = selectedAnalysisScopeSelections.find(
+                    (currentSelection) => currentSelection.worksheetId === entity.id,
+                  );
+                  const worksheet = workbook?.worksheets.find(
+                    (currentWorksheet) => currentWorksheet.worksheetId === entity.id,
+                  );
+                  const sourceOptions = worksheet
+                    ? getAnalysisScopeSourceOptions(workbook, worksheet)
+                    : [];
+                  const canUseCleanedCopy = sourceOptions.some(
+                    (option) =>
+                      option.sourceType === "cleaned_working_copy" && option.isAvailable,
+                  );
                   return (
                     <article key={entity.id} className="question-workspace-scope-chip">
                       <div>
                         <strong>{entity.displayName}</strong>
                         <span>{formatEntityMeta(entity)}</span>
                       </div>
+                      {selection && (
+                        <span
+                          className={`analysis-scope-source-badge is-${
+                            selection.sourceType === "cleaned_working_copy"
+                              ? "cleaned"
+                              : selection.cleanedTableName
+                                ? "available"
+                                : "original"
+                          }`}
+                        >
+                          {getAnalysisScopeSourceBadge(selection)}
+                        </span>
+                      )}
                       {columns.length > 0 && (
                         <small>{columns.join(", ")}</small>
+                      )}
+                      {selection && canUseCleanedCopy && (
+                        <div
+                          className="analysis-scope-source-toggle"
+                          aria-label={`Source version for ${entity.displayName}`}
+                        >
+                          <button
+                            type="button"
+                            className={selection.sourceType === "original" ? "is-selected" : ""}
+                            onClick={() => changeAnalysisEntitySource(entity.id, "original")}
+                          >
+                            Original
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              selection.sourceType === "cleaned_working_copy"
+                                ? "is-selected"
+                                : ""
+                            }
+                            onClick={() =>
+                              changeAnalysisEntitySource(entity.id, "cleaned_working_copy")
+                            }
+                          >
+                            Cleaned
+                          </button>
+                        </div>
                       )}
                       <button
                         type="button"

@@ -6,8 +6,13 @@ import {
   type RelationshipContractDiagnosticsResponse,
 } from "../../services/api";
 import {
+  createAnalysisScopeSelection,
   getActiveWorksheet,
+  getAnalysisScopeSourceBadge,
+  getAnalysisScopeSourceOptions,
   getWorkbookMetadata,
+  type AnalysisScopeSelection,
+  type AnalysisScopeSourceType,
   type AcceptedRelationshipContract,
   type WorkbookIngestionProfile,
   type WorksheetRelationshipCandidate,
@@ -42,6 +47,8 @@ type WorkbookContextPanelProps = {
    */
   onWorksheetSelect?: (worksheetId: string) => void;
   isSwitchingWorksheet?: boolean;
+  analysisScopeSelections?: AnalysisScopeSelection[];
+  onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
   onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
 };
 
@@ -807,15 +814,25 @@ function WorkbookContextPanel({
   onRelationshipReview,
   onWorksheetSelect,
   isSwitchingWorksheet,
+  analysisScopeSelections,
+  onAnalysisScopeSelectionsChange,
   onOpenSqlAssistantMode,
 }: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
   const relationshipRegistry = useWorkbookRelationships(workbook);
   const [diagnostics, setDiagnostics] =
     useState<RelationshipContractDiagnosticsResponse | null>(null);
-  const [selectedScopeWorksheetIds, setSelectedScopeWorksheetIds] = useState<string[]>([]);
-  const [appliedScopeWorksheetIds, setAppliedScopeWorksheetIds] = useState<string[]>([]);
+  const [localScopeSelections, setLocalScopeSelections] = useState<AnalysisScopeSelection[]>([]);
+  const selectedScopeSelections = analysisScopeSelections ?? localScopeSelections;
+  const [appliedScopeSelections, setAppliedScopeSelections] = useState<AnalysisScopeSelection[]>([]);
   const [isSqlSourceExpanded, setIsSqlSourceExpanded] = useState(false);
+  const updateScopeSelections = (next: AnalysisScopeSelection[]) => {
+    if (onAnalysisScopeSelectionsChange) {
+      onAnalysisScopeSelectionsChange(next);
+      return;
+    }
+    setLocalScopeSelections(next);
+  };
 
   useEffect(() => {
     if (!dataset || !workbook || workbook.acceptedRelationshipContracts.length === 0) {
@@ -843,15 +860,17 @@ function WorkbookContextPanel({
         .filter((worksheet) => worksheet.status === "ready" || worksheet.status === "empty")
         .map((worksheet) => worksheet.worksheetId),
     );
-    setSelectedScopeWorksheetIds((current) => {
-      const next = current.filter((worksheetId) => availableWorksheetIds.has(worksheetId));
+    const nextSelected = selectedScopeSelections.filter((selection) =>
+      availableWorksheetIds.has(selection.worksheetId),
+    );
+    if (nextSelected.length !== selectedScopeSelections.length) {
+      updateScopeSelections(nextSelected);
+    }
+    setAppliedScopeSelections((current) => {
+      const next = current.filter((selection) => availableWorksheetIds.has(selection.worksheetId));
       return next.length === current.length ? current : next;
     });
-    setAppliedScopeWorksheetIds((current) => {
-      const next = current.filter((worksheetId) => availableWorksheetIds.has(worksheetId));
-      return next.length === current.length ? current : next;
-    });
-  }, [workbook?.workbookId, workbook?.updatedAt]);
+  }, [workbook?.workbookId, workbook?.updatedAt, selectedScopeSelections]);
 
   if (!workbook) return null;
 
@@ -859,11 +878,12 @@ function WorkbookContextPanel({
   const scopeEligibleWorksheets = workbook.worksheets.filter(
     (worksheet) => worksheet.status === "ready" || worksheet.status === "empty",
   );
-  const selectedScopeWorksheets = selectedScopeWorksheetIds
-    .map((worksheetId) => scopeEligibleWorksheets.find((worksheet) => worksheet.worksheetId === worksheetId))
+  const selectedScopeWorksheetIds = selectedScopeSelections.map((selection) => selection.worksheetId);
+  const selectedScopeWorksheets = selectedScopeSelections
+    .map((selection) => scopeEligibleWorksheets.find((worksheet) => worksheet.worksheetId === selection.worksheetId))
     .filter((worksheet): worksheet is WorksheetMetadata => Boolean(worksheet));
-  const appliedScopeWorksheets = appliedScopeWorksheetIds
-    .map((worksheetId) => scopeEligibleWorksheets.find((worksheet) => worksheet.worksheetId === worksheetId))
+  const appliedScopeWorksheets = appliedScopeSelections
+    .map((selection) => scopeEligibleWorksheets.find((worksheet) => worksheet.worksheetId === selection.worksheetId))
     .filter((worksheet): worksheet is WorksheetMetadata => Boolean(worksheet));
   const selectableScopeWorksheets = scopeEligibleWorksheets.filter(
     (worksheet) => !selectedScopeWorksheetIds.includes(worksheet.worksheetId),
@@ -880,17 +900,42 @@ function WorkbookContextPanel({
     inferWorkbookRelationshipReadiness(appliedScopeWorksheets);
 
   const addScopeWorksheet = (worksheetId: string) => {
-    setSelectedScopeWorksheetIds((current) =>
-      current.includes(worksheetId) ? current : [...current, worksheetId],
+    if (selectedScopeWorksheetIds.includes(worksheetId)) return;
+    const worksheet = scopeEligibleWorksheets.find(
+      (currentWorksheet) => currentWorksheet.worksheetId === worksheetId,
     );
+    if (!worksheet) return;
+    updateScopeSelections([
+      ...selectedScopeSelections,
+      createAnalysisScopeSelection(workbook, worksheet),
+    ]);
   };
 
   const removeScopeWorksheet = (worksheetId: string) => {
-    setSelectedScopeWorksheetIds((current) => current.filter((id) => id !== worksheetId));
+    updateScopeSelections(
+      selectedScopeSelections.filter((selection) => selection.worksheetId !== worksheetId),
+    );
   };
 
   const applySelectedScope = () => {
-    setAppliedScopeWorksheetIds(selectedScopeWorksheetIds);
+    setAppliedScopeSelections(selectedScopeSelections);
+  };
+
+  const changeScopeWorksheetSource = (
+    worksheetId: string,
+    sourceType: AnalysisScopeSourceType,
+  ) => {
+    const worksheet = scopeEligibleWorksheets.find(
+      (currentWorksheet) => currentWorksheet.worksheetId === worksheetId,
+    );
+    if (!worksheet) return;
+    updateScopeSelections(
+      selectedScopeSelections.map((selection) =>
+        selection.worksheetId === worksheetId
+          ? createAnalysisScopeSelection(workbook, worksheet, sourceType)
+          : selection,
+      ),
+    );
   };
   const sqlContextSourceOptions: WorksheetSwitcherOption[] = workbook.worksheets.map((worksheet) => {
     const isActive = worksheet.worksheetId === workbook.activeWorksheetId;
@@ -1071,6 +1116,14 @@ function WorkbookContextPanel({
               ) : (
                 selectedScopeWorksheets.map((worksheet) => {
                   const columns = formatWorkbookColumnPreview(worksheet);
+                  const selection = selectedScopeSelections.find(
+                    (currentSelection) => currentSelection.worksheetId === worksheet.worksheetId,
+                  );
+                  const sourceOptions = getAnalysisScopeSourceOptions(workbook, worksheet);
+                  const canUseCleanedCopy = sourceOptions.some(
+                    (option) =>
+                      option.sourceType === "cleaned_working_copy" && option.isAvailable,
+                  );
                   return (
                     <article className="workbook-analysis-scope-chip" key={worksheet.worksheetId}>
                       <div>
@@ -1080,7 +1133,52 @@ function WorkbookContextPanel({
                           {worksheet.columnCount.toLocaleString()} columns
                         </span>
                       </div>
+                      {selection && (
+                        <span
+                          className={`analysis-scope-source-badge is-${
+                            selection.sourceType === "cleaned_working_copy"
+                              ? "cleaned"
+                              : selection.cleanedTableName
+                                ? "available"
+                                : "original"
+                          }`}
+                        >
+                          {getAnalysisScopeSourceBadge(selection)}
+                        </span>
+                      )}
                       {columns.length > 0 && <small>{columns.join(", ")}</small>}
+                      {selection && canUseCleanedCopy && (
+                        <div
+                          className="analysis-scope-source-toggle"
+                          aria-label={`Source version for ${worksheet.displayName}`}
+                        >
+                          <button
+                            type="button"
+                            className={selection.sourceType === "original" ? "is-selected" : ""}
+                            onClick={() =>
+                              changeScopeWorksheetSource(worksheet.worksheetId, "original")
+                            }
+                          >
+                            Original
+                          </button>
+                          <button
+                            type="button"
+                            className={
+                              selection.sourceType === "cleaned_working_copy"
+                                ? "is-selected"
+                                : ""
+                            }
+                            onClick={() =>
+                              changeScopeWorksheetSource(
+                                worksheet.worksheetId,
+                                "cleaned_working_copy",
+                              )
+                            }
+                          >
+                            Cleaned
+                          </button>
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => removeScopeWorksheet(worksheet.worksheetId)}

@@ -82,6 +82,8 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
       onSqlWorkspaceMetadataChange,
       onWorksheetSelect,
       isSwitchingWorksheet,
+      analysisScopeSelections,
+      onAnalysisScopeSelectionsChange,
       onAnalystViewChange,
       onSqlAssistantModeChange,
     }) =>
@@ -92,6 +94,8 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
         onMetadataChange: onSqlWorkspaceMetadataChange,
         onWorksheetSelect,
         isSwitchingWorksheet,
+        analysisScopeSelections,
+        onAnalysisScopeSelectionsChange,
         onAnalystViewChange,
         onSqlAssistantModeChange,
       }),

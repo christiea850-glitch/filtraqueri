@@ -42,6 +42,7 @@ import {
   coordinateExecutionResult,
 } from "./features/workspace/workspaceOrchestration";
 import useWorkspaceIntelligenceReports from "./features/workspace/useWorkspaceIntelligenceReports";
+import type { AnalysisScopeSelection } from "./features/workbook";
 import {
   createRuntimeNavigationSelection,
   getContextualObjectIdForView,
@@ -104,6 +105,9 @@ function App() {
     useState<CleanPrepareRestoreContext | null>(null);
   const [requestedSqlAssistantMode, setRequestedSqlAssistantMode] =
     useState<SqlAssistantMode | null>(null);
+  const [analysisScopeSelections, setAnalysisScopeSelections] = useState<
+    AnalysisScopeSelection[]
+  >([]);
   const consumeCleanPrepareRestoreContext = useCallback(
     () => setCleanPrepareRestoreContext(null),
     [],
@@ -215,6 +219,9 @@ function App() {
     },
     onDatasetContextChange: clearActiveExecution,
   });
+  useEffect(() => {
+    setAnalysisScopeSelections([]);
+  }, [dataset?.dataset_id]);
   const draftFilters = buildBackendFilters(dataset);
   const activeFilters =
     activeResultTab === "preview" ? [] : activeResult.source?.filters || draftFilters;
@@ -1241,6 +1248,8 @@ function App() {
               onApplyQueryBuilderRequestDraft={applyGovernedQueryBuilderRequestForReview}
               onAnalysisSourceSelect={handleAnalysisSourceSelect}
               onPreviewDataset={openDatasetPreview}
+              analysisScopeSelections={analysisScopeSelections}
+              onAnalysisScopeSelectionsChange={setAnalysisScopeSelections}
               cleanPrepareRestoreContext={cleanPrepareRestoreContext}
               onCleanPrepareRestoreConsumed={consumeCleanPrepareRestoreContext}
             />
@@ -1355,6 +1364,8 @@ function App() {
     onSqlWorkspaceMetadataChange: setSqlWorkspaceMetadata,
     onWorksheetSelect: handleWorksheetSelect,
     isSwitchingWorksheet,
+    analysisScopeSelections,
+    onAnalysisScopeSelectionsChange: setAnalysisScopeSelections,
     onAnalystViewChange: (view) => {
       setWorkspaceMode("analyst");
       updateDatasetSessionView(view);

@@ -2399,6 +2399,28 @@
   grid-column: 1 / -1;
 }
 
+.workbook-analysis-scope-chip .analysis-scope-source-badge {
+  justify-self: end;
+}
+
+.workbook-analysis-scope-chip .analysis-scope-source-toggle {
+  display: inline-flex;
+  grid-column: 1 / -1;
+  gap: 4px;
+}
+
+.workbook-analysis-scope-chip .analysis-scope-source-toggle button {
+  border-color: #dbeafe;
+  background: #ffffff;
+  color: #475569;
+}
+
+.workbook-analysis-scope-chip .analysis-scope-source-toggle button.is-selected {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .workbook-analysis-scope-chip button {
   padding: 4px 8px;
   border: 1px solid #cbd5e1;

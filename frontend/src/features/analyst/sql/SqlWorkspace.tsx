@@ -2,6 +2,7 @@ import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "rea
 import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
+import type { AnalysisScopeSelection } from "../../workbook";
 import DataTable, {
   type DataTableColumn,
   type DataTableRow,
@@ -20,6 +21,8 @@ type SqlWorkspaceProps = {
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
   onWorksheetSelect?: (worksheetId: string) => void;
   isSwitchingWorksheet?: boolean;
+  analysisScopeSelections?: AnalysisScopeSelection[];
+  onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
   onAnalystViewChange?: (view: ActiveView) => void;
   onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
 };
@@ -336,6 +339,8 @@ function SqlWorkspace({
   onMetadataChange,
   onWorksheetSelect,
   isSwitchingWorksheet,
+  analysisScopeSelections,
+  onAnalysisScopeSelectionsChange,
   onAnalystViewChange,
   onSqlAssistantModeChange,
 }: SqlWorkspaceProps) {
@@ -559,6 +564,8 @@ function SqlWorkspace({
                   variant="analyst"
                   onWorksheetSelect={onWorksheetSelect}
                   isSwitchingWorksheet={isSwitchingWorksheet}
+                  analysisScopeSelections={analysisScopeSelections}
+                  onAnalysisScopeSelectionsChange={onAnalysisScopeSelectionsChange}
                   onOpenSqlAssistantMode={openSqlAssistantMode}
                 />
               </div>

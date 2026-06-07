@@ -4,6 +4,12 @@ export {
   hasSuspiciousWorkbookHeaders,
 } from "./workbookHeaderWarnings";
 export {
+  createAnalysisScopeSelection,
+  getAnalysisScopeSourceBadge,
+  getAnalysisScopeSourceOptions,
+  getCleanedCopyForWorksheet,
+} from "./analysisScopeSources";
+export {
   DEFAULT_WORKBOOK_INGESTION_PROFILE,
   WORKBOOK_METADATA_NORMALIZATION_VERSION,
   generateSafeWorksheetTableName,
@@ -42,3 +48,8 @@ export type {
   WorksheetTemplateStructureEvidence,
   WorksheetTemplateStructureEvidenceType,
 } from "./workbookTypes";
+export type {
+  AnalysisScopeSelection,
+  AnalysisScopeSourceOption,
+  AnalysisScopeSourceType,
+} from "./analysisScopeSources";
