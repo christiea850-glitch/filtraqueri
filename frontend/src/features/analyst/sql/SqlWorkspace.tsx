@@ -614,7 +614,8 @@ function SqlWorkspace({
             onDialectChange: setSelectedDialect,
           }}
           workbookLabel={workbookLabel}
-          activeSourceLabel={activeSourceLabel}
+          activeSourceLabel={sqlTabs.activeTabTitle || activeSourceLabel}
+          activeSourceKindLabel={sqlTabs.activeTabSourceKind}
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((current) => !current)}
         />

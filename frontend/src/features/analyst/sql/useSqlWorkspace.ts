@@ -161,6 +161,12 @@ function useSqlWorkspace(
 
     return {
       activeTabId: tabsState.activeTabId,
+      activeTabTitle: activeTab.title,
+      activeTabSourceBadge:
+        activeTab.sourceType === "cleaned_working_copy"
+          ? activeTab.cleanedTableName || activeTab.tableName || "cleaned copy"
+          : activeTab.tableName || null,
+      activeTabSourceKind: activeTab.sourceType === "cleaned_working_copy" ? "Cleaned" : "Original",
       tabs: tabsState.tabs.map((tab) => ({
         id: tab.id,
         title: tab.title,
@@ -173,7 +179,7 @@ function useSqlWorkspace(
       onSwitchTab: switchTab,
       onCloseTab: closeTab,
     };
-  }, [closeTab, createTab, switchTab, tabsState.activeTabId, tabsState.tabs]);
+  }, [activeTab, closeTab, createTab, switchTab, tabsState.activeTabId, tabsState.tabs]);
 
   useEffect(() => {
     syncActiveDialect(normalizedMetadata.selectedDialect);

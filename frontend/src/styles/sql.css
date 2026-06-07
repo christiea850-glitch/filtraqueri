@@ -2413,6 +2413,18 @@
 }
 
 /* Switch pill — white, opens SQL Context. */
+.sql-active-source-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .sql-switch-pill {
   display: inline-flex;
   align-items: center;

@@ -61,19 +61,12 @@ function SqlAssistantRoutePage({
   const {
     selectedDialect,
     selectedDialectProfile,
+    sqlTabs,
     insertSql,
   } = useSqlWorkspace(dataset, undefined, metadata, onMetadataChange);
   const copy = pageCopy[kind];
   const allowedModes = kind === "templates" ? templateModes : reportModes;
-  const activeSourceLabel =
-    dataset?.workbook_metadata?.worksheets.find(
-      (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
-    )?.displayName ||
-    dataset?.workbook_metadata?.worksheets.find(
-      (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
-    )?.sheetName ||
-    dataset?.table_name ||
-    "No active source";
+  const activeSourceLabel = sqlTabs.activeTabTitle || "No active SQL tab";
 
   const insertAndReturnToInspectSql = (sql: string) => {
     insertSql(sql);
@@ -93,8 +86,13 @@ function SqlAssistantRoutePage({
           {dataset?.original_filename || "No dataset open"}
         </span>
         <span className="sql-route-source-pill is-active">
-          Active - {activeSourceLabel}
+          Active tab - {activeSourceLabel}
         </span>
+        {sqlTabs.activeTabSourceKind && (
+          <span className="sql-route-source-pill">
+            {sqlTabs.activeTabSourceKind}
+          </span>
+        )}
         <span>{copy.note}</span>
       </div>
 

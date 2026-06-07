@@ -94,6 +94,9 @@ export type SqlWorkspaceTabView = {
 export type SqlWorkspaceTabsInterface = {
   tabs: SqlWorkspaceTabView[];
   activeTabId: string;
+  activeTabTitle: string;
+  activeTabSourceBadge: string | null;
+  activeTabSourceKind: "Original" | "Cleaned" | null;
   onNewTab: () => void;
   onSwitchTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SqlDraftSnapshot } from "../../sqlWorkspacePersistence";
@@ -78,6 +78,13 @@ const createSeedTab = ({
 
 const createNewTabId = () => `sql-tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+const sqlWorkspaceTabsMemory = new Map<string, SqlWorkspaceTabsState>();
+
+const getTabsMemoryKey = (dataset: DatasetMetadata | null) =>
+  dataset
+    ? `${dataset.dataset_id}:${dataset.workbook_metadata?.workbookId || "flat"}`
+    : "no-dataset";
+
 const createSourceTab = ({
   source,
   dialect,
@@ -112,13 +119,35 @@ const isSameTabSource = (tab: SqlWorkspaceTab, source: SqlWorkspaceTabSource) =>
   (!source.worksheetId || tab.worksheetId === source.worksheetId);
 
 function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
-  const [tabsState, setTabsState] = useState<SqlWorkspaceTabsState>(() => {
+  const memoryKey = getTabsMemoryKey(seed.dataset);
+  const createInitialTabsState = (): SqlWorkspaceTabsState => {
     const tab = createSeedTab(seed);
     return {
       activeTabId: tab.id,
       tabs: [tab],
     };
+  };
+  const [tabsState, setTabsState] = useState<SqlWorkspaceTabsState>(() => {
+    const restoredState = sqlWorkspaceTabsMemory.get(memoryKey);
+    return restoredState || createInitialTabsState();
   });
+  const tabsStateRef = useRef(tabsState);
+
+  const commitTabsState = useCallback((updater: (currentState: SqlWorkspaceTabsState) => SqlWorkspaceTabsState) => {
+    const nextState = updater(tabsStateRef.current);
+    tabsStateRef.current = nextState;
+    sqlWorkspaceTabsMemory.set(memoryKey, nextState);
+    setTabsState(nextState);
+  }, [memoryKey]);
+
+  useEffect(() => {
+    const restoredState = sqlWorkspaceTabsMemory.get(memoryKey);
+    const nextState = restoredState || createInitialTabsState();
+
+    tabsStateRef.current = nextState;
+    sqlWorkspaceTabsMemory.set(memoryKey, nextState);
+    setTabsState(nextState);
+  }, [memoryKey]);
 
   const activeTab =
     tabsState.tabs.find((tab) => tab.id === tabsState.activeTabId) || tabsState.tabs[0];
@@ -127,13 +156,13 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
   }
 
   const updateActiveTab = useCallback((updater: (tab: SqlWorkspaceTab) => SqlWorkspaceTab) => {
-    setTabsState((currentState) => ({
+    commitTabsState((currentState) => ({
       ...currentState,
       tabs: currentState.tabs.map((tab) =>
         tab.id === currentState.activeTabId ? updater(tab) : tab,
       ),
     }));
-  }, []);
+  }, [commitTabsState]);
 
   const setActiveSqlDraft = useCallback((sqlDraft: string) => {
     updateActiveTab((tab) => ({
@@ -171,7 +200,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
 
   const replaceActiveTabDraft = useCallback((draft: SqlDraftSnapshot, options?: { activate?: boolean }) => {
     const source = getActiveSourceSnapshot(seed.dataset);
-    setTabsState((currentState) => {
+    commitTabsState((currentState) => {
       const shouldActivate = Boolean(options?.activate);
       const currentTab =
         currentState.tabs.find((tab) =>
@@ -201,7 +230,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
         ],
       };
     });
-  }, [seed.dataset]);
+  }, [commitTabsState, seed.dataset]);
 
   const createTab = useCallback(() => {
     const source = getActiveSourceSnapshot(seed.dataset);
@@ -213,12 +242,13 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
       createStarterSql: seed.createStarterSql,
     });
 
-    setTabsState((currentState) => ({
+    commitTabsState((currentState) => ({
       activeTabId: tab.id,
       tabs: [...currentState.tabs, tab],
     }));
   }, [
     activeTab.dialect,
+    commitTabsState,
     seed,
     seed.createStarterSql,
     seed.dataset,
@@ -227,7 +257,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
   ]);
 
   const openSourceTab = useCallback((source: SqlWorkspaceTabSource) => {
-    setTabsState((currentState) => {
+    commitTabsState((currentState) => {
       const existingTab = currentState.tabs.find((tab) => isSameTabSource(tab, source));
       if (existingTab) {
         return {
@@ -251,21 +281,22 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     });
   }, [
     activeTab.dialect,
+    commitTabsState,
     seed.createStarterSql,
     seed.initialEditorStatus,
     seed.initialPreviewResult,
   ]);
 
   const switchTab = useCallback((tabId: string) => {
-    setTabsState((currentState) =>
+    commitTabsState((currentState) =>
       currentState.tabs.some((tab) => tab.id === tabId)
         ? { ...currentState, activeTabId: tabId }
         : currentState,
     );
-  }, []);
+  }, [commitTabsState]);
 
   const closeTab = useCallback((tabId: string) => {
-    setTabsState((currentState) => {
+    commitTabsState((currentState) => {
       if (currentState.tabs.length <= 1) return currentState;
 
       const closingIndex = currentState.tabs.findIndex((tab) => tab.id === tabId);
@@ -282,7 +313,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
         tabs: nextTabs,
       };
     });
-  }, []);
+  }, [commitTabsState]);
 
   return {
     tabsState,
