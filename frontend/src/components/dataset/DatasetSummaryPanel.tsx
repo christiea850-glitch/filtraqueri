@@ -1216,7 +1216,7 @@ function DataCleanPreparePage({
     <FocusedWorkspaceShell
       className="data-clean-prepare-page"
       eyebrow="Dataset preparation"
-      title={`Clean / Prepare · ${sourceName}`}
+      title={`Clean & Prepare · ${sourceName}`}
       summary={headerSummary}
       backLabel="Back to Data"
       onBack={onBack}
@@ -2030,7 +2030,7 @@ function DatasetSummaryPanel({
                       <path d="M3 6h18M3 12h18M3 18h12" />
                       <path d="m17 17 2 2 4-4" />
                     </svg>
-                    Clean / Prepare
+                    Clean & Prepare
                   </button>
                 )}
                 <button
