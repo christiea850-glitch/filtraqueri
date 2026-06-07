@@ -1180,7 +1180,7 @@
 
 .sql-template-recommender-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -1200,6 +1200,104 @@
 .sql-template-recommendation-list {
   display: grid;
   gap: 8px;
+}
+
+.sql-scope-recommendation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sql-scope-recommendation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.sql-scope-recommendation-actions > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sql-scope-recommendation-actions strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sql-scope-recommendation-actions span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sql-scope-recommendation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.sql-scope-recommendation-card {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.sql-scope-recommendation-card > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.sql-scope-recommendation-card strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sql-scope-recommendation-card span,
+.sql-scope-recommendation-card p,
+.sql-scope-recommendation-card li {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sql-scope-recommendation-card p {
+  margin: 0;
+}
+
+.sql-scope-recommendation-card ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.sql-scope-recommendation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.sql-scope-recommendation-meta em,
+.sql-scope-recommendation-meta span {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
 }
 
 .sql-template-recommendation-card {

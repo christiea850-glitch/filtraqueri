@@ -603,6 +603,8 @@ function SqlWorkspace({
                   onAnalysisScopeSelectionsChange={sqlTabs.onSelectedScopeChange}
                   appliedAnalysisScopeSelections={sqlTabs.appliedScopeSelections}
                   onApplyAnalysisScope={sqlTabs.onApplyScope}
+                  taskPrompt={sqlTabs.taskPrompt}
+                  onTaskPromptChange={sqlTabs.onTaskPromptChange}
                   onOpenSqlAssistantMode={openSqlAssistantMode}
                   onOpenSqlSourceTab={openSqlSourceTab}
                 />

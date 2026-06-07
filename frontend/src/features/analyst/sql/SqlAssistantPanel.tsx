@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import type { AnalysisScopeSelection } from "../../workbook";
 import {
   buildAIMetadataContextPayload,
   checkAIProviderBoundary,
@@ -33,12 +34,17 @@ import {
 } from "./reportIntelligencePlanner";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
 import {
+  recommendSqlScope,
+  type SqlScopeRecommendation,
+} from "./sqlScopeRecommender";
+import {
   recommendSqlTemplates,
   type SqlTemplateRecommendation,
 } from "./sqlTemplateRecommender";
 
 type SqlAssistantPanelProps = {
   dataset: DatasetMetadata | null;
+  scopeRecommendationDataset?: DatasetMetadata | null;
   selectedDialect: SqlDialectId;
   selectedDialectProfile: SqlDialectProfile;
   onInsertSql: (
@@ -49,6 +55,7 @@ type SqlAssistantPanelProps = {
   allowedModes?: SqlAssistantMode[];
   taskPrompt?: string;
   onTaskPromptChange?: (prompt: string) => void;
+  onSelectedScopeChange?: (selections: AnalysisScopeSelection[]) => void;
   appliedScopeLabels?: string[];
   activeTabLabel?: string;
 };
@@ -449,6 +456,34 @@ function SqlTemplateRecommendationCard({
   );
 }
 
+function SqlScopeRecommendationCard({
+  recommendation,
+}: {
+  recommendation: SqlScopeRecommendation;
+}) {
+  return (
+    <article className="sql-scope-recommendation-card">
+      <div>
+        <strong>{recommendation.worksheetName}</strong>
+        <span>{recommendation.tableName}</span>
+      </div>
+      <div className="sql-scope-recommendation-meta">
+        <em>{recommendation.confidence}</em>
+        <span>{recommendation.rowCount.toLocaleString()} rows</span>
+        <span>{recommendation.columnCount.toLocaleString()} columns</span>
+      </div>
+      {recommendation.matchedColumns.length > 0 && (
+        <p>Columns: {recommendation.matchedColumns.join(", ")}</p>
+      )}
+      <ul>
+        {recommendation.reasons.slice(0, 2).map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
 // K10: Opportunity card. Richer than SqlReportRecipeCard because opportunities
 // carry business-question / why-it-matters copy, confidence, method, joins/
 // aggregation/date-logic/anomaly tags, and a worksheet-usage chip strip.
@@ -840,6 +875,7 @@ function ReportOpportunityList({
 
 function SqlAssistantPanel({
   dataset,
+  scopeRecommendationDataset,
   selectedDialect,
   selectedDialectProfile,
   onInsertSql,
@@ -847,6 +883,7 @@ function SqlAssistantPanel({
   allowedModes,
   taskPrompt = "",
   onTaskPromptChange,
+  onSelectedScopeChange,
   appliedScopeLabels = [],
   activeTabLabel = "active SQL tab",
 }: SqlAssistantPanelProps) {
@@ -857,6 +894,16 @@ function SqlAssistantPanel({
   const [generatedDrafts, setGeneratedDrafts] = useState<SqlTaskGenerationResult[]>([]);
   const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
   const [activeRecipeFilter, setActiveRecipeFilter] = useState<SqlReportRecipeFilter>("All");
+  const [hasRequestedScopeRecommendation, setHasRequestedScopeRecommendation] = useState(false);
+  const scopeRecommendations = useMemo(
+    () =>
+      recommendSqlScope({
+        taskPrompt,
+        dataset: scopeRecommendationDataset ?? dataset,
+        appliedScopeLabels,
+      }),
+    [appliedScopeLabels, dataset, scopeRecommendationDataset, taskPrompt],
+  );
   const templates = useMemo(
     () => createSqlAssistantTemplates(dataset, selectedDialect),
     [dataset, selectedDialect],
@@ -1060,6 +1107,15 @@ function SqlAssistantPanel({
     setHasRequestedRecommendation(true);
   };
 
+  const recommendScope = () => {
+    setHasRequestedScopeRecommendation(true);
+  };
+
+  const useSuggestedScope = () => {
+    if (scopeRecommendations.length === 0) return;
+    onSelectedScopeChange?.(scopeRecommendations.map((recommendation) => recommendation.selection));
+  };
+
   const handleTaskKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
@@ -1099,8 +1155,8 @@ function SqlAssistantPanel({
           <div>
             <strong>What do you want to do?</strong>
             <span>
-              Recommendations use the applied scope for {activeTabLabel} and existing
-              templates or reports. Nothing inserts until you choose a card.
+              Start by finding the worksheets for {activeTabLabel}. After you apply a scope,
+              FiltraQueri can recommend matching templates or reports.
             </span>
           </div>
           <em>
@@ -1118,6 +1174,7 @@ function SqlAssistantPanel({
             onChange={(event) => {
               onTaskPromptChange?.(event.target.value);
               setHasRequestedRecommendation(false);
+              setHasRequestedScopeRecommendation(false);
             }}
             placeholder="Find leases expiring soon by property"
             aria-label="Describe the SQL task for this tab"
@@ -1125,27 +1182,85 @@ function SqlAssistantPanel({
           <button
             type="button"
             className="primary-button"
+            onClick={recommendScope}
+            disabled={taskPrompt.trim().length === 0}
+          >
+            Suggest worksheets
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
             onClick={recommendTemplate}
             disabled={taskPrompt.trim().length === 0}
           >
-            Recommend template
+            Find matching template
           </button>
         </div>
-        {hasRequestedRecommendation && (
-          recommendations.length > 0 ? (
-            <div className="sql-template-recommendation-list" aria-label="Recommended templates">
-              {recommendations.map((recommendation) => (
-                <SqlTemplateRecommendationCard
-                  key={`${recommendation.kind}:${recommendation.id}`}
-                  recommendation={recommendation}
-                  onInsertSql={onInsertSql}
-                />
-              ))}
+        {taskPrompt.trim().length === 0 && (
+          <p className="sql-template-recommender-empty">
+            Describe your task first, then FiltraQueri can suggest worksheets for this tab.
+          </p>
+        )}
+        {hasRequestedScopeRecommendation && taskPrompt.trim().length > 0 && (
+          scopeRecommendations.length > 0 ? (
+            <div className="sql-scope-recommendation-list" aria-label="Recommended worksheets">
+              <div className="sql-scope-recommendation-actions">
+                <div>
+                  <strong>Suggested worksheets for this task</strong>
+                  <span>
+                    Review these worksheets, then use them for this tab's scope. Nothing is
+                    applied until you confirm.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={useSuggestedScope}
+                  disabled={!onSelectedScopeChange}
+                >
+                  Use suggested worksheets in this tab
+                </button>
+              </div>
+              <div className="sql-scope-recommendation-grid">
+                {scopeRecommendations.map((recommendation) => (
+                  <SqlScopeRecommendationCard
+                    key={recommendation.worksheetId}
+                    recommendation={recommendation}
+                  />
+                ))}
+              </div>
             </div>
           ) : (
             <p className="sql-template-recommender-empty">
-              No strong template match yet. You can choose a template manually or continue writing SQL.
+              No strong worksheet match yet. You can select worksheets manually in SQL Context.
             </p>
+          )
+        )}
+        {hasRequestedRecommendation && (
+          appliedScopeLabels.length === 0 ? (
+            <p className="sql-template-recommender-empty">
+              Apply a worksheet scope to this tab before choosing templates.
+            </p>
+          ) : (
+            recommendations.length > 0 ? (
+              <div className="sql-template-recommendation-list" aria-label="Recommended templates">
+                <div className="sql-helper-section-label">
+                  <span>Matching templates/reports</span>
+                  <small>{recommendations.length.toLocaleString()}</small>
+                </div>
+                {recommendations.map((recommendation) => (
+                  <SqlTemplateRecommendationCard
+                    key={`${recommendation.kind}:${recommendation.id}`}
+                    recommendation={recommendation}
+                    onInsertSql={onInsertSql}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="sql-template-recommender-empty">
+                No strong template match yet. You can choose a template manually or continue writing SQL.
+              </p>
+            )
           )
         )}
       </section>

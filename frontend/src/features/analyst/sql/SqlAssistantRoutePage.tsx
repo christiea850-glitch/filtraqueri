@@ -214,6 +214,7 @@ function SqlAssistantRoutePage({
 
       <SqlAssistantPanel
         dataset={assistantDataset}
+        scopeRecommendationDataset={dataset}
         selectedDialect={selectedDialect}
         selectedDialectProfile={selectedDialectProfile}
         onInsertSql={insertAndReturnToInspectSql}
@@ -221,6 +222,7 @@ function SqlAssistantRoutePage({
         allowedModes={allowedModes}
         taskPrompt={sqlTabs.taskPrompt}
         onTaskPromptChange={sqlTabs.onTaskPromptChange}
+        onSelectedScopeChange={sqlTabs.onSelectedScopeChange}
         appliedScopeLabels={appliedScopeLabels}
         activeTabLabel={activeSourceLabel}
       />
