@@ -24,6 +24,7 @@ type SqlEditorPanelProps = {
   // editor toolbar reads as a single calm Analyst command bar.
   workbookLabel?: string | null;
   activeSourceLabel?: string | null;
+  activeSourceTableLabel?: string | null;
   activeSourceKindLabel?: string | null;
   isContextOpen?: boolean;
   onToggleContext?: () => void;
@@ -50,6 +51,7 @@ function SqlEditorPanel({
   dialectContext,
   workbookLabel,
   activeSourceLabel,
+  activeSourceTableLabel,
   activeSourceKindLabel,
   isContextOpen,
   onToggleContext,
@@ -116,6 +118,14 @@ function SqlEditorPanel({
             >
               <span aria-hidden="true" className="sql-active-source-pill-dot" />
               Active · <strong>{activeSourceLabel}</strong>
+            </span>
+          )}
+          {activeSourceTableLabel && (
+            <span
+              className="sql-active-source-table"
+              title={`Source table: ${activeSourceTableLabel}`}
+            >
+              {activeSourceTableLabel}
             </span>
           )}
           {activeSourceKindLabel && (

@@ -88,6 +88,11 @@ function SqlAssistantRoutePage({
         <span className="sql-route-source-pill is-active">
           Active tab - {activeSourceLabel}
         </span>
+        {sqlTabs.activeTabSourceBadge && (
+          <span className="sql-route-source-pill">
+            {sqlTabs.activeTabSourceBadge}
+          </span>
+        )}
         {sqlTabs.activeTabSourceKind && (
           <span className="sql-route-source-pill">
             {sqlTabs.activeTabSourceKind}

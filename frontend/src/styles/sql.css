@@ -2267,9 +2267,17 @@
 }
 
 .sql-workspace-tab.is-active {
-  border-color: #c7d2fe;
+  border-color: #635bff;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 0 0 2px rgba(99, 91, 255, 0.14), 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.sql-workspace-tab.is-active .sql-workspace-tab-title {
+  color: #312e81;
+}
+
+.sql-workspace-tab.is-active .sql-workspace-tab-source {
+  color: #4f46e5;
 }
 
 .sql-workspace-tab-button,
@@ -2407,6 +2415,22 @@
 .sql-active-source-pill strong {
   color: #312a8f;
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-active-source-table {
+  display: inline-flex;
+  align-items: center;
+  max-width: 220px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 750;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

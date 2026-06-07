@@ -615,6 +615,7 @@ function SqlWorkspace({
           }}
           workbookLabel={workbookLabel}
           activeSourceLabel={sqlTabs.activeTabTitle || activeSourceLabel}
+          activeSourceTableLabel={sqlTabs.activeTabSourceBadge}
           activeSourceKindLabel={sqlTabs.activeTabSourceKind}
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((current) => !current)}

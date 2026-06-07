@@ -58,6 +58,16 @@ const createPreviewMessage = (status: SqlExecutionStatus) => {
   return "No results yet.";
 };
 
+const getTabSourceTableLabel = (tab: {
+  sourceType: "original" | "cleaned_working_copy";
+  tableName: string;
+  originalTableName?: string;
+  cleanedTableName?: string;
+}) =>
+  tab.sourceType === "cleaned_working_copy"
+    ? tab.cleanedTableName || tab.tableName || "cleaned copy"
+    : tab.originalTableName || tab.tableName || null;
+
 function useSqlWorkspace(
   dataset: DatasetMetadata | null,
   onExecutionResult?: (result: WorkspaceExecutionResult) => void,
@@ -162,15 +172,12 @@ function useSqlWorkspace(
     return {
       activeTabId: tabsState.activeTabId,
       activeTabTitle: activeTab.title,
-      activeTabSourceBadge:
-        activeTab.sourceType === "cleaned_working_copy"
-          ? activeTab.cleanedTableName || activeTab.tableName || "cleaned copy"
-          : activeTab.tableName || null,
+      activeTabSourceBadge: getTabSourceTableLabel(activeTab),
       activeTabSourceKind: activeTab.sourceType === "cleaned_working_copy" ? "Cleaned" : "Original",
       tabs: tabsState.tabs.map((tab) => ({
         id: tab.id,
         title: tab.title,
-        sourceBadge: tab.sourceType === "cleaned_working_copy" ? "cleaned copy" : tab.tableName || null,
+        sourceBadge: getTabSourceTableLabel(tab),
         isActive: tab.id === tabsState.activeTabId,
         isDirty: tab.isDirty,
         canClose: canCloseTabs,

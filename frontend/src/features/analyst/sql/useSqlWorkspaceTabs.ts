@@ -115,8 +115,9 @@ const createSourceTab = ({
 
 const isSameTabSource = (tab: SqlWorkspaceTab, source: SqlWorkspaceTabSource) =>
   tab.sourceType === source.sourceType &&
-  tab.tableName === source.tableName &&
-  (!source.worksheetId || tab.worksheetId === source.worksheetId);
+  (source.worksheetId
+    ? tab.worksheetId === source.worksheetId
+    : tab.tableName === source.tableName);
 
 function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
   const memoryKey = getTabsMemoryKey(seed.dataset);
@@ -199,7 +200,6 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
   }, [updateActiveTab]);
 
   const replaceActiveTabDraft = useCallback((draft: SqlDraftSnapshot, options?: { activate?: boolean }) => {
-    const source = getActiveSourceSnapshot(seed.dataset);
     commitTabsState((currentState) => {
       const shouldActivate = Boolean(options?.activate);
       const currentTab =
@@ -211,12 +211,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
       const nextTab = {
         ...currentTab,
         id: shouldActivate ? draft.id : currentTab.id,
-        title: draft.label || source.title,
-        worksheetId: source.worksheetId,
-        sourceType: source.sourceType,
-        tableName: source.tableName,
-        originalTableName: source.originalTableName,
-        cleanedTableName: source.cleanedTableName,
+        title: draft.label || currentTab.title,
         sqlDraft: draft.sql,
         dialect: draft.selectedDialect,
         isDirty: false,
@@ -230,7 +225,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
         ],
       };
     });
-  }, [commitTabsState, seed.dataset]);
+  }, [commitTabsState]);
 
   const createTab = useCallback(() => {
     const source = getActiveSourceSnapshot(seed.dataset);
