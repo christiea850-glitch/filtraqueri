@@ -27,6 +27,7 @@ import type {
   SqlPreviewResult,
   SqlQueryDraft,
 } from "./sqlTypes";
+import useSqlWorkspaceTabs from "./useSqlWorkspaceTabs";
 
 const createInitialSql = (tableName: string | undefined, dialect: SqlDialectId) => `SELECT *
 FROM ${tableName || "uploaded_dataset"}
@@ -70,11 +71,6 @@ function useSqlWorkspace(
     () => getActiveSqlDraftSnapshot(normalizedMetadata),
     [normalizedMetadata],
   );
-  const [sqlDraft, setSqlDraft] = useState(
-    () =>
-      restoredActiveDraft?.sql ??
-      createInitialSql(dataset?.table_name, normalizedMetadata.selectedDialect),
-  );
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>(() =>
     normalizedMetadata.snippets.map((snippet) => ({
       id: snippet.id,
@@ -84,15 +80,35 @@ function useSqlWorkspace(
       dialect: snippet.dialect,
     })),
   );
-  const [editorStatus, setEditorStatus] = useState<SqlExecutionStatus>("idle");
-  const [selectedDialect, setSelectedDialect] = useState<SqlDialectId>(
-    normalizedMetadata.selectedDialect,
+  const initialPreviewResult = useMemo<SqlPreviewResult>(
+    () => ({
+      columns: [],
+      rows: [],
+      message: createPreviewMessage("idle"),
+    }),
+    [],
   );
-  const [previewResult, setPreviewResult] = useState<SqlPreviewResult>({
-    columns: [],
-    rows: [],
-    message: createPreviewMessage("idle"),
+
+  const {
+    activeTab,
+    setActiveSqlDraft,
+    setActiveDialect,
+    syncActiveDialect,
+    setActiveEditorStatus,
+    setActivePreviewResult,
+    replaceActiveTabDraft,
+  } = useSqlWorkspaceTabs({
+    dataset,
+    restoredActiveDraft,
+    initialSql: createInitialSql(dataset?.table_name, normalizedMetadata.selectedDialect),
+    initialDialect: normalizedMetadata.selectedDialect,
+    initialPreviewResult,
+    initialEditorStatus: "idle",
   });
+  const sqlDraft = activeTab.sqlDraft;
+  const selectedDialect = activeTab.dialect;
+  const editorStatus = activeTab.editorStatus;
+  const previewResult = activeTab.previewResult;
 
   const templates = useMemo(() => (dataset ? createSqlTemplates(dataset) : []), [dataset]);
   const suggestions = useMemo(() => (dataset ? createColumnSuggestions(dataset) : []), [dataset]);
@@ -133,15 +149,20 @@ function useSqlWorkspace(
   const characterCount = sqlDraft.trim().length;
 
   useEffect(() => {
-    setSelectedDialect(normalizedMetadata.selectedDialect);
-  }, [normalizedMetadata.selectedDialect]);
+    syncActiveDialect(normalizedMetadata.selectedDialect);
+  }, [normalizedMetadata.selectedDialect, syncActiveDialect]);
 
   useEffect(() => {
     if (!restoredActiveDraft) return;
 
-    setSqlDraft(restoredActiveDraft.sql);
-    setSelectedDialect(restoredActiveDraft.selectedDialect);
-  }, [restoredActiveDraft?.id, restoredActiveDraft?.sql, restoredActiveDraft?.selectedDialect]);
+    replaceActiveTabDraft(restoredActiveDraft);
+  }, [
+    replaceActiveTabDraft,
+    restoredActiveDraft,
+    restoredActiveDraft?.id,
+    restoredActiveDraft?.sql,
+    restoredActiveDraft?.selectedDialect,
+  ]);
 
   useEffect(() => {
     setSavedDrafts(
@@ -187,14 +208,14 @@ function useSqlWorkspace(
   ]);
 
   const updateSelectedDialect = (dialect: SqlDialectId) => {
-    setSelectedDialect(dialect);
+    setActiveDialect(dialect);
     onMetadataChange?.(updateSqlWorkspaceDialect(normalizedMetadata, dialect));
   };
 
   const updateStatus = (status: SqlExecutionStatus) => {
     const message = createPreviewMessage(status);
-    setEditorStatus(status);
-    setPreviewResult({
+    setActiveEditorStatus(status);
+    setActivePreviewResult({
       columns: [],
       rows: [],
       message,
@@ -206,7 +227,7 @@ function useSqlWorkspace(
     const separator = trimmedCurrentSql ? "\n\n" : "";
     const nextSql = `${trimmedCurrentSql}${separator}${sql}`;
 
-    setSqlDraft(nextSql);
+    setActiveSqlDraft(nextSql);
     onMetadataChange?.(
       upsertActiveSqlDraftSnapshot(normalizedMetadata, {
         sql: nextSql,
@@ -313,7 +334,7 @@ function useSqlWorkspace(
   };
 
   const clearDraft = () => {
-    setSqlDraft("");
+    setActiveSqlDraft("");
     updateStatus("idle");
   };
 
@@ -325,8 +346,8 @@ function useSqlWorkspace(
     const trimmedSql = sqlDraft.trim();
 
     if (!dataset) {
-      setEditorStatus("idle");
-      setPreviewResult({
+      setActiveEditorStatus("idle");
+      setActivePreviewResult({
         columns: [],
         rows: [],
         message: "Open a dataset before running SQL.",
@@ -335,8 +356,8 @@ function useSqlWorkspace(
     }
 
     if (!trimmedSql) {
-      setEditorStatus("idle");
-      setPreviewResult({
+      setActiveEditorStatus("idle");
+      setActivePreviewResult({
         columns: [],
         rows: [],
         message: "Write a SELECT query before running SQL.",
@@ -344,8 +365,8 @@ function useSqlWorkspace(
       return;
     }
 
-    setEditorStatus("running");
-    setPreviewResult({
+    setActiveEditorStatus("running");
+    setActivePreviewResult({
       columns: [],
       rows: [],
       message: createPreviewMessage("running"),
@@ -365,16 +386,16 @@ function useSqlWorkspace(
         },
       });
 
-      setEditorStatus("success");
-      setPreviewResult({
+      setActiveEditorStatus("success");
+      setActivePreviewResult({
         columns: executionResult.outputVisibleColumns,
         rows: executionResult.outputRows,
         message: executionResult.sql?.message || createPreviewMessage("success"),
       });
       onExecutionResult?.(executionResult);
     } catch (error) {
-      setEditorStatus("error");
-      setPreviewResult({
+      setActiveEditorStatus("error");
+      setActivePreviewResult({
         columns: [],
         rows: [],
         message: error instanceof Error ? error.message : createPreviewMessage("error"),
@@ -383,7 +404,7 @@ function useSqlWorkspace(
   };
 
   const loadDraft = (draft: SqlQueryDraft) => {
-    setSqlDraft(draft.sql);
+    setActiveSqlDraft(draft.sql);
     onMetadataChange?.(
       upsertActiveSqlDraftSnapshot(normalizedMetadata, {
         id: draft.id,
@@ -392,13 +413,13 @@ function useSqlWorkspace(
         selectedDialect: draft.dialect,
       }),
     );
-    setSelectedDialect(draft.dialect);
+    setActiveDialect(draft.dialect);
     updateStatus("idle");
   };
 
   const editor: SqlEditorInterface = {
     value: sqlDraft,
-    onChange: setSqlDraft,
+    onChange: setActiveSqlDraft,
     onRun: runDraft,
     onExplain: explainDraft,
     onSaveDraft: saveDraft,
