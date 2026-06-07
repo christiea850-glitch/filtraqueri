@@ -117,6 +117,10 @@ function useSqlWorkspace(
     syncActiveDialect,
     setActiveEditorStatus,
     setActivePreviewResult,
+    setActiveTabSelectedScope,
+    applyActiveTabScope,
+    setActiveTabTaskPrompt,
+    markActiveTabTemplate,
     replaceActiveTabDraft,
   } = useSqlWorkspaceTabs({
     dataset,
@@ -204,6 +208,14 @@ function useSqlWorkspace(
       activeTabTitle: activeTab.title,
       activeTabSourceBadge: getTabSourceTableLabel(activeTab),
       activeTabSourceKind: activeTab.sourceType === "cleaned_working_copy" ? "Cleaned" : "Original",
+      selectedScopeSelections: activeTab.selectedScopeSelections || [],
+      appliedScopeSelections: activeTab.appliedScopeSelections || [],
+      taskPrompt: activeTab.taskPrompt || "",
+      selectedTemplateLabel: activeTab.selectedTemplateLabel || null,
+      onSelectedScopeChange: setActiveTabSelectedScope,
+      onApplyScope: applyActiveTabScope,
+      onTaskPromptChange: setActiveTabTaskPrompt,
+      onMarkTemplate: markActiveTabTemplate,
       tabs: tabsState.tabs.map((tab) => ({
         id: tab.id,
         title: tab.title,
@@ -216,7 +228,18 @@ function useSqlWorkspace(
       onSwitchTab: switchTab,
       onCloseTab: closeTab,
     };
-  }, [activeTab, closeTab, createTab, switchTab, tabsState.activeTabId, tabsState.tabs]);
+  }, [
+    activeTab,
+    applyActiveTabScope,
+    closeTab,
+    createTab,
+    markActiveTabTemplate,
+    setActiveTabSelectedScope,
+    setActiveTabTaskPrompt,
+    switchTab,
+    tabsState.activeTabId,
+    tabsState.tabs,
+  ]);
 
   useEffect(() => {
     syncActiveDialect(normalizedMetadata.selectedDialect);

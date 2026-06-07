@@ -2449,6 +2449,31 @@
   font-weight: 750;
 }
 
+.sql-active-scope-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 280px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-active-scope-pill strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #14532d;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sql-switch-pill {
   display: inline-flex;
   align-items: center;

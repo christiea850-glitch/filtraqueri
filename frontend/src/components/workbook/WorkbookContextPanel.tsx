@@ -50,6 +50,8 @@ type WorkbookContextPanelProps = {
   isSwitchingWorksheet?: boolean;
   analysisScopeSelections?: AnalysisScopeSelection[];
   onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
+  appliedAnalysisScopeSelections?: AnalysisScopeSelection[];
+  onApplyAnalysisScope?: (selections: AnalysisScopeSelection[]) => void;
   onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
   onOpenSqlSourceTab?: (source: SqlWorkspaceTabSource) => void;
 };
@@ -818,6 +820,8 @@ function WorkbookContextPanel({
   isSwitchingWorksheet,
   analysisScopeSelections,
   onAnalysisScopeSelectionsChange,
+  appliedAnalysisScopeSelections,
+  onApplyAnalysisScope,
   onOpenSqlAssistantMode,
   onOpenSqlSourceTab,
 }: WorkbookContextPanelProps) {
@@ -827,7 +831,9 @@ function WorkbookContextPanel({
     useState<RelationshipContractDiagnosticsResponse | null>(null);
   const [localScopeSelections, setLocalScopeSelections] = useState<AnalysisScopeSelection[]>([]);
   const selectedScopeSelections = analysisScopeSelections ?? localScopeSelections;
-  const [appliedScopeSelections, setAppliedScopeSelections] = useState<AnalysisScopeSelection[]>([]);
+  const [localAppliedScopeSelections, setLocalAppliedScopeSelections] = useState<AnalysisScopeSelection[]>([]);
+  const appliedScopeSelections = appliedAnalysisScopeSelections ?? localAppliedScopeSelections;
+  const isTabControlledScope = variant === "analyst" && Boolean(onApplyAnalysisScope);
   const [isSqlSourceExpanded, setIsSqlSourceExpanded] = useState(false);
   const updateScopeSelections = (next: AnalysisScopeSelection[]) => {
     if (onAnalysisScopeSelectionsChange) {
@@ -869,7 +875,8 @@ function WorkbookContextPanel({
     if (nextSelected.length !== selectedScopeSelections.length) {
       updateScopeSelections(nextSelected);
     }
-    setAppliedScopeSelections((current) => {
+    if (appliedAnalysisScopeSelections) return;
+    setLocalAppliedScopeSelections((current) => {
       const next = current.filter((selection) => availableWorksheetIds.has(selection.worksheetId));
       return next.length === current.length ? current : next;
     });
@@ -921,7 +928,11 @@ function WorkbookContextPanel({
   };
 
   const applySelectedScope = () => {
-    setAppliedScopeSelections(selectedScopeSelections);
+    if (onApplyAnalysisScope) {
+      onApplyAnalysisScope(selectedScopeSelections);
+      return;
+    }
+    setLocalAppliedScopeSelections(selectedScopeSelections);
   };
 
   const changeScopeWorksheetSource = (
@@ -1123,7 +1134,9 @@ function WorkbookContextPanel({
             <small>{selectedScopeWorksheets.length.toLocaleString()} selected</small>
           </div>
           <p className="workbook-analysis-scope-copy">
-            Choose the tables or sheets that belong to this analysis. FiltraQueri will use this scope to prepare safer suggestions and reports.
+            {isTabControlledScope
+              ? "This scope belongs to the active SQL tab. It helps templates and reports. Run Query still only runs the SQL written in this tab."
+              : "Choose the tables or sheets that belong to this analysis. FiltraQueri will use this scope to prepare safer suggestions and reports."}
           </p>
           <div className="workbook-analysis-scope-layout">
             <div className="workbook-analysis-scope-options" aria-label="Available analysis entities">
@@ -1246,7 +1259,9 @@ function WorkbookContextPanel({
               Apply selected scope
             </button>
             <small>
-              Metadata-only confirmation. This does not change the active SQL source or run a query.
+              {isTabControlledScope
+                ? "Tab context only. This does not change the active SQL source or run a query."
+                : "Metadata-only confirmation. This does not change the active SQL source or run a query."}
             </small>
           </div>
           {appliedScopeWorksheets.length > 0 && (

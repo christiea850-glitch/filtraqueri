@@ -26,6 +26,8 @@ type SqlEditorPanelProps = {
   activeSourceLabel?: string | null;
   activeSourceTableLabel?: string | null;
   activeSourceKindLabel?: string | null;
+  selectedScopeSummary?: string | null;
+  appliedScopeSummary?: string | null;
   isContextOpen?: boolean;
   onToggleContext?: () => void;
   // Option C — Optional execution-mismatch warning. When the active SQL
@@ -59,6 +61,8 @@ function SqlEditorPanel({
   activeSourceLabel,
   activeSourceTableLabel,
   activeSourceKindLabel,
+  selectedScopeSummary,
+  appliedScopeSummary,
   isContextOpen,
   onToggleContext,
   sourceMismatchWarning,
@@ -137,6 +141,14 @@ function SqlEditorPanel({
           )}
           {activeSourceKindLabel && (
             <span className="sql-active-source-kind">{activeSourceKindLabel}</span>
+          )}
+          {(appliedScopeSummary || selectedScopeSummary) && (
+            <span
+              className="sql-active-scope-pill"
+              title="This scope belongs to the active SQL tab. It helps templates and reports; Run Query still only runs this tab's SQL."
+            >
+              Scope - <strong>{appliedScopeSummary || selectedScopeSummary}</strong>
+            </span>
           )}
           {onToggleContext && (
             <button

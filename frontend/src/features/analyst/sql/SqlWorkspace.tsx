@@ -54,6 +54,24 @@ const createSqlPreview = (sql: string) => {
   return normalized.length > 150 ? `${normalized.slice(0, 150)}...` : normalized;
 };
 
+const formatSqlTabScopeSummary = (
+  dataset: DatasetMetadata | null,
+  selections: AnalysisScopeSelection[],
+) => {
+  if (selections.length === 0) return null;
+  const worksheets = dataset?.workbook_metadata?.worksheets || [];
+  const labels = selections.map((selection) => {
+    const worksheet = worksheets.find((current) => current.worksheetId === selection.worksheetId);
+    return worksheet?.displayName || worksheet?.sheetName || selection.tableName;
+  });
+  const visibleLabels = labels.slice(0, 3);
+  const remainingCount = Math.max(0, labels.length - visibleLabels.length);
+
+  return remainingCount > 0
+    ? `${visibleLabels.join(", ")} +${remainingCount}`
+    : visibleLabels.join(", ");
+};
+
 function SqlFocusedResultPreview({
   previewResult,
   onBack,
@@ -339,8 +357,6 @@ function SqlWorkspace({
   onMetadataChange,
   onWorksheetSelect,
   isSwitchingWorksheet,
-  analysisScopeSelections,
-  onAnalysisScopeSelectionsChange,
   onAnalystViewChange,
   onSqlAssistantModeChange,
 }: SqlWorkspaceProps) {
@@ -384,6 +400,14 @@ function SqlWorkspace({
   // "Active · {worksheet}" pill.
   const workbookLabel = dataset?.original_filename || null;
   const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
+  const selectedTabScopeSummary = formatSqlTabScopeSummary(
+    dataset,
+    sqlTabs.selectedScopeSelections,
+  );
+  const appliedTabScopeSummary = formatSqlTabScopeSummary(
+    dataset,
+    sqlTabs.appliedScopeSelections,
+  );
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
@@ -575,8 +599,10 @@ function SqlWorkspace({
                   variant="analyst"
                   onWorksheetSelect={onWorksheetSelect}
                   isSwitchingWorksheet={isSwitchingWorksheet}
-                  analysisScopeSelections={analysisScopeSelections}
-                  onAnalysisScopeSelectionsChange={onAnalysisScopeSelectionsChange}
+                  analysisScopeSelections={sqlTabs.selectedScopeSelections}
+                  onAnalysisScopeSelectionsChange={sqlTabs.onSelectedScopeChange}
+                  appliedAnalysisScopeSelections={sqlTabs.appliedScopeSelections}
+                  onApplyAnalysisScope={sqlTabs.onApplyScope}
                   onOpenSqlAssistantMode={openSqlAssistantMode}
                   onOpenSqlSourceTab={openSqlSourceTab}
                 />
@@ -615,6 +641,8 @@ function SqlWorkspace({
               ? "Cleaned"
               : "Original"
           }
+          selectedScopeSummary={selectedTabScopeSummary}
+          appliedScopeSummary={appliedTabScopeSummary}
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((current) => !current)}
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}

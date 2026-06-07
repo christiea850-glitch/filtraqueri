@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SqlDraftSnapshot } from "../../sqlWorkspacePersistence";
+import type { AnalysisScopeSelection } from "../../workbook";
 import type { SqlExecutionStatus, SqlPreviewResult } from "./sqlTypes";
 import type {
   SqlWorkspaceTab,
@@ -67,6 +68,8 @@ const createSeedTab = ({
     tableName: source.tableName,
     originalTableName: source.originalTableName,
     cleanedTableName: source.cleanedTableName,
+    selectedScopeSelections: [],
+    appliedScopeSelections: [],
     sqlDraft: restoredActiveDraft?.sql ?? initialSql,
     dialect: restoredActiveDraft?.selectedDialect || initialDialect,
     previewResult: initialPreviewResult,
@@ -105,6 +108,8 @@ const createSourceTab = ({
   tableName: source.tableName,
   originalTableName: source.originalTableName,
   cleanedTableName: source.cleanedTableName,
+  selectedScopeSelections: [],
+  appliedScopeSelections: [],
   sqlDraft: createStarterSql(source.tableName, dialect),
   dialect,
   previewResult,
@@ -196,6 +201,39 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     updateActiveTab((tab) => ({
       ...tab,
       previewResult,
+    }));
+  }, [updateActiveTab]);
+
+  const setActiveTabSelectedScope = useCallback((selections: AnalysisScopeSelection[]) => {
+    updateActiveTab((tab) => ({
+      ...tab,
+      selectedScopeSelections: selections,
+      isDirty: true,
+    }));
+  }, [updateActiveTab]);
+
+  const applyActiveTabScope = useCallback(() => {
+    updateActiveTab((tab) => ({
+      ...tab,
+      appliedScopeSelections: tab.selectedScopeSelections || [],
+      isDirty: true,
+    }));
+  }, [updateActiveTab]);
+
+  const setActiveTabTaskPrompt = useCallback((taskPrompt: string) => {
+    updateActiveTab((tab) => ({
+      ...tab,
+      taskPrompt,
+      isDirty: true,
+    }));
+  }, [updateActiveTab]);
+
+  const markActiveTabTemplate = useCallback((template: { id?: string; label?: string }) => {
+    updateActiveTab((tab) => ({
+      ...tab,
+      selectedTemplateId: template.id,
+      selectedTemplateLabel: template.label,
+      isDirty: true,
     }));
   }, [updateActiveTab]);
 
@@ -322,6 +360,10 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     syncActiveDialect,
     setActiveEditorStatus,
     setActivePreviewResult,
+    setActiveTabSelectedScope,
+    applyActiveTabScope,
+    setActiveTabTaskPrompt,
+    markActiveTabTemplate,
     replaceActiveTabDraft,
   };
 }

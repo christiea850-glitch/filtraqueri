@@ -6,6 +6,7 @@ import type {
   SqlValidationResult,
   SqlWorkspaceAnalysis,
 } from "../../sqlIntelligence";
+import type { AnalysisScopeSelection } from "../../workbook";
 
 export type SqlExecutionStatus =
   | "idle"
@@ -97,6 +98,14 @@ export type SqlWorkspaceTabsInterface = {
   activeTabTitle: string;
   activeTabSourceBadge: string | null;
   activeTabSourceKind: "Original" | "Cleaned" | null;
+  selectedScopeSelections: AnalysisScopeSelection[];
+  appliedScopeSelections: AnalysisScopeSelection[];
+  taskPrompt: string;
+  selectedTemplateLabel: string | null;
+  onSelectedScopeChange: (selections: AnalysisScopeSelection[]) => void;
+  onApplyScope: () => void;
+  onTaskPromptChange: (prompt: string) => void;
+  onMarkTemplate: (template: { id?: string; label?: string }) => void;
   onNewTab: () => void;
   onSwitchTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
