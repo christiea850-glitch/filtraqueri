@@ -1297,6 +1297,7 @@ function DataCleanPreparePage({
         onPreviewDataset={onPreviewWorksheet}
         restoreContext={cleanPrepareRestoreContext}
         onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
+        onContinueInAnalyst={onContinueInAnalyst}
         activeStep={step}
         embedded
       />

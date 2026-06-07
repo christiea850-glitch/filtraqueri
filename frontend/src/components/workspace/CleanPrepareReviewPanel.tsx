@@ -58,6 +58,7 @@ type CleanPrepareReviewPanelProps = {
     requestId: number;
   } | null;
   onRestoreContextConsumed?: () => void;
+  onContinueInAnalyst?: () => void;
   // When true, the panel is mounted inside a dedicated page (FocusedWorkspaceShell)
   // that already provides intro framing and Back navigation. We then skip the
   // internal "Intelligence Assistant" intro header and the toggle pill, and
@@ -389,6 +390,7 @@ export function CleanPrepareReviewPanel({
   onPreviewDataset,
   restoreContext,
   onRestoreContextConsumed,
+  onContinueInAnalyst,
   embedded = false,
   activeStep = "review",
 }: CleanPrepareReviewPanelProps) {
@@ -621,6 +623,20 @@ export function CleanPrepareReviewPanel({
     recipePreview.recipe.length > 0 &&
     recipeStatus === "success" &&
     selectedWorksheet?.status === "ready";
+  const selectedWorksheetName =
+    selectedWorksheet?.displayName || selectedWorksheet?.sheetName || "Selected worksheet";
+  const selectedWorksheetStatusLabel = isUsingCleanedCopy
+    ? "Active cleaned copy"
+    : hasCleanedWorkingCopy
+      ? "Cleaned copy available"
+      : recipePreview
+        ? "Preview only"
+        : "Original";
+  const selectedWorksheetChangeSummary = recipePreview
+    ? recipePreview.recipe.length > 0
+      ? `${pluralise(recipePreview.recipe.length, "draft recipe step")} ready to review.`
+      : "No cleaning recipe is needed for this worksheet."
+    : "Choose a ready worksheet to preview its draft cleaning recipe.";
   type StatusChecklistState = "complete" | "active" | "available" | "pending" | "needs-decision";
   const hasDraftDecisions = Boolean(worksheetDecision) || decidedColumnCount > 0;
   const statusChecklistItems: Array<{
@@ -1235,13 +1251,25 @@ export function CleanPrepareReviewPanel({
             hidden={embedded && activeStep !== "apply"}
           >
             {supportsRecipePreview && worksheets.length > 0 && (
-            <section className="clean-prepare-recipe-preview">
+            <>
+              {embedded && (
+                <div className="clean-prepare-apply-step-heading">
+                  <p className="section-label">Step 3 &middot; Apply</p>
+                  <h4>Create the cleaned working copy</h4>
+                  <p>Create a cleaned working copy for each worksheet. Originals stay intact.</p>
+                </div>
+              )}
+            <section className={embedded ? "clean-prepare-apply-card" : "clean-prepare-recipe-preview"}>
               <div className="clean-prepare-section-heading">
                 <div>
-                  <h4>{embedded ? "Step 3: Preview cleaned working copy" : "Preview cleaned working copy"}</h4>
-                  <p>Review a proposed analysis shape for one worksheet at a time.</p>
+                  <h4>{embedded ? selectedWorksheetName : "Preview cleaned working copy"}</h4>
+                  <p>
+                    {embedded
+                      ? "Review the draft shape for this worksheet before creating a cleaned copy."
+                      : "Review a proposed analysis shape for one worksheet at a time."}
+                  </p>
                 </div>
-                <strong>{embedded ? "No changes applied yet" : "Preview only"}</strong>
+                <strong>{embedded ? selectedWorksheetStatusLabel : "Preview only"}</strong>
               </div>
 
               <div className="clean-prepare-worksheet-tabs" aria-label="Cleaning recipe worksheets">
@@ -1287,7 +1315,7 @@ export function CleanPrepareReviewPanel({
               )}
 
               {embedded && selectedWorksheet && (
-                <div className="clean-prepare-workbook-summary" aria-live="polite">
+                <div className="clean-prepare-apply-card-summary" aria-live="polite">
                   <strong>
                     {isUsingCleanedCopy
                       ? "Using cleaned copy"
@@ -1302,6 +1330,7 @@ export function CleanPrepareReviewPanel({
                         ? "You can activate the cleaned copy when you are ready to use it for analysis."
                         : "Create a cleaned working copy after reviewing the preview. The original workbook remains unchanged."}
                   </p>
+                  <span>{selectedWorksheetChangeSummary}</span>
                 </div>
               )}
 
@@ -1420,7 +1449,7 @@ export function CleanPrepareReviewPanel({
                       {selectedWorksheetApplyState.status === "idle" && (
                         <>
                           {embedded && (
-                            <h4>Step 4: Create / activate cleaned working copy</h4>
+                            <h4>Create cleaned working copy</h4>
                           )}
                           <p className="clean-prepare-apply-helper">
                             The original workbook will not be changed. A new cleaned table is created alongside the existing analysis table.
@@ -1603,6 +1632,7 @@ export function CleanPrepareReviewPanel({
                 </p>
               )}
               </section>
+            </>
             )}
 
             <section className="clean-prepare-draft-status">
@@ -1628,6 +1658,23 @@ export function CleanPrepareReviewPanel({
               </>
             )}
             </section>
+            {embedded && onContinueInAnalyst && (
+              <section className="clean-prepare-analyst-handoff">
+                <div>
+                  <strong>Ready for analysis?</strong>
+                  <p>
+                    Continue when you're ready to analyze the active source. Run Query stays manual in Analyst.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={onContinueInAnalyst}
+                >
+                  Continue in Analyst &rarr;
+                </button>
+              </section>
+            )}
           </div>
             </div>
 
