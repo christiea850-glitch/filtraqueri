@@ -3,18 +3,23 @@ import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 import type { CleanPrepareStep } from "../../features/cleanPrepare/useCleanPrepareStep";
 import { buildPreparationSignalReport } from "../../features/dataPreparation/preparationSignals";
 import {
+  classifyColumnMissingTypeGroup,
   createMissingValueDecision,
   createMissingValueDecisionKey,
   decisionNeedsCustomValue,
   getColumnMissingValueStrategies,
+  getWorksheetMissingTypeDecisionColumn,
+  getWorksheetMissingTypeStrategies,
   missingValueStrategyHelpers,
   missingValueStrategyLabels,
   missingValueStrategyShortLabels,
   readMissingValueDecisions,
   WORKSHEET_DECISION_COLUMN,
+  worksheetMissingTypeGroupLabels,
   worksheetMissingValueStrategies,
   writeMissingValueDecisions,
   type MissingValueStrategy,
+  type WorksheetMissingTypeGroup,
 } from "../../features/dataPreparation/missingValueDecisions";
 import {
   getWorkbookMetadata,
@@ -453,6 +458,13 @@ export function CleanPrepareReviewPanel({
   const [fixDecisionDrafts, setFixDecisionDrafts] = useState<
     Record<string, SuggestedFixDecision>
   >({});
+  // C-7B — UI view mode for the Missing-value handling card. "wide" shows
+  // type-grouped fill choices for the whole worksheet; "perColumn" reveals
+  // the existing per-column override UI from C-7. Defaults to "perColumn"
+  // when the user already saved decide_per_column on the worksheet decision.
+  const [missingValueViewMode, setMissingValueViewMode] = useState<
+    "wide" | "perColumn"
+  >("wide");
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
   const issueGroups = useMemo(
     () =>
@@ -505,10 +517,75 @@ export function CleanPrepareReviewPanel({
       (!decisionNeedsCustomValue(decision.strategy) || decision.customValue?.trim()),
     );
   }).length;
+  // C-7B — Group missing-value columns by type so the worksheet-wide UI can
+  // expose type-aware fill choices (Replace with 0 / mean / Unknown / etc.).
+  const missingValueColumnsByGroup = useMemo(() => {
+    const groups: Record<WorksheetMissingTypeGroup, typeof missingValueColumns> = {
+      numeric: [],
+      text: [],
+      date: [],
+      unknown: [],
+    };
+    for (const column of missingValueColumns) {
+      groups[classifyColumnMissingTypeGroup(column.inferred_type)].push(column);
+    }
+    return groups;
+  }, [missingValueColumns]);
+
+  const presentMissingTypeGroups = useMemo<WorksheetMissingTypeGroup[]>(
+    () =>
+      (["numeric", "text", "date", "unknown"] as WorksheetMissingTypeGroup[]).filter(
+        (group) => missingValueColumnsByGroup[group].length > 0,
+      ),
+    [missingValueColumnsByGroup],
+  );
+
+  // C-7B — Tally how many of the present type-groups have a saved decision.
+  // Drives the readiness logic so users get credit for picking worksheet-wide
+  // type-aware fills (not just the legacy "treatment" worksheet strategies).
+  const worksheetTypeGroupDecisionCount = useMemo(() => {
+    let count = 0;
+    for (const group of presentMissingTypeGroups) {
+      const key = createMissingValueDecisionKey(
+        dataset.dataset_id,
+        decisionWorksheetId,
+        getWorksheetMissingTypeDecisionColumn(group),
+      );
+      const decision = missingValueDecisions[key];
+      if (
+        decision &&
+        (!decisionNeedsCustomValue(decision.strategy) || decision.customValue?.trim())
+      ) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [
+    presentMissingTypeGroups,
+    missingValueDecisions,
+    dataset.dataset_id,
+    decisionWorksheetId,
+  ]);
+
+  const worksheetTypeGroupDecisionsReady =
+    presentMissingTypeGroups.length > 0 &&
+    worksheetTypeGroupDecisionCount === presentMissingTypeGroups.length;
+
+  // C-7B — Sync the view-mode toggle with the persisted worksheet decision
+  // when the user navigates back to this worksheet. If they previously chose
+  // decide_per_column the UI lands in per-column view; otherwise it stays
+  // on the type-grouped worksheet-wide view.
+  useEffect(() => {
+    setMissingValueViewMode(isPerColumnDecision ? "perColumn" : "wide");
+  }, [decisionWorksheetId, isPerColumnDecision]);
+
   const missingValueDecisionReady =
     missingValueColumns.length > 0 &&
-    Boolean(worksheetDecision) &&
-    (!isPerColumnDecision || decidedColumnCount === missingValueColumns.length);
+    (
+      (Boolean(worksheetDecision) &&
+        (!isPerColumnDecision || decidedColumnCount === missingValueColumns.length))
+      || worksheetTypeGroupDecisionsReady
+    );
   // C-7 tri-state status for the Decisions checklist row. Combines whether a
   // worksheet-wide decision exists with whether per-column decisions are
   // complete (when the user opted into per-column).
@@ -1152,56 +1229,202 @@ export function CleanPrepareReviewPanel({
               </div>
 
               {/*
-                C-7 — Worksheet-wide strategy as a radio-card cluster.
-                Mirrors the C-6 cleaning-fix decision pattern: one fieldset,
-                radio inputs labelled with the short user-facing copy from
-                missingValueStrategyShortLabels, and a one-line helper from
-                missingValueStrategyHelpers. The user can switch to per-
-                column customisation by picking "Customize per column"
-                (decide_per_column), which reveals the per-column section
-                below — that is the explicit opt-in for per-column overrides.
+                C-7B — Prominent "Customize by column" toggle. Switches the
+                Missing-value handling card between worksheet-wide type-grouped
+                fills (default) and the per-column override UI from C-7.
               */}
-              <fieldset className="clean-prepare-missing-strategy-control">
-                <legend>Worksheet strategy</legend>
-                <p className="clean-prepare-missing-strategy-helper">
-                  Applies to all blanks in this worksheet unless you customise
-                  individual columns below. Nothing changes until Apply.
-                </p>
-                <div className="clean-prepare-missing-strategy-options">
-                  {worksheetMissingValueStrategies.map((strategy) => {
-                    const isSelected = worksheetDecision?.strategy === strategy;
+              <div className="clean-prepare-missing-mode-toggle" role="group" aria-label="Choose how to apply missing-value strategies">
+                <button
+                  type="button"
+                  className={missingValueViewMode === "wide" ? "is-active" : ""}
+                  onClick={() => {
+                    setMissingValueViewMode("wide");
+                    // Clear decide_per_column so the worksheet decision no
+                    // longer pins the user into per-column mode.
+                    if (isPerColumnDecision) {
+                      saveMissingValueDecision(worksheetDecisionKey, "leave_unchanged");
+                    }
+                  }}
+                  aria-pressed={missingValueViewMode === "wide"}
+                >
+                  Worksheet-wide
+                </button>
+                <button
+                  type="button"
+                  className={missingValueViewMode === "perColumn" ? "is-active" : ""}
+                  onClick={() => {
+                    setMissingValueViewMode("perColumn");
+                    saveMissingValueDecision(worksheetDecisionKey, "decide_per_column");
+                  }}
+                  aria-pressed={missingValueViewMode === "perColumn"}
+                >
+                  Customize by column
+                </button>
+              </div>
+
+              {/*
+                C-7B — Type-grouped worksheet-wide fill choices. Visible when
+                missingValueViewMode === "wide". Each present column type
+                (numeric / text / date / unknown) gets its own sub-card with
+                a radio cluster pulling from getWorksheetMissingTypeStrategies.
+                Each cluster persists to its own type-scoped decision key
+                inside the existing localStorage map — no new persistence
+                layer. The choices the user picks here become draft state;
+                nothing applies until Step 3 Apply.
+              */}
+              {missingValueViewMode === "wide" && presentMissingTypeGroups.length > 0 && (
+                <div className="clean-prepare-missing-type-groups">
+                  {presentMissingTypeGroups.map((group) => {
+                    const groupColumns = missingValueColumnsByGroup[group];
+                    const groupKey = createMissingValueDecisionKey(
+                      dataset.dataset_id,
+                      decisionWorksheetId,
+                      getWorksheetMissingTypeDecisionColumn(group),
+                    );
+                    const groupDecision = missingValueDecisions[groupKey];
+                    const groupStrategies = getWorksheetMissingTypeStrategies(group);
                     return (
-                      <label
-                        key={strategy}
-                        className={isSelected ? "is-selected" : ""}
+                      <article
+                        className="clean-prepare-missing-type-group"
+                        key={group}
+                        aria-label={`${worksheetMissingTypeGroupLabels[group]} strategy`}
                       >
-                        <input
-                          type="radio"
-                          name={`clean-prepare-missing-worksheet-${decisionWorksheetId}`}
-                          value={strategy}
-                          checked={isSelected}
-                          onChange={() =>
-                            saveMissingValueDecision(
-                              worksheetDecisionKey,
-                              strategy,
-                            )
-                          }
-                        />
-                        <span>
-                          <strong>
-                            {missingValueStrategyShortLabels[strategy] ||
-                              missingValueStrategyLabels[strategy]}
-                          </strong>
-                          <small>
-                            {missingValueStrategyHelpers[strategy] ||
-                              missingValueStrategyLabels[strategy]}
-                          </small>
-                        </span>
-                      </label>
+                        <header className="clean-prepare-missing-type-head">
+                          <div>
+                            <strong>{worksheetMissingTypeGroupLabels[group]}</strong>
+                            <span>{pluralise(groupColumns.length, "column")} with blanks</span>
+                          </div>
+                          <span className={`clean-prepare-missing-type-status is-${groupDecision ? "ready" : "pending"}`}>
+                            {groupDecision
+                              ? missingValueStrategyShortLabels[groupDecision.strategy] ||
+                                missingValueStrategyLabels[groupDecision.strategy]
+                              : "Decision needed"}
+                          </span>
+                        </header>
+                        <fieldset className="clean-prepare-missing-strategy-control">
+                          <legend className="visually-hidden-legend">
+                            {worksheetMissingTypeGroupLabels[group]}
+                          </legend>
+                          <div className="clean-prepare-missing-strategy-options">
+                            {groupStrategies.map((strategy) => {
+                              const isSelected = groupDecision?.strategy === strategy;
+                              return (
+                                <label
+                                  key={strategy}
+                                  className={isSelected ? "is-selected" : ""}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`clean-prepare-missing-${group}-${decisionWorksheetId}`}
+                                    value={strategy}
+                                    checked={isSelected}
+                                    onChange={() => saveMissingValueDecision(groupKey, strategy)}
+                                  />
+                                  <span>
+                                    <strong>
+                                      {missingValueStrategyShortLabels[strategy] ||
+                                        missingValueStrategyLabels[strategy]}
+                                    </strong>
+                                    <small>
+                                      {missingValueStrategyHelpers[strategy] ||
+                                        missingValueStrategyLabels[strategy]}
+                                    </small>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          {groupDecision &&
+                            decisionNeedsCustomValue(groupDecision.strategy) && (
+                              <label className="clean-prepare-missing-custom-input">
+                                <span>
+                                  {groupDecision.strategy === "custom_date"
+                                    ? "Custom date"
+                                    : "Custom value"}
+                                </span>
+                                <input
+                                  type={
+                                    groupDecision.strategy === "custom_date" ? "date" : "text"
+                                  }
+                                  value={groupDecision.customValue || ""}
+                                  placeholder={
+                                    groupDecision.strategy === "custom_date"
+                                      ? "yyyy-mm-dd"
+                                      : "Type a value"
+                                  }
+                                  aria-label={`Custom missing value for ${worksheetMissingTypeGroupLabels[group]}`}
+                                  onChange={(event) =>
+                                    saveMissingValueDecision(
+                                      groupKey,
+                                      groupDecision.strategy,
+                                      event.target.value,
+                                    )
+                                  }
+                                />
+                              </label>
+                            )}
+                        </fieldset>
+                      </article>
                     );
                   })}
+                  <p className="clean-prepare-missing-draft-note">
+                    Saved as a draft decision. Apply support may depend on the cleaning engine.
+                  </p>
                 </div>
-              </fieldset>
+              )}
+
+              {/*
+                C-7B — Demoted legacy worksheet treatment options. These
+                cover "Treat as layout space" and "Remove rows that are
+                mostly blank" — they apply to the rows themselves, not to
+                the fill values. Kept available behind a disclosure so the
+                K1/K2 worksheet-level treatments remain reachable without
+                cluttering the primary type-grouped fill UI above.
+              */}
+              {missingValueViewMode === "wide" && (
+                <details className="clean-prepare-disclosure" open={false}>
+                  <summary>
+                    <strong>Other worksheet options</strong>
+                    <span>Row-level treatment</span>
+                  </summary>
+                  <fieldset className="clean-prepare-missing-strategy-control">
+                    <legend className="visually-hidden-legend">Worksheet treatment</legend>
+                    <div className="clean-prepare-missing-strategy-options">
+                      {worksheetMissingValueStrategies
+                        .filter((strategy) => strategy !== "decide_per_column")
+                        .map((strategy) => {
+                          const isSelected = worksheetDecision?.strategy === strategy;
+                          return (
+                            <label
+                              key={strategy}
+                              className={isSelected ? "is-selected" : ""}
+                            >
+                              <input
+                                type="radio"
+                                name={`clean-prepare-missing-treatment-${decisionWorksheetId}`}
+                                value={strategy}
+                                checked={isSelected}
+                                onChange={() =>
+                                  saveMissingValueDecision(worksheetDecisionKey, strategy)
+                                }
+                              />
+                              <span>
+                                <strong>
+                                  {missingValueStrategyShortLabels[strategy] ||
+                                    missingValueStrategyLabels[strategy]}
+                                </strong>
+                                <small>
+                                  {missingValueStrategyHelpers[strategy] ||
+                                    missingValueStrategyLabels[strategy]}
+                                </small>
+                              </span>
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </fieldset>
+                </details>
+              )}
 
               <details className="clean-prepare-disclosure" open={embedded}>
                 <summary>
@@ -1223,12 +1446,12 @@ export function CleanPrepareReviewPanel({
                 </ul>
               </details>
 
-              {isPerColumnDecision && (
-                <details className="clean-prepare-disclosure" open={!embedded}>
-                  <summary>
-                    <strong>Customize per column</strong>
+              {missingValueViewMode === "perColumn" && (
+                <section className="clean-prepare-missing-per-column" aria-label="Per-column missing-value strategies">
+                  <header className="clean-prepare-missing-per-column-head">
+                    <strong>Customize by column</strong>
                     <span>{pluralise(missingValueColumns.length, "field")}</span>
-                  </summary>
+                  </header>
                   <p className="clean-prepare-missing-strategy-helper">
                     A per-column decision overrides the worksheet choice for
                     that column only. Choices below match the column type.
@@ -1337,7 +1560,7 @@ export function CleanPrepareReviewPanel({
                       );
                     })}
                   </div>
-                </details>
+                </section>
               )}
 
               <p className="clean-prepare-missing-draft-note">

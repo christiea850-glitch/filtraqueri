@@ -27,6 +27,61 @@ export type MissingValueDecisionMap = Record<string, MissingValueDecision>;
 export const MISSING_VALUE_DECISION_STORAGE_KEY = "filtraqueri:missing-value-decisions";
 export const WORKSHEET_DECISION_COLUMN = "__worksheet__";
 
+/**
+ * C-7B — Type-scoped worksheet decision tokens. Used as the synthetic
+ * `columnName` argument to createMissingValueDecisionKey so each column-type
+ * group on a worksheet (numeric / text / date / unknown) gets its own draft
+ * decision while still sharing the existing storage schema. No new
+ * persistence layer is introduced — these keys live alongside the existing
+ * worksheet-wide and per-column decisions in the same localStorage map.
+ */
+export const WORKSHEET_NUMERIC_DECISION_COLUMN = "__worksheet_numeric__";
+export const WORKSHEET_TEXT_DECISION_COLUMN = "__worksheet_text__";
+export const WORKSHEET_DATE_DECISION_COLUMN = "__worksheet_date__";
+export const WORKSHEET_UNKNOWN_DECISION_COLUMN = "__worksheet_unknown__";
+
+export type WorksheetMissingTypeGroup = "numeric" | "text" | "date" | "unknown";
+
+export const getWorksheetMissingTypeDecisionColumn = (
+  group: WorksheetMissingTypeGroup,
+): string => {
+  if (group === "numeric") return WORKSHEET_NUMERIC_DECISION_COLUMN;
+  if (group === "text") return WORKSHEET_TEXT_DECISION_COLUMN;
+  if (group === "date") return WORKSHEET_DATE_DECISION_COLUMN;
+  return WORKSHEET_UNKNOWN_DECISION_COLUMN;
+};
+
+export const getWorksheetMissingTypeStrategies = (
+  group: WorksheetMissingTypeGroup,
+): MissingValueStrategy[] => {
+  if (group === "numeric") {
+    return ["leave_unchanged", "fill_zero", "fill_mean", "fill_median", "fill_custom"];
+  }
+  if (group === "text") {
+    return ["leave_unchanged", "mark_unknown", "fill_mode", "fill_custom"];
+  }
+  if (group === "date") {
+    return ["leave_unchanged", "forward_fill", "custom_date"];
+  }
+  return ["leave_unchanged", "fill_custom", "decide_later"];
+};
+
+export const worksheetMissingTypeGroupLabels: Record<WorksheetMissingTypeGroup, string> = {
+  numeric: "Numeric blanks",
+  text: "Text / categorical blanks",
+  date: "Date blanks",
+  unknown: "Other blanks",
+};
+
+export const classifyColumnMissingTypeGroup = (
+  inferredType: string | null | undefined,
+): WorksheetMissingTypeGroup => {
+  if (inferredType === "numeric") return "numeric";
+  if (inferredType === "date") return "date";
+  if (inferredType === "text" || inferredType === "categorical") return "text";
+  return "unknown";
+};
+
 export const createMissingValueDecisionKey = (
   datasetId: string,
   worksheetId: string,
