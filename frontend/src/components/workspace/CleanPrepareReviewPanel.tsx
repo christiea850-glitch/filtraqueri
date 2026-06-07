@@ -7,7 +7,9 @@ import {
   createMissingValueDecisionKey,
   decisionNeedsCustomValue,
   getColumnMissingValueStrategies,
+  missingValueStrategyHelpers,
   missingValueStrategyLabels,
+  missingValueStrategyShortLabels,
   readMissingValueDecisions,
   WORKSHEET_DECISION_COLUMN,
   worksheetMissingValueStrategies,
@@ -507,11 +509,14 @@ export function CleanPrepareReviewPanel({
     missingValueColumns.length > 0 &&
     Boolean(worksheetDecision) &&
     (!isPerColumnDecision || decidedColumnCount === missingValueColumns.length);
+  // C-7 tri-state status for the Decisions checklist row. Combines whether a
+  // worksheet-wide decision exists with whether per-column decisions are
+  // complete (when the user opted into per-column).
   const missingValueDecisionStatus = !worksheetDecision
-    ? "Not reviewed"
+    ? "Not reviewed yet"
     : missingValueDecisionReady
-      ? "Ready for cleanup plan"
-      : "Decision needed";
+      ? "Decisions ready"
+      : "Some decisions made";
   const worstBlankColumns = missingValueColumns.slice(0, 3);
   const selectedMissingValueApplyState: MissingValueApplyState =
     missingValueApplyStateByWorksheet[decisionWorksheetId] || { status: "idle" };
@@ -1119,7 +1124,7 @@ export function CleanPrepareReviewPanel({
                   <h4>{embedded ? "Missing-value handling" : "Missing value decisions"}</h4>
                   <p>
                     {embedded
-                      ? "Choose how blanks should be treated. Nothing changes until Apply."
+                      ? "Choose how blanks should be treated. You can use one strategy for the worksheet or customize individual columns. Nothing changes until Apply."
                       : "Blanks may be intentional layout space, empty future-entry rows, real missing values, unknown values, or fields that should be completed later."}
                   </p>
                 </div>
@@ -1146,25 +1151,57 @@ export function CleanPrepareReviewPanel({
                 )}
               </div>
 
-              <label className="clean-prepare-missing-strategy">
-                <span>Worksheet strategy</span>
-                <select
-                  value={worksheetDecision?.strategy || ""}
-                  onChange={(event) =>
-                    saveMissingValueDecision(
-                      worksheetDecisionKey,
-                      event.target.value as MissingValueStrategy,
-                    )
-                  }
-                >
-                  <option value="" disabled>Choose a draft decision</option>
-                  {worksheetMissingValueStrategies.map((strategy) => (
-                    <option key={strategy} value={strategy}>
-                      {missingValueStrategyLabels[strategy]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/*
+                C-7 — Worksheet-wide strategy as a radio-card cluster.
+                Mirrors the C-6 cleaning-fix decision pattern: one fieldset,
+                radio inputs labelled with the short user-facing copy from
+                missingValueStrategyShortLabels, and a one-line helper from
+                missingValueStrategyHelpers. The user can switch to per-
+                column customisation by picking "Customize per column"
+                (decide_per_column), which reveals the per-column section
+                below — that is the explicit opt-in for per-column overrides.
+              */}
+              <fieldset className="clean-prepare-missing-strategy-control">
+                <legend>Worksheet strategy</legend>
+                <p className="clean-prepare-missing-strategy-helper">
+                  Applies to all blanks in this worksheet unless you customise
+                  individual columns below. Nothing changes until Apply.
+                </p>
+                <div className="clean-prepare-missing-strategy-options">
+                  {worksheetMissingValueStrategies.map((strategy) => {
+                    const isSelected = worksheetDecision?.strategy === strategy;
+                    return (
+                      <label
+                        key={strategy}
+                        className={isSelected ? "is-selected" : ""}
+                      >
+                        <input
+                          type="radio"
+                          name={`clean-prepare-missing-worksheet-${decisionWorksheetId}`}
+                          value={strategy}
+                          checked={isSelected}
+                          onChange={() =>
+                            saveMissingValueDecision(
+                              worksheetDecisionKey,
+                              strategy,
+                            )
+                          }
+                        />
+                        <span>
+                          <strong>
+                            {missingValueStrategyShortLabels[strategy] ||
+                              missingValueStrategyLabels[strategy]}
+                          </strong>
+                          <small>
+                            {missingValueStrategyHelpers[strategy] ||
+                              missingValueStrategyLabels[strategy]}
+                          </small>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
 
               <details className="clean-prepare-disclosure" open={embedded}>
                 <summary>
@@ -1192,6 +1229,17 @@ export function CleanPrepareReviewPanel({
                     <strong>Customize per column</strong>
                     <span>{pluralise(missingValueColumns.length, "field")}</span>
                   </summary>
+                  <p className="clean-prepare-missing-strategy-helper">
+                    A per-column decision overrides the worksheet choice for
+                    that column only. Choices below match the column type.
+                  </p>
+                  {/*
+                    C-7 — Per-column strategy cards. Same radio-card pattern
+                    as the worksheet-wide cluster above, but the strategy set
+                    is type-aware (numeric / text / date / unknown). Custom
+                    value / custom date prompts appear inline below the radio
+                    row only when their strategy is selected.
+                  */}
                   <div className="clean-prepare-missing-columns">
                     {missingValueColumns.map((column) => {
                       const decisionKey = createMissingValueDecisionKey(
@@ -1203,45 +1251,89 @@ export function CleanPrepareReviewPanel({
                       const rate = decisionRowCount > 0
                         ? (column.null_count / decisionRowCount) * 100
                         : 0;
+                      const columnStrategies = getColumnMissingValueStrategies(column);
+                      const radioGroupName = `clean-prepare-missing-col-${decisionWorksheetId}-${column.name}`;
                       return (
-                        <div className="clean-prepare-missing-column" key={column.name}>
-                          <div>
-                            <strong>{column.name}</strong>
-                            <span>{column.inferred_type} / {rate.toFixed(1)}% blank</span>
+                        <article
+                          className="clean-prepare-missing-column"
+                          key={column.name}
+                        >
+                          <div className="clean-prepare-missing-column-head">
+                            <div>
+                              <strong>{column.name}</strong>
+                              <span>
+                                {column.inferred_type || "unknown type"} ·{" "}
+                                {rate.toFixed(1)}% blank
+                              </span>
+                            </div>
                           </div>
-                          <select
-                            aria-label={`Missing value strategy for ${column.name}`}
-                            value={decision?.strategy || ""}
-                            onChange={(event) =>
-                              saveMissingValueDecision(
-                                decisionKey,
-                                event.target.value as MissingValueStrategy,
-                              )
-                            }
-                          >
-                            <option value="" disabled>Choose decision</option>
-                            {getColumnMissingValueStrategies(column).map((strategy) => (
-                              <option key={strategy} value={strategy}>
-                                {missingValueStrategyLabels[strategy]}
-                              </option>
-                            ))}
-                          </select>
-                          {decisionNeedsCustomValue(decision?.strategy) && (
-                            <input
-                              type={decision?.strategy === "custom_date" ? "date" : "text"}
-                              value={decision?.customValue || ""}
-                              placeholder="Custom value"
-                              aria-label={`Custom missing value for ${column.name}`}
-                              onChange={(event) =>
-                                saveMissingValueDecision(
-                                  decisionKey,
-                                  decision.strategy,
-                                  event.target.value,
-                                )
-                              }
-                            />
-                          )}
-                        </div>
+                          <fieldset className="clean-prepare-missing-strategy-control is-per-column">
+                            <legend>Strategy for this column</legend>
+                            <div className="clean-prepare-missing-strategy-options">
+                              {columnStrategies.map((strategy) => {
+                                const isSelected = decision?.strategy === strategy;
+                                return (
+                                  <label
+                                    key={strategy}
+                                    className={isSelected ? "is-selected" : ""}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name={radioGroupName}
+                                      value={strategy}
+                                      checked={isSelected}
+                                      onChange={() =>
+                                        saveMissingValueDecision(
+                                          decisionKey,
+                                          strategy,
+                                        )
+                                      }
+                                    />
+                                    <span>
+                                      <strong>
+                                        {missingValueStrategyShortLabels[strategy] ||
+                                          missingValueStrategyLabels[strategy]}
+                                      </strong>
+                                      <small>
+                                        {missingValueStrategyHelpers[strategy] ||
+                                          missingValueStrategyLabels[strategy]}
+                                      </small>
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            {decision &&
+                              decisionNeedsCustomValue(decision.strategy) && (
+                                <label className="clean-prepare-missing-custom-input">
+                                  <span>
+                                    {decision.strategy === "custom_date"
+                                      ? "Custom date"
+                                      : "Custom value"}
+                                  </span>
+                                  <input
+                                    type={
+                                      decision.strategy === "custom_date" ? "date" : "text"
+                                    }
+                                    value={decision.customValue || ""}
+                                    placeholder={
+                                      decision.strategy === "custom_date"
+                                        ? "yyyy-mm-dd"
+                                        : "Type a value"
+                                    }
+                                    aria-label={`Custom missing value for ${column.name}`}
+                                    onChange={(event) =>
+                                      saveMissingValueDecision(
+                                        decisionKey,
+                                        decision.strategy,
+                                        event.target.value,
+                                      )
+                                    }
+                                  />
+                                </label>
+                              )}
+                          </fieldset>
+                        </article>
                       );
                     })}
                   </div>
