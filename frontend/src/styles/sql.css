@@ -1127,6 +1127,126 @@
   min-width: 0;
 }
 
+.sql-template-recommender {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.sql-template-recommender-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sql-template-recommender-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sql-template-recommender-head strong {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.sql-template-recommender-head span {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sql-template-recommender-head em {
+  flex: 0 1 auto;
+  max-width: 360px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #dbe4ef;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-template-recommender-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.sql-template-recommender-row input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+}
+
+.sql-template-recommendation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sql-template-recommendation-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.48fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.sql-template-recommendation-card > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sql-template-recommendation-card strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sql-template-recommendation-card span,
+.sql-template-recommendation-card li,
+.sql-template-recommender-empty {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sql-template-recommendation-card ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.sql-template-recommender-empty {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
 .sql-assistant-search {
   display: grid;
   gap: 5px;

@@ -219,6 +219,10 @@ function SqlAssistantRoutePage({
         onInsertSql={insertAndReturnToInspectSql}
         requestedMode={kind === "reports" ? "recipes" : requestedMode}
         allowedModes={allowedModes}
+        taskPrompt={sqlTabs.taskPrompt}
+        onTaskPromptChange={sqlTabs.onTaskPromptChange}
+        appliedScopeLabels={appliedScopeLabels}
+        activeTabLabel={activeSourceLabel}
       />
     </section>
   );

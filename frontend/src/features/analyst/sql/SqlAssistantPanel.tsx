@@ -32,6 +32,10 @@ import {
   type ReportOpportunityDomain,
 } from "./reportIntelligencePlanner";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
+import {
+  recommendSqlTemplates,
+  type SqlTemplateRecommendation,
+} from "./sqlTemplateRecommender";
 
 type SqlAssistantPanelProps = {
   dataset: DatasetMetadata | null;
@@ -43,6 +47,10 @@ type SqlAssistantPanelProps = {
   ) => void;
   requestedMode?: SqlAssistantMode | null;
   allowedModes?: SqlAssistantMode[];
+  taskPrompt?: string;
+  onTaskPromptChange?: (prompt: string) => void;
+  appliedScopeLabels?: string[];
+  activeTabLabel?: string;
 };
 
 const categoryOrder: SqlTemplateCategory[] = [
@@ -402,6 +410,41 @@ function SqlTemplateCard({
           Use template
         </button>
       </div>
+    </article>
+  );
+}
+
+function SqlTemplateRecommendationCard({
+  recommendation,
+  onInsertSql,
+}: {
+  recommendation: SqlTemplateRecommendation;
+  onInsertSql: SqlAssistantPanelProps["onInsertSql"];
+}) {
+  return (
+    <article className="sql-template-recommendation-card">
+      <div>
+        <strong>{recommendation.title}</strong>
+        <span>{recommendation.description}</span>
+      </div>
+      <ul>
+        {recommendation.reasons.slice(0, 2).map((reason) => (
+          <li key={reason}>{reason}</li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() =>
+          onInsertSql(recommendation.sql, {
+            id: recommendation.id,
+            label: recommendation.title,
+            createdFrom: recommendation.kind,
+          })
+        }
+      >
+        {recommendation.kind === "report" ? "Use report" : "Use template"}
+      </button>
     </article>
   );
 }
@@ -802,6 +845,10 @@ function SqlAssistantPanel({
   onInsertSql,
   requestedMode,
   allowedModes,
+  taskPrompt = "",
+  onTaskPromptChange,
+  appliedScopeLabels = [],
+  activeTabLabel = "active SQL tab",
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -840,6 +887,19 @@ function SqlAssistantPanel({
   const reportOpportunities = useMemo(
     () => createReportOpportunities(dataset, selectedDialect),
     [dataset, selectedDialect],
+  );
+  const [hasRequestedRecommendation, setHasRequestedRecommendation] = useState(false);
+  const recommendations = useMemo(
+    () =>
+      recommendSqlTemplates({
+        taskPrompt,
+        dataset,
+        appliedScopeLabels,
+        templates,
+        recipes,
+        opportunities: reportOpportunities,
+      }),
+    [appliedScopeLabels, dataset, recipes, reportOpportunities, taskPrompt, templates],
   );
   const aiMetadataPayload = useMemo(
     () => buildAIMetadataContextPayload({ dataset, selectedDialect }),
@@ -996,6 +1056,10 @@ function SqlAssistantPanel({
     setGeneratedDrafts([nextDraft]);
   };
 
+  const recommendTemplate = () => {
+    setHasRequestedRecommendation(true);
+  };
+
   const handleTaskKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
@@ -1029,6 +1093,62 @@ function SqlAssistantPanel({
           ))}
         </div>
       )}
+
+      <section className="sql-template-recommender" aria-label="Find matching SQL template">
+        <div className="sql-template-recommender-head">
+          <div>
+            <strong>What do you want to do?</strong>
+            <span>
+              Recommendations use the applied scope for {activeTabLabel} and existing
+              templates or reports. Nothing inserts until you choose a card.
+            </span>
+          </div>
+          <em>
+            {appliedScopeLabels.length > 0
+              ? `Scope: ${appliedScopeLabels.slice(0, 4).join(", ")}${
+                  appliedScopeLabels.length > 4 ? ` +${appliedScopeLabels.length - 4}` : ""
+                }`
+              : "No scope applied; using active tab source"}
+          </em>
+        </div>
+        <div className="sql-template-recommender-row">
+          <input
+            type="text"
+            value={taskPrompt}
+            onChange={(event) => {
+              onTaskPromptChange?.(event.target.value);
+              setHasRequestedRecommendation(false);
+            }}
+            placeholder="Find leases expiring soon by property"
+            aria-label="Describe the SQL task for this tab"
+          />
+          <button
+            type="button"
+            className="primary-button"
+            onClick={recommendTemplate}
+            disabled={taskPrompt.trim().length === 0}
+          >
+            Recommend template
+          </button>
+        </div>
+        {hasRequestedRecommendation && (
+          recommendations.length > 0 ? (
+            <div className="sql-template-recommendation-list" aria-label="Recommended templates">
+              {recommendations.map((recommendation) => (
+                <SqlTemplateRecommendationCard
+                  key={`${recommendation.kind}:${recommendation.id}`}
+                  recommendation={recommendation}
+                  onInsertSql={onInsertSql}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="sql-template-recommender-empty">
+              No strong template match yet. You can choose a template manually or continue writing SQL.
+            </p>
+          )
+        )}
+      </section>
 
       {activeAssistantMode === "templates" ? (
         <section className="sql-assistant-mode-panel" aria-label="Template Library">
