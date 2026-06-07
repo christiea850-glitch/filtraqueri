@@ -175,19 +175,19 @@ export function SqlGuidancePanel({
           </div>
           <div className="sql-query-explanation-grid">
             <article>
-              <strong>Intent</strong>
+              <strong>Purpose</strong>
               <span>{queryExplanation.intent}</span>
             </article>
             <article>
-              <strong>Source</strong>
+              <strong>Looks in</strong>
               <span>{queryExplanation.source}</span>
             </article>
             <article>
-              <strong>Fields</strong>
+              <strong>Information shown</strong>
               <span>{queryExplanation.fields.join(" ")}</span>
             </article>
             <article>
-              <strong>Filters</strong>
+              <strong>Only includes</strong>
               <span>{queryExplanation.filters.join(" ")}</span>
             </article>
             <article>
@@ -203,7 +203,7 @@ export function SqlGuidancePanel({
               <span>{queryExplanation.joins.join(" ")}</span>
             </article>
             <article>
-              <strong>Output shape</strong>
+              <strong>Result you should expect</strong>
               <span>{queryExplanation.outputShape}</span>
             </article>
             <article className="sql-query-explanation-wide">

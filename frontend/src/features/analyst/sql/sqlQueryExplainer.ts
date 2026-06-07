@@ -18,12 +18,12 @@ const emptyExplanation = (sourceLabel: string): SqlQueryExplanation => ({
   summary: "Write or insert a SELECT query to see a plain-English explanation here.",
   intent: "No SQL draft is currently selected.",
   source: sourceLabel,
-  fields: ["No selected fields detected yet."],
-  filters: ["No filters detected."],
+  fields: ["No columns selected yet."],
+  filters: ["No limits on which rows are included yet."],
   grouping: ["No grouping or aggregation detected."],
   sorting: ["No sorting detected.", "No row limit detected."],
   joins: ["No joins detected."],
-  outputShape: "No output shape can be inferred until a query is present.",
+  outputShape: "No result preview can be described until a query is present.",
   businessMeaning: "This area will describe the current query without running it.",
   safetyNote: "Run Query remains manual. This explanation does not execute SQL.",
   isComplex: false,
@@ -38,6 +38,20 @@ const stripWrappingQuotes = (value: string) =>
     .replace(/^"(.+)"$/, "$1")
     .replace(/^`(.+)`$/, "$1")
     .replace(/^\[(.+)\]$/, "$1");
+
+const stripSqlValueQuotes = (value: string) => {
+  const trimmedValue = value.trim();
+  const unquotedValue =
+    /^'(.*)'$/.exec(trimmedValue)?.[1] ??
+    /^"(.*)"$/.exec(trimmedValue)?.[1] ??
+    /^`(.*)`$/.exec(trimmedValue)?.[1] ??
+    trimmedValue;
+
+  return unquotedValue.replace(/''/g, "'");
+};
+
+const isGenericSourceName = (value: string | null) =>
+  !value || ["data", "main table", "main_table", "uploaded_dataset"].includes(value.toLowerCase());
 
 const maskSqlLiterals = (sql: string) => {
   let masked = "";
@@ -128,7 +142,7 @@ const formatList = (items: string[], maxItems = 6) => {
   if (items.length === 0) return [];
   const visibleItems = items.slice(0, maxItems);
   return items.length > maxItems
-    ? [...visibleItems, `${items.length - maxItems} more fields`]
+    ? [...visibleItems, `${items.length - maxItems} more columns`]
     : visibleItems;
 };
 
@@ -178,6 +192,9 @@ const getSourceTable = (fromClause: string) => {
   return sourceMatch ? stripWrappingQuotes(sourceMatch[1]) : null;
 };
 
+const resolveSourceLabel = (rawSource: string | null, sourceLabel: string) =>
+  isGenericSourceName(rawSource) ? sourceLabel : rawSource || sourceLabel;
+
 const getJoinDescriptions = (sql: string) => {
   const maskedSql = maskSqlLiterals(sql);
   const joins = [...maskedSql.matchAll(/\b((?:INNER|LEFT|RIGHT|FULL|CROSS)\s+(?:OUTER\s+)?JOIN|JOIN)\s+("[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][\w.$-]*)/gi)];
@@ -198,40 +215,147 @@ const simplifyFieldLabel = (field: string) => {
   return dottedMatch ? stripWrappingQuotes(dottedMatch[1]) : normalizeWhitespace(field);
 };
 
+const formatFieldList = (fields: string[]) => {
+  const visibleFields = formatList(fields);
+  return visibleFields.length > 0 ? [visibleFields.join(", ")] : ["No selected fields detected."];
+};
+
+const describeOperator = (operator: string) => {
+  const normalizedOperator = operator.toUpperCase();
+  if (normalizedOperator === "=") return "equals";
+  if (normalizedOperator === "!=" || normalizedOperator === "<>") return "does not equal";
+  if (normalizedOperator === ">") return "is greater than";
+  if (normalizedOperator === ">=") return "is greater than or equal to";
+  if (normalizedOperator === "<") return "is less than";
+  if (normalizedOperator === "<=") return "is less than or equal to";
+  if (normalizedOperator === "LIKE") return "matches";
+  return operator;
+};
+
+const describeSimpleFilter = (whereClause: string) => {
+  const betweenMatch = /^("[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][\w.$-]*)\s+BETWEEN\s+(.+?)\s+AND\s+(.+)$/i.exec(
+    whereClause,
+  );
+  if (betweenMatch) {
+    return `${stripWrappingQuotes(betweenMatch[1])} is between ${stripSqlValueQuotes(betweenMatch[2])} and ${stripSqlValueQuotes(betweenMatch[3])}`;
+  }
+
+  const comparisonMatch = /^("[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][\w.$-]*)\s*(=|!=|<>|>=|<=|>|<|LIKE)\s*(.+)$/i.exec(
+    whereClause,
+  );
+  if (comparisonMatch) {
+    return `${stripWrappingQuotes(comparisonMatch[1])} ${describeOperator(comparisonMatch[2])} ${stripSqlValueQuotes(comparisonMatch[3])}`;
+  }
+
+  return normalizeWhitespace(whereClause);
+};
+
+const describeAggregateField = (field: string) => {
+  const aggregateMatch = /\b(COUNT|SUM|AVG|MIN|MAX)\s*\((.*?)\)/i.exec(field);
+  if (!aggregateMatch) return null;
+
+  const label = simplifyFieldLabel(field);
+  const functionName = aggregateMatch[1].toUpperCase();
+  const target = normalizeWhitespace(aggregateMatch[2]) === "*"
+    ? "rows"
+    : stripWrappingQuotes(simplifyFieldLabel(aggregateMatch[2]));
+  const functionDescription: Record<string, string> = {
+    COUNT: "a count of",
+    SUM: "the total of",
+    AVG: "the average of",
+    MIN: "the minimum of",
+    MAX: "the maximum of",
+  };
+
+  return `${label} as ${functionDescription[functionName] || functionName.toLowerCase()} ${target}`;
+};
+
+const describeSorting = (orderByClause: string) => {
+  if (!orderByClause) return "No sorting detected.";
+
+  const sortDescriptions = splitTopLevel(orderByClause).map((sortExpression) => {
+    const directionMatch = /\s+(ASC|DESC)\s*$/i.exec(sortExpression);
+    const direction = directionMatch?.[1].toUpperCase();
+    const fieldExpression = directionMatch
+      ? sortExpression.slice(0, directionMatch.index).trim()
+      : sortExpression.trim();
+    const field = simplifyFieldLabel(fieldExpression);
+
+    if (direction === "DESC") return `${field} descending`;
+    if (direction === "ASC") return `${field} ascending`;
+    return field;
+  });
+
+  return `Sorted by ${sortDescriptions.join(", ")}.`;
+};
+
 const inferIntent = ({
   fields,
   groupByClause,
   whereClause,
   orderByClause,
+  source,
+  filterDescriptions,
+  limitClause,
 }: {
   fields: string[];
   groupByClause: string;
   whereClause: string;
   orderByClause: string;
+  source: string;
+  filterDescriptions: string[];
+  limitClause: string;
 }) => {
   const aggregateQuery = fields.some(hasAggregate) || Boolean(groupByClause);
+  const limitText = limitClause ? ` It will show up to ${limitClause} matching rows.` : "";
+
   if (aggregateQuery && groupByClause) {
-    return "Summarizes records into grouped results so you can compare categories or segments.";
+    const groupFields = splitTopLevel(groupByClause).map(simplifyFieldLabel).join(", ");
+    return `This query summarizes rows in ${source} by ${groupFields || "group"}.${limitText}`;
   }
 
   if (aggregateQuery) {
-    return "Calculates summary values across the selected source.";
-  }
-
-  if (whereClause && orderByClause) {
-    return "Filters records from the selected source, then sorts the matching rows.";
+    return `This query calculates summary values from ${source}.${limitText}`;
   }
 
   if (whereClause) {
-    return "Filters records from the selected source and returns the matching rows.";
+    const filterText = filterDescriptions.length > 0
+      ? ` and only includes rows where ${filterDescriptions.join("; ")}`
+      : "";
+    const sortText = orderByClause ? " The matching rows are sorted." : "";
+    return `This query looks in ${source}${filterText}.${sortText}${limitText}`;
   }
 
-  return "Reads records from the selected source and prepares a table-style result.";
+  if (orderByClause) {
+    return `This query looks in ${source}, shows matching rows, and sorts them.${limitText}`;
+  }
+
+  return `This query looks in ${source} and shows matching rows.${limitText}`;
 };
 
-const inferBusinessMeaning = (fields: string[], groupByClause: string, sourceLabel: string) => {
+const inferBusinessMeaning = (
+  fields: string[],
+  groupByClause: string,
+  sourceLabel: string,
+  filterDescriptions: string[],
+) => {
   const combined = [...fields, groupByClause].join(" ").toLowerCase();
   const sourceText = sourceLabel ? ` from ${sourceLabel}` : "";
+  const fieldLabels = fields.map(simplifyFieldLabel);
+  const readableFields = fieldLabels.length > 0 ? fieldLabels.join(", ") : "the selected fields";
+  const entityIdFilter = filterDescriptions.find((description) =>
+    /\b(property_id|property id)\s+equals\s+/i.test(description),
+  );
+
+  if (entityIdFilter) {
+    const propertyId = entityIdFilter.replace(/^.*\s+equals\s+/i, "");
+    return `This query finds property ${propertyId} and shows ${readableFields}.`;
+  }
+
+  if (groupByClause && /\bcount\s*\(/i.test(combined)) {
+    const groupFields = splitTopLevel(groupByClause).map(simplifyFieldLabel).join(", ");
+    return `This query counts rows by ${groupFields || "group"}${sourceText}.`;
+  }
 
   if (/\b(revenue|sales|amount|cost|price|profit|margin|invoice|payment)\b/.test(combined)) {
     return `This may support financial or transaction review${sourceText}.`;
@@ -262,14 +386,60 @@ const inferOutputShape = ({
   const limitText = limitClause ? ` capped at ${limitClause} rows` : "";
 
   if (groupByClause) {
-    return `One row per group with ${fields.length || "selected"} result column${fields.length === 1 ? "" : "s"}${limitText}.`;
+    return `A summary table with one row per group and ${fields.length || "selected"} result column${fields.length === 1 ? "" : "s"}${limitText}.`;
   }
 
   if (selectAll) {
-    return `A row-level table with every available column${limitText}.`;
+    return `A table of matching rows with every available column${limitText}.`;
   }
 
-  return `A row-level table with ${fields.length || "selected"} selected field${fields.length === 1 ? "" : "s"}${limitText}.`;
+  return `A table of matching rows with ${fields.length || "selected"} shown column${fields.length === 1 ? "" : "s"}${limitText}.`;
+};
+
+const createPlainSummary = ({
+  source,
+  selectedFields,
+  selectAll,
+  filterDescriptions,
+  groupByClause,
+  aggregateFields,
+  orderByClause,
+  limitClause,
+}: {
+  source: string;
+  selectedFields: string[];
+  selectAll: boolean;
+  filterDescriptions: string[];
+  groupByClause: string;
+  aggregateFields: string[];
+  orderByClause: string;
+  limitClause: string;
+}) => {
+  const limitText = limitClause ? ` It will show up to ${limitClause} matching rows.` : "";
+  const fieldText = selectAll
+    ? "all available columns"
+    : selectedFields.map(simplifyFieldLabel).join(", ");
+  const propertyFilter = filterDescriptions.find((description) =>
+    /\b(property_id|property id)\s+equals\s+/i.test(description),
+  );
+
+  if (propertyFilter) {
+    const propertyId = propertyFilter.replace(/^.*\s+equals\s+/i, "");
+    return `This query looks in ${source}, finds the property with ID ${propertyId}, and shows ${fieldText}.${limitText}`;
+  }
+
+  if (groupByClause) {
+    const groupFields = splitTopLevel(groupByClause).map(simplifyFieldLabel).join(", ");
+    const aggregateText = aggregateFields.length > 0 ? ` and shows ${aggregateFields.join(", ")}` : "";
+    const sortText = orderByClause ? " The summary is sorted." : "";
+    return `This query summarizes rows in ${source} by ${groupFields || "group"}${aggregateText}.${sortText}${limitText}`;
+  }
+
+  if (filterDescriptions.length > 0) {
+    return `This query looks in ${source}, only includes rows where ${filterDescriptions.join("; ")}, and shows ${fieldText}.${limitText}`;
+  }
+
+  return `This query looks in ${source} and shows ${fieldText}.${limitText}`;
 };
 
 const getFallbackExplanation = (
@@ -279,7 +449,7 @@ const getFallbackExplanation = (
 ): SqlQueryExplanation => {
   const positions = findClausePositions(sql);
   const fromClause = getClauseText(sql, positions, "from");
-  const source = getSourceTable(fromClause) || sourceLabel;
+  const source = resolveSourceLabel(getSourceTable(fromClause), sourceLabel);
   const clauseNames = positions.map((position) =>
     position.name === "groupBy" ? "GROUP BY" : position.name === "orderBy" ? "ORDER BY" : position.name.toUpperCase(),
   );
@@ -291,16 +461,16 @@ const getFallbackExplanation = (
       ? `Detected SQL clauses: ${Array.from(new Set(clauseNames)).join(", ")}.`
       : "The query could not be confidently broken into simple clauses.",
     source,
-    fields: ["Review the SELECT list before running."],
-    filters: [positions.some((position) => position.name === "where") ? "WHERE clause detected." : "No simple WHERE clause detected."],
+    fields: ["Review the columns being shown before running."],
+    filters: [positions.some((position) => position.name === "where") ? "A row filter was detected." : "No simple row filter detected."],
     grouping: [positions.some((position) => position.name === "groupBy") ? "GROUP BY clause detected." : "No simple GROUP BY clause detected."],
     sorting: [
       positions.some((position) => position.name === "orderBy") ? "ORDER BY clause detected." : "No simple ORDER BY clause detected.",
       positions.some((position) => position.name === "limit") ? "LIMIT clause detected." : "No simple LIMIT clause detected.",
     ],
     joins: getJoinDescriptions(sql).length > 0 ? getJoinDescriptions(sql) : ["No simple joins detected."],
-    outputShape: "Output shape is not confidently inferred for this query.",
-    businessMeaning: inferBusinessMeaning([], "", context.activeSourceLabel || sourceLabel),
+    outputShape: "The result cannot be confidently described for this query.",
+    businessMeaning: inferBusinessMeaning([], "", context.activeSourceLabel || sourceLabel, []),
     safetyNote: "This explanation is deterministic and does not run SQL. Review before choosing Run Query.",
     isComplex: true,
     fallbackMessage,
@@ -349,39 +519,53 @@ export const explainSqlQuery = (
   const havingClause = getClauseText(sql, positions, "having");
   const orderByClause = getClauseText(sql, positions, "orderBy");
   const limitClause = getClauseText(sql, positions, "limit").match(/\d+/)?.[0] || "";
-  const source = getSourceTable(fromClause) || sourceLabel;
+  const source = resolveSourceLabel(getSourceTable(fromClause), sourceLabel);
   const selectedFields = splitTopLevel(selectClause);
   const selectAll = selectedFields.length === 1 && selectedFields[0] === "*";
   const fieldLabels = selectAll
     ? ["All columns from the selected source."]
-    : formatList(selectedFields.map(simplifyFieldLabel));
-  const aggregateFields = selectedFields.filter(hasAggregate).map(simplifyFieldLabel);
+    : formatFieldList(selectedFields.map(simplifyFieldLabel));
+  const aggregateFields = selectedFields
+    .filter(hasAggregate)
+    .map((field) => describeAggregateField(field) || simplifyFieldLabel(field));
   const groupFields = splitTopLevel(groupByClause).map(simplifyFieldLabel);
   const joins = getJoinDescriptions(sql);
+  const filterDescriptions = [
+    whereClause ? describeSimpleFilter(whereClause) : "",
+    havingClause ? `grouped results where ${describeSimpleFilter(havingClause)}` : "",
+  ].filter(Boolean);
   const sortingItems = [
-    orderByClause ? `Sorted by ${normalizeWhitespace(orderByClause)}.` : "No sorting detected.",
+    describeSorting(orderByClause),
     limitClause ? `Limited to ${limitClause} rows.` : "No row limit detected.",
   ];
+  const plainSummary = createPlainSummary({
+    source,
+    selectedFields,
+    selectAll,
+    filterDescriptions,
+    groupByClause,
+    aggregateFields,
+    orderByClause,
+    limitClause,
+  });
+  const intent = inferIntent({
+    fields: selectedFields,
+    groupByClause,
+    whereClause,
+    orderByClause,
+    source,
+    filterDescriptions,
+    limitClause,
+  });
 
   return {
     title: "What this query does",
-    summary: inferIntent({
-      fields: selectedFields,
-      groupByClause,
-      whereClause,
-      orderByClause,
-    }),
-    intent: inferIntent({
-      fields: selectedFields,
-      groupByClause,
-      whereClause,
-      orderByClause,
-    }),
+    summary: plainSummary,
+    intent,
     source,
     fields: fieldLabels,
     filters: [
-      whereClause ? `Keeps rows where ${whereClause}.` : "No row filters detected.",
-      havingClause ? `Filters grouped results where ${havingClause}.` : "",
+      filterDescriptions.length > 0 ? filterDescriptions.join("; ") : "All rows can be included.",
     ].filter(Boolean),
     grouping: [
       groupByClause ? `Groups by ${groupFields.join(", ")}.` : "No grouping detected.",
@@ -395,7 +579,12 @@ export const explainSqlQuery = (
       groupByClause,
       limitClause,
     }),
-    businessMeaning: inferBusinessMeaning(selectedFields, groupByClause, context.activeSourceLabel || source),
+    businessMeaning: inferBusinessMeaning(
+      selectedFields,
+      groupByClause,
+      context.activeSourceLabel || source,
+      filterDescriptions,
+    ),
     safetyNote: "This is a read-only explanation. FiltraQueri does not run this SQL until you choose Run Query.",
     isComplex: false,
     fallbackMessage: null,
