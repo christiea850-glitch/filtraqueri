@@ -105,7 +105,11 @@ export type SqlWorkspaceTabsInterface = {
   onSelectedScopeChange: (selections: AnalysisScopeSelection[]) => void;
   onApplyScope: () => void;
   onTaskPromptChange: (prompt: string) => void;
-  onMarkTemplate: (template: { id?: string; label?: string }) => void;
+  onMarkTemplate: (template: {
+    id?: string;
+    label?: string;
+    createdFrom?: "template" | "report";
+  }) => void;
   onNewTab: () => void;
   onSwitchTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;

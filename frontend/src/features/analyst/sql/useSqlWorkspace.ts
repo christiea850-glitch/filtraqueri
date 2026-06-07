@@ -331,12 +331,18 @@ function useSqlWorkspace(
     });
   };
 
-  const insertSql = (sql: string) => {
+  const insertSql = (
+    sql: string,
+    templateMetadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
+  ) => {
     const trimmedCurrentSql = sqlDraft.trimEnd();
     const separator = trimmedCurrentSql ? "\n\n" : "";
     const nextSql = `${trimmedCurrentSql}${separator}${sql}`;
 
     setActiveSqlDraft(nextSql);
+    if (templateMetadata) {
+      markActiveTabTemplate(templateMetadata);
+    }
     onMetadataChange?.(
       upsertActiveSqlDraftSnapshot(normalizedMetadata, {
         sql: nextSql,

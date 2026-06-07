@@ -1,5 +1,6 @@
 import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
+import type { AnalysisScopeSelection, WorkbookMetadata } from "../../workbook";
 import SqlAssistantPanel, { type SqlAssistantMode } from "./SqlAssistantPanel";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -16,6 +17,82 @@ type SqlAssistantRoutePageProps = {
 
 const templateModes: SqlAssistantMode[] = ["templates", "assist"];
 const reportModes: SqlAssistantMode[] = ["recipes"];
+
+const getScopeWorksheetLabels = (
+  dataset: DatasetMetadata | null,
+  selections: AnalysisScopeSelection[],
+) => {
+  const worksheets = dataset?.workbook_metadata?.worksheets || [];
+  return selections.map((selection) => {
+    const worksheet = worksheets.find((current) => current.worksheetId === selection.worksheetId);
+    return worksheet?.displayName || worksheet?.sheetName || selection.tableName;
+  });
+};
+
+const createAppliedScopeDataset = (
+  dataset: DatasetMetadata | null,
+  fallbackDataset: DatasetMetadata | null,
+  selections: AnalysisScopeSelection[],
+): DatasetMetadata | null => {
+  if (!dataset || selections.length === 0 || !dataset.workbook_metadata) {
+    return fallbackDataset;
+  }
+
+  const selectionIds = new Set(selections.map((selection) => selection.worksheetId));
+  const scopedWorksheets = dataset.workbook_metadata.worksheets.filter((worksheet) =>
+    selectionIds.has(worksheet.worksheetId),
+  );
+  const firstSelection = selections[0];
+  const primaryWorksheet =
+    scopedWorksheets.find((worksheet) => worksheet.worksheetId === firstSelection?.worksheetId) ||
+    scopedWorksheets[0];
+
+  if (!firstSelection || !primaryWorksheet) {
+    return fallbackDataset;
+  }
+
+  const scopedWorkbook: WorkbookMetadata = {
+    ...dataset.workbook_metadata,
+    activeWorksheetId: primaryWorksheet.worksheetId,
+    activeAnalysisSource: {
+      type: firstSelection.sourceType,
+      worksheetId: firstSelection.worksheetId,
+      tableName: firstSelection.tableName,
+      originalTableName: firstSelection.originalTableName || primaryWorksheet.tableName,
+      activatedAt:
+        dataset.workbook_metadata.activeAnalysisSource?.activatedAt ||
+        dataset.workbook_metadata.updatedAt,
+    },
+    worksheetIds: scopedWorksheets.map((worksheet) => worksheet.worksheetId),
+    worksheets: scopedWorksheets,
+    tableMappings: dataset.workbook_metadata.tableMappings.filter((mapping) =>
+      scopedWorksheets.some((worksheet) => worksheet.tableName === mapping.tableName),
+    ),
+    cleanedWorkingCopies: dataset.workbook_metadata.cleanedWorkingCopies.filter((copy) =>
+      selectionIds.has(copy.sourceWorksheetId),
+    ),
+    relationshipCandidates: dataset.workbook_metadata.relationshipCandidates.filter(
+      (candidate) =>
+        selectionIds.has(candidate.sourceWorksheetId) &&
+        selectionIds.has(candidate.targetWorksheetId),
+    ),
+    acceptedRelationshipContracts:
+      dataset.workbook_metadata.acceptedRelationshipContracts.filter(
+        (contract) =>
+          selectionIds.has(contract.sourceWorksheetId) &&
+          selectionIds.has(contract.targetWorksheetId),
+      ),
+  };
+
+  return {
+    ...dataset,
+    table_name: firstSelection.tableName,
+    schema: primaryWorksheet.schema,
+    row_count: primaryWorksheet.rowCount,
+    column_count: primaryWorksheet.columnCount,
+    workbook_metadata: scopedWorkbook,
+  };
+};
 
 const pageCopy: Record<
   SqlAssistantRoutePageKind,
@@ -69,15 +146,24 @@ function SqlAssistantRoutePage({
   const copy = pageCopy[kind];
   const allowedModes = kind === "templates" ? templateModes : reportModes;
   const activeSourceLabel = sqlTabs.activeTabTitle || "No active SQL tab";
+  const appliedScopeLabels = getScopeWorksheetLabels(dataset, sqlTabs.appliedScopeSelections);
+  const appliedScopeLabel =
+    appliedScopeLabels.length > 0 ? appliedScopeLabels.join(", ") : null;
   // Option C — Templates / Reports must render against the active SQL tab's
   // source (schema, table name), not the global dataset. SqlAssistantPanel
   // already accepts a dataset; we feed it the tab-scoped synthesis from
   // useSqlWorkspace so cards (column choices, sample SQL, eligibility) are
   // built from the active tab's worksheet schema.
-  const assistantDataset = scopedDatasetForTab ?? dataset;
+  const assistantDataset =
+    createAppliedScopeDataset(dataset, scopedDatasetForTab ?? dataset, sqlTabs.appliedScopeSelections) ??
+    scopedDatasetForTab ??
+    dataset;
 
-  const insertAndReturnToInspectSql = (sql: string) => {
-    insertSql(sql);
+  const insertAndReturnToInspectSql = (
+    sql: string,
+    metadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
+  ) => {
+    insertSql(sql, metadata);
     onAnalystViewChange?.("sqlWorkspace");
   };
 
@@ -109,9 +195,12 @@ function SqlAssistantRoutePage({
         <span>{copy.note}</span>
       </div>
       <p className="sql-route-scope-helper">
-        Selected analysis scope (if any) is metadata context for suggestions,
-        templates, and reports only. It is not an execution source. You don't
-        need to remove selected worksheets to open or work in another SQL tab.
+        Templates use the active SQL tab's applied scope. To use different
+        worksheets, switch tabs or update this tab's SQL Context.{" "}
+        {appliedScopeLabel
+          ? `Current applied scope: ${appliedScopeLabel}.`
+          : "No scope applied yet; using the active tab source."}{" "}
+        Selected scope is context only and does not run or activate anything.
       </p>
 
       <div className="sql-assistant-route-header">

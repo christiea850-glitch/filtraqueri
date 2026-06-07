@@ -37,7 +37,10 @@ type SqlAssistantPanelProps = {
   dataset: DatasetMetadata | null;
   selectedDialect: SqlDialectId;
   selectedDialectProfile: SqlDialectProfile;
-  onInsertSql: (sql: string) => void;
+  onInsertSql: (
+    sql: string,
+    metadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
+  ) => void;
   requestedMode?: SqlAssistantMode | null;
   allowedModes?: SqlAssistantMode[];
 };
@@ -363,7 +366,7 @@ function SqlTemplateCard({
 }: {
   template: SqlAssistantTemplate;
   selectedDialect: SqlDialectId;
-  onInsertSql: (sql: string) => void;
+  onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const isDifferentDialect =
     Boolean(template.dialects?.length) &&
@@ -388,7 +391,13 @@ function SqlTemplateCard({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => onInsertSql(template.sql)}
+          onClick={() =>
+            onInsertSql(template.sql, {
+              id: template.id,
+              label: template.title,
+              createdFrom: "template",
+            })
+          }
         >
           Use template
         </button>
@@ -407,7 +416,7 @@ function ReportOpportunityCard({
 }: {
   opportunity: ReportOpportunity;
   selectedDialectProfile: SqlDialectProfile;
-  onInsertSql: (sql: string) => void;
+  onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const ready = opportunity.support === "can_generate_now" && Boolean(opportunity.sql);
   const confidencePct = Math.round(opportunity.confidence * 100);
@@ -525,7 +534,14 @@ function ReportOpportunityCard({
       <button
         type="button"
         className="secondary-button"
-        onClick={() => opportunity.sql && onInsertSql(opportunity.sql)}
+        onClick={() =>
+          opportunity.sql &&
+          onInsertSql(opportunity.sql, {
+            id: opportunity.id,
+            label: opportunity.title,
+            createdFrom: "report",
+          })
+        }
         disabled={!ready}
       >
         {ready ? "Use report" : "Needs missing fields"}
@@ -631,7 +647,7 @@ function SqlReportRecipeCard({
 }: {
   recipe: SqlReportRecipe;
   selectedDialectProfile: SqlDialectProfile;
-  onInsertSql: (sql: string) => void;
+  onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const importantWarnings = recipe.warnings.filter((warning) => {
     const normalizedWarning = warning.toLowerCase();
@@ -708,7 +724,14 @@ function SqlReportRecipeCard({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => recipe.sql && onInsertSql(recipe.sql)}
+          onClick={() =>
+            recipe.sql &&
+            onInsertSql(recipe.sql, {
+              id: recipe.id,
+              label: recipe.title,
+              createdFrom: "report",
+            })
+          }
           disabled={!recipe.sql}
         >
           {recipe.sql ? "Use report" : "Needs more structure"}
@@ -724,7 +747,7 @@ function ReportOpportunityList({
 }: {
   opportunities: ReportOpportunity[];
   selectedDialectProfile: SqlDialectProfile;
-  onInsertSql: (sql: string) => void;
+  onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const grouped = familyOrder
     .map((family) => ({
@@ -1135,7 +1158,13 @@ function SqlAssistantPanel({
                   <button
                     type="button"
                     className="secondary-button"
-                    onClick={() => onInsertSql(draft.sql)}
+                    onClick={() =>
+                      onInsertSql(draft.sql, {
+                        id: draft.id,
+                        label: draft.title,
+                        createdFrom: "template",
+                      })
+                    }
                   >
                     Insert into Monaco
                   </button>

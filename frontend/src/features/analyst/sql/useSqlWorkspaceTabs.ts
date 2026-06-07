@@ -228,11 +228,16 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     }));
   }, [updateActiveTab]);
 
-  const markActiveTabTemplate = useCallback((template: { id?: string; label?: string }) => {
+  const markActiveTabTemplate = useCallback((template: {
+    id?: string;
+    label?: string;
+    createdFrom?: "template" | "report";
+  }) => {
     updateActiveTab((tab) => ({
       ...tab,
       selectedTemplateId: template.id,
       selectedTemplateLabel: template.label,
+      createdFrom: template.createdFrom || tab.createdFrom,
       isDirty: true,
     }));
   }, [updateActiveTab]);
