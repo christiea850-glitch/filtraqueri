@@ -95,6 +95,7 @@ function useSqlWorkspace(
     activeTab,
     tabsState,
     createTab,
+    openSourceTab,
     switchTab,
     closeTab,
     setActiveSqlDraft,
@@ -139,7 +140,8 @@ function useSqlWorkspace(
     (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
   );
   const activeSourceLabel = dataset
-    ? activeWorkbookWorksheet?.displayName ||
+    ? activeTab.title ||
+      activeWorkbookWorksheet?.displayName ||
       activeWorkbookWorksheet?.sheetName ||
       dataset.table_name ||
       null
@@ -498,6 +500,7 @@ function useSqlWorkspace(
     renameDraft,
     deleteDraft,
     deleteDrafts,
+    openSqlSourceTab: openSourceTab,
   };
 }
 

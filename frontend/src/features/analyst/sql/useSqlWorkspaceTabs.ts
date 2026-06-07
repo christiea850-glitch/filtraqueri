@@ -4,8 +4,8 @@ import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SqlDraftSnapshot } from "../../sqlWorkspacePersistence";
 import type { SqlExecutionStatus, SqlPreviewResult } from "./sqlTypes";
 import type {
-  SqlWorkspaceSourceType,
   SqlWorkspaceTab,
+  SqlWorkspaceTabSource,
   SqlWorkspaceTabsState,
 } from "./sqlTabsTypes";
 
@@ -19,16 +19,7 @@ type SqlWorkspaceTabSeed = {
   createStarterSql: (tableName: string | undefined, dialect: SqlDialectId) => string;
 };
 
-type ActiveSourceSnapshot = {
-  worksheetId?: string;
-  sourceType: SqlWorkspaceSourceType;
-  tableName: string;
-  originalTableName?: string;
-  cleanedTableName?: string;
-  title: string;
-};
-
-const getActiveSourceSnapshot = (dataset: DatasetMetadata | null): ActiveSourceSnapshot => {
+const getActiveSourceSnapshot = (dataset: DatasetMetadata | null): SqlWorkspaceTabSource => {
   const workbook = dataset?.workbook_metadata;
   const activeWorksheet = workbook?.worksheets.find(
     (worksheet) => worksheet.worksheetId === workbook.activeWorksheetId,
@@ -86,6 +77,39 @@ const createSeedTab = ({
 };
 
 const createNewTabId = () => `sql-tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+const createSourceTab = ({
+  source,
+  dialect,
+  previewResult,
+  editorStatus,
+  createStarterSql,
+}: {
+  source: SqlWorkspaceTabSource;
+  dialect: SqlDialectId;
+  previewResult: SqlPreviewResult;
+  editorStatus: SqlExecutionStatus;
+  createStarterSql: SqlWorkspaceTabSeed["createStarterSql"];
+}): SqlWorkspaceTab => ({
+  id: createNewTabId(),
+  title: source.title,
+  worksheetId: source.worksheetId,
+  sourceType: source.sourceType,
+  tableName: source.tableName,
+  originalTableName: source.originalTableName,
+  cleanedTableName: source.cleanedTableName,
+  sqlDraft: createStarterSql(source.tableName, dialect),
+  dialect,
+  previewResult,
+  editorStatus,
+  isDirty: false,
+  createdFrom: "starter",
+});
+
+const isSameTabSource = (tab: SqlWorkspaceTab, source: SqlWorkspaceTabSource) =>
+  tab.sourceType === source.sourceType &&
+  tab.tableName === source.tableName &&
+  (!source.worksheetId || tab.worksheetId === source.worksheetId);
 
 function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
   const [tabsState, setTabsState] = useState<SqlWorkspaceTabsState>(() => {
@@ -181,25 +205,16 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
 
   const createTab = useCallback(() => {
     const source = getActiveSourceSnapshot(seed.dataset);
-    const id = createNewTabId();
-    const tab: SqlWorkspaceTab = {
-      id,
-      title: source.title,
-      worksheetId: source.worksheetId,
-      sourceType: source.sourceType,
-      tableName: source.tableName,
-      originalTableName: source.originalTableName,
-      cleanedTableName: source.cleanedTableName,
-      sqlDraft: seed.createStarterSql(source.tableName, activeTab.dialect),
+    const tab = createSourceTab({
+      source,
       dialect: activeTab.dialect,
       previewResult: seed.initialPreviewResult,
       editorStatus: seed.initialEditorStatus,
-      isDirty: false,
-      createdFrom: "starter",
-    };
+      createStarterSql: seed.createStarterSql,
+    });
 
     setTabsState((currentState) => ({
-      activeTabId: id,
+      activeTabId: tab.id,
       tabs: [...currentState.tabs, tab],
     }));
   }, [
@@ -207,6 +222,36 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     seed,
     seed.createStarterSql,
     seed.dataset,
+    seed.initialEditorStatus,
+    seed.initialPreviewResult,
+  ]);
+
+  const openSourceTab = useCallback((source: SqlWorkspaceTabSource) => {
+    setTabsState((currentState) => {
+      const existingTab = currentState.tabs.find((tab) => isSameTabSource(tab, source));
+      if (existingTab) {
+        return {
+          ...currentState,
+          activeTabId: existingTab.id,
+        };
+      }
+
+      const tab = createSourceTab({
+        source,
+        dialect: activeTab.dialect,
+        previewResult: seed.initialPreviewResult,
+        editorStatus: seed.initialEditorStatus,
+        createStarterSql: seed.createStarterSql,
+      });
+
+      return {
+        activeTabId: tab.id,
+        tabs: [...currentState.tabs, tab],
+      };
+    });
+  }, [
+    activeTab.dialect,
+    seed.createStarterSql,
     seed.initialEditorStatus,
     seed.initialPreviewResult,
   ]);
@@ -243,6 +288,7 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     tabsState,
     activeTab,
     createTab,
+    openSourceTab,
     switchTab,
     closeTab,
     setActiveSqlDraft,

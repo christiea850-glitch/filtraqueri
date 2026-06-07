@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
+import type { SqlWorkspaceTabSource } from "../../features/analyst/sql/sqlTabsTypes";
 import {
   getWorkbookContractDiagnostics,
   type RelationshipContractDiagnostic,
@@ -50,6 +51,7 @@ type WorkbookContextPanelProps = {
   analysisScopeSelections?: AnalysisScopeSelection[];
   onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
   onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
+  onOpenSqlSourceTab?: (source: SqlWorkspaceTabSource) => void;
 };
 
 const statusLabel = (status: WorksheetStatus) => (status === "error" ? "unsupported" : status);
@@ -817,6 +819,7 @@ function WorkbookContextPanel({
   analysisScopeSelections,
   onAnalysisScopeSelectionsChange,
   onOpenSqlAssistantMode,
+  onOpenSqlSourceTab,
 }: WorkbookContextPanelProps) {
   const workbook = getWorkbookMetadata(dataset);
   const relationshipRegistry = useWorkbookRelationships(workbook);
@@ -937,6 +940,30 @@ function WorkbookContextPanel({
       ),
     );
   };
+
+  const createSqlTabSource = (worksheet: WorksheetMetadata): SqlWorkspaceTabSource => {
+    const cleanedCopy = workbook.cleanedWorkingCopies.find(
+      (copy) => copy.sourceWorksheetId === worksheet.worksheetId,
+    );
+    const isActiveCleanedSource =
+      workbook.activeAnalysisSource?.type === "cleaned_working_copy" &&
+      workbook.activeAnalysisSource.worksheetId === worksheet.worksheetId;
+    const sourceType = isActiveCleanedSource ? "cleaned_working_copy" : "original";
+    const tableName =
+      sourceType === "cleaned_working_copy"
+        ? workbook.activeAnalysisSource?.tableName || cleanedCopy?.cleanedTableName || worksheet.tableName
+        : worksheet.tableName;
+
+    return {
+      title: worksheet.displayName || worksheet.sheetName,
+      worksheetId: worksheet.worksheetId,
+      sourceType,
+      tableName,
+      originalTableName: worksheet.tableName,
+      cleanedTableName: cleanedCopy?.cleanedTableName,
+    };
+  };
+
   const sqlContextSourceOptions: WorksheetSwitcherOption[] = workbook.worksheets.map((worksheet) => {
     const isActive = worksheet.worksheetId === workbook.activeWorksheetId;
     const activeIsCleanedCopy =
@@ -949,6 +976,10 @@ function WorkbookContextPanel({
       !isActive &&
       worksheet.status === "ready" &&
       !isSwitchingWorksheet;
+    const canOpenSqlTab =
+      variant === "analyst" &&
+      Boolean(onOpenSqlSourceTab) &&
+      worksheet.status === "ready";
 
     return {
       id: worksheet.worksheetId,
@@ -1001,6 +1032,19 @@ function WorkbookContextPanel({
                 {isSwitchingWorksheet ? "Switching\u2026" : "Make active"}
               </button>
             ) : null}
+            {canOpenSqlTab && (
+              <button
+                type="button"
+                className="secondary-button workbook-mapping-open-tab"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenSqlSourceTab?.(createSqlTabSource(worksheet));
+                }}
+                title={`Open ${worksheet.displayName} in a SQL tab`}
+              >
+                Open tab
+              </button>
+            )}
           </div>
         </>
       ),

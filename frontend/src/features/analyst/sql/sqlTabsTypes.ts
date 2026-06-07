@@ -26,6 +26,15 @@ export type SqlWorkspaceTab = {
   createdFrom?: SqlWorkspaceTabCreatedFrom;
 };
 
+export type SqlWorkspaceTabSource = {
+  title: string;
+  worksheetId?: string;
+  sourceType: SqlWorkspaceSourceType;
+  tableName: string;
+  originalTableName?: string;
+  cleanedTableName?: string;
+};
+
 export type SqlWorkspaceTabsState = {
   activeTabId: string;
   tabs: SqlWorkspaceTab[];

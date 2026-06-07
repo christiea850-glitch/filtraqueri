@@ -370,6 +370,7 @@ function SqlWorkspace({
     renameDraft,
     deleteDraft,
     deleteDrafts,
+    openSqlSourceTab,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
   // Active source chip label for the Analyst command bar. Falls through
@@ -583,6 +584,7 @@ function SqlWorkspace({
                   analysisScopeSelections={analysisScopeSelections}
                   onAnalysisScopeSelectionsChange={onAnalysisScopeSelectionsChange}
                   onOpenSqlAssistantMode={openSqlAssistantMode}
+                  onOpenSqlSourceTab={openSqlSourceTab}
                 />
               </div>
             </section>
