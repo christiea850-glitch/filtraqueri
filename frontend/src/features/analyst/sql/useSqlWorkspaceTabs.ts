@@ -16,6 +16,7 @@ type SqlWorkspaceTabSeed = {
   initialDialect: SqlDialectId;
   initialPreviewResult: SqlPreviewResult;
   initialEditorStatus: SqlExecutionStatus;
+  createStarterSql: (tableName: string | undefined, dialect: SqlDialectId) => string;
 };
 
 type ActiveSourceSnapshot = {
@@ -84,6 +85,8 @@ const createSeedTab = ({
   };
 };
 
+const createNewTabId = () => `sql-tab-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
 function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
   const [tabsState, setTabsState] = useState<SqlWorkspaceTabsState>(() => {
     const tab = createSeedTab(seed);
@@ -142,38 +145,106 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     }));
   }, [updateActiveTab]);
 
-  const replaceActiveTabDraft = useCallback((draft: SqlDraftSnapshot) => {
+  const replaceActiveTabDraft = useCallback((draft: SqlDraftSnapshot, options?: { activate?: boolean }) => {
     const source = getActiveSourceSnapshot(seed.dataset);
     setTabsState((currentState) => {
+      const shouldActivate = Boolean(options?.activate);
       const currentTab =
-        currentState.tabs.find((tab) => tab.id === draft.id) || currentState.tabs[0];
+        currentState.tabs.find((tab) =>
+          shouldActivate ? tab.id === draft.id : tab.id === currentState.activeTabId,
+        ) || currentState.tabs[0];
       if (!currentTab) return currentState;
 
+      const nextTab = {
+        ...currentTab,
+        id: shouldActivate ? draft.id : currentTab.id,
+        title: draft.label || source.title,
+        worksheetId: source.worksheetId,
+        sourceType: source.sourceType,
+        tableName: source.tableName,
+        originalTableName: source.originalTableName,
+        cleanedTableName: source.cleanedTableName,
+        sqlDraft: draft.sql,
+        dialect: draft.selectedDialect,
+        isDirty: false,
+      };
+
       return {
-        activeTabId: draft.id,
+        activeTabId: shouldActivate ? nextTab.id : currentState.activeTabId,
         tabs: [
-          {
-            ...currentTab,
-            id: draft.id,
-            title: draft.label || source.title,
-            worksheetId: source.worksheetId,
-            sourceType: source.sourceType,
-            tableName: source.tableName,
-            originalTableName: source.originalTableName,
-            cleanedTableName: source.cleanedTableName,
-            sqlDraft: draft.sql,
-            dialect: draft.selectedDialect,
-            isDirty: false,
-          },
-          ...currentState.tabs.filter((tab) => tab.id !== draft.id),
+          nextTab,
+          ...currentState.tabs.filter((tab) => tab.id !== nextTab.id),
         ],
       };
     });
   }, [seed.dataset]);
 
+  const createTab = useCallback(() => {
+    const source = getActiveSourceSnapshot(seed.dataset);
+    const id = createNewTabId();
+    const tab: SqlWorkspaceTab = {
+      id,
+      title: source.title,
+      worksheetId: source.worksheetId,
+      sourceType: source.sourceType,
+      tableName: source.tableName,
+      originalTableName: source.originalTableName,
+      cleanedTableName: source.cleanedTableName,
+      sqlDraft: seed.createStarterSql(source.tableName, activeTab.dialect),
+      dialect: activeTab.dialect,
+      previewResult: seed.initialPreviewResult,
+      editorStatus: seed.initialEditorStatus,
+      isDirty: false,
+      createdFrom: "starter",
+    };
+
+    setTabsState((currentState) => ({
+      activeTabId: id,
+      tabs: [...currentState.tabs, tab],
+    }));
+  }, [
+    activeTab.dialect,
+    seed,
+    seed.createStarterSql,
+    seed.dataset,
+    seed.initialEditorStatus,
+    seed.initialPreviewResult,
+  ]);
+
+  const switchTab = useCallback((tabId: string) => {
+    setTabsState((currentState) =>
+      currentState.tabs.some((tab) => tab.id === tabId)
+        ? { ...currentState, activeTabId: tabId }
+        : currentState,
+    );
+  }, []);
+
+  const closeTab = useCallback((tabId: string) => {
+    setTabsState((currentState) => {
+      if (currentState.tabs.length <= 1) return currentState;
+
+      const closingIndex = currentState.tabs.findIndex((tab) => tab.id === tabId);
+      if (closingIndex === -1) return currentState;
+
+      const nextTabs = currentState.tabs.filter((tab) => tab.id !== tabId);
+      const nextActiveTabId =
+        currentState.activeTabId === tabId
+          ? nextTabs[Math.min(closingIndex, nextTabs.length - 1)]?.id || nextTabs[0].id
+          : currentState.activeTabId;
+
+      return {
+        activeTabId: nextActiveTabId,
+        tabs: nextTabs,
+      };
+    });
+  }, []);
+
   return {
     tabsState,
     activeTab,
+    createTab,
+    switchTab,
+    closeTab,
     setActiveSqlDraft,
     setActiveDialect,
     syncActiveDialect,

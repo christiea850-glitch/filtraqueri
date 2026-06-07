@@ -82,4 +82,21 @@ export type SqlDialectContext = {
   onDialectChange: (dialect: SqlDialectId) => void;
 };
 
+export type SqlWorkspaceTabView = {
+  id: string;
+  title: string;
+  sourceBadge: string | null;
+  isActive: boolean;
+  isDirty: boolean;
+  canClose: boolean;
+};
+
+export type SqlWorkspaceTabsInterface = {
+  tabs: SqlWorkspaceTabView[];
+  activeTabId: string;
+  onNewTab: () => void;
+  onSwitchTab: (tabId: string) => void;
+  onCloseTab: (tabId: string) => void;
+};
+
 export type SqlValidationSummary = SqlValidationResult;

@@ -2235,6 +2235,122 @@
   flex-wrap: wrap;
 }
 
+.sql-workspace-tabbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.sql-workspace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.sql-workspace-tab {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  max-width: 240px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
+}
+
+.sql-workspace-tab.is-active {
+  border-color: #c7d2fe;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.sql-workspace-tab-button,
+.sql-workspace-tab-close,
+.sql-workspace-new-tab {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sql-workspace-tab-button {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 6px 9px;
+  text-align: left;
+}
+
+.sql-workspace-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-workspace-tab-source {
+  min-width: 0;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-workspace-tab-close {
+  width: 26px;
+  min-height: 100%;
+  border-left: 1px solid #e2e8f0;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sql-workspace-tab-close:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.sql-workspace-new-tab {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.sql-workspace-new-tab:hover {
+  border-color: #c7d2fe;
+  background: #f8fafc;
+  color: #4f46c9;
+}
+
+.sql-workspace-tab-button:focus-visible,
+.sql-workspace-tab-close:focus-visible,
+.sql-workspace-new-tab:focus-visible {
+  outline: 2px solid rgba(99, 91, 255, 0.42);
+  outline-offset: 2px;
+}
+
 /* Workbook badge — white pill with mint dot + filename. */
 .sql-workbook-badge {
   display: inline-flex;
@@ -2391,6 +2507,15 @@
 
   .sql-command-bar-lead {
     justify-content: space-between;
+  }
+
+  .sql-workspace-tabbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sql-workspace-new-tab {
+    align-self: flex-start;
   }
 
   .sql-query-explanation-grid {

@@ -6,6 +6,7 @@ import type {
   SqlGuidanceCard,
   SqlQueryExplanation,
   SqlValidationSummary,
+  SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
 
 type SqlEditorPanelProps = {
@@ -16,6 +17,7 @@ type SqlEditorPanelProps = {
   canOpenResultPreview: boolean;
   onOpenResultPreview: () => void;
   onOpenSavedDrafts: () => void;
+  sqlTabs: SqlWorkspaceTabsInterface;
   dialectContext: SqlDialectContext;
   // Analyst command-bar additions: workbook badge + active source pill +
   // Switch button (toggles SQL Context). Matches the routing mockup so the
@@ -43,6 +45,7 @@ function SqlEditorPanel({
   canOpenResultPreview,
   onOpenResultPreview,
   onOpenSavedDrafts,
+  sqlTabs,
   dialectContext,
   workbookLabel,
   activeSourceLabel,
@@ -51,6 +54,48 @@ function SqlEditorPanel({
 }: SqlEditorPanelProps) {
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
+      <div className="sql-workspace-tabbar" aria-label="Open SQL tabs">
+        <div className="sql-workspace-tabs" role="tablist" aria-label="SQL drafts">
+          {sqlTabs.tabs.map((tab) => (
+            <div
+              key={tab.id}
+              className={["sql-workspace-tab", tab.isActive ? "is-active" : ""]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab.isActive}
+                className="sql-workspace-tab-button"
+                onClick={() => sqlTabs.onSwitchTab(tab.id)}
+              >
+                <span className="sql-workspace-tab-title">
+                  {tab.title}
+                  {tab.isDirty ? <span aria-label="Unsaved changes"> *</span> : null}
+                </span>
+                {tab.sourceBadge && (
+                  <span className="sql-workspace-tab-source">{tab.sourceBadge}</span>
+                )}
+              </button>
+              {tab.canClose && (
+                <button
+                  type="button"
+                  className="sql-workspace-tab-close"
+                  aria-label={`Close ${tab.title}`}
+                  onClick={() => sqlTabs.onCloseTab(tab.id)}
+                >
+                  x
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button type="button" className="sql-workspace-new-tab" onClick={sqlTabs.onNewTab}>
+          + New tab
+        </button>
+      </div>
+
       <div className="sql-editor-toolbar sql-command-bar">
         <div className="sql-command-bar-lead">
           {workbookLabel && (

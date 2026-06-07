@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { executeWorkspaceQuery } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
@@ -26,6 +26,7 @@ import type {
   SqlExecutionStatus,
   SqlPreviewResult,
   SqlQueryDraft,
+  SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
 import useSqlWorkspaceTabs from "./useSqlWorkspaceTabs";
 
@@ -71,6 +72,7 @@ function useSqlWorkspace(
     () => getActiveSqlDraftSnapshot(normalizedMetadata),
     [normalizedMetadata],
   );
+  const hasAppliedRestoredDraftRef = useRef(Boolean(restoredActiveDraft));
   const [savedDrafts, setSavedDrafts] = useState<SqlQueryDraft[]>(() =>
     normalizedMetadata.snippets.map((snippet) => ({
       id: snippet.id,
@@ -91,6 +93,10 @@ function useSqlWorkspace(
 
   const {
     activeTab,
+    tabsState,
+    createTab,
+    switchTab,
+    closeTab,
     setActiveSqlDraft,
     setActiveDialect,
     syncActiveDialect,
@@ -104,6 +110,7 @@ function useSqlWorkspace(
     initialDialect: normalizedMetadata.selectedDialect,
     initialPreviewResult,
     initialEditorStatus: "idle",
+    createStarterSql: createInitialSql,
   });
   const sqlDraft = activeTab.sqlDraft;
   const selectedDialect = activeTab.dialect;
@@ -147,6 +154,24 @@ function useSqlWorkspace(
     [activeSourceLabel, dataset, selectedDialect, sqlDraft],
   );
   const characterCount = sqlDraft.trim().length;
+  const sqlTabs = useMemo<SqlWorkspaceTabsInterface>(() => {
+    const canCloseTabs = tabsState.tabs.length > 1;
+
+    return {
+      activeTabId: tabsState.activeTabId,
+      tabs: tabsState.tabs.map((tab) => ({
+        id: tab.id,
+        title: tab.title,
+        sourceBadge: tab.sourceType === "cleaned_working_copy" ? "cleaned copy" : tab.tableName || null,
+        isActive: tab.id === tabsState.activeTabId,
+        isDirty: tab.isDirty,
+        canClose: canCloseTabs,
+      })),
+      onNewTab: createTab,
+      onSwitchTab: switchTab,
+      onCloseTab: closeTab,
+    };
+  }, [closeTab, createTab, switchTab, tabsState.activeTabId, tabsState.tabs]);
 
   useEffect(() => {
     syncActiveDialect(normalizedMetadata.selectedDialect);
@@ -154,14 +179,30 @@ function useSqlWorkspace(
 
   useEffect(() => {
     if (!restoredActiveDraft) return;
+    if (hasAppliedRestoredDraftRef.current) return;
 
-    replaceActiveTabDraft(restoredActiveDraft);
+    const initialTab = tabsState.tabs[0];
+    const canHydrateInitialTab =
+      tabsState.tabs.length === 1 &&
+      initialTab &&
+      !initialTab.isDirty &&
+      tabsState.activeTabId === initialTab.id;
+
+    if (!canHydrateInitialTab) {
+      hasAppliedRestoredDraftRef.current = true;
+      return;
+    }
+
+    replaceActiveTabDraft(restoredActiveDraft, { activate: true });
+    hasAppliedRestoredDraftRef.current = true;
   }, [
     replaceActiveTabDraft,
     restoredActiveDraft,
     restoredActiveDraft?.id,
     restoredActiveDraft?.sql,
     restoredActiveDraft?.selectedDialect,
+    tabsState.activeTabId,
+    tabsState.tabs,
   ]);
 
   useEffect(() => {
@@ -445,6 +486,7 @@ function useSqlWorkspace(
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,
+    sqlTabs,
     setSelectedDialect: updateSelectedDialect,
     editor,
     insertSql,

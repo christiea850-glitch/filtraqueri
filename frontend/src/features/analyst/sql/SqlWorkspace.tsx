@@ -362,6 +362,7 @@ function SqlWorkspace({
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,
+    sqlTabs,
     setSelectedDialect,
     editor,
     insertSql,
@@ -603,6 +604,7 @@ function SqlWorkspace({
           canOpenResultPreview={canOpenResultPreview}
           onOpenResultPreview={() => setFocusedView("result")}
           onOpenSavedDrafts={() => setFocusedView("drafts")}
+          sqlTabs={sqlTabs}
           dialectContext={{
             selectedDialect,
             selectedDialectProfile,
