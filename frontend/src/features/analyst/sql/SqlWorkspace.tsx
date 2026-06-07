@@ -370,6 +370,22 @@ function SqlWorkspace({
     deleteDrafts,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
+  // Active source chip label for the Analyst command bar. Falls through
+  // worksheet displayName → sheetName → dataset.table_name → original_filename
+  // so the chip always reads something meaningful when a dataset is open.
+  const activeWorkbookWorksheet = dataset?.workbook_metadata?.worksheets.find(
+    (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
+  );
+  const activeSourceLabel = dataset
+    ? activeWorkbookWorksheet?.displayName ||
+      activeWorkbookWorksheet?.sheetName ||
+      dataset.table_name ||
+      null
+    : null;
+  // Separate workbook badge label for the command bar — mirrors the routing
+  // mockup's "Property Management Company.xlsx" pill next to the violet
+  // "Active · {worksheet}" pill.
+  const workbookLabel = dataset?.original_filename || null;
   const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
@@ -519,27 +535,25 @@ function SqlWorkspace({
         .join(" ")}
       aria-label="SQL workspace"
     >
-      <div className="analyst-page-banner">
+      <div className="analyst-page-banner" aria-label="Analyst workspace introduction">
         <p className="section-label">Analyst workspace</p>
         <h2>Inspect SQL</h2>
         <p>
-          Write, review, and run SQL safely from one focused workspace. Use templates or reports
-          when you need a starting point - Run Query always stays manual.
+          Write, review, and run SQL safely from one focused workspace. Templates and Reports
+          for ready-made starting points — Run Query always stays manual.
         </p>
       </div>
 
-      <div className="sqlw-main">
-        <div className="sqlw-dockbar">
-          <button
-            type="button"
-            className={["sqlw-pill", isContextOpen ? "is-on" : ""].filter(Boolean).join(" ")}
-            aria-expanded={isContextOpen}
-            onClick={() => setIsContextOpen((current) => !current)}
-          >
-            SQL context
-          </button>
-        </div>
+      <header className="analyst-page-head" aria-label="Inspect SQL section heading">
+        <p className="section-label">Analyst · Inspect SQL</p>
+        <h2>Write and run SQL</h2>
+        <p>
+          The editor below targets the active worksheet. Browse Templates and Browse Reports for
+          ready-made starting points — they insert back here.
+        </p>
+      </header>
 
+      <div className="sqlw-main">
         {isContextOpen && (
           <>
             <section
@@ -594,6 +608,10 @@ function SqlWorkspace({
             dialectOptions,
             onDialectChange: setSelectedDialect,
           }}
+          workbookLabel={workbookLabel}
+          activeSourceLabel={activeSourceLabel}
+          isContextOpen={isContextOpen}
+          onToggleContext={() => setIsContextOpen((current) => !current)}
         />
 
         {bottomTab && (
@@ -656,6 +674,7 @@ function SqlWorkspace({
         collapsed={isRailCollapsed}
         onToggleCollapsed={() => setIsRailCollapsed((current) => !current)}
         onInsertSql={insertSql}
+        activeSourceLabel={activeSourceLabel}
       />
     </section>
   );

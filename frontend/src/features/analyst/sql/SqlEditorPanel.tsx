@@ -16,6 +16,13 @@ type SqlEditorPanelProps = {
   onOpenResultPreview: () => void;
   onOpenSavedDrafts: () => void;
   dialectContext: SqlDialectContext;
+  // Analyst command-bar additions: workbook badge + active source pill +
+  // Switch button (toggles SQL Context). Matches the routing mockup so the
+  // editor toolbar reads as a single calm Analyst command bar.
+  workbookLabel?: string | null;
+  activeSourceLabel?: string | null;
+  isContextOpen?: boolean;
+  onToggleContext?: () => void;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -36,10 +43,44 @@ function SqlEditorPanel({
   onOpenResultPreview,
   onOpenSavedDrafts,
   dialectContext,
+  workbookLabel,
+  activeSourceLabel,
+  isContextOpen,
+  onToggleContext,
 }: SqlEditorPanelProps) {
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
-      <div className="sql-editor-toolbar">
+      <div className="sql-editor-toolbar sql-command-bar">
+        <div className="sql-command-bar-lead">
+          {workbookLabel && (
+            <span
+              className="sql-workbook-badge"
+              title={`Workbook: ${workbookLabel}`}
+            >
+              <span aria-hidden="true" className="sql-workbook-badge-dot" />
+              <span className="sql-workbook-badge-label">{workbookLabel}</span>
+            </span>
+          )}
+          {activeSourceLabel && (
+            <span
+              className="sql-active-source-pill"
+              title={`Active source: ${activeSourceLabel}`}
+            >
+              <span aria-hidden="true" className="sql-active-source-pill-dot" />
+              Active · <strong>{activeSourceLabel}</strong>
+            </span>
+          )}
+          {onToggleContext && (
+            <button
+              type="button"
+              className={["sql-switch-pill", isContextOpen ? "is-on" : ""].filter(Boolean).join(" ")}
+              aria-expanded={isContextOpen}
+              onClick={onToggleContext}
+            >
+              Switch <span aria-hidden="true">▾</span>
+            </button>
+          )}
+        </div>
         <div className="sql-actions">
           <label className="sql-dialect-selector">
             <span>Dialect</span>
