@@ -81,10 +81,46 @@ type SuggestedFix = {
   detail: string;
 };
 
+type SuggestedFixDecision = "use_recommendation" | "keep_original" | "decide_later";
+
 type PreparationReview = {
   priority: PreparationPriority;
   issues: PreparationIssue[];
   suggestedFixes: SuggestedFix[];
+};
+
+const suggestedFixDecisionLabels: Record<SuggestedFixDecision, string> = {
+  use_recommendation: "Use recommendation",
+  keep_original: "Keep original",
+  decide_later: "Decide later",
+};
+
+const getSuggestedFixRecommendationLabel = (fix: SuggestedFix) => {
+  if (fix.id.includes("side_note")) return "Exclude side-note regions";
+  if (fix.id.includes("generated-columns")) return "Drop generated columns";
+  if (fix.id.includes("sparse_layout_gap")) return "Exclude layout separator rows";
+  if (fix.id.includes("serial_only_placeholder_rows")) return "Remove empty template slots";
+  if (fix.id.includes("repeated_header")) return "Remove repeated header rows";
+  if (fix.id.includes("section_banner")) return "Keep section labels out of data rows";
+  if (fix.id.includes("date_title_row")) return "Carry section dates forward";
+  if (fix.id.includes("missing-values") || fix.id.includes("repeated_missing_pattern")) {
+    return "Review blanks before filling values";
+  }
+  return fix.title;
+};
+
+const getSuggestedFixKeepOriginalLabel = (fix: SuggestedFix) => {
+  if (fix.id.includes("side_note")) return "Keep side-note regions";
+  if (fix.id.includes("generated-columns")) return "Keep generated columns";
+  if (fix.id.includes("sparse_layout_gap")) return "Keep layout separator rows";
+  if (fix.id.includes("serial_only_placeholder_rows")) return "Keep empty template slots";
+  if (fix.id.includes("repeated_header")) return "Keep repeated header rows";
+  if (fix.id.includes("section_banner")) return "Keep section labels as rows";
+  if (fix.id.includes("date_title_row")) return "Keep section dates as rows";
+  if (fix.id.includes("missing-values") || fix.id.includes("repeated_missing_pattern")) {
+    return "Keep blanks as-is";
+  }
+  return "Do not apply this fix";
 };
 
 const getIssueCategory = (issue: PreparationIssue) => {
@@ -412,6 +448,9 @@ export function CleanPrepareReviewPanel({
     Record<string, MissingValueApplyState>
   >({});
   const [missingValueDecisions, setMissingValueDecisions] = useState(readMissingValueDecisions);
+  const [fixDecisionDrafts, setFixDecisionDrafts] = useState<
+    Record<string, SuggestedFixDecision>
+  >({});
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
   const issueGroups = useMemo(
     () =>
@@ -638,7 +677,22 @@ export function CleanPrepareReviewPanel({
       : "No cleaning recipe is needed for this worksheet."
     : "Choose a ready worksheet to preview its draft cleaning recipe.";
   type StatusChecklistState = "complete" | "active" | "available" | "pending" | "needs-decision";
-  const hasDraftDecisions = Boolean(worksheetDecision) || decidedColumnCount > 0;
+  const fixDecisionCount = review.suggestedFixes.filter(
+    (fix) => fixDecisionDrafts[fix.id] && fixDecisionDrafts[fix.id] !== "decide_later",
+  ).length;
+  const allSuggestedFixesDecided =
+    review.suggestedFixes.length > 0 && fixDecisionCount === review.suggestedFixes.length;
+  const missingValueDraftDecisionCount =
+    (worksheetDecision ? 1 : 0) + decidedColumnCount;
+  const hasDraftDecisions = fixDecisionCount > 0 || missingValueDraftDecisionCount > 0;
+  const decisionsReady =
+    (review.suggestedFixes.length === 0 || allSuggestedFixesDecided) &&
+    (missingValueColumns.length === 0 || missingValueDecisionReady);
+  const decisionStatusCopy = decisionsReady
+    ? "Decisions ready"
+    : hasDraftDecisions
+      ? "Some decisions made"
+      : "Not reviewed yet";
   const statusChecklistItems: Array<{
     id: "review" | "decisions" | "cleaned-copy" | "active-source";
     label: string;
@@ -659,8 +713,8 @@ export function CleanPrepareReviewPanel({
     {
       id: "decisions",
       label: "Decisions",
-      state: hasDraftDecisions ? "complete" : activeStep === "decide" ? "needs-decision" : "pending",
-      copy: hasDraftDecisions ? "Draft decisions selected" : "Not reviewed yet",
+      state: decisionsReady ? "complete" : hasDraftDecisions || activeStep === "decide" ? "needs-decision" : "pending",
+      copy: decisionStatusCopy,
       step: "decide",
     },
     {
@@ -993,19 +1047,65 @@ export function CleanPrepareReviewPanel({
             </summary>
             {embedded && (
               <p>
-                Pick the fixes that match your intent. Each fix is a draft - review it before applying.
+                FiltraQueri recommends a path. You decide what belongs in the cleaned working copy.
+                Nothing changes until Step 3 Apply.
               </p>
             )}
             {review.suggestedFixes.length > 0 ? (
               <ul className={embedded ? "clean-prepare-decision-rows" : undefined}>
-                {review.suggestedFixes.map((fix) => (
-                  <li key={fix.id}>
-                    {embedded && <span className="clean-prepare-draft-indicator" aria-hidden="true" />}
-                    <strong>{fix.title}</strong>
-                    <span>{fix.detail}</span>
-                    {embedded && <small>Draft decision</small>}
-                  </li>
-                ))}
+                {review.suggestedFixes.map((fix) => {
+                  const decision = fixDecisionDrafts[fix.id] || "decide_later";
+                  const recommendationLabel = getSuggestedFixRecommendationLabel(fix);
+                  const keepOriginalLabel = getSuggestedFixKeepOriginalLabel(fix);
+                  return (
+                    <li key={fix.id}>
+                      <div className="clean-prepare-decision-row-copy">
+                        <strong>{fix.title}</strong>
+                        <span>{fix.detail}</span>
+                      </div>
+                      {embedded ? (
+                        <>
+                          <div className="clean-prepare-recommendation-copy">
+                            <span>Recommendation</span>
+                            <strong>{recommendationLabel}</strong>
+                          </div>
+                          <fieldset className="clean-prepare-decision-control">
+                            <legend>Your decision</legend>
+                            {([
+                              ["use_recommendation", recommendationLabel],
+                              ["keep_original", keepOriginalLabel],
+                              ["decide_later", "Decide later"],
+                            ] as Array<[SuggestedFixDecision, string]>).map(([value, label]) => (
+                              <label
+                                key={value}
+                                className={decision === value ? "is-selected" : ""}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`clean-prepare-fix-${fix.id}`}
+                                  value={value}
+                                  checked={decision === value}
+                                  onChange={() =>
+                                    setFixDecisionDrafts((current) => ({
+                                      ...current,
+                                      [fix.id]: value,
+                                    }))
+                                  }
+                                />
+                                <span>
+                                  <strong>{suggestedFixDecisionLabels[value]}</strong>
+                                  <small>{label}</small>
+                                </span>
+                              </label>
+                            ))}
+                          </fieldset>
+                        </>
+                      ) : (
+                        <span>{recommendationLabel}</span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p>No draft fixes are suggested yet.</p>
@@ -1019,7 +1119,7 @@ export function CleanPrepareReviewPanel({
                   <h4>{embedded ? "Missing-value handling" : "Missing value decisions"}</h4>
                   <p>
                     {embedded
-                      ? "Choose one worksheet-wide strategy, or customize per column."
+                      ? "Choose how blanks should be treated. Nothing changes until Apply."
                       : "Blanks may be intentional layout space, empty future-entry rows, real missing values, unknown values, or fields that should be completed later."}
                   </p>
                 </div>
