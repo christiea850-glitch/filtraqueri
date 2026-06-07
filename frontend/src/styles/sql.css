@@ -2669,3 +2669,44 @@
   font-size: 11.5px;
   line-height: 1.45;
 }
+
+/* ============================================================
+ * Option C — Tab source-of-truth surfaces
+ * Execution-mismatch warning + route page scope helper copy
+ * ============================================================ */
+
+.sql-source-mismatch-warning {
+  margin: 6px 0 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  font-size: 12.5px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sql-source-mismatch-warning strong {
+  color: #78350f;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.sql-source-mismatch-warning span {
+  color: #92400e;
+}
+
+.sql-route-scope-helper {
+  margin: 4px 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f8f7ff;
+  border: 1px dashed #ddd9ff;
+  color: #4f46c9;
+  font-size: 12px;
+  line-height: 1.55;
+}

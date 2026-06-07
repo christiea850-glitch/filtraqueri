@@ -20,6 +20,10 @@ import {
 } from "../../sqlIntelligence";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import { explainSqlQuery } from "./sqlQueryExplainer";
+import {
+  resolveSqlTabSourceContext,
+  type SqlTabSourceContext,
+} from "./resolveSqlTabSourceContext";
 import { formatRowLimitClause } from "./sqlTemplateLibrary";
 import type {
   SqlEditorInterface,
@@ -128,8 +132,41 @@ function useSqlWorkspace(
   const editorStatus = activeTab.editorStatus;
   const previewResult = activeTab.previewResult;
 
-  const templates = useMemo(() => (dataset ? createSqlTemplates(dataset) : []), [dataset]);
-  const suggestions = useMemo(() => (dataset ? createColumnSuggestions(dataset) : []), [dataset]);
+  // Option C — Resolve the active tab's source context once and reuse it for
+  // every UI / intelligence surface (schema rail, command bar, templates,
+  // reports, query explanation, suggestions). Execution is unchanged.
+  const activeTabSourceContext = useMemo<SqlTabSourceContext>(
+    () => resolveSqlTabSourceContext(dataset, activeTab),
+    [dataset, activeTab],
+  );
+
+  // Synthesize a tab-scoped DatasetMetadata so existing helpers
+  // (createSqlTemplates, createColumnSuggestions, explainSqlQuery) see the
+  // active tab's schema + table_name. Execution still uses the unaltered
+  // global dataset prop — this synthesized object is for intelligence /
+  // display only and is never passed to executeWorkspaceQuery.
+  const scopedDatasetForTab = useMemo(() => {
+    if (!dataset) return null;
+    return {
+      ...dataset,
+      schema:
+        activeTabSourceContext.schema.length > 0
+          ? activeTabSourceContext.schema
+          : dataset.schema,
+      table_name: activeTabSourceContext.tableName || dataset.table_name,
+      row_count: activeTabSourceContext.rowCount || dataset.row_count,
+      column_count: activeTabSourceContext.columnCount || dataset.column_count,
+    };
+  }, [dataset, activeTabSourceContext]);
+
+  const templates = useMemo(
+    () => (scopedDatasetForTab ? createSqlTemplates(scopedDatasetForTab) : []),
+    [scopedDatasetForTab],
+  );
+  const suggestions = useMemo(
+    () => (scopedDatasetForTab ? createColumnSuggestions(scopedDatasetForTab) : []),
+    [scopedDatasetForTab],
+  );
   const dialectOptions = useMemo(
     () =>
       listSupportedDialects().map((dialect) => ({
@@ -146,24 +183,17 @@ function useSqlWorkspace(
     () => analyzeSqlWorkspaceDraft(sqlDraft, selectedDialect),
     [selectedDialect, sqlDraft],
   );
-  const activeWorkbookWorksheet = dataset?.workbook_metadata?.worksheets.find(
-    (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
-  );
-  const activeSourceLabel = dataset
-    ? activeTab.title ||
-      activeWorkbookWorksheet?.displayName ||
-      activeWorkbookWorksheet?.sheetName ||
-      dataset.table_name ||
-      null
-    : null;
+  // Option C — Drive the displayed active-source label from the resolved tab
+  // context. Falls back to null when no dataset is open.
+  const activeSourceLabel = dataset ? activeTabSourceContext.sourceLabel : null;
   const queryExplanation = useMemo(
     () =>
       explainSqlQuery(sqlDraft, {
-        dataset,
+        dataset: scopedDatasetForTab,
         activeSourceLabel,
         selectedDialect,
       }),
-    [activeSourceLabel, dataset, selectedDialect, sqlDraft],
+    [activeSourceLabel, scopedDatasetForTab, selectedDialect, sqlDraft],
   );
   const characterCount = sqlDraft.trim().length;
   const sqlTabs = useMemo<SqlWorkspaceTabsInterface>(() => {
@@ -480,7 +510,11 @@ function useSqlWorkspace(
     onExplain: explainDraft,
     onSaveDraft: saveDraft,
     onClear: clearDraft,
-    schema: dataset?.schema || [],
+    // Option C — editor.schema mirrors the active tab's source schema so
+    // Monaco column suggestions stay in sync with the tab.
+    schema: activeTabSourceContext.schema.length > 0
+      ? activeTabSourceContext.schema
+      : dataset?.schema || [],
     suggestions,
     templates,
     keywordSuggestions: sqlKeywordSuggestions,
@@ -514,6 +548,11 @@ function useSqlWorkspace(
     deleteDraft,
     deleteDrafts,
     openSqlSourceTab: openSourceTab,
+    // Option C exports — consumers (SqlWorkspace, SqlSchemaPanel,
+    // SqlAssistantRoutePage) read the active tab's source context from here
+    // instead of recomputing it from the global dataset.
+    activeTabSourceContext,
+    scopedDatasetForTab,
   };
 }
 

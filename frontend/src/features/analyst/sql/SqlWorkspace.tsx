@@ -371,20 +371,14 @@ function SqlWorkspace({
     deleteDraft,
     deleteDrafts,
     openSqlSourceTab,
+    activeTabSourceContext,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
-  // Active source chip label for the Analyst command bar. Falls through
-  // worksheet displayName → sheetName → dataset.table_name → original_filename
-  // so the chip always reads something meaningful when a dataset is open.
-  const activeWorkbookWorksheet = dataset?.workbook_metadata?.worksheets.find(
-    (worksheet) => worksheet.worksheetId === dataset.workbook_metadata?.activeWorksheetId,
-  );
-  const activeSourceLabel = dataset
-    ? activeWorkbookWorksheet?.displayName ||
-      activeWorkbookWorksheet?.sheetName ||
-      dataset.table_name ||
-      null
-    : null;
+  // Option C — Drive the command-bar source label from the active SQL tab's
+  // resolved context instead of falling back to the global active worksheet.
+  // The schema rail (right) and command bar (top) now both reflect the
+  // *tab's* source, not the global dataset's.
+  const activeSourceLabel = dataset ? activeTabSourceContext.sourceLabel : null;
   // Separate workbook badge label for the command bar — mirrors the routing
   // mockup's "Property Management Company.xlsx" pill next to the violet
   // "Active · {worksheet}" pill.
@@ -614,11 +608,16 @@ function SqlWorkspace({
             onDialectChange: setSelectedDialect,
           }}
           workbookLabel={workbookLabel}
-          activeSourceLabel={sqlTabs.activeTabTitle || activeSourceLabel}
-          activeSourceTableLabel={sqlTabs.activeTabSourceBadge}
-          activeSourceKindLabel={sqlTabs.activeTabSourceKind}
+          activeSourceLabel={activeSourceLabel}
+          activeSourceTableLabel={activeTabSourceContext.tableName || sqlTabs.activeTabSourceBadge}
+          activeSourceKindLabel={
+            activeTabSourceContext.sourceType === "cleaned_working_copy"
+              ? "Cleaned"
+              : "Original"
+          }
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((current) => !current)}
+          sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
         />
 
         {bottomTab && (
@@ -683,6 +682,8 @@ function SqlWorkspace({
         onToggleCollapsed={() => setIsRailCollapsed((current) => !current)}
         onInsertSql={insertSql}
         activeSourceLabel={activeSourceLabel}
+        schemaOverride={activeTabSourceContext.schema}
+        columnCountOverride={activeTabSourceContext.columnCount}
       />
     </section>
   );

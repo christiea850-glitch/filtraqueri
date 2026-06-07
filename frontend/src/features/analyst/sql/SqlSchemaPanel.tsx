@@ -1,4 +1,4 @@
-import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
 import {
   WORKBOOK_HEADER_WARNING_COPY,
   getStructuralColumnNotice,
@@ -10,9 +10,13 @@ type SqlSchemaPanelProps = {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onInsertSql: (sql: string) => void;
-  // Optional active worksheet label shown in the rail header
-  // ("Columns · {sheet}") so the rail matches the routing mockup.
+  // Option C — Active tab source-of-truth. When provided, the rail shows
+  // the active tab's worksheet schema and label instead of the global
+  // dataset's schema, so opening properties / managers / realtors tabs
+  // shows the correct columns for each.
   activeSourceLabel?: string | null;
+  schemaOverride?: SchemaColumn[];
+  columnCountOverride?: number;
 };
 
 const getSchemaTypeGroup = (inferredType: string | null | undefined): string => {
@@ -36,10 +40,22 @@ function SqlSchemaPanel({
   onToggleCollapsed,
   onInsertSql,
   activeSourceLabel,
+  schemaOverride,
+  columnCountOverride,
 }: SqlSchemaPanelProps) {
   const showHeaderWarning = hasSuspiciousWorkbookHeaders(dataset);
   const structuralColumnNotice = getStructuralColumnNotice(dataset);
-  const columnCount = dataset ? dataset.schema.length : 0;
+  // Option C — Render the active tab's schema when an override is supplied;
+  // otherwise fall back to the dataset's global schema for backward
+  // compatibility.
+  const railSchema: SchemaColumn[] =
+    schemaOverride && schemaOverride.length > 0
+      ? schemaOverride
+      : dataset
+        ? dataset.schema
+        : [];
+  const columnCount =
+    typeof columnCountOverride === "number" ? columnCountOverride : railSchema.length;
   const headerLabel = activeSourceLabel ? `Columns · ${activeSourceLabel}` : "Columns";
 
   return (
@@ -68,8 +84,8 @@ function SqlSchemaPanel({
             </span>
           </div>
           <div className="schema-list sql-schema-list" aria-label="SQL available columns">
-            {dataset ? (
-              dataset.schema.map((column) => {
+            {dataset && railSchema.length > 0 ? (
+              railSchema.map((column) => {
                 const typeGroup = getSchemaTypeGroup(column.inferred_type);
                 return (
                   <button
@@ -84,6 +100,8 @@ function SqlSchemaPanel({
                   </button>
                 );
               })
+            ) : dataset ? (
+              <p className="sql-helper-empty">No columns available for this source.</p>
             ) : (
               <p className="sql-helper-empty">No dataset open.</p>
             )}

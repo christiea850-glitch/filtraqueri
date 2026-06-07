@@ -63,10 +63,18 @@ function SqlAssistantRoutePage({
     selectedDialectProfile,
     sqlTabs,
     insertSql,
+    activeTabSourceContext,
+    scopedDatasetForTab,
   } = useSqlWorkspace(dataset, undefined, metadata, onMetadataChange);
   const copy = pageCopy[kind];
   const allowedModes = kind === "templates" ? templateModes : reportModes;
   const activeSourceLabel = sqlTabs.activeTabTitle || "No active SQL tab";
+  // Option C — Templates / Reports must render against the active SQL tab's
+  // source (schema, table name), not the global dataset. SqlAssistantPanel
+  // already accepts a dataset; we feed it the tab-scoped synthesis from
+  // useSqlWorkspace so cards (column choices, sample SQL, eligibility) are
+  // built from the active tab's worksheet schema.
+  const assistantDataset = scopedDatasetForTab ?? dataset;
 
   const insertAndReturnToInspectSql = (sql: string) => {
     insertSql(sql);
@@ -88,18 +96,23 @@ function SqlAssistantRoutePage({
         <span className="sql-route-source-pill is-active">
           Active tab - {activeSourceLabel}
         </span>
-        {sqlTabs.activeTabSourceBadge && (
+        {activeTabSourceContext.tableName && (
           <span className="sql-route-source-pill">
-            {sqlTabs.activeTabSourceBadge}
+            {activeTabSourceContext.tableName}
           </span>
         )}
-        {sqlTabs.activeTabSourceKind && (
-          <span className="sql-route-source-pill">
-            {sqlTabs.activeTabSourceKind}
-          </span>
-        )}
+        <span className="sql-route-source-pill">
+          {activeTabSourceContext.sourceType === "cleaned_working_copy"
+            ? "Cleaned"
+            : "Original"}
+        </span>
         <span>{copy.note}</span>
       </div>
+      <p className="sql-route-scope-helper">
+        Selected analysis scope (if any) is metadata context for suggestions,
+        templates, and reports only. It is not an execution source. You don't
+        need to remove selected worksheets to open or work in another SQL tab.
+      </p>
 
       <div className="sql-assistant-route-header">
         <div>
@@ -110,7 +123,7 @@ function SqlAssistantRoutePage({
       </div>
 
       <SqlAssistantPanel
-        dataset={dataset}
+        dataset={assistantDataset}
         selectedDialect={selectedDialect}
         selectedDialectProfile={selectedDialectProfile}
         onInsertSql={insertAndReturnToInspectSql}

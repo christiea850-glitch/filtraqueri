@@ -28,6 +28,12 @@ type SqlEditorPanelProps = {
   activeSourceKindLabel?: string | null;
   isContextOpen?: boolean;
   onToggleContext?: () => void;
+  // Option C — Optional execution-mismatch warning. When the active SQL
+  // tab's source differs from the dataset's currently executable source,
+  // this string is rendered as a calm note below the toolbar. Run Query
+  // remains enabled; the warning is informational only and never blocks
+  // typing or execution.
+  sourceMismatchWarning?: string | null;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -55,6 +61,7 @@ function SqlEditorPanel({
   activeSourceKindLabel,
   isContextOpen,
   onToggleContext,
+  sourceMismatchWarning,
 }: SqlEditorPanelProps) {
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -181,6 +188,17 @@ function SqlEditorPanel({
           </button>
         </div>
       </div>
+
+      {sourceMismatchWarning && (
+        <div
+          className="sql-source-mismatch-warning"
+          role="status"
+          aria-live="polite"
+        >
+          <strong>Tab source differs from executable source.</strong>
+          <span>{sourceMismatchWarning}</span>
+        </div>
+      )}
 
       <SqlEditorHost editor={editor} />
 
