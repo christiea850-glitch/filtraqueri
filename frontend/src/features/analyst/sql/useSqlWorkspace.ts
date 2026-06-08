@@ -432,6 +432,16 @@ function useSqlWorkspace(
     onMetadataChange?.(updateSqlWorkspaceDialect(normalizedMetadata, dialect));
   };
 
+  const clearExecutionError = () => {
+    setActiveEditorStatus("idle");
+    setActivePreviewResult({
+      columns: [],
+      rows: [],
+      message: createPreviewMessage("idle"),
+      errorInsight: null,
+    });
+  };
+
   const updateStatus = (status: SqlExecutionStatus) => {
     const message = createPreviewMessage(status);
     setActiveEditorStatus(status);
@@ -441,6 +451,16 @@ function useSqlWorkspace(
       message,
       errorInsight: null,
     });
+  };
+
+  const handleEditorChange = (nextSql: string) => {
+    const sqlChanged = nextSql !== sqlDraft;
+
+    setActiveSqlDraft(nextSql);
+
+    if (previewResult.errorInsight && sqlChanged) {
+      clearExecutionError();
+    }
   };
 
   const insertSql = (
@@ -650,7 +670,7 @@ function useSqlWorkspace(
 
   const editor: SqlEditorInterface = {
     value: sqlDraft,
-    onChange: setActiveSqlDraft,
+    onChange: handleEditorChange,
     onRun: runDraft,
     onExplain: explainDraft,
     onSaveDraft: saveDraft,
