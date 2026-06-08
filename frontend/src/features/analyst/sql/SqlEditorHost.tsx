@@ -5,6 +5,7 @@ import type { SqlEditorInterface } from "./sqlTypes";
 
 type SqlEditorHostProps = {
   editor: SqlEditorInterface;
+  errorDock?: ReactNode;
 };
 
 type MonacoErrorBoundaryProps = {
@@ -32,7 +33,7 @@ class MonacoErrorBoundary extends Component<MonacoErrorBoundaryProps, MonacoErro
   }
 }
 
-function SqlTextareaFallback({ editor }: SqlEditorHostProps) {
+function SqlTextareaFallback({ editor }: Pick<SqlEditorHostProps, "editor">) {
   return (
     <textarea
       className="sql-editor-input"
@@ -89,7 +90,7 @@ const getEditorPosition = (text: string, offset: number) => {
   };
 };
 
-function SqlEditorHost({ editor }: SqlEditorHostProps) {
+function SqlEditorHost({ editor, errorDock }: SqlEditorHostProps) {
   const [shouldUseFallback, setShouldUseFallback] = useState(false);
   const [isMonacoReady, setIsMonacoReady] = useState(false);
   const hasMountedMonacoRef = useRef(false);
@@ -313,38 +314,41 @@ function SqlEditorHost({ editor }: SqlEditorHostProps) {
 
   return (
     <div className="sql-editor-host" data-editor-host="monaco-ready">
-      {shouldUseFallback ? (
-        <SqlTextareaFallback editor={editor} />
-      ) : (
-        <MonacoErrorBoundary fallback={<SqlTextareaFallback editor={editor} />}>
-          <Editor
-            className="sql-monaco-editor"
-            height="100%"
-            defaultLanguage="sql"
-            language="sql"
-            theme="filtraqueri-sql-dark"
-            value={editor.value}
-            beforeMount={configureMonaco}
-            onMount={handleMount}
-            onChange={(value) => editor.onChange(value || "")}
-            loading={<SqlTextareaFallback editor={editor} />}
-            options={{
-              automaticLayout: true,
-              fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
-              fontSize: 14,
-              lineHeight: 24,
-              minimap: { enabled: false },
-              padding: { top: 16, bottom: 16 },
-              quickSuggestions: true,
-              readOnly: false,
-              renderLineHighlight: "line",
-              scrollBeyondLastLine: false,
-              tabSize: 2,
-              wordWrap: "on",
-            }}
-          />
-        </MonacoErrorBoundary>
-      )}
+      <div className="sql-editor-host-main">
+        {shouldUseFallback ? (
+          <SqlTextareaFallback editor={editor} />
+        ) : (
+          <MonacoErrorBoundary fallback={<SqlTextareaFallback editor={editor} />}>
+            <Editor
+              className="sql-monaco-editor"
+              height="100%"
+              defaultLanguage="sql"
+              language="sql"
+              theme="filtraqueri-sql-dark"
+              value={editor.value}
+              beforeMount={configureMonaco}
+              onMount={handleMount}
+              onChange={(value) => editor.onChange(value || "")}
+              loading={<SqlTextareaFallback editor={editor} />}
+              options={{
+                automaticLayout: true,
+                fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
+                fontSize: 14,
+                lineHeight: 24,
+                minimap: { enabled: false },
+                padding: { top: 16, bottom: 16 },
+                quickSuggestions: true,
+                readOnly: false,
+                renderLineHighlight: "line",
+                scrollBeyondLastLine: false,
+                tabSize: 2,
+                wordWrap: "on",
+              }}
+            />
+          </MonacoErrorBoundary>
+        )}
+      </div>
+      {errorDock}
     </div>
   );
 }

@@ -54,73 +54,87 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   error: "Query failed",
 };
 
-
-function SqlExecutionErrorInsightCard({
+function SqlExecutionErrorDock({
   insight,
 }: {
   insight: NonNullable<SqlPreviewResult["errorInsight"]>;
 }) {
-  const confidenceLabel = `${insight.confidence.charAt(0).toUpperCase()}${insight.confidence.slice(1)} confidence`;
+  const compactGuidance = insight.suggestions.length > 0 ? insight.suggestions : insight.howToFix;
+  const visibleGuidance = compactGuidance.slice(0, 2);
+  const hiddenGuidanceCount = Math.max(compactGuidance.length - visibleGuidance.length, 0);
 
   return (
-    <article
-      className="sql-execution-error-card"
-      aria-labelledby="sql-execution-error-card-title"
+    <aside
+      className="sql-execution-error-dock"
+      aria-labelledby="sql-execution-error-dock-title"
       role="status"
       aria-live="polite"
     >
-      <div className="sql-execution-error-card-head">
-        <div>
+      <div className="sql-execution-error-dock-summary">
+        <div className="sql-execution-error-dock-copy">
           <span className="sql-execution-error-eyebrow">Query failed</span>
-          <h3 id="sql-execution-error-card-title">SQL execution issue</h3>
+          <strong id="sql-execution-error-dock-title">{insight.title}</strong>
+          <span>{insight.summary}</span>
         </div>
-        <span className="sql-execution-error-confidence">{confidenceLabel}</span>
+
+        {insight.likelyLocation?.token && (
+          <div className="sql-execution-error-token" aria-label="Likely error location">
+            <span>Likely location</span>
+            <code>{insight.likelyLocation.token}</code>
+          </div>
+        )}
       </div>
 
-      <div className="sql-execution-error-section">
-        <strong>{insight.title}</strong>
-        <p>{insight.summary}</p>
-      </div>
-
-      <div className="sql-execution-error-section">
-        <span className="sql-execution-error-label">Likely cause</span>
-        <p>{insight.likelyCause}</p>
-      </div>
-
-      {insight.likelyLocation?.token && (
-        <div className="sql-execution-error-token" aria-label="Likely error location">
-          <span>Likely location</span>
-          <code>{insight.likelyLocation.token}</code>
-        </div>
-      )}
-
-      {insight.howToFix.length > 0 && (
-        <div className="sql-execution-error-section">
-          <span className="sql-execution-error-label">How to fix</span>
-          <ul>
-            {insight.howToFix.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {insight.suggestions.length > 0 && (
-        <div className="sql-execution-error-section">
-          <span className="sql-execution-error-label">Suggestions</span>
-          <ul>
-            {insight.suggestions.map((suggestion) => (
-              <li key={suggestion}>{suggestion}</li>
-            ))}
-          </ul>
-        </div>
+      {visibleGuidance.length > 0 && (
+        <ul className="sql-execution-error-suggestions" aria-label="Suggested next steps">
+          {visibleGuidance.map((suggestion) => (
+            <li key={suggestion}>{suggestion}</li>
+          ))}
+          {hiddenGuidanceCount > 0 && (
+            <li>
+              {hiddenGuidanceCount} more item{hiddenGuidanceCount === 1 ? "" : "s"} in details.
+            </li>
+          )}
+        </ul>
       )}
 
       <details className="sql-execution-error-details">
-        <summary>Technical details</summary>
-        <pre>{insight.rawMessage}</pre>
+        <summary>Technical details and full guidance</summary>
+        <div className="sql-execution-error-details-grid">
+          <section className="sql-execution-error-section">
+            <span className="sql-execution-error-label">Likely cause</span>
+            <p>{insight.likelyCause}</p>
+          </section>
+
+          {insight.howToFix.length > 0 && (
+            <section className="sql-execution-error-section">
+              <span className="sql-execution-error-label">How to fix</span>
+              <ul>
+                {insight.howToFix.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {insight.suggestions.length > 0 && (
+            <section className="sql-execution-error-section">
+              <span className="sql-execution-error-label">Suggestions</span>
+              <ul>
+                {insight.suggestions.map((suggestion) => (
+                  <li key={suggestion}>{suggestion}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="sql-execution-error-section">
+            <span className="sql-execution-error-label">Raw error</span>
+            <pre>{insight.rawMessage}</pre>
+          </section>
+        </div>
       </details>
-    </article>
+    </aside>
   );
 }
 
@@ -352,9 +366,10 @@ function SqlEditorPanel({
         </div>
       )}
 
-      <SqlEditorHost editor={editor} />
-
-      {errorInsight && <SqlExecutionErrorInsightCard insight={errorInsight} />}
+      <SqlEditorHost
+        editor={editor}
+        errorDock={errorInsight ? <SqlExecutionErrorDock insight={errorInsight} /> : null}
+      />
 
       <div className="sql-editor-footer">
         <span>{statusLabels[executionStatus]}</span>
