@@ -665,6 +665,7 @@ function SqlWorkspace({
           onToggleContext={() => setIsContextOpen((current) => !current)}
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
           readinessReport={readinessReport}
+          errorInsight={previewResult.errorInsight}
         />
 
         {bottomTab && (
