@@ -3081,3 +3081,73 @@
   font-size: 12px;
   line-height: 1.55;
 }
+
+/* T-11C grounding metadata surfaced on Task Assist recommendation cards. */
+.sql-grounding-meta,
+.sql-template-recommendation-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sql-grounding-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 2px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.sql-grounding-badge.supported {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.sql-grounding-badge.needs_review {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.sql-grounding-badge.unsupported {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.sql-grounding-warning,
+.sql-grounding-notice {
+  margin: 0;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.sql-grounding-warning strong {
+  color: #78350f;
+  font-weight: 850;
+}
+
+.sql-grounding-notice {
+  padding: 7px 9px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+}
+
+.sql-template-recommendation-card.is-unsupported,
+.workbook-task-template-result.is-unsupported {
+  opacity: 0.72;
+  background: #f1f5f9;
+}

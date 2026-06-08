@@ -80,6 +80,27 @@ const sqlAssistantModeLabels: Record<SqlAssistantMode, string> = {
   recipes: "Report Recipes",
 };
 
+
+const groundingEmptyCopy = {
+  noScope: "Apply a worksheet scope to this tab before choosing templates. Browsing templates does not auto-insert SQL.",
+  noPrompt: "Describe your task first, then FiltraQueri can suggest worksheets or grounded templates for this tab.",
+  noSupportedMatches: "No grounded template match yet. You can choose a template manually or continue writing SQL.",
+  needsReviewOnly: "Only review-required matches are available. Review warnings before inserting SQL, then run manually.",
+} as const;
+
+const conciseGroundingMessage = (values?: readonly string[]): string =>
+  (values || [])
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+
+const groundingSupportLabel = (support: SqlTemplateRecommendation["support"]): string => {
+  if (support === "needs_review") return "Needs review";
+  if (support === "unsupported") return "Unsupported";
+  return "Grounded";
+};
+
 type SqlReportRecipeFilter =
   | "All"
   | "Supported"
@@ -428,11 +449,30 @@ function SqlTemplateRecommendationCard({
   recommendation: SqlTemplateRecommendation;
   onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
+  const groundingWarning = conciseGroundingMessage(recommendation.warnings);
+  const unsupportedReason = conciseGroundingMessage(recommendation.unsupportedReasons);
+  const isUnsupported = recommendation.support === "unsupported";
+
   return (
-    <article className="sql-template-recommendation-card">
+    <article className={`sql-template-recommendation-card${isUnsupported ? " is-unsupported" : ""}`}>
       <div>
-        <strong>{recommendation.title}</strong>
+        <div className="sql-template-recommendation-title-row">
+          <strong>{recommendation.title}</strong>
+          <span className={`sql-grounding-badge ${recommendation.support || "supported"}`}>
+            {groundingSupportLabel(recommendation.support)}
+          </span>
+        </div>
         <span>{recommendation.description}</span>
+        {recommendation.support === "needs_review" && groundingWarning && (
+          <span className="sql-grounding-warning">
+            <strong>Review warning:</strong> {groundingWarning}
+          </span>
+        )}
+        {isUnsupported && unsupportedReason && (
+          <span className="sql-grounding-warning">
+            <strong>Unsupported:</strong> {unsupportedReason}
+          </span>
+        )}
       </div>
       <ul>
         {recommendation.reasons.slice(0, 2).map((reason) => (
@@ -442,6 +482,7 @@ function SqlTemplateRecommendationCard({
       <button
         type="button"
         className="secondary-button"
+        disabled={isUnsupported}
         onClick={() =>
           onInsertSql(recommendation.sql, {
             id: recommendation.id,
@@ -948,6 +989,9 @@ function SqlAssistantPanel({
       }),
     [appliedScopeLabels, dataset, recipes, reportOpportunities, taskPrompt, templates],
   );
+  const onlyNeedsReviewRecommendations =
+    recommendations.length > 0 &&
+    recommendations.every((recommendation) => recommendation.support === "needs_review");
   const aiMetadataPayload = useMemo(
     () => buildAIMetadataContextPayload({ dataset, selectedDialect }),
     [dataset, selectedDialect],
@@ -1198,7 +1242,7 @@ function SqlAssistantPanel({
         </div>
         {taskPrompt.trim().length === 0 && (
           <p className="sql-template-recommender-empty">
-            Describe your task first, then FiltraQueri can suggest worksheets for this tab.
+            {groundingEmptyCopy.noPrompt}
           </p>
         )}
         {hasRequestedScopeRecommendation && taskPrompt.trim().length > 0 && (
@@ -1239,7 +1283,7 @@ function SqlAssistantPanel({
         {hasRequestedRecommendation && (
           appliedScopeLabels.length === 0 ? (
             <p className="sql-template-recommender-empty">
-              Apply a worksheet scope to this tab before choosing templates.
+              {groundingEmptyCopy.noScope}
             </p>
           ) : (
             recommendations.length > 0 ? (
@@ -1248,6 +1292,9 @@ function SqlAssistantPanel({
                   <span>Matching templates/reports</span>
                   <small>{recommendations.length.toLocaleString()}</small>
                 </div>
+                {onlyNeedsReviewRecommendations && (
+                  <p className="sql-grounding-notice">{groundingEmptyCopy.needsReviewOnly}</p>
+                )}
                 {recommendations.map((recommendation) => (
                   <SqlTemplateRecommendationCard
                     key={`${recommendation.kind}:${recommendation.id}`}
@@ -1258,7 +1305,7 @@ function SqlAssistantPanel({
               </div>
             ) : (
               <p className="sql-template-recommender-empty">
-                No strong template match yet. You can choose a template manually or continue writing SQL.
+                {groundingEmptyCopy.noSupportedMatches}
               </p>
             )
           )

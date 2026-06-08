@@ -86,6 +86,26 @@ const statusLabel = (status: WorksheetStatus) => (status === "error" ? "unsuppor
 const countByStatus = (worksheets: WorksheetMetadata[], status: WorksheetStatus) =>
   worksheets.filter((worksheet) => worksheet.status === status).length;
 
+const groundingEmptyCopy = {
+  noScope: "Apply a worksheet scope to this tab before choosing templates. Browsing templates does not auto-insert SQL.",
+  noPrompt: "Describe your task first, then FiltraQueri can suggest worksheets or grounded templates for this tab.",
+  noSupportedMatches: "No grounded template match yet. You can browse templates manually or continue writing SQL.",
+  needsReviewOnly: "Only review-required matches are available. Review the warning before inserting SQL, then run manually.",
+} as const;
+
+const conciseGroundingMessage = (values?: readonly string[]): string =>
+  (values || [])
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+
+const groundingSupportLabel = (support: SqlTemplateRecommendation["support"]): string => {
+  if (support === "needs_review") return "Needs review";
+  if (support === "unsupported") return "Unsupported";
+  return "Grounded";
+};
+
 const formatProfileValue = (value: number | string) =>
   typeof value === "number" ? value.toLocaleString() : value;
 
@@ -325,6 +345,16 @@ function TaskAssistShell({
       opportunities: createReportOpportunities(appliedTemplateDataset, selectedDialect),
     });
   }, [appliedScopeLabels, appliedTemplateDataset, isSqlTabControlled, selectedDialect, taskText]);
+  const topTemplateRecommendation = templateRecommendations[0];
+  const topTemplateGroundingWarning = conciseGroundingMessage(
+    topTemplateRecommendation?.warnings,
+  );
+  const topTemplateUnsupportedReason = conciseGroundingMessage(
+    topTemplateRecommendation?.unsupportedReasons,
+  );
+  const onlyNeedsReviewTemplateRecommendations =
+    templateRecommendations.length > 0 &&
+    templateRecommendations.every((recommendationItem) => recommendationItem.support === "needs_review");
 
   const updateTaskText = (nextTaskText: string) => {
     if (isSqlTabControlled) {
@@ -436,7 +466,7 @@ function TaskAssistShell({
 
       {isSqlTabControlled && taskText.trim().length === 0 && (
         <p className="workbook-task-assist-empty">
-          Describe your task first, then FiltraQueri can suggest worksheets for this tab.
+          {groundingEmptyCopy.noPrompt}
         </p>
       )}
 
@@ -490,16 +520,27 @@ function TaskAssistShell({
 
       {isSqlTabControlled && showTemplateGate && (
         <p className="workbook-task-assist-empty">
-          Apply a worksheet scope to this tab before choosing templates.
+          {groundingEmptyCopy.noScope}
         </p>
       )}
 
       {isSqlTabControlled && hasRequestedTemplateRecommendation && (
-        templateRecommendations.length > 0 ? (
-          <article className="workbook-task-template-result" aria-label="Matching templates and reports">
+        templateRecommendations.length > 0 && topTemplateRecommendation ? (
+          <article
+            className={`workbook-task-template-result${topTemplateRecommendation.support === "unsupported" ? " is-unsupported" : ""}`}
+            aria-label="Matching templates and reports"
+          >
             <div>
               <span>Matching template/report</span>
-              <strong>{templateRecommendations[0].title}</strong>
+              <strong>{topTemplateRecommendation.title}</strong>
+            </div>
+            <div className="sql-grounding-meta" aria-label="Grounding support">
+              <span className={`sql-grounding-badge ${topTemplateRecommendation.support || "supported"}`}>
+                {groundingSupportLabel(topTemplateRecommendation.support)}
+              </span>
+              {onlyNeedsReviewTemplateRecommendations && (
+                <span className="sql-grounding-notice">{groundingEmptyCopy.needsReviewOnly}</span>
+              )}
             </div>
             <p>
               <strong>Task:</strong> {taskText}
@@ -509,22 +550,32 @@ function TaskAssistShell({
             </p>
             <p>
               <strong>Why this matches:</strong>{" "}
-              {templateRecommendations[0].reasons.join(" ")}
+              {topTemplateRecommendation.reasons.join(" ")}
             </p>
+            {topTemplateRecommendation.support === "needs_review" && topTemplateGroundingWarning && (
+              <p className="sql-grounding-warning">
+                <strong>Review warning:</strong> {topTemplateGroundingWarning}
+              </p>
+            )}
+            {topTemplateRecommendation.support === "unsupported" && topTemplateUnsupportedReason && (
+              <p className="sql-grounding-warning">
+                <strong>Unsupported:</strong> {topTemplateUnsupportedReason}
+              </p>
+            )}
             <div className="workbook-task-assist-actions">
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => insertRecommendedSql(templateRecommendations[0])}
-                disabled={!onInsertSql}
+                onClick={() => insertRecommendedSql(topTemplateRecommendation)}
+                disabled={!onInsertSql || topTemplateRecommendation.support === "unsupported"}
               >
-                {templateRecommendations[0].kind === "report" ? "Use report" : "Use template"}
+                {topTemplateRecommendation.kind === "report" ? "Use report" : "Use template"}
               </button>
               <button
                 type="button"
                 className="text-button"
                 onClick={() => onOpenSqlAssistantMode?.(
-                  templateRecommendations[0].kind === "report" ? "recipes" : "templates",
+                  topTemplateRecommendation.kind === "report" ? "recipes" : "templates",
                   { sqlAssistantOrigin: "sql-context-task-assist" },
                 )}
               >
@@ -534,7 +585,7 @@ function TaskAssistShell({
           </article>
         ) : (
           <p className="workbook-task-assist-empty">
-            No strong template match yet. You can browse templates manually or continue writing SQL.
+            {groundingEmptyCopy.noSupportedMatches}
           </p>
         )
       )}
