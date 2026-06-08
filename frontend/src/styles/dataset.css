@@ -2752,6 +2752,46 @@
   font-weight: 800;
 }
 
+.workbook-task-template-result {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workbook-task-template-result > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.workbook-task-template-result > div:first-child span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.workbook-task-template-result > div:first-child strong {
+  color: #172033;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.workbook-task-template-result p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.workbook-task-template-result p strong {
+  color: #172033;
+}
+
 .workbook-task-assist-result {
   display: grid;
   gap: 7px;

@@ -4,7 +4,17 @@ import {
   recommendSqlScope,
   type SqlScopeRecommendation,
 } from "../../features/analyst/sql/sqlScopeRecommender";
+import {
+  recommendSqlTemplates,
+  type SqlTemplateRecommendation,
+} from "../../features/analyst/sql/sqlTemplateRecommender";
+import {
+  createSqlAssistantTemplates,
+} from "../../features/analyst/sql/sqlTemplateLibrary";
+import { createSqlReportRecipes } from "../../features/analyst/sql/sqlReportRecipes";
+import { createReportOpportunities } from "../../features/analyst/sql/reportIntelligencePlanner";
 import type { SqlWorkspaceTabSource } from "../../features/analyst/sql/sqlTabsTypes";
+import type { SqlDialectId } from "../../features/sqlIntelligence";
 import {
   getWorkbookContractDiagnostics,
   type RelationshipContractDiagnostic,
@@ -19,6 +29,7 @@ import {
   type AnalysisScopeSelection,
   type AnalysisScopeSourceType,
   type AcceptedRelationshipContract,
+  type WorkbookMetadata,
   type WorkbookIngestionProfile,
   type WorksheetRelationshipCandidate,
   type WorksheetMetadata,
@@ -58,6 +69,11 @@ type WorkbookContextPanelProps = {
   onApplyAnalysisScope?: (selections: AnalysisScopeSelection[]) => void;
   taskPrompt?: string;
   onTaskPromptChange?: (prompt: string) => void;
+  selectedDialect?: SqlDialectId;
+  onInsertSql?: (
+    sql: string,
+    metadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
+  ) => void;
   onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
   onOpenSqlSourceTab?: (source: SqlWorkspaceTabSource) => void;
 };
@@ -178,23 +194,92 @@ function RelationshipReadinessList({
   );
 }
 
+const createAppliedScopeDataset = (
+  dataset: DatasetMetadata | null,
+  selections: AnalysisScopeSelection[],
+): DatasetMetadata | null => {
+  if (!dataset?.workbook_metadata || selections.length === 0) return null;
+
+  const selectionIds = new Set(selections.map((selection) => selection.worksheetId));
+  const scopedWorksheets = dataset.workbook_metadata.worksheets.filter((worksheet) =>
+    selectionIds.has(worksheet.worksheetId),
+  );
+  const firstSelection = selections[0];
+  const primaryWorksheet =
+    scopedWorksheets.find((worksheet) => worksheet.worksheetId === firstSelection?.worksheetId) ||
+    scopedWorksheets[0];
+
+  if (!firstSelection || !primaryWorksheet) return null;
+
+  const scopedWorkbook: WorkbookMetadata = {
+    ...dataset.workbook_metadata,
+    activeWorksheetId: primaryWorksheet.worksheetId,
+    activeAnalysisSource: {
+      type: firstSelection.sourceType,
+      worksheetId: firstSelection.worksheetId,
+      tableName: firstSelection.tableName,
+      originalTableName: firstSelection.originalTableName || primaryWorksheet.tableName,
+      activatedAt:
+        dataset.workbook_metadata.activeAnalysisSource?.activatedAt ||
+        dataset.workbook_metadata.updatedAt,
+    },
+    worksheetIds: scopedWorksheets.map((worksheet) => worksheet.worksheetId),
+    worksheets: scopedWorksheets,
+    tableMappings: dataset.workbook_metadata.tableMappings.filter((mapping) =>
+      scopedWorksheets.some((worksheet) => worksheet.tableName === mapping.tableName),
+    ),
+    cleanedWorkingCopies: dataset.workbook_metadata.cleanedWorkingCopies.filter((copy) =>
+      selectionIds.has(copy.sourceWorksheetId),
+    ),
+    relationshipCandidates: dataset.workbook_metadata.relationshipCandidates.filter(
+      (candidate) =>
+        selectionIds.has(candidate.sourceWorksheetId) &&
+        selectionIds.has(candidate.targetWorksheetId),
+    ),
+    acceptedRelationshipContracts:
+      dataset.workbook_metadata.acceptedRelationshipContracts.filter(
+        (contract) =>
+          selectionIds.has(contract.sourceWorksheetId) &&
+          selectionIds.has(contract.targetWorksheetId),
+      ),
+  };
+
+  return {
+    ...dataset,
+    table_name: firstSelection.tableName,
+    schema: primaryWorksheet.schema,
+    row_count: primaryWorksheet.rowCount,
+    column_count: primaryWorksheet.columnCount,
+    workbook_metadata: scopedWorkbook,
+  };
+};
+
 function TaskAssistShell({
   dataset,
   appliedWorksheets,
+  appliedScopeSelections,
   relationshipMatches,
   isSqlTabControlled,
   taskPrompt,
   onTaskPromptChange,
   onSelectedScopeChange,
+  selectedDialect = "duckdb",
+  onInsertSql,
   onOpenSqlAssistantMode,
 }: {
   dataset: DatasetMetadata | null;
   appliedWorksheets: WorksheetMetadata[];
+  appliedScopeSelections: AnalysisScopeSelection[];
   relationshipMatches: WorkbookRelationshipReadinessMatch[];
   isSqlTabControlled?: boolean;
   taskPrompt?: string;
   onTaskPromptChange?: (prompt: string) => void;
   onSelectedScopeChange?: (selections: AnalysisScopeSelection[]) => void;
+  selectedDialect?: SqlDialectId;
+  onInsertSql?: (
+    sql: string,
+    metadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
+  ) => void;
   onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
 }) {
   const [localTaskText, setLocalTaskText] = useState("");
@@ -202,11 +287,17 @@ function TaskAssistShell({
     useState<WorkbookTaskAssistRecommendation | null>(null);
   const [hasRequestedScopeRecommendation, setHasRequestedScopeRecommendation] = useState(false);
   const [showTemplateGate, setShowTemplateGate] = useState(false);
+  const [hasRequestedTemplateRecommendation, setHasRequestedTemplateRecommendation] = useState(false);
   const taskText = isSqlTabControlled ? taskPrompt || "" : localTaskText;
   const canFindPath = taskText.trim().length > 0;
   const appliedScopeLabels = appliedWorksheets.map(
     (worksheet) => worksheet.displayName || worksheet.sheetName || worksheet.tableName,
   );
+  const appliedTemplateDataset = useMemo(
+    () => createAppliedScopeDataset(dataset, appliedScopeSelections) || dataset,
+    [appliedScopeSelections, dataset],
+  );
+
   const scopeRecommendations = useMemo(
     () =>
       recommendSqlScope({
@@ -216,6 +307,18 @@ function TaskAssistShell({
       }),
     [appliedScopeLabels, dataset, taskText],
   );
+  const templateRecommendations = useMemo(() => {
+    if (!isSqlTabControlled || appliedScopeLabels.length === 0) return [];
+
+    return recommendSqlTemplates({
+      taskPrompt: taskText,
+      dataset: appliedTemplateDataset,
+      appliedScopeLabels,
+      templates: createSqlAssistantTemplates(appliedTemplateDataset, selectedDialect),
+      recipes: createSqlReportRecipes(appliedTemplateDataset, selectedDialect),
+      opportunities: createReportOpportunities(appliedTemplateDataset, selectedDialect),
+    });
+  }, [appliedScopeLabels, appliedTemplateDataset, isSqlTabControlled, selectedDialect, taskText]);
 
   const updateTaskText = (nextTaskText: string) => {
     if (isSqlTabControlled) {
@@ -226,6 +329,7 @@ function TaskAssistShell({
     setRecommendation(null);
     setHasRequestedScopeRecommendation(false);
     setShowTemplateGate(false);
+    setHasRequestedTemplateRecommendation(false);
   };
 
   const findBestPath = () => {
@@ -251,16 +355,12 @@ function TaskAssistShell({
     if (appliedWorksheets.length === 0) {
       setRecommendation(null);
       setShowTemplateGate(true);
+      setHasRequestedTemplateRecommendation(false);
       return;
     }
     setShowTemplateGate(false);
-    setRecommendation(
-      recommendWorkbookTaskAssistPath({
-        taskText,
-        appliedWorksheets,
-        relationshipMatches,
-      }),
-    );
+    setRecommendation(null);
+    setHasRequestedTemplateRecommendation(true);
   };
 
   const useSuggestedWorksheets = () => {
@@ -275,6 +375,15 @@ function TaskAssistShell({
     setRecommendation(null);
     setHasRequestedScopeRecommendation(false);
     setShowTemplateGate(false);
+    setHasRequestedTemplateRecommendation(false);
+  };
+
+  const insertRecommendedSql = (recommendationItem: SqlTemplateRecommendation) => {
+    onInsertSql?.(recommendationItem.sql, {
+      id: recommendationItem.id,
+      label: recommendationItem.title,
+      createdFrom: recommendationItem.kind,
+    });
   };
 
   return (
@@ -377,6 +486,50 @@ function TaskAssistShell({
         <p className="workbook-task-assist-empty">
           Apply a worksheet scope to this tab before choosing templates.
         </p>
+      )}
+
+      {isSqlTabControlled && hasRequestedTemplateRecommendation && (
+        templateRecommendations.length > 0 ? (
+          <article className="workbook-task-template-result" aria-label="Matching templates and reports">
+            <div>
+              <span>Matching template/report</span>
+              <strong>{templateRecommendations[0].title}</strong>
+            </div>
+            <p>
+              <strong>Task:</strong> {taskText}
+            </p>
+            <p>
+              <strong>Applied scope:</strong> {appliedScopeLabels.join(", ")}
+            </p>
+            <p>
+              <strong>Why this matches:</strong>{" "}
+              {templateRecommendations[0].reasons.join(" ")}
+            </p>
+            <div className="workbook-task-assist-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => insertRecommendedSql(templateRecommendations[0])}
+                disabled={!onInsertSql}
+              >
+                {templateRecommendations[0].kind === "report" ? "Use report" : "Use template"}
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => onOpenSqlAssistantMode?.(
+                  templateRecommendations[0].kind === "report" ? "recipes" : "templates",
+                )}
+              >
+                Browse more
+              </button>
+            </div>
+          </article>
+        ) : (
+          <p className="workbook-task-assist-empty">
+            No strong template match yet. You can browse templates manually or continue writing SQL.
+          </p>
+        )
       )}
 
       {recommendation && (
@@ -969,6 +1122,8 @@ function WorkbookContextPanel({
   onApplyAnalysisScope,
   taskPrompt,
   onTaskPromptChange,
+  selectedDialect,
+  onInsertSql,
   onOpenSqlAssistantMode,
   onOpenSqlSourceTab,
 }: WorkbookContextPanelProps) {
@@ -1437,11 +1592,14 @@ function WorkbookContextPanel({
           <TaskAssistShell
             dataset={dataset}
             appliedWorksheets={appliedScopeWorksheets}
+            appliedScopeSelections={appliedScopeSelections}
             relationshipMatches={relationshipReadinessMatches}
             isSqlTabControlled={isTabControlledScope}
             taskPrompt={taskPrompt}
             onTaskPromptChange={onTaskPromptChange}
             onSelectedScopeChange={onAnalysisScopeSelectionsChange}
+            selectedDialect={selectedDialect}
+            onInsertSql={onInsertSql}
             onOpenSqlAssistantMode={onOpenSqlAssistantMode}
           />
         </section>

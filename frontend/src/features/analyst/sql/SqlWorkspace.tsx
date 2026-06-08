@@ -605,6 +605,8 @@ function SqlWorkspace({
                   onApplyAnalysisScope={sqlTabs.onApplyScope}
                   taskPrompt={sqlTabs.taskPrompt}
                   onTaskPromptChange={sqlTabs.onTaskPromptChange}
+                  selectedDialect={selectedDialect}
+                  onInsertSql={insertSql}
                   onOpenSqlAssistantMode={openSqlAssistantMode}
                   onOpenSqlSourceTab={openSqlSourceTab}
                 />
