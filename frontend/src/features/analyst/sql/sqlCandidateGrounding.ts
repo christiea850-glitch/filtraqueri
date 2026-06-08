@@ -7,6 +7,8 @@
  * scope, verified columns, and verified join keys.
  */
 
+import type { SchemaColumn } from "../../dataset/datasetTypes";
+import type { AcceptedRelationshipContract } from "../../workbook";
 import type { ReportOpportunity } from "./reportIntelligencePlanner";
 import {
   detectBusinessIntent,
@@ -15,11 +17,14 @@ import {
 import type { SqlReportRecipe } from "./sqlReportRecipes";
 import type { SqlAssistantTemplate } from "./sqlTemplateLibrary";
 
-export type VerifiedJoinKey = {
+export type RequiredJoinKey = {
   leftTable: string;
   leftColumn: string;
   rightTable: string;
   rightColumn: string;
+};
+
+export type VerifiedJoinKey = RequiredJoinKey & {
   source: "accepted_contract" | "recipe_verified" | "single_table" | "none";
 };
 
@@ -36,6 +41,7 @@ export type GroundedSqlCandidate = {
   usedTables: string[];
   requiredColumns: string[];
   usedColumns: string[];
+  requiredJoins?: RequiredJoinKey[];
   verifiedJoinKeys: VerifiedJoinKey[];
   support: CandidateSupport;
   unsupportedReasons: string[];
@@ -47,6 +53,42 @@ export type NormalizeSqlCandidatesInput = {
   recipes?: readonly SqlReportRecipe[];
   opportunities?: readonly ReportOpportunity[];
 };
+
+export type GroundingContext = {
+  detectedIntent: BusinessIntent;
+  appliedScopeTables: string[];
+  schemaByTable: Map<string, SchemaColumn[]>;
+  acceptedRelationshipContracts: AcceptedRelationshipContract[];
+};
+
+export type GroundedRecommendationEmptyStateInput = {
+  taskPrompt: string;
+  appliedScopeTables: readonly string[];
+  candidates: readonly GroundedSqlCandidate[];
+};
+
+export type GroundingSupportSummary = {
+  total: number;
+  supported: number;
+  needsReview: number;
+  unsupported: number;
+  bestSupport: CandidateSupport | null;
+  warnings: string[];
+};
+
+export const EMPTY_GROUNDED_RECOMMENDATION_COPY = {
+  noScope: "Apply a worksheet scope to this tab before choosing templates.",
+  noPrompt: "Describe your task to see matching templates.",
+  noSupportedMatches:
+    "No template matches your task in this scope yet. Try refining your prompt or applying additional worksheets.",
+  needsReviewOnly:
+    "Possible matches found, but join keys are not yet verified. Review before running.",
+} as const;
+
+export const GROUNDED_RECOMMENDATION_WARNING_COPY = {
+  needsReview:
+    "Possible matches found, but join keys are not yet verified. Review before running.",
+} as const;
 
 const PLACEHOLDER_UNSUPPORTED_REASON =
   "Template uses placeholder fields that are not bound to your workbook.";
@@ -68,9 +110,7 @@ const sourcePriority: Record<GroundedSqlCandidate["source"], number> = {
 const uniqueStrings = (values: readonly string[] = []): string[] =>
   Array.from(
     new Set(
-      values
-        .map((value) => value.trim())
-        .filter((value) => value.length > 0),
+      values.map((value) => value.trim()).filter((value) => value.length > 0),
     ),
   );
 
@@ -84,23 +124,301 @@ const stableSlug = (value: string): string => {
   return slug || "untitled";
 };
 
-const candidateIntentFrom = (title: string, description: string): BusinessIntent =>
-  detectBusinessIntent(`${title} ${description}`.trim());
+const candidateIntentFrom = (
+  title: string,
+  description: string,
+): BusinessIntent => detectBusinessIntent(`${title} ${description}`.trim());
 
 const containsPlaceholderSqlToken = (sql: string | null): boolean => {
   if (!sql) return false;
   return placeholderSqlTokens.some((token) => {
     const escapedToken = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|[^A-Za-z0-9])${escapedToken}([^A-Za-z0-9]|$)`, "i").test(sql);
+    return new RegExp(
+      `(^|[^A-Za-z0-9])${escapedToken}([^A-Za-z0-9]|$)`,
+      "i",
+    ).test(sql);
   });
 };
 
 const mergeUnsupportedReason = (
   unsupportedReasons: readonly string[],
   reason: string,
-): string[] => (unsupportedReasons.includes(reason) ? [...unsupportedReasons] : [...unsupportedReasons, reason]);
+): string[] =>
+  unsupportedReasons.includes(reason)
+    ? [...unsupportedReasons]
+    : [...unsupportedReasons, reason];
 
-const applyPlaceholderSupport = (candidate: GroundedSqlCandidate): GroundedSqlCandidate => {
+const canonicalName = (value: string): string => value.trim().toLowerCase();
+
+const sameName = (left: string, right: string): boolean =>
+  canonicalName(left) === canonicalName(right);
+
+const formatJoin = (join: RequiredJoinKey): string =>
+  `${join.leftTable}.${join.leftColumn} → ${join.rightTable}.${join.rightColumn}`;
+
+const parseColumnReference = (
+  columnReference: string,
+): { table: string | null; column: string } => {
+  const normalizedReference = columnReference.trim().replace(/^"|"$/g, "");
+  const parts = normalizedReference
+    .split(".")
+    .map((part) => part.trim().replace(/^"|"$/g, ""))
+    .filter((part) => part.length > 0);
+
+  if (parts.length >= 2) {
+    return {
+      table: parts.slice(0, -1).join("."),
+      column: parts[parts.length - 1],
+    };
+  }
+
+  return { table: null, column: normalizedReference };
+};
+
+const columnExists = (
+  schemaByTable: Map<string, SchemaColumn[]>,
+  table: string,
+  column: string,
+): boolean => {
+  const schema = Array.from(schemaByTable.entries()).find(([tableName]) =>
+    sameName(tableName, table),
+  )?.[1];
+  return Boolean(
+    schema?.some((schemaColumn) => sameName(schemaColumn.name, column)),
+  );
+};
+
+const findUnqualifiedColumnMatches = (
+  column: string,
+  appliedScopeTables: readonly string[],
+  schemaByTable: Map<string, SchemaColumn[]>,
+): string[] =>
+  appliedScopeTables.filter((table) =>
+    columnExists(schemaByTable, table, column),
+  );
+
+const joinMatches = (
+  left: RequiredJoinKey,
+  right: RequiredJoinKey,
+): boolean => {
+  const sameDirection =
+    sameName(left.leftTable, right.leftTable) &&
+    sameName(left.leftColumn, right.leftColumn) &&
+    sameName(left.rightTable, right.rightTable) &&
+    sameName(left.rightColumn, right.rightColumn);
+  const reverseDirection =
+    sameName(left.leftTable, right.rightTable) &&
+    sameName(left.leftColumn, right.rightColumn) &&
+    sameName(left.rightTable, right.leftTable) &&
+    sameName(left.rightColumn, right.leftColumn);
+
+  return sameDirection || reverseDirection;
+};
+
+const contractToJoin = (
+  contract: AcceptedRelationshipContract,
+): RequiredJoinKey => ({
+  leftTable: contract.sourceTableName,
+  leftColumn: contract.sourceColumnName,
+  rightTable: contract.targetTableName,
+  rightColumn: contract.targetColumnName,
+});
+
+const hasAcceptedContractForJoin = (
+  join: RequiredJoinKey,
+  contracts: readonly AcceptedRelationshipContract[],
+): boolean =>
+  contracts.some(
+    (contract) =>
+      contract.status === "active" &&
+      contract.validationState !== "broken" &&
+      joinMatches(join, contractToJoin(contract)),
+  );
+
+const hasRecipeVerifiedJoin = (
+  candidate: GroundedSqlCandidate,
+  join: RequiredJoinKey,
+): boolean =>
+  candidate.verifiedJoinKeys.some(
+    (verifiedJoin) =>
+      verifiedJoin.source === "recipe_verified" &&
+      joinMatches(join, verifiedJoin),
+  );
+
+const requiredJoinsForCandidate = (
+  candidate: GroundedSqlCandidate,
+): RequiredJoinKey[] => {
+  if (candidate.requiredJoins && candidate.requiredJoins.length > 0)
+    return candidate.requiredJoins;
+  return candidate.verifiedJoinKeys
+    .filter((join) => join.source !== "single_table" && join.source !== "none")
+    .map(({ leftTable, leftColumn, rightTable, rightColumn }) => ({
+      leftTable,
+      leftColumn,
+      rightTable,
+      rightColumn,
+    }));
+};
+
+const validateCandidateTables = (
+  candidate: GroundedSqlCandidate,
+  appliedScopeTables: readonly string[],
+): string[] => {
+  const tables = uniqueStrings([
+    ...candidate.requiredTables,
+    ...candidate.usedTables,
+  ]);
+  return tables
+    .filter(
+      (table) =>
+        !appliedScopeTables.some((scopeTable) => sameName(scopeTable, table)),
+    )
+    .map(
+      (table) =>
+        `Required table \`${table}\` is not in this tab's applied scope.`,
+    );
+};
+
+const validateCandidateColumns = (
+  candidate: GroundedSqlCandidate,
+  context: GroundingContext,
+): string[] => {
+  const columnReferences = uniqueStrings([
+    ...candidate.requiredColumns,
+    ...candidate.usedColumns,
+  ]);
+  const reasons: string[] = [];
+
+  for (const columnReference of columnReferences) {
+    const { table, column } = parseColumnReference(columnReference);
+
+    if (table) {
+      if (!columnExists(context.schemaByTable, table, column)) {
+        reasons.push(
+          `Required column \`${table}.${column}\` was not found in this tab's applied schema.`,
+        );
+      }
+      continue;
+    }
+
+    const matches = findUnqualifiedColumnMatches(
+      column,
+      context.appliedScopeTables,
+      context.schemaByTable,
+    );
+    if (matches.length === 0) {
+      reasons.push(
+        `Required column \`${column}\` was not found in this tab's applied schema.`,
+      );
+    } else if (matches.length > 1) {
+      reasons.push(
+        `Required column \`${column}\` is ambiguous across this tab's applied schema; qualify it with a table.`,
+      );
+    }
+  }
+
+  return uniqueStrings(reasons);
+};
+
+const validateCandidateIntent = (
+  candidate: GroundedSqlCandidate,
+  detectedIntent: BusinessIntent,
+): string[] => {
+  const candidateIntent = candidate.candidateIntent.primaryIntent;
+  if (
+    candidateIntent === detectedIntent.primaryIntent ||
+    detectedIntent.alternates.includes(candidateIntent)
+  ) {
+    return [];
+  }
+
+  return [
+    `Not recommended: this candidate is for \`${candidateIntent}\`, but your task asks for \`${detectedIntent.primaryIntent}\`.`,
+  ];
+};
+
+const validateCandidateJoins = (
+  candidate: GroundedSqlCandidate,
+  context: GroundingContext,
+): {
+  verifiedJoinKeys: VerifiedJoinKey[];
+  unsupportedReasons: string[];
+  warnings: string[];
+  support: CandidateSupport;
+} => {
+  const tables = uniqueStrings([
+    ...candidate.requiredTables,
+    ...candidate.usedTables,
+  ]);
+  const requiredJoins = requiredJoinsForCandidate(candidate);
+
+  if (tables.length <= 1 && requiredJoins.length === 0) {
+    return {
+      verifiedJoinKeys:
+        candidate.verifiedJoinKeys.length > 0
+          ? [...candidate.verifiedJoinKeys]
+          : [],
+      unsupportedReasons: [],
+      warnings: [],
+      support: "supported",
+    };
+  }
+
+  let support: CandidateSupport = "supported";
+  let verifiedJoinKeys = [...candidate.verifiedJoinKeys];
+  const unsupportedReasons: string[] = [];
+  const warnings: string[] = [];
+
+  for (const join of requiredJoins) {
+    if (
+      hasAcceptedContractForJoin(join, context.acceptedRelationshipContracts)
+    ) {
+      verifiedJoinKeys = [
+        ...verifiedJoinKeys.filter(
+          (verifiedJoin) => !joinMatches(verifiedJoin, join),
+        ),
+        { ...join, source: "accepted_contract" },
+      ];
+      continue;
+    }
+
+    if (hasRecipeVerifiedJoin(candidate, join)) {
+      support = support === "unsupported" ? support : "needs_review";
+      verifiedJoinKeys = [
+        ...verifiedJoinKeys.filter(
+          (verifiedJoin) => !joinMatches(verifiedJoin, join),
+        ),
+        { ...join, source: "recipe_verified" },
+      ];
+      warnings.push(
+        `Join \`${formatJoin(join)}\` is not verified by relationship contracts. Review before running.`,
+      );
+      continue;
+    }
+
+    support = "unsupported";
+    verifiedJoinKeys = [
+      ...verifiedJoinKeys.filter(
+        (verifiedJoin) => !joinMatches(verifiedJoin, join),
+      ),
+      { ...join, source: "none" },
+    ];
+    unsupportedReasons.push(
+      `Join key \`${formatJoin(join)}\` could not be verified.`,
+    );
+  }
+
+  return {
+    verifiedJoinKeys,
+    unsupportedReasons: uniqueStrings(unsupportedReasons),
+    warnings: uniqueStrings(warnings),
+    support,
+  };
+};
+
+const applyPlaceholderSupport = (
+  candidate: GroundedSqlCandidate,
+): GroundedSqlCandidate => {
   if (!containsPlaceholderSqlToken(candidate.sql)) return candidate;
 
   return {
@@ -113,7 +431,9 @@ const applyPlaceholderSupport = (candidate: GroundedSqlCandidate): GroundedSqlCa
   };
 };
 
-const normalizeTemplate = (template: SqlAssistantTemplate): GroundedSqlCandidate =>
+const normalizeTemplate = (
+  template: SqlAssistantTemplate,
+): GroundedSqlCandidate =>
   applyPlaceholderSupport({
     candidateId: `template:${stableSlug(template.id || template.title)}`,
     source: "template",
@@ -138,7 +458,8 @@ const normalizeRecipe = (recipe: SqlReportRecipe): GroundedSqlCandidate => {
     ? missingRequirements
     : uniqueStrings([
         ...missingRequirements,
-        recipe.supportSummary || "Recipe cannot generate SQL with the available fields.",
+        recipe.supportSummary ||
+          "Recipe cannot generate SQL with the available fields.",
       ]);
 
   return applyPlaceholderSupport({
@@ -153,13 +474,18 @@ const normalizeRecipe = (recipe: SqlReportRecipe): GroundedSqlCandidate => {
     requiredColumns: uniqueStrings(recipe.requiredFieldRoles),
     usedColumns: [],
     verifiedJoinKeys: [],
-    support: recipe.sql && missingRequirements.length === 0 ? "supported" : "unsupported",
+    support:
+      recipe.sql && missingRequirements.length === 0
+        ? "supported"
+        : "unsupported",
     unsupportedReasons,
     warnings,
   });
 };
 
-const normalizeOpportunity = (opportunity: ReportOpportunity): GroundedSqlCandidate => {
+const normalizeOpportunity = (
+  opportunity: ReportOpportunity,
+): GroundedSqlCandidate => {
   const missingRequirements = uniqueStrings(opportunity.missingRequirements);
   const unsupportedReasons = opportunity.sql
     ? missingRequirements
@@ -176,14 +502,19 @@ const normalizeOpportunity = (opportunity: ReportOpportunity): GroundedSqlCandid
     title: opportunity.title,
     description: opportunity.businessQuestion,
     sql: opportunity.sql,
-    candidateIntent: candidateIntentFrom(opportunity.title, opportunity.businessQuestion),
+    candidateIntent: candidateIntentFrom(
+      opportunity.title,
+      opportunity.businessQuestion,
+    ),
     requiredTables: uniqueStrings(opportunity.requiredTables),
     usedTables: uniqueStrings(opportunity.requiredTables),
     requiredColumns: uniqueStrings(opportunity.requiredColumns),
     usedColumns: [],
     verifiedJoinKeys: [],
     support:
-      opportunity.support === "can_generate_now" && opportunity.sql && missingRequirements.length === 0
+      opportunity.support === "can_generate_now" &&
+      opportunity.sql &&
+      missingRequirements.length === 0
         ? "supported"
         : "unsupported",
     unsupportedReasons,
@@ -217,7 +548,11 @@ export function normalizeCandidates({
     const slug = candidateDedupSlug(candidate);
     const existingCandidate = candidatesBySlug.get(slug);
 
-    if (!existingCandidate || sourcePriority[candidate.source] < sourcePriority[existingCandidate.source]) {
+    if (
+      !existingCandidate ||
+      sourcePriority[candidate.source] <
+        sourcePriority[existingCandidate.source]
+    ) {
       candidatesBySlug.set(slug, candidate);
     }
   }
@@ -225,4 +560,171 @@ export function normalizeCandidates({
   return Array.from(candidatesBySlug.values()).sort(
     (left, right) => sourcePriority[left.source] - sourcePriority[right.source],
   );
+}
+
+export function summarizeGroundingSupport(
+  candidates: readonly GroundedSqlCandidate[],
+): GroundingSupportSummary {
+  const supported = candidates.filter(
+    (candidate) => candidate.support === "supported",
+  ).length;
+  const needsReview = candidates.filter(
+    (candidate) => candidate.support === "needs_review",
+  ).length;
+  const unsupported = candidates.filter(
+    (candidate) => candidate.support === "unsupported",
+  ).length;
+  const bestSupport: CandidateSupport | null =
+    supported > 0
+      ? "supported"
+      : needsReview > 0
+        ? "needs_review"
+        : unsupported > 0
+          ? "unsupported"
+          : null;
+
+  return {
+    total: candidates.length,
+    supported,
+    needsReview,
+    unsupported,
+    bestSupport,
+    warnings: uniqueStrings(
+      candidates.flatMap((candidate) => candidate.warnings),
+    ),
+  };
+}
+
+export function getNeedsReviewGroundingCopy(
+  candidate: GroundedSqlCandidate,
+): string[] {
+  if (candidate.support !== "needs_review") return [];
+  const warnings = uniqueStrings(candidate.warnings);
+  return warnings.length > 0
+    ? warnings
+    : [GROUNDED_RECOMMENDATION_WARNING_COPY.needsReview];
+}
+
+export function getGroundedRecommendationEmptyState(
+  input: GroundedRecommendationEmptyStateInput,
+): string | null {
+  if (input.appliedScopeTables.length === 0) {
+    return EMPTY_GROUNDED_RECOMMENDATION_COPY.noScope;
+  }
+  if (!input.taskPrompt.trim()) {
+    return EMPTY_GROUNDED_RECOMMENDATION_COPY.noPrompt;
+  }
+
+  const summary = summarizeGroundingSupport(input.candidates);
+  if (summary.supported > 0) return null;
+  if (summary.needsReview > 0) {
+    return EMPTY_GROUNDED_RECOMMENDATION_COPY.needsReviewOnly;
+  }
+
+  return EMPTY_GROUNDED_RECOMMENDATION_COPY.noSupportedMatches;
+}
+
+export function createAppliedScopeFingerprint(
+  tables: readonly string[],
+): string {
+  return uniqueStrings(tables.map(canonicalName)).sort().join("|");
+}
+
+export function createGroundingContextFingerprint(
+  context: GroundingContext,
+): string {
+  const schemaFingerprint = Array.from(context.schemaByTable.entries())
+    .map(([table, schema]) => ({
+      table: canonicalName(table),
+      columns: uniqueStrings(
+        schema.map((column) => canonicalName(column.name)),
+      ).sort(),
+    }))
+    .sort((left, right) => left.table.localeCompare(right.table));
+  const contractFingerprint = context.acceptedRelationshipContracts
+    .map((contract) => ({
+      sourceTable: canonicalName(contract.sourceTableName),
+      sourceColumn: canonicalName(contract.sourceColumnName),
+      targetTable: canonicalName(contract.targetTableName),
+      targetColumn: canonicalName(contract.targetColumnName),
+      status: contract.status,
+      validationState: contract.validationState,
+    }))
+    .sort((left, right) =>
+      `${left.sourceTable}.${left.sourceColumn}.${left.targetTable}.${left.targetColumn}`.localeCompare(
+        `${right.sourceTable}.${right.sourceColumn}.${right.targetTable}.${right.targetColumn}`,
+      ),
+    );
+
+  return JSON.stringify({
+    detectedIntent: {
+      primaryIntent: context.detectedIntent.primaryIntent,
+      alternates: [...context.detectedIntent.alternates].sort(),
+      detectorVersion: context.detectedIntent.detectorVersion,
+    },
+    appliedScopeTables: createAppliedScopeFingerprint(
+      context.appliedScopeTables,
+    ),
+    schema: schemaFingerprint,
+    acceptedRelationshipContracts: contractFingerprint,
+  });
+}
+
+/**
+ * Validate a normalized SQL candidate against a detected business intent and
+ * the active SQL tab's applied workbook scope. This is frontend-only,
+ * deterministic, side-effect free, and intentionally not wired into the
+ * recommender or execution path yet.
+ */
+export function groundCandidate(
+  candidate: GroundedSqlCandidate,
+  context: GroundingContext,
+): GroundedSqlCandidate {
+  if (candidate.support === "unsupported") {
+    return {
+      ...candidate,
+      unsupportedReasons: uniqueStrings(candidate.unsupportedReasons),
+      warnings: uniqueStrings(candidate.warnings),
+    };
+  }
+
+  const hardGateReasons = uniqueStrings([
+    ...validateCandidateTables(candidate, context.appliedScopeTables),
+    ...validateCandidateColumns(candidate, context),
+    ...validateCandidateIntent(candidate, context.detectedIntent),
+  ]);
+  const unsupportedReasons = uniqueStrings([
+    ...candidate.unsupportedReasons,
+    ...hardGateReasons,
+  ]);
+
+  if (hardGateReasons.length > 0) {
+    return {
+      ...candidate,
+      support: "unsupported",
+      unsupportedReasons,
+      warnings: uniqueStrings(candidate.warnings),
+    };
+  }
+
+  const joinValidation = validateCandidateJoins(candidate, context);
+  const groundedUnsupportedReasons = uniqueStrings([
+    ...unsupportedReasons,
+    ...joinValidation.unsupportedReasons,
+  ]);
+  const warnings = uniqueStrings([
+    ...candidate.warnings,
+    ...joinValidation.warnings,
+  ]);
+
+  return {
+    ...candidate,
+    support:
+      groundedUnsupportedReasons.length > 0
+        ? "unsupported"
+        : joinValidation.support,
+    unsupportedReasons: groundedUnsupportedReasons,
+    warnings,
+    verifiedJoinKeys: joinValidation.verifiedJoinKeys,
+  };
 }

@@ -39,6 +39,7 @@ export type BusinessIntentFixture = {
   expectedPrimary: BusinessIntentCategory | BusinessIntentCategory[];
   mustNotInclude: BusinessIntentCategory[];
   expectedEntitiesSubset?: string[];
+  expectedAlternatesSubset?: BusinessIntentCategory[];
   expectedTemporal?: boolean;
   description?: string;
 };
@@ -72,12 +73,32 @@ export const BUSINESS_INTENT_FIXTURES: BusinessIntentFixture[] = [
       "The reported failing prompt. Must classify as count_grouping; must not match the lease expiration / move-out watchlist family.",
   },
   {
+    prompt: "show top properties with most leases",
+    expectedPrimary: ["top_bottom", "ranking", "unknown"],
+    mustNotInclude: ["expiration", "renewal"],
+    expectedEntitiesSubset: ["properties", "leases"],
+    expectedAlternatesSubset: ["count_grouping"],
+    expectedTemporal: false,
+    description:
+      "Ambiguous top/most prompt should preserve ranking/top-bottom intent while keeping count_grouping available as a likely alternate.",
+  },
+  {
+    prompt: "show property information",
+    expectedPrimary: ["unknown", "filtering", "preview"],
+    mustNotInclude: ["expiration", "renewal", "count_grouping"],
+    expectedEntitiesSubset: ["properties"],
+    expectedTemporal: false,
+    description:
+      "Weak vague information request should stay unknown unless only a lightweight display intent is justified.",
+  },
+  {
     prompt: "show leases expiring in the next 90 days",
     expectedPrimary: "expiration",
     mustNotInclude: ["count_grouping"],
     expectedEntitiesSubset: ["leases"],
     expectedTemporal: true,
-    description: "Temporal expiration prompt — the lease expiration watchlist family should be eligible.",
+    description:
+      "Temporal expiration prompt — the lease expiration watchlist family should be eligible.",
   },
   {
     prompt: "which properties have vacant units",
@@ -85,7 +106,8 @@ export const BUSINESS_INTENT_FIXTURES: BusinessIntentFixture[] = [
     mustNotInclude: ["expiration"],
     expectedEntitiesSubset: ["properties", "units"],
     expectedTemporal: false,
-    description: "Either count_grouping or filtering is acceptable; expiration must not fire.",
+    description:
+      "Either count_grouping or filtering is acceptable; expiration must not fire.",
   },
   {
     prompt: "top 10 tenants by payment volume",
@@ -93,7 +115,8 @@ export const BUSINESS_INTENT_FIXTURES: BusinessIntentFixture[] = [
     mustNotInclude: ["expiration"],
     expectedEntitiesSubset: ["tenants"],
     expectedTemporal: false,
-    description: "Either top_bottom or ranking is acceptable; expiration must not fire.",
+    description:
+      "Either top_bottom or ranking is acceptable; expiration must not fire.",
   },
   {
     prompt: "show me missing emails in tenants",
@@ -110,7 +133,8 @@ export const BUSINESS_INTENT_FIXTURES: BusinessIntentFixture[] = [
     mustNotInclude: ["expiration", "count_grouping"],
     expectedEntitiesSubset: ["leases"],
     expectedTemporal: false,
-    description: "Explicit preview intent. Must not match expiration or count_grouping.",
+    description:
+      "Explicit preview intent. Must not match expiration or count_grouping.",
   },
 ];
 
@@ -122,8 +146,9 @@ const matchesExpectedPrimary = (
   return detected === expected;
 };
 
-const formatExpected = (expected: BusinessIntentCategory | BusinessIntentCategory[]): string =>
-  Array.isArray(expected) ? expected.join(" or ") : expected;
+const formatExpected = (
+  expected: BusinessIntentCategory | BusinessIntentCategory[],
+): string => (Array.isArray(expected) ? expected.join(" or ") : expected);
 
 /**
  * Runs all fixtures through `detectBusinessIntent` and verifies each. Pure
@@ -131,49 +156,70 @@ const formatExpected = (expected: BusinessIntentCategory | BusinessIntentCategor
  * in a `test()` call by iterating `BUSINESS_INTENT_FIXTURES` directly.
  */
 export function runBusinessIntentFixtures(): BusinessIntentFixtureReport {
-  const results: BusinessIntentFixtureResult[] = BUSINESS_INTENT_FIXTURES.map((fixture) => {
-    const detected = detectBusinessIntent(fixture.prompt);
-    const failureReasons: string[] = [];
+  const results: BusinessIntentFixtureResult[] = BUSINESS_INTENT_FIXTURES.map(
+    (fixture) => {
+      const detected = detectBusinessIntent(fixture.prompt);
+      const failureReasons: string[] = [];
 
-    if (!matchesExpectedPrimary(detected.primaryIntent, fixture.expectedPrimary)) {
-      failureReasons.push(
-        `primaryIntent expected ${formatExpected(fixture.expectedPrimary)} but got ${detected.primaryIntent}`,
-      );
-    }
-
-    for (const banned of fixture.mustNotInclude) {
-      if (detected.primaryIntent === banned) {
-        failureReasons.push(`banned category ${banned} appeared as primaryIntent`);
-      }
-      if (detected.alternates.includes(banned)) {
-        failureReasons.push(`banned category ${banned} appeared in alternates`);
-      }
-    }
-
-    if (fixture.expectedEntitiesSubset) {
-      const missing = fixture.expectedEntitiesSubset.filter(
-        (entity) => !detected.entities.includes(entity),
-      );
-      if (missing.length > 0) {
-        failureReasons.push(`missing expected entities: ${missing.join(", ")}`);
-      }
-    }
-
-    if (typeof fixture.expectedTemporal === "boolean") {
-      if (detected.explicitlyTemporal !== fixture.expectedTemporal) {
+      if (
+        !matchesExpectedPrimary(detected.primaryIntent, fixture.expectedPrimary)
+      ) {
         failureReasons.push(
-          `explicitlyTemporal expected ${fixture.expectedTemporal} but got ${detected.explicitlyTemporal}`,
+          `primaryIntent expected ${formatExpected(fixture.expectedPrimary)} but got ${detected.primaryIntent}`,
         );
       }
-    }
 
-    return {
-      prompt: fixture.prompt,
-      ok: failureReasons.length === 0,
-      detected,
-      failureReasons,
-    };
-  });
+      for (const banned of fixture.mustNotInclude) {
+        if (detected.primaryIntent === banned) {
+          failureReasons.push(
+            `banned category ${banned} appeared as primaryIntent`,
+          );
+        }
+        if (detected.alternates.includes(banned)) {
+          failureReasons.push(
+            `banned category ${banned} appeared in alternates`,
+          );
+        }
+      }
+
+      if (fixture.expectedEntitiesSubset) {
+        const missing = fixture.expectedEntitiesSubset.filter(
+          (entity) => !detected.entities.includes(entity),
+        );
+        if (missing.length > 0) {
+          failureReasons.push(
+            `missing expected entities: ${missing.join(", ")}`,
+          );
+        }
+      }
+
+      if (fixture.expectedAlternatesSubset) {
+        const missingAlternates = fixture.expectedAlternatesSubset.filter(
+          (alternate) => !detected.alternates.includes(alternate),
+        );
+        if (missingAlternates.length > 0) {
+          failureReasons.push(
+            `missing expected alternates: ${missingAlternates.join(", ")}`,
+          );
+        }
+      }
+
+      if (typeof fixture.expectedTemporal === "boolean") {
+        if (detected.explicitlyTemporal !== fixture.expectedTemporal) {
+          failureReasons.push(
+            `explicitlyTemporal expected ${fixture.expectedTemporal} but got ${detected.explicitlyTemporal}`,
+          );
+        }
+      }
+
+      return {
+        prompt: fixture.prompt,
+        ok: failureReasons.length === 0,
+        detected,
+        failureReasons,
+      };
+    },
+  );
 
   return {
     results,

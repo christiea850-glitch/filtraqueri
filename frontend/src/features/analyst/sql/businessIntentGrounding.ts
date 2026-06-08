@@ -24,9 +24,10 @@
  *    missing_values, preview, duplicates), suppress overlapping generic
  *    intents (grouping, count_grouping) so a temporal "in the next 90 days"
  *    doesn't masquerade as a "group by" clause.
- * 5. Sort scores. If top score < 0.40, return primaryIntent = "unknown" with
- *    sub-threshold categories as alternates. Otherwise, primary = highest
- *    score, alternates = categories within 0.15 of the primary (and >= 0.40).
+ * 5. Sort scores. If the top score is weak/ambiguous but at least one
+ *    category is plausible, return primaryIntent = "unknown" with likely
+ *    categories as alternates. Strong primaries keep the top category and
+ *    alternates within 0.15 of that top score.
  *
  * No category is ever inferred from the prompt's surrounding workbook
  * metadata — this module is intentionally context-free so it can be reused
@@ -65,10 +66,10 @@ export type BusinessIntent = {
 // Configuration
 // --------------------------------------------------------------------------
 
-const PRIMARY_THRESHOLD = 0.4;
+const MINIMUM_MATCH_THRESHOLD = 0.4;
+const STRONG_PRIMARY_THRESHOLD = 0.65;
 const ALTERNATE_DELTA = 0.15;
 const ALTERNATE_FLOOR = 0.4;
-const UNKNOWN_ALTERNATE_FLOOR = 0.3;
 
 // Time-unit nouns. When preceded by a quantifier like "next", "last", "past",
 // "previous", "coming", or a digit, an `in X` phrase is treated as a temporal
@@ -126,7 +127,8 @@ const VERB_TO_ENTITY: Record<string, string> = {
 const normalizePrompt = (prompt: string): string =>
   prompt.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
 
-const includes = (text: string, needle: string): boolean => text.includes(needle);
+const includes = (text: string, needle: string): boolean =>
+  text.includes(needle);
 
 const matches = (text: string, pattern: RegExp): boolean => pattern.test(text);
 
@@ -154,16 +156,26 @@ const scorePreview = (text: string): number => {
   if (includes(text, "preview ")) return 0.85;
   if (matches(text, /\bshow (me )?the [a-z_]+ table\b/)) return 0.7;
   if (matches(text, /\bdescribe (the )?[a-z_]+ (table|columns)\b/)) return 0.65;
-  if (includes(text, "first rows") || includes(text, "first few rows")) return 0.7;
+  if (includes(text, "first rows") || includes(text, "first few rows"))
+    return 0.7;
   if (includes(text, "look at the data")) return 0.5;
   return 0;
 };
 
 const scoreCount = (text: string): number => {
-  if (includes(text, "the number of") || includes(text, "number of")) return 0.75;
+  if (includes(text, "the number of") || includes(text, "number of"))
+    return 0.75;
   if (includes(text, "count of") || includes(text, "count the")) return 0.75;
   if (includes(text, "how many")) return 0.85;
-  if (includes(text, "total number") || includes(text, "total count")) return 0.8;
+  if (includes(text, "total number") || includes(text, "total count"))
+    return 0.8;
+  if (
+    matches(
+      text,
+      /\bmost\s+(properties|units|leases|tenants|managers|vendors|payments)\b/,
+    )
+  )
+    return 0.4;
   if (matches(text, /\btally\b/)) return 0.6;
   return 0;
 };
@@ -171,22 +183,26 @@ const scoreCount = (text: string): number => {
 const scoreGrouping = (text: string): number => {
   // Strong grouping markers
   if (includes(text, "grouped by")) return 0.9;
-  if (includes(text, "broken down by") || includes(text, "broken out by")) return 0.85;
+  if (includes(text, "broken down by") || includes(text, "broken out by"))
+    return 0.85;
   if (includes(text, "for each ")) return 0.75;
   // `by <noun>` — accept only when followed by a non-time token, or accept
   // generally since `by month/year/quarter` are legitimate grouping fields.
   if (BY_GROUPING_PATTERN.test(text)) return 0.55;
+  if (matches(text, /\btop\s+[a-z_]+\s+with\s+most\s+[a-z_]+\b/)) return 0.4;
   // `per <noun>`
   if (PER_GROUPING_PATTERN.test(text)) return 0.55;
   // `in <noun>` — only when the phrase is NOT a temporal expression.
-  if (!TEMPORAL_IN_PATTERN.test(text) && GROUPING_IN_PATTERN.test(text)) return 0.45;
+  if (!TEMPORAL_IN_PATTERN.test(text) && GROUPING_IN_PATTERN.test(text))
+    return 0.45;
   return 0;
 };
 
 const scoreTrend = (text: string): number => {
   if (matches(text, /\btrend(s|ed|ing)?\b/)) return 0.85;
   if (includes(text, "over time")) return 0.85;
-  if (includes(text, "month by month") || includes(text, "year by year")) return 0.85;
+  if (includes(text, "month by month") || includes(text, "year by year"))
+    return 0.85;
   if (includes(text, "year over year") || matches(text, /\byoy\b/)) return 0.85;
   if (matches(text, /\bgrowth\b/)) return 0.7;
   if (matches(text, /\bdecline\b/)) return 0.7;
@@ -194,9 +210,11 @@ const scoreTrend = (text: string): number => {
 };
 
 const scoreExpiration = (text: string): number => {
-  if (includes(text, "days to expiry") || includes(text, "days to expiration")) return 0.95;
+  if (includes(text, "days to expiry") || includes(text, "days to expiration"))
+    return 0.95;
   if (matches(text, /\bexpir(e|es|ed|ing|ation|y)\b/)) return 0.85;
-  if (includes(text, "end of lease") || includes(text, "lease end")) return 0.85;
+  if (includes(text, "end of lease") || includes(text, "lease end"))
+    return 0.85;
   if (matches(text, /\bmove[- ]?out\b/)) return 0.85;
   if (includes(text, "watchlist")) return 0.8;
   if (includes(text, "ending soon") || includes(text, "ends soon")) return 0.75;
@@ -225,13 +243,15 @@ const scoreMissingValues = (text: string): number => {
   if (matches(text, /\bnull(s)?\b/)) return 0.75;
   if (matches(text, /\bempty\b/)) return 0.7;
   if (includes(text, "no value") || includes(text, "no values")) return 0.7;
-  if (includes(text, "without an email") || includes(text, "without a name")) return 0.65;
+  if (includes(text, "without an email") || includes(text, "without a name"))
+    return 0.65;
   return 0;
 };
 
 const scoreDuplicates = (text: string): number => {
   if (matches(text, /\bduplicate(s|d)?\b/)) return 0.85;
-  if (includes(text, "distinct count") || includes(text, "unique count")) return 0.8;
+  if (includes(text, "distinct count") || includes(text, "unique count"))
+    return 0.8;
   if (matches(text, /\bdedup(licate)?(s|ed|ing)?\b/)) return 0.85;
   return 0;
 };
@@ -263,11 +283,17 @@ const scoreTopBottom = (text: string): number => {
 
 const scoreFiltering = (text: string): number => {
   if (matches(text, /^which\b/)) return 0.65;
-  if (matches(text, /\bwhich\s+(properties|units|leases|tenants|managers|vendors)\b/))
+  if (
+    matches(
+      text,
+      /\bwhich\s+(properties|units|leases|tenants|managers|vendors)\b/,
+    )
+  )
     return 0.65;
   if (includes(text, "that have")) return 0.5;
   if (includes(text, "that are")) return 0.45;
-  if (matches(text, /\bwhere\s+/) && !matches(text, /\bwhere\s+(is|are|do)\b/)) return 0.6;
+  if (matches(text, /\bwhere\s+/) && !matches(text, /\bwhere\s+(is|are|do)\b/))
+    return 0.6;
   if (includes(text, "with status")) return 0.65;
   if (includes(text, "with type")) return 0.6;
   if (includes(text, "matching ")) return 0.5;
@@ -300,13 +326,17 @@ const detectEntities = (text: string): string[] => {
 const detectMetrics = (text: string, entities: string[]): string[] => {
   const metrics: string[] = [];
   // Count metric — when `number of <entity>` / `count of <entity>` / `how many <entity>`
-  const countOfMatch = text.match(/(?:number of|count of|how many)\s+([a-z_]+)/);
+  const countOfMatch = text.match(
+    /(?:number of|count of|how many)\s+([a-z_]+)/,
+  );
   if (countOfMatch) {
     const target = countOfMatch[1];
     // Match the captured noun against entities (plural or singular).
     const entityMatch =
       entities.find((entity) => entity === target) ||
-      ENTITY_NOUNS.find((noun) => noun.token === target || noun.plural === target)?.plural;
+      ENTITY_NOUNS.find(
+        (noun) => noun.token === target || noun.plural === target,
+      )?.plural;
     if (entityMatch) {
       metrics.push(`count_${entityMatch}`);
     } else {
@@ -341,10 +371,19 @@ const detectGroupingTargets = (text: string, suppress: boolean): string[] => {
 
 const RELATIONSHIP_PATTERNS: Array<{ regex: RegExp; predicate: string }> = [
   { regex: /\bleased to\s+(tenant|tenants)\b/, predicate: "leased_to_tenants" },
-  { regex: /\bowned by\s+(manager|managers|owner|owners)\b/, predicate: "owned_by_managers" },
-  { regex: /\bmanaged by\s+(manager|managers|owner|owners)\b/, predicate: "managed_by_managers" },
+  {
+    regex: /\bowned by\s+(manager|managers|owner|owners)\b/,
+    predicate: "owned_by_managers",
+  },
+  {
+    regex: /\bmanaged by\s+(manager|managers|owner|owners)\b/,
+    predicate: "managed_by_managers",
+  },
   { regex: /\brented to\s+(tenant|tenants)\b/, predicate: "rented_to_tenants" },
-  { regex: /\boccupied by\s+(tenant|tenants)\b/, predicate: "occupied_by_tenants" },
+  {
+    regex: /\boccupied by\s+(tenant|tenants)\b/,
+    predicate: "occupied_by_tenants",
+  },
 ];
 
 const detectRelationshipPredicate = (text: string): string | null => {
@@ -357,8 +396,10 @@ const detectRelationshipPredicate = (text: string): string | null => {
 const detectExplicitlyTemporal = (text: string): boolean => {
   if (TEMPORAL_IN_PATTERN.test(text)) return true;
   if (matches(text, /\bexpir(e|es|ed|ing|ation|y)\b/)) return true;
-  if (matches(text, /\brenewal(s)?\b/) || matches(text, /\brenew(s|ed|ing)?\b/)) return true;
-  if (matches(text, /\btrend(s|ed|ing)?\b/) || includes(text, "over time")) return true;
+  if (matches(text, /\brenewal(s)?\b/) || matches(text, /\brenew(s|ed|ing)?\b/))
+    return true;
+  if (matches(text, /\btrend(s|ed|ing)?\b/) || includes(text, "over time"))
+    return true;
   if (matches(text, /\b(today|yesterday|tomorrow)\b/)) return true;
   if (matches(text, /\b(year over year|month by month|yoy)\b/)) return true;
   return false;
@@ -407,7 +448,10 @@ export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
   // their per-component thresholds. We boost above either constituent so the
   // composite wins over its parts.
   if (scores.count >= 0.4 && scores.grouping >= 0.3) {
-    scores.count_grouping = Math.min(0.98, Math.max(scores.count, scores.grouping) + 0.2);
+    scores.count_grouping = Math.min(
+      0.98,
+      Math.max(scores.count, scores.grouping) + 0.2,
+    );
   }
 
   // Precedence — when a strong specific intent fires, suppress the generic
@@ -437,7 +481,9 @@ export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
   }
 
   // Determine primary + alternates.
-  const ranked = (Object.entries(scores) as Array<[BusinessIntentCategory, number]>)
+  const ranked = (
+    Object.entries(scores) as Array<[BusinessIntentCategory, number]>
+  )
     .filter(([category]) => category !== "unknown")
     .sort((a, b) => b[1] - a[1]);
   const topScore = ranked.length > 0 ? ranked[0][1] : 0;
@@ -445,14 +491,20 @@ export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
   let primaryIntent: BusinessIntentCategory;
   let alternates: BusinessIntentCategory[];
 
-  if (topScore < PRIMARY_THRESHOLD) {
+  if (topScore < MINIMUM_MATCH_THRESHOLD) {
+    primaryIntent = "unknown";
+    alternates = [];
+  } else if (topScore < STRONG_PRIMARY_THRESHOLD) {
     primaryIntent = "unknown";
     alternates = ranked
-      .filter(([, score]) => score >= UNKNOWN_ALTERNATE_FLOOR)
+      .filter(([, score]) => score >= MINIMUM_MATCH_THRESHOLD)
       .map(([category]) => category);
   } else {
     primaryIntent = ranked[0][0];
-    const alternateFloor = Math.max(ALTERNATE_FLOOR, topScore - ALTERNATE_DELTA);
+    const alternateFloor = Math.max(
+      ALTERNATE_FLOOR,
+      topScore - ALTERNATE_DELTA,
+    );
     alternates = ranked
       .slice(1)
       .filter(([, score]) => score >= alternateFloor)
