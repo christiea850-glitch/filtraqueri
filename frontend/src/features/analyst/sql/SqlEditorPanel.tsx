@@ -4,6 +4,7 @@ import type {
   SqlDialectContext,
   SqlExecutionStatus,
   SqlGuidanceCard,
+  SqlPreviewResult,
   SqlQueryExplanation,
   SqlReadinessReport,
   SqlValidationSummary,
@@ -41,6 +42,7 @@ type SqlEditorPanelProps = {
   // typing or execution.
   sourceMismatchWarning?: string | null;
   readinessReport?: SqlReadinessReport;
+  errorInsight?: SqlPreviewResult["errorInsight"];
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -51,6 +53,76 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   success: "Query complete",
   error: "Query failed",
 };
+
+
+function SqlExecutionErrorInsightCard({
+  insight,
+}: {
+  insight: NonNullable<SqlPreviewResult["errorInsight"]>;
+}) {
+  const confidenceLabel = `${insight.confidence.charAt(0).toUpperCase()}${insight.confidence.slice(1)} confidence`;
+
+  return (
+    <article
+      className="sql-execution-error-card"
+      aria-labelledby="sql-execution-error-card-title"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="sql-execution-error-card-head">
+        <div>
+          <span className="sql-execution-error-eyebrow">Query failed</span>
+          <h3 id="sql-execution-error-card-title">SQL execution issue</h3>
+        </div>
+        <span className="sql-execution-error-confidence">{confidenceLabel}</span>
+      </div>
+
+      <div className="sql-execution-error-section">
+        <strong>{insight.title}</strong>
+        <p>{insight.summary}</p>
+      </div>
+
+      <div className="sql-execution-error-section">
+        <span className="sql-execution-error-label">Likely cause</span>
+        <p>{insight.likelyCause}</p>
+      </div>
+
+      {insight.likelyLocation?.token && (
+        <div className="sql-execution-error-token" aria-label="Likely error location">
+          <span>Likely location</span>
+          <code>{insight.likelyLocation.token}</code>
+        </div>
+      )}
+
+      {insight.howToFix.length > 0 && (
+        <div className="sql-execution-error-section">
+          <span className="sql-execution-error-label">How to fix</span>
+          <ul>
+            {insight.howToFix.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {insight.suggestions.length > 0 && (
+        <div className="sql-execution-error-section">
+          <span className="sql-execution-error-label">Suggestions</span>
+          <ul>
+            {insight.suggestions.map((suggestion) => (
+              <li key={suggestion}>{suggestion}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <details className="sql-execution-error-details">
+        <summary>Technical details</summary>
+        <pre>{insight.rawMessage}</pre>
+      </details>
+    </article>
+  );
+}
 
 function SqlEditorPanel({
   editor,
@@ -75,6 +147,7 @@ function SqlEditorPanel({
   onToggleContext,
   sourceMismatchWarning,
   readinessReport,
+  errorInsight,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -278,6 +351,8 @@ function SqlEditorPanel({
           )}
         </div>
       )}
+
+      {errorInsight && <SqlExecutionErrorInsightCard insight={errorInsight} />}
 
       <SqlEditorHost editor={editor} />
 

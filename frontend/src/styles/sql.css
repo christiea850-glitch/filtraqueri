@@ -3071,6 +3071,113 @@
   padding-left: 18px;
 }
 
+.sql-execution-error-card {
+  display: grid;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff7f7;
+  color: #7f1d1d;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.sql-execution-error-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sql-execution-error-eyebrow,
+.sql-execution-error-label,
+.sql-execution-error-token span {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sql-execution-error-card h3 {
+  margin: 1px 0 0;
+  font-size: 15px;
+  line-height: 1.3;
+  color: #7f1d1d;
+}
+
+.sql-execution-error-confidence {
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #ffffff;
+  color: #991b1b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sql-execution-error-section {
+  display: grid;
+  gap: 3px;
+}
+
+.sql-execution-error-section strong {
+  color: #7f1d1d;
+}
+
+.sql-execution-error-section p,
+.sql-execution-error-section ul {
+  margin: 0;
+}
+
+.sql-execution-error-section ul {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+}
+
+.sql-execution-error-token {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.sql-execution-error-token code {
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: #ffffff;
+  color: #7f1d1d;
+  font-size: 12px;
+}
+
+.sql-execution-error-details {
+  border-top: 1px solid #fecaca;
+  padding-top: 7px;
+}
+
+.sql-execution-error-details summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.sql-execution-error-details pre {
+  margin: 7px 0 0;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+  color: #450a0a;
+  font-size: 11.5px;
+}
+
 .sql-route-scope-helper {
   margin: 4px 0 16px;
   padding: 10px 14px;
