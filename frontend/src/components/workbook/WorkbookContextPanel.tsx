@@ -74,7 +74,10 @@ type WorkbookContextPanelProps = {
     sql: string,
     metadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
   ) => void;
-  onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
+  onOpenSqlAssistantMode?: (
+    mode: WorkbookTaskAssistAction,
+    context?: { sqlAssistantOrigin?: "sql-context-task-assist" },
+  ) => void;
   onOpenSqlSourceTab?: (source: SqlWorkspaceTabSource) => void;
 };
 
@@ -280,7 +283,10 @@ function TaskAssistShell({
     sql: string,
     metadata?: { id?: string; label?: string; createdFrom?: "template" | "report" },
   ) => void;
-  onOpenSqlAssistantMode?: (mode: WorkbookTaskAssistAction) => void;
+  onOpenSqlAssistantMode?: (
+    mode: WorkbookTaskAssistAction,
+    context?: { sqlAssistantOrigin?: "sql-context-task-assist" },
+  ) => void;
 }) {
   const [localTaskText, setLocalTaskText] = useState("");
   const [recommendation, setRecommendation] =
@@ -519,6 +525,7 @@ function TaskAssistShell({
                 className="text-button"
                 onClick={() => onOpenSqlAssistantMode?.(
                   templateRecommendations[0].kind === "report" ? "recipes" : "templates",
+                  { sqlAssistantOrigin: "sql-context-task-assist" },
                 )}
               >
                 Browse more

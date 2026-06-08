@@ -3,6 +3,7 @@ import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
 import type { AnalysisScopeSelection } from "../../workbook";
+import type { AnalystNavigationContext } from "../analystWorkspaceTypes";
 import DataTable, {
   type DataTableColumn,
   type DataTableRow,
@@ -23,13 +24,13 @@ type SqlWorkspaceProps = {
   isSwitchingWorksheet?: boolean;
   analysisScopeSelections?: AnalysisScopeSelection[];
   onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
-  onAnalystViewChange?: (view: ActiveView) => void;
+  onAnalystViewChange?: (view: ActiveView, context?: AnalystNavigationContext) => void;
   onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
 };
 
 type BottomTab = "guidance";
 type FocusedSqlView = "editor" | "result" | "drafts" | "draft-detail";
-type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts";
+type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts" | "context";
 
 const bottomTabLabels: Record<BottomTab, string> = {
   guidance: "SQL diagnostics",
@@ -411,9 +412,12 @@ function SqlWorkspace({
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
-  const openSqlAssistantMode = (mode: SqlAssistantMode) => {
+  const openSqlAssistantMode = (
+    mode: SqlAssistantMode,
+    context?: AnalystNavigationContext,
+  ) => {
     onSqlAssistantModeChange?.(mode);
-    onAnalystViewChange?.(mode === "recipes" ? "sqlReports" : "sqlTemplates");
+    onAnalystViewChange?.(mode === "recipes" ? "sqlReports" : "sqlTemplates", context);
   };
   const openDraftDetail = (draft: SqlQueryDraft) => {
     setActiveDraftId(draft.id);
@@ -467,6 +471,12 @@ function SqlWorkspace({
 
       if (target === "result") {
         if (canOpenResultPreview) setFocusedView("result");
+        return;
+      }
+
+      if (target === "context") {
+        setFocusedView("editor");
+        setIsContextOpen(true);
         return;
       }
 

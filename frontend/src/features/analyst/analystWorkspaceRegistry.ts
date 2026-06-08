@@ -118,6 +118,7 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
       onSqlWorkspaceMetadataChange,
       onAnalystViewChange,
       requestedSqlAssistantMode,
+      sqlAssistantOrigin,
     }) =>
       createElement(SqlAssistantRoutePage, {
         dataset,
@@ -126,6 +127,7 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
         kind: "templates",
         requestedMode: requestedSqlAssistantMode,
         onAnalystViewChange,
+        sqlAssistantOrigin,
       }),
   },
   {
@@ -145,6 +147,7 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
       sqlWorkspaceMetadata,
       onSqlWorkspaceMetadataChange,
       onAnalystViewChange,
+      sqlAssistantOrigin,
     }) =>
       createElement(SqlAssistantRoutePage, {
         dataset,
@@ -153,6 +156,7 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
         kind: "reports",
         requestedMode: "recipes",
         onAnalystViewChange,
+        sqlAssistantOrigin,
       }),
   },
   ...placeholderWorkspaces.map((workspace) => ({

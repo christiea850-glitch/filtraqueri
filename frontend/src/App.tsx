@@ -17,6 +17,7 @@ import {
   createAnalystWorkspaceRenderers,
 } from "./features/analyst/analystWorkspaceHelpers";
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
+import type { AnalystNavigationContext } from "./features/analyst/analystWorkspaceTypes";
 import type { SqlAssistantMode } from "./features/analyst/sql/SqlAssistantPanel";
 import type {
   ActiveView,
@@ -105,6 +106,8 @@ function App() {
     useState<CleanPrepareRestoreContext | null>(null);
   const [requestedSqlAssistantMode, setRequestedSqlAssistantMode] =
     useState<SqlAssistantMode | null>(null);
+  const [sqlAssistantOrigin, setSqlAssistantOrigin] =
+    useState<AnalystNavigationContext["sqlAssistantOrigin"]>();
   const [analysisScopeSelections, setAnalysisScopeSelections] = useState<
     AnalysisScopeSelection[]
   >([]);
@@ -485,6 +488,7 @@ function App() {
 
   const handleWorkspaceViewChange = (view: ActiveView) => {
     if (view === "queryBuilder") setHumanAnalyzeStage("investigate");
+    setSqlAssistantOrigin(undefined);
     updateDatasetSessionView(view);
   };
 
@@ -682,6 +686,7 @@ function App() {
   const openAnalystCommand = (target: "editor" | "result" | "drafts" = "editor") => {
     setWorkspaceMode("analyst");
     setRequestedSqlAssistantMode(null);
+    setSqlAssistantOrigin(undefined);
     updateDatasetSessionView("sqlWorkspace");
     dispatchDeferredWorkspaceCommand("filtraqueri:sql-workspace-command", { target });
   };
@@ -1366,12 +1371,18 @@ function App() {
     isSwitchingWorksheet,
     analysisScopeSelections,
     onAnalysisScopeSelectionsChange: setAnalysisScopeSelections,
-    onAnalystViewChange: (view) => {
+    onAnalystViewChange: (view, context) => {
       setWorkspaceMode("analyst");
+      if (view === "sqlTemplates" || view === "sqlReports") {
+        setSqlAssistantOrigin(context?.sqlAssistantOrigin);
+      } else {
+        setSqlAssistantOrigin(undefined);
+      }
       updateDatasetSessionView(view);
     },
     requestedSqlAssistantMode,
     onSqlAssistantModeChange: setRequestedSqlAssistantMode,
+    sqlAssistantOrigin,
 
     onExecutionResult: (executionResult) => {
       const coordinationResult = coordinateExecutionResult({
@@ -1520,6 +1531,7 @@ function App() {
         onRun: () => {
           setWorkspaceMode("analyst");
           setRequestedSqlAssistantMode("templates");
+          setSqlAssistantOrigin(undefined);
           updateDatasetSessionView("sqlTemplates");
         },
       },
@@ -1532,6 +1544,7 @@ function App() {
         onRun: () => {
           setWorkspaceMode("analyst");
           setRequestedSqlAssistantMode("recipes");
+          setSqlAssistantOrigin(undefined);
           updateDatasetSessionView("sqlReports");
         },
       },

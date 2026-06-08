@@ -1,5 +1,6 @@
 import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
+import type { AnalystNavigationContext } from "../analystWorkspaceTypes";
 import type { AnalysisScopeSelection, WorkbookMetadata } from "../../workbook";
 import SqlAssistantPanel, { type SqlAssistantMode } from "./SqlAssistantPanel";
 import useSqlWorkspace from "./useSqlWorkspace";
@@ -12,7 +13,8 @@ type SqlAssistantRoutePageProps = {
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void;
   kind: SqlAssistantRoutePageKind;
   requestedMode?: SqlAssistantMode | null;
-  onAnalystViewChange?: (view: ActiveView) => void;
+  onAnalystViewChange?: (view: ActiveView, context?: AnalystNavigationContext) => void;
+  sqlAssistantOrigin?: AnalystNavigationContext["sqlAssistantOrigin"];
 };
 
 const templateModes: SqlAssistantMode[] = ["templates", "assist"];
@@ -134,6 +136,7 @@ function SqlAssistantRoutePage({
   kind,
   requestedMode,
   onAnalystViewChange,
+  sqlAssistantOrigin,
 }: SqlAssistantRoutePageProps) {
   const {
     selectedDialect,
@@ -149,6 +152,7 @@ function SqlAssistantRoutePage({
   const appliedScopeLabels = getScopeWorksheetLabels(dataset, sqlTabs.appliedScopeSelections);
   const appliedScopeLabel =
     appliedScopeLabels.length > 0 ? appliedScopeLabels.join(", ") : null;
+  const openedFromSqlTask = sqlAssistantOrigin === "sql-context-task-assist";
   // Option C — Templates / Reports must render against the active SQL tab's
   // source (schema, table name), not the global dataset. SqlAssistantPanel
   // already accepts a dataset; we feed it the tab-scoped synthesis from
@@ -165,6 +169,17 @@ function SqlAssistantRoutePage({
   ) => {
     insertSql(sql, metadata);
     onAnalystViewChange?.("sqlWorkspace");
+  };
+
+  const returnToSqlTask = () => {
+    onAnalystViewChange?.("sqlWorkspace");
+    const detail = { target: "context" };
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("filtraqueri:sql-workspace-command", { detail }));
+    }, 0);
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("filtraqueri:sql-workspace-command", { detail }));
+    }, 80);
   };
 
   return (
@@ -210,6 +225,15 @@ function SqlAssistantRoutePage({
           <h2>{copy.title}</h2>
           <p>{copy.description}</p>
         </div>
+        {openedFromSqlTask && (
+          <button
+            type="button"
+            className="secondary-button sql-route-back-button"
+            onClick={returnToSqlTask}
+          >
+            Back to SQL Context
+          </button>
+        )}
       </div>
 
       <SqlAssistantPanel
