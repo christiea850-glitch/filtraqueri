@@ -368,7 +368,7 @@ const detectExplicitlyTemporal = (text: string): boolean => {
 // Main entry — detectBusinessIntent
 // --------------------------------------------------------------------------
 
-const EMPTY_INTENT: BusinessIntent = {
+export const EMPTY_BUSINESS_INTENT: BusinessIntent = {
   primaryIntent: "unknown",
   alternates: [],
   entities: [],
@@ -379,10 +379,61 @@ const EMPTY_INTENT: BusinessIntent = {
   detectorVersion: "v1",
 };
 
+export type BusinessIntentAmbiguity = {
+  isAmbiguous: boolean;
+  reason: "none" | "unknown_with_alternates" | "close_alternates";
+  reviewIntents: BusinessIntentCategory[];
+};
+
+const sortedUnique = (values: readonly string[]): string[] =>
+  Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort();
+
+export function describeBusinessIntentAmbiguity(
+  intent: BusinessIntent,
+): BusinessIntentAmbiguity {
+  if (intent.primaryIntent === "unknown" && intent.alternates.length > 0) {
+    return {
+      isAmbiguous: true,
+      reason: "unknown_with_alternates",
+      reviewIntents: sortedUnique(intent.alternates) as BusinessIntentCategory[],
+    };
+  }
+
+  if (intent.alternates.length > 0) {
+    return {
+      isAmbiguous: true,
+      reason: "close_alternates",
+      reviewIntents: sortedUnique([
+        intent.primaryIntent,
+        ...intent.alternates,
+      ]) as BusinessIntentCategory[],
+    };
+  }
+
+  return { isAmbiguous: false, reason: "none", reviewIntents: [] };
+}
+
+export function fingerprintBusinessIntent(intent: BusinessIntent): string {
+  return JSON.stringify({
+    primaryIntent: intent.primaryIntent,
+    alternates: sortedUnique(intent.alternates),
+    entities: sortedUnique(intent.entities),
+    metrics: sortedUnique(intent.metrics),
+    grouping: sortedUnique(intent.grouping),
+    relationshipPredicate: intent.relationshipPredicate,
+    explicitlyTemporal: intent.explicitlyTemporal,
+    detectorVersion: intent.detectorVersion,
+  });
+}
+
+export const EMPTY_BUSINESS_INTENT_FINGERPRINT = fingerprintBusinessIntent(
+  EMPTY_BUSINESS_INTENT,
+);
+
 export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
-  if (!taskPrompt || !taskPrompt.trim()) return EMPTY_INTENT;
+  if (!taskPrompt || !taskPrompt.trim()) return EMPTY_BUSINESS_INTENT;
   const text = normalizePrompt(taskPrompt);
-  if (!text) return EMPTY_INTENT;
+  if (!text) return EMPTY_BUSINESS_INTENT;
 
   // Compute raw per-category scores.
   const scores: Record<BusinessIntentCategory, number> = {

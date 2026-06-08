@@ -29,7 +29,11 @@
  */
 
 import {
+  EMPTY_BUSINESS_INTENT,
+  EMPTY_BUSINESS_INTENT_FINGERPRINT,
+  describeBusinessIntentAmbiguity,
   detectBusinessIntent,
+  fingerprintBusinessIntent,
   type BusinessIntent,
   type BusinessIntentCategory,
 } from "../businessIntentGrounding";
@@ -131,7 +135,7 @@ const formatExpected = (expected: BusinessIntentCategory | BusinessIntentCategor
  * in a `test()` call by iterating `BUSINESS_INTENT_FIXTURES` directly.
  */
 export function runBusinessIntentFixtures(): BusinessIntentFixtureReport {
-  const results: BusinessIntentFixtureResult[] = BUSINESS_INTENT_FIXTURES.map((fixture) => {
+  const fixtureResults: BusinessIntentFixtureResult[] = BUSINESS_INTENT_FIXTURES.map((fixture) => {
     const detected = detectBusinessIntent(fixture.prompt);
     const failureReasons: string[] = [];
 
@@ -174,6 +178,49 @@ export function runBusinessIntentFixtures(): BusinessIntentFixtureReport {
       failureReasons,
     };
   });
+
+  const emptyDetected = detectBusinessIntent("   ");
+  const ambiguousDetected = detectBusinessIntent("count vacant units by property");
+  const ambiguity = describeBusinessIntentAmbiguity(ambiguousDetected);
+  const fingerprintA = fingerprintBusinessIntent({
+    ...ambiguousDetected,
+    entities: [...ambiguousDetected.entities].reverse(),
+  });
+  const fingerprintB = fingerprintBusinessIntent(ambiguousDetected);
+
+  const results: BusinessIntentFixtureResult[] = [
+    ...fixtureResults,
+    {
+      prompt: "empty prompt uses exported empty-state constant",
+      ok:
+        emptyDetected === EMPTY_BUSINESS_INTENT &&
+        fingerprintBusinessIntent(emptyDetected) ===
+          EMPTY_BUSINESS_INTENT_FINGERPRINT,
+      detected: emptyDetected,
+      failureReasons:
+        emptyDetected === EMPTY_BUSINESS_INTENT
+          ? []
+          : ["Expected blank prompt detection to return EMPTY_BUSINESS_INTENT."],
+    },
+    {
+      prompt: "ambiguous intent exposes review intents",
+      ok: ambiguity.isAmbiguous && ambiguity.reviewIntents.length >= 2,
+      detected: ambiguousDetected,
+      failureReasons:
+        ambiguity.isAmbiguous && ambiguity.reviewIntents.length >= 2
+          ? []
+          : ["Expected close alternates to be described as ambiguous."],
+    },
+    {
+      prompt: "business intent fingerprint is stable for reordered arrays",
+      ok: fingerprintA === fingerprintB,
+      detected: ambiguousDetected,
+      failureReasons:
+        fingerprintA === fingerprintB
+          ? []
+          : ["Expected fingerprintBusinessIntent to sort set-like arrays."],
+    },
+  ];
 
   return {
     results,

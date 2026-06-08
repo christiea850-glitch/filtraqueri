@@ -11,6 +11,12 @@ import type { AcceptedRelationshipContract } from "../../../workbook";
 import type { ReportOpportunity } from "../reportIntelligencePlanner";
 import { detectBusinessIntent } from "../businessIntentGrounding";
 import {
+  EMPTY_GROUNDED_SQL_CANDIDATES,
+  EMPTY_GROUNDING_CONTEXT,
+  EMPTY_NEEDS_REVIEW_COPY,
+  fingerprintGroundingContext,
+  fingerprintSqlCandidate,
+  getNeedsReviewCopy,
   groundCandidate,
   normalizeCandidates,
   type GroundedSqlCandidate,
@@ -40,6 +46,8 @@ const intentMismatchReason =
   "Not recommended: this candidate is for `expiration`, but your task asks for `count_grouping`.";
 const recipeJoinWarning =
   "Join `leases.tenant_id → tenants.tenant_id` is not verified by relationship contracts. Review before running.";
+const ambiguousColumnWarning =
+  "Required column `tenant_id` is ambiguous across `leases`, `tenants`; qualify it with a table before running.";
 
 const schemaColumn = (name: string): SchemaColumn => ({
   name,
@@ -345,6 +353,40 @@ export function runSqlCandidateGroundingFixtures(): CandidateGroundingFixtureRep
     }),
   );
 
+  const ambiguousColumnCandidate = groundCandidate(
+    groundedCandidate({
+      title: "Lease tenant lookup",
+      description: "Show tenant records for leases.",
+      candidateIntent: detectBusinessIntent("Show tenant records for leases."),
+      requiredTables: ["leases", "tenants"],
+      usedTables: ["leases", "tenants"],
+      requiredColumns: ["tenant_id"],
+      usedColumns: ["tenant_id"],
+    }),
+    baseGroundingContext({ prompt: "Show tenant records for leases." }),
+  );
+  const needsReviewCopy = getNeedsReviewCopy(ambiguousColumnCandidate);
+  const nonReviewCopy = getNeedsReviewCopy(singleTableCandidate);
+
+  const contextFingerprintA = fingerprintGroundingContext(
+    baseGroundingContext({ appliedScopeTables: ["leases", "tenants", "units"] }),
+  );
+  const contextFingerprintB = fingerprintGroundingContext(
+    baseGroundingContext({ appliedScopeTables: ["units", "tenants", "leases"] }),
+  );
+  const candidateFingerprintA = fingerprintSqlCandidate(
+    groundedCandidate({
+      requiredTables: ["leases", "tenants"],
+      usedTables: ["tenants", "leases"],
+    }),
+  );
+  const candidateFingerprintB = fingerprintSqlCandidate(
+    groundedCandidate({
+      requiredTables: ["tenants", "leases"],
+      usedTables: ["leases", "tenants"],
+    }),
+  );
+
   const results: CandidateGroundingFixtureResult[] = [
     expect(
       "generic JOIN template containing other_table is unsupported",
@@ -423,6 +465,40 @@ export function runSqlCandidateGroundingFixtures(): CandidateGroundingFixtureRep
       singleTableCandidate.support === "supported" &&
         singleTableCandidate.unsupportedReasons.length === 0,
       "Expected single-table candidate to remain supported without join verification.",
+    ),
+    expect(
+      "ambiguous unqualified column needs review instead of unsupported",
+      ambiguousColumnCandidate.support === "needs_review" &&
+        ambiguousColumnCandidate.unsupportedReasons.length === 0 &&
+        ambiguousColumnCandidate.warnings.includes(ambiguousColumnWarning),
+      "Expected ambiguous unqualified column to produce a needs_review warning without blocking the candidate.",
+    ),
+    expect(
+      "needs_review copy helper exposes warning reasons",
+      needsReviewCopy !== EMPTY_NEEDS_REVIEW_COPY &&
+        needsReviewCopy.reasons.includes(ambiguousColumnWarning),
+      "Expected getNeedsReviewCopy to return candidate-specific review reasons.",
+    ),
+    expect(
+      "non-review copy helper returns empty-state copy",
+      nonReviewCopy === EMPTY_NEEDS_REVIEW_COPY,
+      "Expected getNeedsReviewCopy to return EMPTY_NEEDS_REVIEW_COPY for supported candidates.",
+    ),
+    expect(
+      "empty-state constants are reusable stable references",
+      EMPTY_GROUNDED_SQL_CANDIDATES.length === 0 &&
+        EMPTY_GROUNDING_CONTEXT.appliedScopeTables.length === 0,
+      "Expected exported empty-state constants to be available for future memoized callers.",
+    ),
+    expect(
+      "grounding context fingerprint is stable for reordered scope tables",
+      contextFingerprintA === contextFingerprintB,
+      "Expected fingerprintGroundingContext to normalize set-like scope ordering.",
+    ),
+    expect(
+      "SQL candidate fingerprint is stable for reordered table lists",
+      candidateFingerprintA === candidateFingerprintB,
+      "Expected fingerprintSqlCandidate to normalize set-like candidate arrays.",
     ),
   ];
 
