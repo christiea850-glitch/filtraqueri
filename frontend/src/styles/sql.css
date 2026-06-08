@@ -3071,6 +3071,10 @@
   padding-left: 18px;
 }
 
+.sql-editor-host + .sql-execution-error-card {
+  margin-top: 10px;
+}
+
 .sql-execution-error-card {
   display: grid;
   gap: 9px;

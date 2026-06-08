@@ -352,9 +352,9 @@ function SqlEditorPanel({
         </div>
       )}
 
-      {errorInsight && <SqlExecutionErrorInsightCard insight={errorInsight} />}
-
       <SqlEditorHost editor={editor} />
+
+      {errorInsight && <SqlExecutionErrorInsightCard insight={errorInsight} />}
 
       <div className="sql-editor-footer">
         <span>{statusLabels[executionStatus]}</span>
