@@ -74,6 +74,18 @@ export type SqlQueryExplanation = {
   fallbackMessage: string | null;
 };
 
+export type SqlReadinessIssue = {
+  id: string;
+  severity: "info" | "warning";
+  message: string;
+};
+
+export type SqlReadinessReport = {
+  status: "ready" | "info" | "warning";
+  summary: string;
+  issues: SqlReadinessIssue[];
+};
+
 export type SqlDialectOption = Pick<SqlDialectProfile, "id" | "displayName">;
 
 export type SqlDialectContext = {

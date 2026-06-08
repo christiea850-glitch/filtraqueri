@@ -20,6 +20,7 @@ import {
 } from "../../sqlIntelligence";
 import { createColumnSuggestions, createSqlTemplates, sqlKeywordSuggestions } from "./sqlSuggestions";
 import { explainSqlQuery } from "./sqlQueryExplainer";
+import { analyzeSqlReadiness } from "./sqlReadinessGuard";
 import {
   resolveSqlTabSourceContext,
   type SqlTabSourceContext,
@@ -198,6 +199,16 @@ function useSqlWorkspace(
         selectedDialect,
       }),
     [activeSourceLabel, scopedDatasetForTab, selectedDialect, sqlDraft],
+  );
+  const readinessReport = useMemo(
+    () =>
+      analyzeSqlReadiness({
+        sqlDraft,
+        dataset,
+        appliedScopeSelections: activeTab.appliedScopeSelections || [],
+        activeTabSourceContext,
+      }),
+    [activeTab.appliedScopeSelections, activeTabSourceContext, dataset, sqlDraft],
   );
   const characterCount = sqlDraft.trim().length;
   const sqlTabs = useMemo<SqlWorkspaceTabsInterface>(() => {
@@ -561,6 +572,7 @@ function useSqlWorkspace(
     keywordSuggestions: sqlKeywordSuggestions,
     sqlAnalysis,
     queryExplanation,
+    readinessReport,
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,

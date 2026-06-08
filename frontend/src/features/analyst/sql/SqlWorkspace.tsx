@@ -376,6 +376,7 @@ function SqlWorkspace({
     previewResult,
     sqlAnalysis,
     queryExplanation,
+    readinessReport,
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,
@@ -663,6 +664,7 @@ function SqlWorkspace({
           isContextOpen={isContextOpen}
           onToggleContext={() => setIsContextOpen((current) => !current)}
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
+          readinessReport={readinessReport}
         />
 
         {bottomTab && (

@@ -3022,6 +3022,55 @@
   color: #92400e;
 }
 
+.sql-readiness-guard {
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+  color: #1e3a8a;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.sql-readiness-guard.has-warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.sql-readiness-guard-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sql-readiness-guard-head span {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sql-readiness-guard-head strong {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sql-readiness-guard p,
+.sql-readiness-guard ul {
+  margin: 0;
+}
+
+.sql-readiness-guard ul {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+}
+
 .sql-route-scope-helper {
   margin: 4px 0 16px;
   padding: 10px 14px;

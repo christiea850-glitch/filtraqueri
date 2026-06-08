@@ -5,6 +5,7 @@ import type {
   SqlExecutionStatus,
   SqlGuidanceCard,
   SqlQueryExplanation,
+  SqlReadinessReport,
   SqlValidationSummary,
   SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
@@ -39,6 +40,7 @@ type SqlEditorPanelProps = {
   // remains enabled; the warning is informational only and never blocks
   // typing or execution.
   sourceMismatchWarning?: string | null;
+  readinessReport?: SqlReadinessReport;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -72,6 +74,7 @@ function SqlEditorPanel({
   isContextOpen,
   onToggleContext,
   sourceMismatchWarning,
+  readinessReport,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -241,6 +244,38 @@ function SqlEditorPanel({
         >
           <strong>Tab source differs from executable source.</strong>
           <span>{sourceMismatchWarning}</span>
+        </div>
+      )}
+
+      {readinessReport && (
+        <div
+          className={[
+            "sql-readiness-guard",
+            readinessReport.status === "warning" ? "has-warning" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          role="status"
+          aria-live="polite"
+        >
+          <div className="sql-readiness-guard-head">
+            <span>SQL readiness check</span>
+            <strong>
+              {readinessReport.status === "ready"
+                ? "Ready"
+                : readinessReport.status === "warning"
+                  ? "Review before running"
+                  : "Review note"}
+            </strong>
+          </div>
+          <p>{readinessReport.summary}</p>
+          {readinessReport.issues.length > 0 && (
+            <ul>
+              {readinessReport.issues.slice(0, 4).map((issue) => (
+                <li key={issue.id}>{issue.message}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
