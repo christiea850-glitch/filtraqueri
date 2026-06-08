@@ -7,6 +7,7 @@ import type {
   SqlWorkspaceAnalysis,
 } from "../../sqlIntelligence";
 import type { AnalysisScopeSelection } from "../../workbook";
+import type { SqlExecutionErrorInsight } from "./sqlErrorFormatter";
 
 export type SqlExecutionStatus =
   | "idle"
@@ -28,6 +29,7 @@ export type SqlPreviewResult = {
   columns: string[];
   rows: Record<string, unknown>[];
   message: string;
+  errorInsight?: SqlExecutionErrorInsight | null;
 };
 
 export type SqlSuggestion = {
