@@ -2,6 +2,7 @@ import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import Editor, { type BeforeMount, type Monaco, type OnMount } from "@monaco-editor/react";
 import type { editor as MonacoEditor, Position } from "monaco-editor";
 import type { SqlEditorInterface, SqlPreviewResult } from "./sqlTypes";
+import { getStaticSqlSyntaxDiagnostics } from "./sqlStaticSyntaxDiagnostics";
 
 type SqlEditorHostProps = {
   editor: SqlEditorInterface;
@@ -78,6 +79,7 @@ const keywordInsertText: Record<string, string> = {
 
 const snippetKeywords = new Set(["COUNT", "SUM", "AVG", "MIN", "MAX", "CASE WHEN"]);
 
+const staticSyntaxMarkerOwner = "filtraqueri-sql-static-syntax";
 const executionMarkerOwner = "filtraqueri-sql-execution";
 
 const errorInsightCategoryLabels: Record<
@@ -135,14 +137,16 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
       providerDisposablesRef.current.forEach((provider) => provider.dispose());
       providerDisposablesRef.current = [];
       const monaco = monacoRef.current;
-      const model = editorRef.current?.getModel();
-      if (editorRef.current) {
-        executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+      const editorInstance = editorRef.current;
+      const model = editorInstance?.getModel();
+      if (editorInstance) {
+        executionDecorationIdsRef.current = editorInstance.deltaDecorations(
           executionDecorationIdsRef.current,
           [],
         );
       }
       if (monaco && model) {
+        monaco.editor.setModelMarkers(model, staticSyntaxMarkerOwner, []);
         monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
       }
       editorRef.current = null;
@@ -323,13 +327,43 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
 
   useEffect(() => {
     const monaco = monacoRef.current;
-    const model = editorRef.current?.getModel();
+    const editorInstance = editorRef.current;
+    const model = editorInstance?.getModel();
     if (!monaco || !model || !isMonacoReady || shouldUseFallback) return undefined;
+
+    const staticDiagnostics = getStaticSqlSyntaxDiagnostics(editor.value);
+    const markers: MonacoEditor.IMarkerData[] = staticDiagnostics.map((diagnostic) => {
+      const start = getEditorPosition(editor.value, diagnostic.start);
+      const end = getEditorPosition(editor.value, diagnostic.end);
+
+      return {
+        severity: monaco.MarkerSeverity.Error,
+        message: diagnostic.message,
+        source: "FiltraQueri SQL static syntax",
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: Math.max(end.column, start.column + 1),
+      };
+    });
+
+    monaco.editor.setModelMarkers(model, staticSyntaxMarkerOwner, markers);
+
+    return () => {
+      monaco.editor.setModelMarkers(model, staticSyntaxMarkerOwner, []);
+    };
+  }, [editor.value, isMonacoReady, shouldUseFallback]);
+
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    const editorInstance = editorRef.current;
+    const model = editorInstance?.getModel();
+    if (!monaco || !model || !editorInstance || !isMonacoReady || shouldUseFallback) return undefined;
 
     if (!errorInsight) {
       executionMarkerSqlRef.current = null;
       previousErrorInsightRef.current = errorInsight;
-      executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+      executionDecorationIdsRef.current = editorInstance.deltaDecorations(
         executionDecorationIdsRef.current,
         [],
       );
@@ -349,7 +383,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
       (errorInsight.confidence === "high" || errorInsight.confidence === "medium");
 
     if (!canShowExecutionMarker || !token) {
-      executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+      executionDecorationIdsRef.current = editorInstance.deltaDecorations(
         executionDecorationIdsRef.current,
         [],
       );
@@ -371,7 +405,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
     const tokenEnd = hasLocationRange ? likelyEnd : tokenStart + token.length;
 
     if (tokenStart < 0 || tokenEnd <= tokenStart) {
-      executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+      executionDecorationIdsRef.current = editorInstance.deltaDecorations(
         executionDecorationIdsRef.current,
         [],
       );
@@ -402,7 +436,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
     ];
 
     monaco.editor.setModelMarkers(model, executionMarkerOwner, markers);
-    executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+    executionDecorationIdsRef.current = editorInstance.deltaDecorations(
       executionDecorationIdsRef.current,
       [
         {
@@ -416,10 +450,6 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
             glyphMarginClassName: "sql-execution-error-glyph",
             glyphMarginHoverMessage: { value: markerMessage },
             hoverMessage: { value: markerMessage },
-            overviewRuler: {
-              color: "#ef4444",
-              position: monaco.editor.OverviewRulerLane.Right,
-            },
             stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
           },
         },
@@ -427,10 +457,10 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
     );
 
     return () => {
-      executionDecorationIdsRef.current = editorRef.current?.deltaDecorations(
+      executionDecorationIdsRef.current = editorInstance.deltaDecorations(
         executionDecorationIdsRef.current,
         [],
-      ) || [];
+      );
       monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
     };
   }, [editor.value, errorInsight, isMonacoReady, shouldUseFallback]);
@@ -490,6 +520,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
                 fontSize: 14,
                 lineHeight: 24,
                 glyphMargin: true,
+                guides: { indentation: false, highlightActiveIndentation: false },
                 minimap: { enabled: false },
                 padding: { top: 16, bottom: 16 },
                 quickSuggestions: true,
