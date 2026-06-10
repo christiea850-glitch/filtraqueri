@@ -447,6 +447,25 @@
   min-height: min(60vh, 590px);
 }
 
+.sql-monaco-editor .monaco-editor .core-guide,
+.sql-monaco-editor .monaco-editor .core-guide-indent,
+.sql-monaco-editor .monaco-editor .core-guide-indent-active,
+.sql-monaco-editor .monaco-editor .bracket-pair-guide,
+.sql-monaco-editor .monaco-editor .view-overlays .vertical,
+.sql-monaco-editor .monaco-editor .current-line,
+.sql-monaco-editor .monaco-editor .current-line-margin,
+.sql-monaco-editor .monaco-editor .margin-view-overlays .current-line-margin {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.sql-monaco-editor .monaco-editor .core-guide,
+.sql-monaco-editor .monaco-editor .core-guide-indent,
+.sql-monaco-editor .monaco-editor .core-guide-indent-active,
+.sql-monaco-editor .monaco-editor .bracket-pair-guide {
+  background-color: transparent !important;
+}
+
 .sql-editor-input:focus {
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
