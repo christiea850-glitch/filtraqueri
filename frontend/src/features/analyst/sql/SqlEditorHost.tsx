@@ -81,6 +81,7 @@ const snippetKeywords = new Set(["COUNT", "SUM", "AVG", "MIN", "MAX", "CASE WHEN
 
 const staticSyntaxMarkerOwner = "filtraqueri-sql-static-syntax";
 const executionMarkerOwner = "filtraqueri-sql-execution";
+const intelligenceMarkerOwner = "filtraqueri-sql-intelligence";
 
 const errorInsightCategoryLabels: Record<
   NonNullable<SqlPreviewResult["errorInsight"]>["category"],
@@ -146,6 +147,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
         );
       }
       if (monaco && model) {
+        monaco.editor.setModelMarkers(model, intelligenceMarkerOwner, []);
         monaco.editor.setModelMarkers(model, staticSyntaxMarkerOwner, []);
         monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
       }
@@ -292,44 +294,28 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
 
   useEffect(() => {
     const monaco = monacoRef.current;
-    if (!monaco || !isMonacoReady || shouldUseFallback) return undefined;
+    const editorInstance = editorRef.current;
+    if (!monaco || !editorInstance || !isMonacoReady || shouldUseFallback) return undefined;
 
-    const model = editorRef.current?.getModel();
+    const model = editorInstance.getModel();
     if (!model || model.getLanguageId() !== "sql") return undefined;
 
-    const markerDiagnostics = editor.diagnostics.filter(
-      (diagnostic) => diagnostic.severity === "warning" || diagnostic.severity === "error",
-    );
-    const markers = markerDiagnostics.map((diagnostic) => {
-      const start = getEditorPosition(editor.value, diagnostic.start);
-      const end = getEditorPosition(editor.value, diagnostic.end);
-
-      return {
-        severity:
-          diagnostic.severity === "error"
-            ? monaco.MarkerSeverity.Error
-            : monaco.MarkerSeverity.Warning,
-        message: diagnostic.message,
-        source: "FiltraQueri SQL Intelligence",
-        startLineNumber: start.lineNumber,
-        startColumn: start.column,
-        endLineNumber: end.lineNumber,
-        endColumn: Math.max(end.column, start.column + 1),
-      };
-    });
-
-    monaco.editor.setModelMarkers(model, "filtraqueri-sql-intelligence", markers);
+    // Readiness and SQL intelligence diagnostics are rendered by the readiness UI.
+    // Keep Monaco markers reserved for static syntax diagnostics and post-run execution errors.
+    monaco.editor.setModelMarkers(model, intelligenceMarkerOwner, []);
 
     return () => {
-      monaco.editor.setModelMarkers(model, "filtraqueri-sql-intelligence", []);
+      monaco.editor.setModelMarkers(model, intelligenceMarkerOwner, []);
     };
-  }, [editor.diagnostics, editor.value, isMonacoReady, shouldUseFallback]);
+  }, [isMonacoReady, shouldUseFallback]);
 
   useEffect(() => {
     const monaco = monacoRef.current;
     const editorInstance = editorRef.current;
-    const model = editorInstance?.getModel();
-    if (!monaco || !model || !isMonacoReady || shouldUseFallback) return undefined;
+    if (!monaco || !editorInstance || !isMonacoReady || shouldUseFallback) return undefined;
+
+    const model = editorInstance.getModel();
+    if (!model) return undefined;
 
     const staticDiagnostics = getStaticSqlSyntaxDiagnostics(editor.value);
     const markers: MonacoEditor.IMarkerData[] = staticDiagnostics.map((diagnostic) => {
@@ -357,8 +343,10 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
   useEffect(() => {
     const monaco = monacoRef.current;
     const editorInstance = editorRef.current;
-    const model = editorInstance?.getModel();
-    if (!monaco || !model || !editorInstance || !isMonacoReady || shouldUseFallback) return undefined;
+    if (!monaco || !editorInstance || !isMonacoReady || shouldUseFallback) return undefined;
+
+    const model = editorInstance.getModel();
+    if (!model) return undefined;
 
     if (!errorInsight) {
       executionMarkerSqlRef.current = null;
@@ -522,6 +510,9 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
                 glyphMargin: true,
                 guides: { indentation: false, highlightActiveIndentation: false },
                 minimap: { enabled: false },
+                overviewRulerBorder: false,
+                overviewRulerLanes: 0,
+                hideCursorInOverviewRuler: true,
                 padding: { top: 16, bottom: 16 },
                 quickSuggestions: true,
                 readOnly: false,
