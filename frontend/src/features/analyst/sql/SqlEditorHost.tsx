@@ -1,11 +1,12 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import Editor, { type BeforeMount, type Monaco, type OnMount } from "@monaco-editor/react";
 import type { editor as MonacoEditor, Position } from "monaco-editor";
-import type { SqlEditorInterface } from "./sqlTypes";
+import type { SqlEditorInterface, SqlPreviewResult } from "./sqlTypes";
 
 type SqlEditorHostProps = {
   editor: SqlEditorInterface;
   errorDock?: ReactNode;
+  errorInsight?: SqlPreviewResult["errorInsight"];
 };
 
 type MonacoErrorBoundaryProps = {
@@ -77,6 +78,26 @@ const keywordInsertText: Record<string, string> = {
 
 const snippetKeywords = new Set(["COUNT", "SUM", "AVG", "MIN", "MAX", "CASE WHEN"]);
 
+const executionMarkerOwner = "filtraqueri-sql-execution";
+
+const errorInsightCategoryLabels: Record<
+  NonNullable<SqlPreviewResult["errorInsight"]>["category"],
+  string
+> = {
+  table_not_found: "Table not found",
+  column_not_found: "Column not found",
+  alias_not_found: "Alias not found",
+  ambiguous_column: "Ambiguous column",
+  parser_error: "SQL parser error",
+  dialect_mismatch: "SQL dialect mismatch",
+  read_only_validation: "Read-only validation error",
+  multi_statement: "Multiple SQL statements",
+  blocked_statement: "Blocked SQL statement",
+  cte_select_first_validation: "CTE validation error",
+  backend_unreachable: "Backend unreachable",
+  unknown: "SQL execution error",
+};
+
 const markdownEscape = (value: string) => value.replace(/\\/g, "\\\\").replace(/`/g, "\\`");
 
 const getEditorPosition = (text: string, offset: number) => {
@@ -90,11 +111,14 @@ const getEditorPosition = (text: string, offset: number) => {
   };
 };
 
-function SqlEditorHost({ editor, errorDock }: SqlEditorHostProps) {
+function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) {
   const [shouldUseFallback, setShouldUseFallback] = useState(false);
   const [isMonacoReady, setIsMonacoReady] = useState(false);
   const hasMountedMonacoRef = useRef(false);
   const monacoRef = useRef<Monaco | null>(null);
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const executionMarkerSqlRef = useRef<string | null>(null);
+  const previousErrorInsightRef = useRef<SqlPreviewResult["errorInsight"] | undefined>(undefined);
   const providerDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
 
   useEffect(() => {
@@ -109,6 +133,12 @@ function SqlEditorHost({ editor, errorDock }: SqlEditorHostProps) {
     () => () => {
       providerDisposablesRef.current.forEach((provider) => provider.dispose());
       providerDisposablesRef.current = [];
+      const monaco = monacoRef.current;
+      const model = editorRef.current?.getModel();
+      if (monaco && model) {
+        monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
+      }
+      editorRef.current = null;
       monacoRef.current = null;
     },
     [],
@@ -284,6 +314,69 @@ function SqlEditorHost({ editor, errorDock }: SqlEditorHostProps) {
     };
   }, [editor.diagnostics, editor.value, isMonacoReady, shouldUseFallback]);
 
+  useEffect(() => {
+    const monaco = monacoRef.current;
+    const model = editorRef.current?.getModel();
+    if (!monaco || !model || !isMonacoReady || shouldUseFallback) return undefined;
+
+    if (!errorInsight) {
+      executionMarkerSqlRef.current = null;
+      previousErrorInsightRef.current = errorInsight;
+      monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
+      return undefined;
+    }
+
+    if (previousErrorInsightRef.current !== errorInsight) {
+      executionMarkerSqlRef.current = editor.value;
+      previousErrorInsightRef.current = errorInsight;
+    }
+
+    const token = errorInsight.likelyLocation?.token.trim();
+    const canShowExecutionMarker =
+      executionMarkerSqlRef.current === editor.value &&
+      Boolean(token) &&
+      (errorInsight.confidence === "high" || errorInsight.confidence === "medium");
+
+    if (!canShowExecutionMarker || !token) {
+      monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
+      return undefined;
+    }
+
+    const tokenStart = editor.value.toLowerCase().indexOf(token.toLowerCase());
+    if (tokenStart < 0) {
+      monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
+      return undefined;
+    }
+
+    const start = getEditorPosition(editor.value, tokenStart);
+    const end = getEditorPosition(editor.value, tokenStart + token.length);
+    const markerMessage = [
+      errorInsight.title || errorInsightCategoryLabels[errorInsight.category],
+      errorInsight.summary,
+      "See error dock below for details.",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const markers: MonacoEditor.IMarkerData[] = [
+      {
+        severity: monaco.MarkerSeverity.Error,
+        message: markerMessage,
+        source: "FiltraQueri SQL execution",
+        startLineNumber: start.lineNumber,
+        startColumn: start.column,
+        endLineNumber: end.lineNumber,
+        endColumn: Math.max(end.column, start.column + 1),
+      },
+    ];
+
+    monaco.editor.setModelMarkers(model, executionMarkerOwner, markers);
+
+    return () => {
+      monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
+    };
+  }, [editor.value, errorInsight, isMonacoReady, shouldUseFallback]);
+
   const configureMonaco: BeforeMount = (monaco) => {
     monaco.editor.defineTheme("filtraqueri-sql-dark", {
       base: "vs-dark",
@@ -308,6 +401,7 @@ function SqlEditorHost({ editor, errorDock }: SqlEditorHostProps) {
   const handleMount: OnMount = (monacoEditor, monaco) => {
     hasMountedMonacoRef.current = true;
     monacoRef.current = monaco;
+    editorRef.current = monacoEditor;
     setIsMonacoReady(true);
     monacoEditor.layout();
   };

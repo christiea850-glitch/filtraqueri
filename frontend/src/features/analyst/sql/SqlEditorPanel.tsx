@@ -368,6 +368,7 @@ function SqlEditorPanel({
 
       <SqlEditorHost
         editor={editor}
+        errorInsight={errorInsight}
         errorDock={errorInsight ? <SqlExecutionErrorDock insight={errorInsight} /> : null}
       />
 
