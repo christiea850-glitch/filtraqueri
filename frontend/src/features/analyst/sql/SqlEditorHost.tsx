@@ -413,12 +413,9 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
             Math.max(end.column, start.column + 1),
           ),
           options: {
-            className: "sql-execution-error-token-range",
-            inlineClassName: "sql-execution-error-token-inline",
             glyphMarginClassName: "sql-execution-error-glyph",
             glyphMarginHoverMessage: { value: markerMessage },
             hoverMessage: { value: markerMessage },
-            linesDecorationsClassName: "sql-execution-error-line-decoration",
             overviewRuler: {
               color: "#ef4444",
               position: monaco.editor.OverviewRulerLane.Right,

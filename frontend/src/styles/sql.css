@@ -3202,31 +3202,7 @@
 }
 
 
-/* T-11D-5A — Monaco execution errors use explicit red affordances. */
-.sql-monaco-editor .sql-execution-error-token-inline {
-  color: #fecaca !important;
-  text-decoration-line: underline;
-  text-decoration-style: wavy;
-  text-decoration-color: #ef4444;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-  border-bottom: 2px solid rgba(239, 68, 68, 0.85);
-  background: rgba(239, 68, 68, 0.18);
-}
-
-.sql-monaco-editor .sql-execution-error-token-range {
-  border-bottom: 2px solid rgba(239, 68, 68, 0.85);
-  background: rgba(239, 68, 68, 0.12);
-}
-
-.sql-monaco-editor .sql-execution-error-line-decoration {
-  width: 5px !important;
-  margin-left: 3px;
-  border-radius: 999px;
-  background: #ef4444;
-  box-shadow: 0 0 0 1px rgba(254, 202, 202, 0.92), 0 0 8px rgba(239, 68, 68, 0.82);
-}
-
+/* T-11D-5A — Monaco execution errors keep the editor text clean. */
 .sql-monaco-editor .sql-execution-error-glyph {
   position: relative;
 }
