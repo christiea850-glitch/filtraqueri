@@ -486,7 +486,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
         "editorBracketPairGuide.activeBackground5": "#00000000",
         "editorBracketPairGuide.activeBackground6": "#00000000",
         "editorError.foreground": "#ef4444",
-        "editorError.border": "#fecaca",
+        "editorOverviewRuler.errorForeground": "#00000000",
       },
     });
   };
