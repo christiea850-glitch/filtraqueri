@@ -118,6 +118,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
   const monacoRef = useRef<Monaco | null>(null);
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const executionMarkerSqlRef = useRef<string | null>(null);
+  const executionDecorationIdsRef = useRef<string[]>([]);
   const previousErrorInsightRef = useRef<SqlPreviewResult["errorInsight"] | undefined>(undefined);
   const providerDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
 
@@ -135,6 +136,12 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
       providerDisposablesRef.current = [];
       const monaco = monacoRef.current;
       const model = editorRef.current?.getModel();
+      if (editorRef.current) {
+        executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+          executionDecorationIdsRef.current,
+          [],
+        );
+      }
       if (monaco && model) {
         monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
       }
@@ -283,11 +290,13 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
     const monaco = monacoRef.current;
     if (!monaco || !isMonacoReady || shouldUseFallback) return undefined;
 
-    const models = monaco.editor.getModels();
-    const model = models.find((editorModel: MonacoEditor.ITextModel) => editorModel.getLanguageId() === "sql");
-    if (!model) return undefined;
+    const model = editorRef.current?.getModel();
+    if (!model || model.getLanguageId() !== "sql") return undefined;
 
-    const markers = editor.diagnostics.map((diagnostic) => {
+    const markerDiagnostics = editor.diagnostics.filter(
+      (diagnostic) => diagnostic.severity === "warning" || diagnostic.severity === "error",
+    );
+    const markers = markerDiagnostics.map((diagnostic) => {
       const start = getEditorPosition(editor.value, diagnostic.start);
       const end = getEditorPosition(editor.value, diagnostic.end);
 
@@ -295,9 +304,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
         severity:
           diagnostic.severity === "error"
             ? monaco.MarkerSeverity.Error
-            : diagnostic.severity === "warning"
-            ? monaco.MarkerSeverity.Warning
-            : monaco.MarkerSeverity.Info,
+            : monaco.MarkerSeverity.Warning,
         message: diagnostic.message,
         source: "FiltraQueri SQL Intelligence",
         startLineNumber: start.lineNumber,
@@ -322,6 +329,10 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
     if (!errorInsight) {
       executionMarkerSqlRef.current = null;
       previousErrorInsightRef.current = errorInsight;
+      executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+        executionDecorationIdsRef.current,
+        [],
+      );
       monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
       return undefined;
     }
@@ -338,18 +349,38 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
       (errorInsight.confidence === "high" || errorInsight.confidence === "medium");
 
     if (!canShowExecutionMarker || !token) {
+      executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+        executionDecorationIdsRef.current,
+        [],
+      );
       monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
       return undefined;
     }
 
-    const tokenStart = editor.value.toLowerCase().indexOf(token.toLowerCase());
-    if (tokenStart < 0) {
+    const likelyStart = errorInsight.likelyLocation?.start;
+    const likelyEnd = errorInsight.likelyLocation?.end;
+    const hasLocationRange =
+      typeof likelyStart === "number" &&
+      typeof likelyEnd === "number" &&
+      likelyStart >= 0 &&
+      likelyEnd > likelyStart &&
+      likelyEnd <= editor.value.length;
+    const tokenStart = hasLocationRange
+      ? likelyStart
+      : editor.value.toLowerCase().indexOf(token.toLowerCase());
+    const tokenEnd = hasLocationRange ? likelyEnd : tokenStart + token.length;
+
+    if (tokenStart < 0 || tokenEnd <= tokenStart) {
+      executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+        executionDecorationIdsRef.current,
+        [],
+      );
       monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
       return undefined;
     }
 
     const start = getEditorPosition(editor.value, tokenStart);
-    const end = getEditorPosition(editor.value, tokenStart + token.length);
+    const end = getEditorPosition(editor.value, tokenEnd);
     const markerMessage = [
       errorInsight.title || errorInsightCategoryLabels[errorInsight.category],
       errorInsight.summary,
@@ -371,8 +402,38 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
     ];
 
     monaco.editor.setModelMarkers(model, executionMarkerOwner, markers);
+    executionDecorationIdsRef.current = editorRef.current.deltaDecorations(
+      executionDecorationIdsRef.current,
+      [
+        {
+          range: new monaco.Range(
+            start.lineNumber,
+            start.column,
+            end.lineNumber,
+            Math.max(end.column, start.column + 1),
+          ),
+          options: {
+            className: "sql-execution-error-token-range",
+            inlineClassName: "sql-execution-error-token-inline",
+            glyphMarginClassName: "sql-execution-error-glyph",
+            glyphMarginHoverMessage: { value: markerMessage },
+            hoverMessage: { value: markerMessage },
+            linesDecorationsClassName: "sql-execution-error-line-decoration",
+            overviewRuler: {
+              color: "#ef4444",
+              position: monaco.editor.OverviewRulerLane.Right,
+            },
+            stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+          },
+        },
+      ],
+    );
 
     return () => {
+      executionDecorationIdsRef.current = editorRef.current?.deltaDecorations(
+        executionDecorationIdsRef.current,
+        [],
+      ) || [];
       monaco.editor.setModelMarkers(model, executionMarkerOwner, []);
     };
   }, [editor.value, errorInsight, isMonacoReady, shouldUseFallback]);
@@ -394,6 +455,8 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
         "editorCursor.foreground": "#bfdbfe",
         "editor.selectionBackground": "#1d4ed866",
         "editor.lineHighlightBackground": "#1e293b88",
+        "editorError.foreground": "#ef4444",
+        "editorError.border": "#fecaca",
       },
     });
   };
@@ -429,6 +492,7 @@ function SqlEditorHost({ editor, errorDock, errorInsight }: SqlEditorHostProps) 
                 fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
                 fontSize: 14,
                 lineHeight: 24,
+                glyphMargin: true,
                 minimap: { enabled: false },
                 padding: { top: 16, bottom: 16 },
                 quickSuggestions: true,

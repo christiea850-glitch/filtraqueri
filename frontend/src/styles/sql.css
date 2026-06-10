@@ -3201,6 +3201,56 @@
   color: #fee2e2;
 }
 
+
+/* T-11D-5A — Monaco execution errors use explicit red affordances. */
+.sql-monaco-editor .sql-execution-error-token-inline {
+  color: #fecaca !important;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #ef4444;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  border-bottom: 2px solid rgba(239, 68, 68, 0.85);
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.sql-monaco-editor .sql-execution-error-token-range {
+  border-bottom: 2px solid rgba(239, 68, 68, 0.85);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.sql-monaco-editor .sql-execution-error-line-decoration {
+  width: 5px !important;
+  margin-left: 3px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px rgba(254, 202, 202, 0.92), 0 0 8px rgba(239, 68, 68, 0.82);
+}
+
+.sql-monaco-editor .sql-execution-error-glyph {
+  position: relative;
+}
+
+.sql-monaco-editor .sql-execution-error-glyph::before {
+  content: "!";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(127, 29, 29, 0.9), 0 0 10px rgba(239, 68, 68, 0.85);
+}
+
 .sql-execution-error-details pre {
   margin: 0;
   max-height: 120px;
