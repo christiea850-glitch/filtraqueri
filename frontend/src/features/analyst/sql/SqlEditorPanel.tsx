@@ -1,4 +1,9 @@
 import SqlEditorHost from "./SqlEditorHost";
+import {
+  getSqlDialectExecutionAdvisory,
+  SQL_DIALECT_EXECUTION_HELPER_TEXT,
+  SQL_DIALECT_SELECTOR_LABEL,
+} from "./sqlDialectExecutionGuidance";
 import type {
   SqlEditorInterface,
   SqlDialectContext,
@@ -165,6 +170,10 @@ function SqlEditorPanel({
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
+  const dialectExecutionAdvisory = getSqlDialectExecutionAdvisory(
+    dialectContext.selectedDialect,
+    dialectContext.selectedDialectProfile,
+  );
 
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -285,13 +294,13 @@ function SqlEditorPanel({
         </div>
         <div className="sql-actions">
           <label className="sql-dialect-selector">
-            <span>Dialect</span>
+            <span className="sql-dialect-selector-label">{SQL_DIALECT_SELECTOR_LABEL}</span>
             <select
               value={dialectContext.selectedDialect}
               onChange={(event) =>
                 dialectContext.onDialectChange(event.target.value as SqlDialectContext["selectedDialect"])
               }
-              aria-label="SQL dialect context"
+              aria-label="SQL guidance dialect"
             >
               {dialectContext.dialectOptions.map((dialect) => (
                 <option key={dialect.id} value={dialect.id}>
@@ -299,6 +308,7 @@ function SqlEditorPanel({
                 </option>
               ))}
             </select>
+            <small>{SQL_DIALECT_EXECUTION_HELPER_TEXT}</small>
           </label>
           <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
             Run query
@@ -331,6 +341,16 @@ function SqlEditorPanel({
         >
           <strong>Tab source differs from executable source.</strong>
           <span>{sourceMismatchWarning}</span>
+        </div>
+      )}
+
+      {dialectExecutionAdvisory && (
+        <div
+          className="sql-dialect-execution-advisory"
+          role="status"
+          aria-live="polite"
+        >
+          {dialectExecutionAdvisory}
         </div>
       )}
 

@@ -435,7 +435,7 @@ function SqlTemplateCard({
             })
           }
         >
-          Use template
+          Insert example
         </button>
       </div>
     </article>
@@ -491,7 +491,7 @@ function SqlTemplateRecommendationCard({
           })
         }
       >
-        {recommendation.kind === "report" ? "Use report" : "Use template"}
+        {recommendation.kind === "report" ? "Use report" : "Insert example"}
       </button>
     </article>
   );
