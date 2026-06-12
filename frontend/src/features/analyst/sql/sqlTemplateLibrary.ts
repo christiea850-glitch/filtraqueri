@@ -57,9 +57,63 @@ export type SqlAssistantGenerationContext = {
 
 const fallbackColumn = "column_name";
 const fallbackTable = "other_table";
-const commonSqlReviewLabel = "Common SQL; review dialect";
-const limitSyntaxReviewLabel = "DuckDB/MariaDB LIMIT style";
+const commonSqlReviewLabel = "Common SQL · review before running";
+const limitSyntaxReviewLabel = "Runs in DuckDB";
 const dialectReviewLabel = "Review dialect before running";
+
+const sqlAssistantDialectDisplayNames: Record<
+  SqlDialectId | SqlAssistantFutureDialectId,
+  string
+> = {
+  duckdb: "DuckDB",
+  mariadb: "MariaDB",
+  oracle: "Oracle",
+  postgresql: "PostgreSQL",
+  mysql: "MySQL",
+  sqlserver: "SQL Server",
+  sqlite: "SQLite",
+};
+
+const hasOracleFetchFirstLimit = (sql: string) =>
+  /\bFETCH\s+FIRST\s+\d+\s+ROWS?\s+ONLY\b/i.test(sql);
+
+const hasLimitClause = (sql: string) => /\bLIMIT\s+\d+\b/i.test(sql);
+
+const formatDialectExampleLabel = (dialects: Array<SqlDialectId | SqlAssistantFutureDialectId>) => {
+  if (dialects.includes("oracle")) return "Oracle example · may need conversion";
+
+  const displayNames = dialects
+    .map((dialect) => sqlAssistantDialectDisplayNames[dialect])
+    .filter(Boolean);
+
+  if (displayNames.length === 0) return dialectReviewLabel;
+
+  return `${displayNames.join("/")} example · review before running`;
+};
+
+export const deriveSqlTemplateRuntimeBadge = ({
+  sql,
+  dialects,
+  dialectLabel,
+}: Pick<SqlAssistantTemplate, "sql" | "dialects" | "dialectLabel">): string => {
+  if (/review dialect/i.test(dialectLabel)) return dialectReviewLabel;
+
+  if (hasOracleFetchFirstLimit(sql)) return "Oracle example · may need conversion";
+
+  if (dialects?.length) {
+    if (dialects.includes("duckdb")) return "Runs in DuckDB";
+
+    if (dialects.includes("mariadb") && hasLimitClause(sql)) {
+      return "DuckDB/MariaDB style";
+    }
+
+    return formatDialectExampleLabel(dialects);
+  }
+
+  if (hasLimitClause(sql)) return limitSyntaxReviewLabel;
+
+  return commonSqlReviewLabel;
+};
 
 const normalizeRequestText = (requestText = "") =>
   requestText.trim().replace(/\s+/g, " ").toLowerCase();
@@ -155,9 +209,7 @@ export const createSqlAssistantTemplates = (
   const sortableExpression = placeholderColumn(sortableColumn);
   const yearExpression = createDatePartExpression(selectedDialect, dateExpression, "year");
   const monthExpression = createDatePartExpression(selectedDialect, dateExpression, "month");
-  const selectedDialectLabel = getDialectProfile(selectedDialect).displayName;
-
-  return [
+  const templates: SqlAssistantTemplate[] = [
     {
       id: "preview-select",
       title: "Preview selected columns",
@@ -362,7 +414,7 @@ LIMIT 100;`,
       title: "Group by year",
       category: "Date/time",
       explanation: `Summarize records by year from ${labelColumn(dateColumn)}.`,
-      dialectLabel: selectedDialectLabel,
+      dialectLabel: getDialectProfile(selectedDialect).displayName,
       dialects: [selectedDialect],
       sql: `SELECT
   ${yearExpression} AS record_year,
@@ -376,7 +428,7 @@ ORDER BY record_year;`,
       title: "Group by month",
       category: "Date/time",
       explanation: `Summarize records by month from ${labelColumn(dateColumn)}.`,
-      dialectLabel: selectedDialectLabel,
+      dialectLabel: getDialectProfile(selectedDialect).displayName,
       dialects: [selectedDialect],
       sql: `SELECT
   ${monthExpression} AS record_month,
@@ -644,4 +696,9 @@ FROM ${tableName}
 LIMIT 100;`,
     },
   ];
+
+  return templates.map((template) => ({
+    ...template,
+    dialectLabel: deriveSqlTemplateRuntimeBadge(template),
+  }));
 };

@@ -407,6 +407,7 @@ function SqlTemplateCard({
   const isDifferentDialect =
     Boolean(template.dialects?.length) &&
     !template.dialects?.includes(selectedDialect);
+  const needsRuntimeReview = /review|conversion|example/i.test(template.dialectLabel);
 
   return (
     <article className="sql-assistant-card">
@@ -417,13 +418,19 @@ function SqlTemplateCard({
         </div>
         <div className="sql-assistant-card-badges">
           <em>{template.category}</em>
-          <em className={isDifferentDialect ? "is-dialect-note" : ""}>
+          <em className={needsRuntimeReview || isDifferentDialect ? "is-dialect-note" : ""}>
             {template.dialectLabel}
           </em>
         </div>
       </div>
       <div className="sql-assistant-card-foot">
-        {isDifferentDialect && <small>Different dialect example. Review syntax before running.</small>}
+        {needsRuntimeReview ? (
+          <small>Insert only; review syntax for DuckDB before running manually.</small>
+        ) : isDifferentDialect ? (
+          <small>Different SQL style. Review syntax before running manually.</small>
+        ) : (
+          <small>Insert only. Run Query remains manual.</small>
+        )}
         <button
           type="button"
           className="secondary-button"
