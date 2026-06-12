@@ -569,7 +569,7 @@ function TaskAssistShell({
                 onClick={() => insertRecommendedSql(topTemplateRecommendation)}
                 disabled={!onInsertSql || topTemplateRecommendation.support === "unsupported"}
               >
-                {topTemplateRecommendation.kind === "report" ? "Use report" : "Use template"}
+                {topTemplateRecommendation.kind === "report" ? "Insert report" : "Insert template"}
               </button>
               <button
                 type="button"
