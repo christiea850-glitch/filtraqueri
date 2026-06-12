@@ -28,6 +28,26 @@ const expect = (
   if (!condition) failureReasons.push(failureReason);
 };
 
+
+const expectComplexRefusal = (
+  sql: string,
+  toDialect: "oracle" | "duckdb" | "mariadb",
+  failureReasons: string[],
+) => {
+  const conversion = getDialectDraftConversion({
+    sql,
+    fromDialect: toDialect === "oracle" ? "duckdb" : "oracle",
+    toDialect,
+  });
+
+  expect(!conversion.canConvert, "Expected complex SQL to be rejected.", failureReasons);
+  expect(
+    conversion.warnings.includes("Complex SQL is not converted automatically yet."),
+    "Expected complex SQL refusal to include the complexity warning.",
+    failureReasons,
+  );
+};
+
 const runFixture = (
   name: string,
   fixture: () => string[],
@@ -141,6 +161,74 @@ export function runDialectDraftConversionFixtures(): DialectDraftConversionFixtu
       });
 
       expect(!conversion.canConvert, "Expected multiple statements to be rejected.", failureReasons);
+      return failureReasons;
+    }),
+    runFixture("WITH CTE LIMIT SQL is refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "WITH latest AS (SELECT * FROM uploaded_dataset) SELECT * FROM latest LIMIT 10;",
+        "oracle",
+        failureReasons,
+      );
+      return failureReasons;
+    }),
+    runFixture("Parenthesized SELECT with trailing LIMIT is refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "SELECT * FROM (SELECT * FROM uploaded_dataset) nested_rows LIMIT 10;",
+        "oracle",
+        failureReasons,
+      );
+      return failureReasons;
+    }),
+    runFixture("UNION with trailing LIMIT is refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "SELECT * FROM first_table UNION SELECT * FROM second_table LIMIT 10;",
+        "oracle",
+        failureReasons,
+      );
+      return failureReasons;
+    }),
+    runFixture("INTERSECT and EXCEPT SQL is refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "SELECT id FROM first_table INTERSECT SELECT id FROM second_table LIMIT 10;",
+        "oracle",
+        failureReasons,
+      );
+      expectComplexRefusal(
+        "SELECT id FROM first_table EXCEPT SELECT id FROM second_table LIMIT 10;",
+        "oracle",
+        failureReasons,
+      );
+      return failureReasons;
+    }),
+    runFixture("Multiple LIMIT clauses are refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "SELECT * FROM uploaded_dataset LIMIT 100 LIMIT 10;",
+        "oracle",
+        failureReasons,
+      );
+      return failureReasons;
+    }),
+    runFixture("Multiple FETCH FIRST clauses are refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "SELECT * FROM uploaded_dataset FETCH FIRST 100 ROWS ONLY FETCH FIRST 10 ROWS ONLY;",
+        "duckdb",
+        failureReasons,
+      );
+      return failureReasons;
+    }),
+    runFixture("Nested FETCH FIRST SQL is refused as complex", () => {
+      const failureReasons: string[] = [];
+      expectComplexRefusal(
+        "SELECT * FROM (SELECT * FROM uploaded_dataset FETCH FIRST 100 ROWS ONLY) nested_rows FETCH FIRST 10 ROWS ONLY;",
+        "duckdb",
+        failureReasons,
+      );
       return failureReasons;
     }),
     runFixture("Unsupported SQL is not converted", () => {
