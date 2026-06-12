@@ -1140,7 +1140,7 @@ const fromCompiledRecipe = (recipe: SqlReportRecipe): ReportOpportunity => {
     title: recipe.title,
     businessQuestion: recipe.businessPurpose,
     whyItMatters:
-      "Compiled multi-worksheet recipe — joins detected automatically and emitted as DuckDB SQL.",
+      "Compiled multi-worksheet recipe — joins detected automatically. Designed for DuckDB execution; review selected-dialect syntax before running.",
     domains: deriveCompiledRecipeDomains(recipe),
     confidence: ready ? 0.9 : 0.55,
     support: ready ? "can_generate_now" : "needs_missing_fields",
