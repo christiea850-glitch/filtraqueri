@@ -174,6 +174,10 @@ function SqlEditorPanel({
     dialectContext.selectedDialect,
     dialectContext.selectedDialectProfile,
   );
+  const draftConversionPreview = dialectContext.draftConversionPreview?.canConvert
+    ? dialectContext.draftConversionPreview
+    : null;
+  const dialectStyleName = dialectContext.selectedDialectProfile.displayName;
 
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -293,23 +297,43 @@ function SqlEditorPanel({
           )}
         </div>
         <div className="sql-actions">
-          <label className="sql-dialect-selector">
-            <span className="sql-dialect-selector-label">{SQL_DIALECT_SELECTOR_LABEL}</span>
-            <select
-              value={dialectContext.selectedDialect}
-              onChange={(event) =>
-                dialectContext.onDialectChange(event.target.value as SqlDialectContext["selectedDialect"])
-              }
-              aria-label="SQL guidance dialect"
-            >
-              {dialectContext.dialectOptions.map((dialect) => (
-                <option key={dialect.id} value={dialect.id}>
-                  {dialect.displayName}
-                </option>
-              ))}
-            </select>
-            <small>{SQL_DIALECT_EXECUTION_HELPER_TEXT}</small>
-          </label>
+          <div className="sql-dialect-control">
+            <label className="sql-dialect-selector">
+              <span className="sql-dialect-selector-label">{SQL_DIALECT_SELECTOR_LABEL}</span>
+              <select
+                value={dialectContext.selectedDialect}
+                onChange={(event) =>
+                  dialectContext.onDialectChange(event.target.value as SqlDialectContext["selectedDialect"])
+                }
+                aria-label="SQL guidance dialect"
+              >
+                {dialectContext.dialectOptions.map((dialect) => (
+                  <option key={dialect.id} value={dialect.id}>
+                    {dialect.displayName}
+                  </option>
+                ))}
+              </select>
+              <small>{SQL_DIALECT_EXECUTION_HELPER_TEXT}</small>
+            </label>
+            {draftConversionPreview && (
+              <div
+                className="sql-dialect-draft-conversion"
+                role="status"
+                aria-live="polite"
+              >
+                <span>{dialectStyleName} style is available for this draft.</span>
+                <small>Run Query still executes with DuckDB. This only changes the draft syntax.</small>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={dialectContext.onApplyDraftConversion}
+                  title={draftConversionPreview.summary}
+                >
+                  Apply {dialectStyleName} style
+                </button>
+              </div>
+            )}
+          </div>
           <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
             Run query
           </button>

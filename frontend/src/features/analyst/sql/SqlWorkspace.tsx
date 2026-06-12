@@ -383,6 +383,8 @@ function SqlWorkspace({
     sqlTabs,
     setSelectedDialect,
     editor,
+    draftConversionPreview,
+    applyDraftConversion,
     insertSql,
     loadDraft,
     renameDraft,
@@ -646,7 +648,9 @@ function SqlWorkspace({
             selectedDialect,
             selectedDialectProfile,
             dialectOptions,
+            draftConversionPreview,
             onDialectChange: setSelectedDialect,
+            onApplyDraftConversion: applyDraftConversion,
           }}
           workbookLabel={workbookLabel}
           activeSourceLabel={activeSourceLabel}

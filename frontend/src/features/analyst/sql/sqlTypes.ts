@@ -7,6 +7,7 @@ import type {
   SqlWorkspaceAnalysis,
 } from "../../sqlIntelligence";
 import type { AnalysisScopeSelection } from "../../workbook";
+import type { SqlDialectDraftConversion } from "./sqlDialectDraftConversion";
 import type { SqlExecutionErrorInsight } from "./sqlErrorFormatter";
 
 export type SqlExecutionStatus =
@@ -94,7 +95,9 @@ export type SqlDialectContext = {
   selectedDialect: SqlDialectId;
   selectedDialectProfile: SqlDialectProfile;
   dialectOptions: SqlDialectOption[];
+  draftConversionPreview: SqlDialectDraftConversion | null;
   onDialectChange: (dialect: SqlDialectId) => void;
+  onApplyDraftConversion: () => void;
 };
 
 export type SqlWorkspaceTabView = {

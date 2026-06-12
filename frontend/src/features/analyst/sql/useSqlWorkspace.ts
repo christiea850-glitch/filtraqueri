@@ -27,6 +27,7 @@ import {
   type SqlTabSourceContext,
 } from "./resolveSqlTabSourceContext";
 import { formatSqlExecutionError } from "./sqlErrorFormatter";
+import { getDialectDraftConversion } from "./sqlDialectDraftConversion";
 import { formatRowLimitClause } from "./sqlTemplateLibrary";
 import type {
   SqlEditorInterface,
@@ -310,6 +311,15 @@ function useSqlWorkspace(
       }),
     [activeTab.appliedScopeSelections, activeTabSourceContext, dataset, sqlDraft],
   );
+  const draftConversionPreview = useMemo(() => {
+    const preview = getDialectDraftConversion({
+      sql: sqlDraft,
+      fromDialect: selectedDialect,
+      toDialect: selectedDialect,
+    });
+
+    return preview.canConvert ? preview : null;
+  }, [selectedDialect, sqlDraft]);
   const characterCount = sqlDraft.trim().length;
   const sqlTabs = useMemo<SqlWorkspaceTabsInterface>(() => {
     const canCloseTabs = tabsState.tabs.length > 1;
@@ -461,6 +471,12 @@ function useSqlWorkspace(
     if (previewResult.errorInsight && sqlChanged) {
       clearExecutionError();
     }
+  };
+
+  const applyDraftConversion = () => {
+    if (!draftConversionPreview?.canConvert) return;
+
+    handleEditorChange(draftConversionPreview.convertedSql);
   };
 
   const insertSql = (
@@ -701,9 +717,11 @@ function useSqlWorkspace(
     selectedDialect,
     selectedDialectProfile,
     dialectOptions,
+    draftConversionPreview,
     sqlTabs,
     setSelectedDialect: updateSelectedDialect,
     editor,
+    applyDraftConversion,
     insertSql,
     saveDraft,
     clearDraft,
