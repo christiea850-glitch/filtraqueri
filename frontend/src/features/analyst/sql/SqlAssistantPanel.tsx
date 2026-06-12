@@ -35,6 +35,11 @@ import {
 } from "./reportIntelligencePlanner";
 import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGenerator";
 import {
+  SQL_REPORT_INSERT_ACTION_LABEL,
+  SQL_REPORT_MANUAL_RUN_COPY,
+  SQL_REPORT_TASK_PLACEHOLDER,
+} from "./sqlReportCopy";
+import {
   recommendSqlScope,
   type SqlScopeRecommendation,
 } from "./sqlScopeRecommender";
@@ -74,6 +79,7 @@ const categoryOrder: SqlTemplateCategory[] = [
 ];
 
 export type SqlAssistantMode = "templates" | "assist" | "recipes";
+
 const sqlAssistantModes: SqlAssistantMode[] = ["templates", "assist", "recipes"];
 const sqlAssistantModeLabels: Record<SqlAssistantMode, string> = {
   templates: "Template Library",
@@ -120,7 +126,7 @@ type SqlReportRecipeFilter =
 const modeCopy: Record<SqlAssistantMode, { title: string; description: string }> = {
   templates: {
     title: "Choose a template",
-    description: "Templates insert into Monaco for review. Run query remains manual.",
+    description: "Templates insert into Monaco for review. Run Query remains manual.",
   },
   assist: {
     title: "Complex SQL Assist",
@@ -128,7 +134,7 @@ const modeCopy: Record<SqlAssistantMode, { title: string; description: string }>
   },
   recipes: {
     title: "Report Recipes",
-    description: "Choose a report pattern, insert the SQL draft into Monaco, then run manually.",
+    description: "Choose a report pattern, insert the SQL draft into Monaco for review. Run Query remains manual.",
   },
 };
 
@@ -499,7 +505,7 @@ function SqlTemplateRecommendationCard({
           })
         }
       >
-        {recommendation.kind === "report" ? "Use report" : "Insert example"}
+        {recommendation.kind === "report" ? SQL_REPORT_INSERT_ACTION_LABEL : "Insert example"}
       </button>
     </article>
   );
@@ -655,9 +661,7 @@ function ReportOpportunityCard({
         </div>
       )}
       {ready ? (
-        <p className="sql-assistant-recipe-ready">
-          Draft available. Review runtime syntax before running. Insert only. Run Query remains manual.
-        </p>
+        <p className="sql-assistant-recipe-ready">{SQL_REPORT_MANUAL_RUN_COPY}</p>
       ) : (
         <p className="sql-assistant-recipe-blocked">
           Needs missing fields. {opportunity.missingRequirements.length > 0
@@ -678,7 +682,7 @@ function ReportOpportunityCard({
         }
         disabled={!ready}
       >
-        {ready ? "Use report" : "Needs missing fields"}
+        {ready ? SQL_REPORT_INSERT_ACTION_LABEL : "Needs missing fields"}
       </button>
     </article>
   );
@@ -795,7 +799,7 @@ function SqlReportRecipeCard({
     selectedDialect,
   });
   const readinessLine = recipe.sql
-    ? "Draft available. Review runtime syntax before running. Insert only. Run Query remains manual."
+    ? SQL_REPORT_MANUAL_RUN_COPY
     : recipe.supportSummary;
   const visibleDomains = recipe.domains?.slice(0, 2) || [];
   const hiddenDomainCount = Math.max(0, (recipe.domains?.length || 0) - visibleDomains.length);
@@ -875,7 +879,7 @@ function SqlReportRecipeCard({
           }
           disabled={!recipe.sql}
         >
-          {recipe.sql ? "Use report" : "Needs more structure"}
+          {recipe.sql ? SQL_REPORT_INSERT_ACTION_LABEL : "Needs more structure"}
         </button>
     </article>
   );
@@ -1242,7 +1246,7 @@ function SqlAssistantPanel({
               setHasRequestedRecommendation(false);
               setHasRequestedScopeRecommendation(false);
             }}
-            placeholder="Find leases expiring soon by property"
+            placeholder={SQL_REPORT_TASK_PLACEHOLDER}
             aria-label="Describe the SQL task for this tab"
           />
           <button
@@ -1411,7 +1415,7 @@ function SqlAssistantPanel({
             >
               Generate SQL
             </button>
-            <small>Generated SQL inserts into Monaco for review. Run query remains manual.</small>
+            <small>Generated SQL inserts into Monaco for review. Run Query remains manual.</small>
           </div>
 
           {generatedDrafts.length > 0 && (
@@ -1491,7 +1495,7 @@ function SqlAssistantPanel({
               />
             </label>
             <p className="sql-assistant-recipe-note">
-              Recipes combine patterns like grouping, ranking, thresholds, CASE checks, and joins into report-style drafts. They insert into Monaco only; blocked recipes show exactly what the active dataset is missing.
+              Recipes combine patterns like grouping, ranking, thresholds, CASE checks, and joins into report-style SQL drafts. Insert only. Run Query remains manual. Blocked recipes show exactly what the active dataset is missing.
             </p>
             <div className="sql-assistant-category-tabs" aria-label="Report recipe filters">
               {recipeFilters.map((filter) => (
@@ -1527,7 +1531,7 @@ function SqlAssistantPanel({
                 </div>
                 <p className="sql-assistant-recipe-note">
                   Dynamic business-report opportunities detected from the upload's
-                  worksheets, column kinds, and likely keys. Inserts into Monaco only.
+                  worksheets, column kinds, and likely keys. Insert only. Run Query remains manual.
                 </p>
                 {relevantOpportunities.length > 0 && (
                   <section

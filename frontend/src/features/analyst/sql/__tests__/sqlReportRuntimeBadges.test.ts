@@ -7,6 +7,11 @@
  */
 
 import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetTypes";
+import {
+  SQL_REPORT_INSERT_ACTION_LABEL,
+  SQL_REPORT_MANUAL_RUN_COPY,
+  SQL_REPORT_TASK_PLACEHOLDER,
+} from "../sqlReportCopy";
 import { createReportOpportunities } from "../reportIntelligencePlanner";
 import {
   createSqlReportRecipes,
@@ -123,6 +128,49 @@ export function runSqlReportRuntimeBadgeFixtures(): ReportRuntimeBadgeFixtureRep
 
       expect(badge !== "Oracle SQL", "Expected badge not to be the selected Oracle display name alone.", failureReasons);
       expect(badge !== "MariaDB", "Expected badge not to be the selected MariaDB display name alone.", failureReasons);
+    }),
+    runFixture("Report assistant copy uses insert-only manual-run wording", (failureReasons) => {
+      expect(
+        SQL_REPORT_INSERT_ACTION_LABEL === "Insert report",
+        `Expected report action label to be Insert report, got ${SQL_REPORT_INSERT_ACTION_LABEL}.`,
+        failureReasons,
+      );
+      expect(
+        /Insert only\. Run Query remains manual\./.test(SQL_REPORT_MANUAL_RUN_COPY),
+        "Expected report copy to state that insertion does not run the query.",
+        failureReasons,
+      );
+      expect(
+        !/Use report/.test(SQL_REPORT_INSERT_ACTION_LABEL),
+        "Expected legacy Use report action label to stay out of report surfaces.",
+        failureReasons,
+      );
+    }),
+    runFixture("Report assistant copy avoids native non-DuckDB execution promises", (failureReasons) => {
+      const copy = SQL_REPORT_MANUAL_RUN_COPY;
+
+      expect(
+        !/running in (Oracle|MariaDB|PostgreSQL)/i.test(copy),
+        "Expected report copy not to imply native Oracle, MariaDB, or PostgreSQL execution.",
+        failureReasons,
+      );
+      expect(
+        /Review runtime syntax before running/.test(copy),
+        "Expected report copy to ask for runtime syntax review before running.",
+        failureReasons,
+      );
+    }),
+    runFixture("Generic report assistant placeholder is dataset-neutral", (failureReasons) => {
+      expect(
+        SQL_REPORT_TASK_PLACEHOLDER === "Summarize records by category",
+        `Expected neutral generic placeholder, got ${SQL_REPORT_TASK_PLACEHOLDER}.`,
+        failureReasons,
+      );
+      expect(
+        !/lease|property|tenant|unit/i.test(SQL_REPORT_TASK_PLACEHOLDER),
+        "Expected generic assistant placeholder not to use property-domain wording.",
+        failureReasons,
+      );
     }),
     runFixture("Report badge derivation is dataset-agnostic", (failureReasons) => {
       const firstRecipe = createSqlReportRecipes(genericDataset, "duckdb").find(
