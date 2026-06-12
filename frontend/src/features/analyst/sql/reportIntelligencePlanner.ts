@@ -30,7 +30,7 @@ import {
   type WorksheetMetadata,
 } from "../../workbook";
 import { createMultiWorksheetRecipes } from "./multiWorksheetRecipes";
-import { formatRowLimitClause } from "./sqlTemplateLibrary";
+import { formatRowLimitClause, type SqlAssistantFutureDialectId } from "./sqlTemplateLibrary";
 import type { SqlReportRecipe } from "./sqlReportRecipes";
 
 // ---------- Public types ----------
@@ -82,8 +82,10 @@ export type ReportOpportunity = {
   optionalColumns: string[];
   /** Specific items the planner could not find when support is needs_missing_fields. */
   missingRequirements: string[];
-  /** DuckDB SQL draft. Only populated when support === "can_generate_now" AND method === "sql". */
+  /** SQL draft. Only populated when support === "can_generate_now" AND method === "sql". */
   sql: string | null;
+  /** Syntax/dialect style metadata for truthful runtime badges; not sent to APIs. */
+  dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
   /** When this opportunity is backed by a K9 compiled recipe, its recipe ID. */
   compiledRecipeId?: string;
 };
@@ -1154,6 +1156,7 @@ const fromCompiledRecipe = (recipe: SqlReportRecipe): ReportOpportunity => {
     optionalColumns: [],
     missingRequirements: recipe.missingRequirements,
     sql: recipe.sql,
+    dialects: recipe.dialects,
     compiledRecipeId: recipe.id,
   };
 };
@@ -1200,16 +1203,12 @@ export const createReportOpportunities = (
   opportunities.push(...buildCompletenessReport(surface, rowLimit));
   opportunities.push(...buildEntityActivity(surface, rowLimit));
 
-  // Dialect warning prefix when the user is targeting a non-DuckDB dialect.
-  if (selectedDialect !== "duckdb") {
-    return opportunities.map((opportunity) => ({
-      ...opportunity,
-      sql: opportunity.sql
-        ? `-- Drafted for DuckDB. Review and adjust for ${selectedDialect} syntax.\n${opportunity.sql}`
-        : opportunity.sql,
-    }));
-  }
-  return opportunities;
+  return opportunities.map((opportunity) => ({
+    ...opportunity,
+    dialects:
+      opportunity.dialects ||
+      (selectedDialect === "duckdb" ? ["duckdb"] : [selectedDialect]),
+  }));
 };
 
 // Exposed for diagnostics / SQL Context surfaces that want to inspect the

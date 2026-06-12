@@ -19,6 +19,7 @@ import {
 } from "./sqlTemplateLibrary";
 import {
   createSqlReportRecipes,
+  deriveSqlReportRuntimeBadge,
   type SqlReportRecipe,
   type SqlReportRecipeDomain,
 } from "./sqlReportRecipes";
@@ -537,11 +538,11 @@ function SqlScopeRecommendationCard({
 // aggregation/date-logic/anomaly tags, and a worksheet-usage chip strip.
 function ReportOpportunityCard({
   opportunity,
-  selectedDialectProfile,
+  selectedDialect,
   onInsertSql,
 }: {
   opportunity: ReportOpportunity;
-  selectedDialectProfile: SqlDialectProfile;
+  selectedDialect: SqlDialectId;
   onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const ready = opportunity.support === "can_generate_now" && Boolean(opportunity.sql);
@@ -569,6 +570,11 @@ function ReportOpportunityCard({
     python: "Python",
     future_optimization: "Future optimization",
   };
+  const runtimeBadge = deriveSqlReportRuntimeBadge({
+    sql: opportunity.sql,
+    dialects: opportunity.dialects,
+    selectedDialect,
+  });
   return (
     <article
       className={`sql-assistant-generated-card sql-assistant-opportunity-card is-${
@@ -580,7 +586,9 @@ function ReportOpportunityCard({
           <strong>{opportunity.title}</strong>
           <span>{opportunity.businessQuestion}</span>
         </div>
-        <em>{selectedDialectProfile.displayName}</em>
+        <em className={/review|conversion|example/i.test(runtimeBadge) ? "is-dialect-note" : ""}>
+          {runtimeBadge}
+        </em>
       </div>
       <div className="sql-assistant-opportunity-meta" aria-label="Opportunity metadata">
         {visibleDomains.map((domain: ReportOpportunityDomain) => (
@@ -648,7 +656,7 @@ function ReportOpportunityCard({
       )}
       {ready ? (
         <p className="sql-assistant-recipe-ready">
-          Can generate now. Safe draft below — insert into Monaco to review before running.
+          Draft available. Review runtime syntax before running. Insert only. Run Query remains manual.
         </p>
       ) : (
         <p className="sql-assistant-recipe-blocked">
@@ -768,11 +776,11 @@ function AISuggestedReportCard({
 
 function SqlReportRecipeCard({
   recipe,
-  selectedDialectProfile,
+  selectedDialect,
   onInsertSql,
 }: {
   recipe: SqlReportRecipe;
-  selectedDialectProfile: SqlDialectProfile;
+  selectedDialect: SqlDialectId;
   onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const importantWarnings = recipe.warnings.filter((warning) => {
@@ -781,8 +789,13 @@ function SqlReportRecipeCard({
       normalizedWarning.includes(requirement.toLowerCase()),
     );
   });
+  const runtimeBadge = deriveSqlReportRuntimeBadge({
+    sql: recipe.sql,
+    dialects: recipe.dialects,
+    selectedDialect,
+  });
   const readinessLine = recipe.sql
-    ? "Safe draft available. Insert into Monaco to review before running."
+    ? "Draft available. Review runtime syntax before running. Insert only. Run Query remains manual."
     : recipe.supportSummary;
   const visibleDomains = recipe.domains?.slice(0, 2) || [];
   const hiddenDomainCount = Math.max(0, (recipe.domains?.length || 0) - visibleDomains.length);
@@ -794,7 +807,9 @@ function SqlReportRecipeCard({
           <strong>{recipe.title}</strong>
           <span>{recipe.businessPurpose}</span>
         </div>
-        <em>{selectedDialectProfile.displayName}</em>
+        <em className={/review|conversion|example/i.test(runtimeBadge) ? "is-dialect-note" : ""}>
+          {runtimeBadge}
+        </em>
       </div>
       {visibleDomains.length > 0 && (
         <div className="sql-assistant-logic-list" aria-label="Recipe domains">
@@ -868,11 +883,11 @@ function SqlReportRecipeCard({
 
 function ReportOpportunityList({
   opportunities,
-  selectedDialectProfile,
+  selectedDialect,
   onInsertSql,
 }: {
   opportunities: ReportOpportunity[];
-  selectedDialectProfile: SqlDialectProfile;
+  selectedDialect: SqlDialectId;
   onInsertSql: SqlAssistantPanelProps["onInsertSql"];
 }) {
   const grouped = familyOrder
@@ -900,7 +915,7 @@ function ReportOpportunityList({
                 <ReportOpportunityCard
                   key={opportunity.id}
                   opportunity={opportunity}
-                  selectedDialectProfile={selectedDialectProfile}
+                  selectedDialect={selectedDialect}
                   onInsertSql={onInsertSql}
                 />
               ))}
@@ -911,7 +926,7 @@ function ReportOpportunityList({
             <ReportOpportunityCard
               key={opportunity.id}
               opportunity={opportunity}
-              selectedDialectProfile={selectedDialectProfile}
+              selectedDialect={selectedDialect}
               onInsertSql={onInsertSql}
             />
           ))
@@ -1527,7 +1542,7 @@ function SqlAssistantPanel({
                       <ReportOpportunityCard
                         key={opportunity.id}
                         opportunity={opportunity}
-                        selectedDialectProfile={selectedDialectProfile}
+                        selectedDialect={selectedDialect}
                         onInsertSql={onInsertSql}
                       />
                     ))}
@@ -1544,7 +1559,7 @@ function SqlAssistantPanel({
                     </div>
                     <ReportOpportunityList
                       opportunities={remainingOpportunities}
-                      selectedDialectProfile={selectedDialectProfile}
+                      selectedDialect={selectedDialect}
                       onInsertSql={onInsertSql}
                     />
                   </section>
@@ -1631,7 +1646,7 @@ function SqlAssistantPanel({
                   <SqlReportRecipeCard
                     key={recipe.id}
                     recipe={recipe}
-                    selectedDialectProfile={selectedDialectProfile}
+                    selectedDialect={selectedDialect}
                     onInsertSql={onInsertSql}
                   />
                 ))}
@@ -1645,7 +1660,7 @@ function SqlAssistantPanel({
                       <SqlReportRecipeCard
                         key={recipe.id}
                         recipe={recipe}
-                        selectedDialectProfile={selectedDialectProfile}
+                        selectedDialect={selectedDialect}
                         onInsertSql={onInsertSql}
                       />
                     ))}

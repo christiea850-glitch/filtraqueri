@@ -11,7 +11,10 @@ import {
 import {
   createSqlAssistantTemplates,
 } from "../../features/analyst/sql/sqlTemplateLibrary";
-import { createSqlReportRecipes } from "../../features/analyst/sql/sqlReportRecipes";
+import {
+  createSqlReportRecipes,
+  deriveSqlReportRuntimeBadge,
+} from "../../features/analyst/sql/sqlReportRecipes";
 import { createReportOpportunities } from "../../features/analyst/sql/reportIntelligencePlanner";
 import type { SqlWorkspaceTabSource } from "../../features/analyst/sql/sqlTabsTypes";
 import type { SqlDialectId } from "../../features/sqlIntelligence";
@@ -346,6 +349,13 @@ function TaskAssistShell({
     });
   }, [appliedScopeLabels, appliedTemplateDataset, isSqlTabControlled, selectedDialect, taskText]);
   const topTemplateRecommendation = templateRecommendations[0];
+  const topReportRuntimeBadge =
+    topTemplateRecommendation?.kind === "report"
+      ? deriveSqlReportRuntimeBadge({
+          sql: topTemplateRecommendation.sql,
+          selectedDialect,
+        })
+      : null;
   const topTemplateGroundingWarning = conciseGroundingMessage(
     topTemplateRecommendation?.warnings,
   );
@@ -538,6 +548,9 @@ function TaskAssistShell({
               <span className={`sql-grounding-badge ${topTemplateRecommendation.support || "supported"}`}>
                 {groundingSupportLabel(topTemplateRecommendation.support)}
               </span>
+              {topReportRuntimeBadge && (
+                <span className="sql-grounding-notice">{topReportRuntimeBadge}</span>
+              )}
               {onlyNeedsReviewTemplateRecommendations && (
                 <span className="sql-grounding-notice">{groundingEmptyCopy.needsReviewOnly}</span>
               )}

@@ -5,6 +5,7 @@ import {
 } from "./sqlSchemaHelpers";
 import {
   createSqlAssistantGenerationContext,
+  deriveSqlTemplateRuntimeBadge,
   formatRowLimitClause,
   type SqlAssistantFutureDialectId,
 } from "./sqlTemplateLibrary";
@@ -55,16 +56,6 @@ export type SqlReportRecipe = {
    * users see exactly which sheets are involved before inserting into Monaco.
    */
   worksheetsUsed?: string[];
-};
-
-const dialectDisplayNames: Record<string, string> = {
-  duckdb: "DuckDB",
-  mariadb: "MariaDB",
-  oracle: "Oracle SQL",
-  postgresql: "PostgreSQL",
-  mysql: "MySQL",
-  sqlserver: "SQL Server",
-  sqlite: "SQLite",
 };
 
 const normalizeText = (value: string) =>
@@ -230,14 +221,32 @@ const pickDateColumn = (columns: SchemaColumn[]) =>
   ) ||
   null;
 
+export const deriveSqlReportRuntimeBadge = ({
+  sql,
+  dialects,
+  selectedDialect,
+}: {
+  sql: string | null;
+  dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
+  selectedDialect?: SqlDialectId;
+}): string => {
+  if (!sql) return "Review syntax for DuckDB before running";
+
+  if (selectedDialect === "mariadb" && /\bLIMIT\s+\d+\b/i.test(sql)) {
+    return "DuckDB/MariaDB style";
+  }
+
+  return deriveSqlTemplateRuntimeBadge({
+    sql,
+    dialects,
+    dialectLabel: "Report SQL",
+  });
+};
+
 const dialectWarning = (selectedDialect: SqlDialectId) =>
   selectedDialect === "duckdb"
     ? []
-    : [
-        `Recipe SQL is drafted in DuckDB-safe syntax today. Review date, text, and row-limit syntax before running in ${
-          dialectDisplayNames[selectedDialect] || selectedDialect
-        }.`,
-      ];
+    : ["Review or convert for DuckDB execution before running."];
 
 const requireFields = (
   requirements: Array<[string, SchemaColumn | null]>,
