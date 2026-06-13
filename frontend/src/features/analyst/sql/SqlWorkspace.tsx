@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ActiveView, DatasetMetadata } from "../../dataset/datasetTypes";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import type { SqlWorkspaceMetadataSnapshot } from "../../sqlWorkspacePersistence";
@@ -12,6 +12,7 @@ import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPa
 import type { SqlAssistantMode } from "./SqlAssistantPanel";
 import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
+import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -412,6 +413,28 @@ function SqlWorkspace({
     dataset,
     sqlTabs.appliedScopeSelections,
   );
+  const businessSqlRenderPreview = useMemo(
+    () =>
+      createBusinessSqlRenderPreviewFromWorkspaceContext({
+        taskPrompt: sqlTabs.taskPrompt,
+        selectedGuidanceDialect: selectedDialect,
+        selectedScopeSelections: sqlTabs.selectedScopeSelections,
+        appliedScopeSelections: sqlTabs.appliedScopeSelections,
+        worksheets: dataset?.workbook_metadata?.worksheets || [],
+        acceptedRelationshipContracts:
+          dataset?.workbook_metadata?.acceptedRelationshipContracts || [],
+        activeSqlDraft: editor.value,
+      }).preview,
+    [
+      dataset?.workbook_metadata?.acceptedRelationshipContracts,
+      dataset?.workbook_metadata?.worksheets,
+      editor.value,
+      selectedDialect,
+      sqlTabs.appliedScopeSelections,
+      sqlTabs.selectedScopeSelections,
+      sqlTabs.taskPrompt,
+    ],
+  );
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
@@ -670,6 +693,7 @@ function SqlWorkspace({
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
           readinessReport={readinessReport}
           errorInsight={previewResult.errorInsight}
+          businessSqlRenderPreview={businessSqlRenderPreview}
         />
 
         {bottomTab && (

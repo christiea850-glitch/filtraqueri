@@ -1,4 +1,5 @@
 import SqlEditorHost from "./SqlEditorHost";
+import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import {
   getSqlDialectExecutionAdvisory,
   SQL_DIALECT_EXECUTION_HELPER_TEXT,
@@ -48,6 +49,7 @@ type SqlEditorPanelProps = {
   sourceMismatchWarning?: string | null;
   readinessReport?: SqlReadinessReport;
   errorInsight?: SqlPreviewResult["errorInsight"];
+  businessSqlRenderPreview?: BusinessSqlRenderPreview;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -167,6 +169,7 @@ function SqlEditorPanel({
   sourceMismatchWarning,
   readinessReport,
   errorInsight,
+  businessSqlRenderPreview,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -408,6 +411,79 @@ function SqlEditorPanel({
             </ul>
           )}
         </div>
+      )}
+
+      {businessSqlRenderPreview && (
+        <section
+          className={[
+            "business-sql-preview-panel",
+            `is-${businessSqlRenderPreview.status.replace("_", "-")}`,
+          ].join(" ")}
+          aria-label="Read-only Business SQL preview"
+        >
+          <div className="business-sql-preview-head">
+            <div>
+              <span>Business SQL preview</span>
+              <strong>{businessSqlRenderPreview.title}</strong>
+            </div>
+            <div className="business-sql-preview-badges" aria-label="Preview metadata">
+              <em>{businessSqlRenderPreview.status === "ready" ? "Ready" : businessSqlRenderPreview.status === "blocked" ? "Blocked" : "Needs review"}</em>
+              <em>DuckDB target</em>
+              {businessSqlRenderPreview.guidanceDialect && (
+                <em>{businessSqlRenderPreview.guidanceDialect.toUpperCase()} guidance</em>
+              )}
+            </div>
+          </div>
+          <p>{businessSqlRenderPreview.body}</p>
+
+          {businessSqlRenderPreview.sql ? (
+            <pre className="business-sql-preview-code" aria-label="Read-only rendered SQL">
+              {businessSqlRenderPreview.sql}
+            </pre>
+          ) : (
+            <div className="business-sql-preview-empty" aria-label="No rendered SQL">
+              No SQL is available for this preview yet.
+            </div>
+          )}
+
+          {(businessSqlRenderPreview.reasons.length > 0 ||
+            businessSqlRenderPreview.warnings.length > 0) && (
+            <div className="business-sql-preview-review-notes">
+              {businessSqlRenderPreview.reasons.length > 0 && (
+                <div>
+                  <strong>Reasons</strong>
+                  <ul>
+                    {businessSqlRenderPreview.reasons.slice(0, 4).map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {businessSqlRenderPreview.warnings.length > 0 && (
+                <div>
+                  <strong>Warnings</strong>
+                  <ul>
+                    {businessSqlRenderPreview.warnings.slice(0, 4).map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="business-sql-preview-actions" aria-label="Preview actions unavailable">
+            <button type="button" className="secondary-button" disabled>
+              Copy SQL not available yet
+            </button>
+            <button type="button" className="secondary-button" disabled>
+              Insert disabled
+            </button>
+            <button type="button" className="secondary-button" disabled>
+              Run disabled
+            </button>
+          </div>
+        </section>
       )}
 
       <SqlEditorHost
