@@ -104,7 +104,7 @@ export function getBusinessSqlRenderPreviewManualInsertState(
     return {
       canManuallyInsertSqlPreview: false,
       sql: null,
-      disabledReason: "Replace draft is disabled for now. Clear the editor before inserting preview SQL.",
+      disabledReason: "Editor already has SQL. Clear it before inserting preview SQL.",
     };
   }
 

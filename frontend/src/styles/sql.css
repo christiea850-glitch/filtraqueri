@@ -2827,6 +2827,13 @@
   gap: 8px;
 }
 
+.business-sql-preview-action-note {
+  margin: -2px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .business-sql-preview-feedback {
   margin: -2px 0 0;
   color: #b45309;

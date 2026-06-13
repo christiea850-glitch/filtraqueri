@@ -70,6 +70,13 @@ const expectInsertRunDisabled = (
   ...(result.preview.actions.canRunSql ? ["Run must be disabled."] : []),
 ];
 
+const expectRunDisabledMessagePresent = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] =>
+  result.preview.actions.canRunSql
+    ? ["Run preview action must stay disabled; manual Run Query remains separate."]
+    : [];
+
 const expectCopyEnabled = (
   result: BusinessSqlRenderPreviewWorkspaceResult,
 ): string[] => {
@@ -114,6 +121,7 @@ const expectManualInsertEnabled = (
     ...(result.preview.actions.canInsertSql
       ? ["Core preview canInsertSql must remain false."]
       : []),
+    ...expectRunDisabledMessagePresent(result),
   ];
 };
 
@@ -141,7 +149,7 @@ const expectManualInsertDisabled = (
 
 export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFixture[] = [
   {
-    name: "ready preview with empty draft allows manual insert",
+    name: "ready preview with empty draft exposes insert helper copy",
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "duckdb",
@@ -153,23 +161,36 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.actions.canCopySql ? [] : ["Expected copy eligibility for ready SQL."]),
       ...expectCopyEnabled(result),
       ...expectManualInsertEnabled(result),
+      ...expectRunDisabledMessagePresent(result),
       ...expectInsertRunDisabled(result),
     ],
   },
   {
-    name: "ready preview with non-empty different draft does not allow manual insert",
+    name: "ready preview with non-empty draft shows clear disabled insert reason",
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "duckdb",
       activeSqlDraft,
     }),
-    assert: (result) => [
-      ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
-      ...(result.preview.sql ? [] : ["Expected display SQL."]),
-      ...expectCopyEnabled(result),
-      ...expectManualInsertDisabled(result),
-      ...expectInsertRunDisabled(result),
-    ],
+    assert: (result) => {
+      const insertState = getBusinessSqlRenderPreviewManualInsertState(
+        result.preview,
+        result.activeSqlDraft,
+      );
+
+      return [
+        ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
+        ...(result.preview.sql ? [] : ["Expected display SQL."]),
+        ...expectCopyEnabled(result),
+        ...expectManualInsertDisabled(result),
+        ...(insertState.disabledReason ===
+        "Editor already has SQL. Clear it before inserting preview SQL."
+          ? []
+          : ["Expected clear non-empty draft disabled reason."]),
+        ...expectRunDisabledMessagePresent(result),
+        ...expectInsertRunDisabled(result),
+      ];
+    },
   },
   {
     name: "needs-review preview displays reasons and no SQL",
@@ -184,6 +205,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.reasons.length > 0 ? [] : ["Expected needs_review reasons."]),
       ...expectCopyDisabled(result),
       ...expectManualInsertDisabled(result),
+      ...expectRunDisabledMessagePresent(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -201,6 +223,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.reasons.length > 0 ? [] : ["Expected blocking reason."]),
       ...expectCopyDisabled(result),
       ...expectManualInsertDisabled(result),
+      ...expectRunDisabledMessagePresent(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -248,6 +271,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
           ? ["Core preview canInsertSql must remain false."]
           : []),
         ...(result.preview.actions.canRunSql ? ["Run must remain disabled."] : []),
+        ...expectRunDisabledMessagePresent(result),
       ];
     },
   },
@@ -268,6 +292,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.sql?.includes('"orders"') ? [] : ["Expected DuckDB SQL display."]),
       ...expectCopyEnabled(result),
       ...expectManualInsertDisabled(result),
+      ...expectRunDisabledMessagePresent(result),
       ...expectInsertRunDisabled(result),
     ],
   },

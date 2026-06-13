@@ -246,9 +246,14 @@ function SqlEditorPanel({
   const businessSqlInsertButtonLabel =
     businessSqlPreviewFeedback === "inserted"
       ? "Inserted into editor"
-      : businessSqlPreviewInsertState?.disabledReason?.startsWith("Replace draft")
+      : businessSqlPreviewInsertState?.disabledReason?.startsWith("Editor already has SQL")
         ? "Replace disabled for now"
-        : "Insert SQL";
+        : "Insert into editor";
+  const businessSqlPreviewActionHelper =
+    businessSqlPreviewInsertState?.canManuallyInsertSqlPreview
+      ? "Insert places this SQL in the editor only. Review it, then use the separate Run Query button when ready."
+      : businessSqlPreviewInsertState?.disabledReason ||
+        "Preview actions become available only when SQL is ready.";
   const dialectStyleName = dialectContext.selectedDialectProfile.displayName;
 
   return (
@@ -561,9 +566,10 @@ function SqlEditorPanel({
               {businessSqlInsertButtonLabel}
             </button>
             <button type="button" className="secondary-button" disabled>
-              Run disabled
+              Run preview disabled
             </button>
           </div>
+          <p className="business-sql-preview-action-note">{businessSqlPreviewActionHelper}</p>
           {businessSqlPreviewFeedback === "copy_failed" && (
             <p className="business-sql-preview-feedback" role="status">
               Copy failed. Select the preview SQL and copy it manually.
