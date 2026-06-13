@@ -1,5 +1,7 @@
+import { useEffect, useMemo, useState } from "react";
 import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
+import { getBusinessSqlRenderPreviewCopyState } from "./businessSqlRenderPreviewUiAdapter";
 import {
   getSqlDialectExecutionAdvisory,
   SQL_DIALECT_EXECUTION_HELPER_TEXT,
@@ -60,6 +62,8 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   success: "Query complete",
   error: "Query failed",
 };
+
+type BusinessSqlPreviewCopyFeedback = "idle" | "copied" | "failed";
 
 function SqlExecutionErrorDock({
   insight,
@@ -180,6 +184,40 @@ function SqlEditorPanel({
   const draftConversionPreview = dialectContext.draftConversionPreview?.canConvert
     ? dialectContext.draftConversionPreview
     : null;
+  const [businessSqlCopyFeedback, setBusinessSqlCopyFeedback] =
+    useState<BusinessSqlPreviewCopyFeedback>("idle");
+  const businessSqlPreviewCopyState = useMemo(
+    () =>
+      businessSqlRenderPreview
+        ? getBusinessSqlRenderPreviewCopyState(businessSqlRenderPreview)
+        : null,
+    [businessSqlRenderPreview],
+  );
+
+  useEffect(() => {
+    setBusinessSqlCopyFeedback("idle");
+  }, [businessSqlRenderPreview?.planId, businessSqlRenderPreview?.sql]);
+
+  useEffect(() => {
+    if (businessSqlCopyFeedback === "idle") return undefined;
+
+    const feedbackTimeout = window.setTimeout(() => {
+      setBusinessSqlCopyFeedback("idle");
+    }, 1600);
+
+    return () => window.clearTimeout(feedbackTimeout);
+  }, [businessSqlCopyFeedback]);
+
+  const copyBusinessSqlPreview = async () => {
+    if (!businessSqlPreviewCopyState?.canCopySql || !businessSqlPreviewCopyState.sql) return;
+
+    try {
+      await navigator.clipboard.writeText(businessSqlPreviewCopyState.sql);
+      setBusinessSqlCopyFeedback("copied");
+    } catch {
+      setBusinessSqlCopyFeedback("failed");
+    }
+  };
   const dialectStyleName = dialectContext.selectedDialectProfile.displayName;
 
   return (
@@ -472,9 +510,15 @@ function SqlEditorPanel({
             </div>
           )}
 
-          <div className="business-sql-preview-actions" aria-label="Preview actions unavailable">
-            <button type="button" className="secondary-button" disabled>
-              Copy SQL not available yet
+          <div className="business-sql-preview-actions" aria-label="Preview actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={copyBusinessSqlPreview}
+              disabled={!businessSqlPreviewCopyState?.canCopySql}
+              title={businessSqlPreviewCopyState?.disabledReason || "Copy preview SQL"}
+            >
+              {businessSqlCopyFeedback === "copied" ? "Copied" : "Copy SQL"}
             </button>
             <button type="button" className="secondary-button" disabled>
               Insert disabled
@@ -483,6 +527,11 @@ function SqlEditorPanel({
               Run disabled
             </button>
           </div>
+          {businessSqlCopyFeedback === "failed" && (
+            <p className="business-sql-preview-feedback" role="status">
+              Copy failed. Select the preview SQL and copy it manually.
+            </p>
+          )}
         </section>
       )}
 

@@ -2827,6 +2827,13 @@
   gap: 8px;
 }
 
+.business-sql-preview-feedback {
+  margin: -2px 0 0;
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .sql-workspace-tab-title {
   min-width: 0;
   overflow: hidden;

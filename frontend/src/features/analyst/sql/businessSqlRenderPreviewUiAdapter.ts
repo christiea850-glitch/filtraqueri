@@ -28,6 +28,46 @@ export type BusinessSqlRenderPreviewWorkspaceResult = {
   activeSqlDraft: string;
 };
 
+export type BusinessSqlRenderPreviewCopyState = {
+  canCopySql: boolean;
+  sql: string | null;
+  disabledReason: string | null;
+};
+
+export function getBusinessSqlRenderPreviewCopyState(
+  preview: BusinessSqlRenderPreview,
+): BusinessSqlRenderPreviewCopyState {
+  if (preview.status !== "ready") {
+    return {
+      canCopySql: false,
+      sql: null,
+      disabledReason: "SQL can be copied only from a ready preview.",
+    };
+  }
+
+  if (!preview.sql) {
+    return {
+      canCopySql: false,
+      sql: null,
+      disabledReason: "No rendered SQL is available to copy.",
+    };
+  }
+
+  if (!preview.actions.canCopySql) {
+    return {
+      canCopySql: false,
+      sql: null,
+      disabledReason: "Copy is not available for this preview.",
+    };
+  }
+
+  return {
+    canCopySql: true,
+    sql: preview.sql,
+    disabledReason: null,
+  };
+}
+
 export function createBusinessSqlRenderPreviewFromWorkspaceContext({
   taskPrompt,
   selectedGuidanceDialect,

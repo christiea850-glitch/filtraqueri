@@ -8,6 +8,7 @@
 import type { AcceptedRelationshipContract } from "../../../workbook";
 import {
   createBusinessSqlRenderPreviewFromWorkspaceContext,
+  getBusinessSqlRenderPreviewCopyState,
   type BusinessSqlRenderPreviewWorkspaceResult,
 } from "../businessSqlRenderPreviewUiAdapter";
 
@@ -66,6 +67,26 @@ const expectInsertRunDisabled = (
   ...(result.preview.actions.canRunSql ? ["Run must be disabled."] : []),
 ];
 
+const expectCopyEnabled = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] => {
+  const copyState = getBusinessSqlRenderPreviewCopyState(result.preview);
+  return [
+    ...(copyState.canCopySql ? [] : ["Copy should be enabled for ready SQL preview."]),
+    ...(copyState.sql === result.preview.sql ? [] : ["Copy SQL should match preview SQL."]),
+  ];
+};
+
+const expectCopyDisabled = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] => {
+  const copyState = getBusinessSqlRenderPreviewCopyState(result.preview);
+  return [
+    ...(copyState.canCopySql ? ["Copy should be disabled."] : []),
+    ...(copyState.sql === null ? [] : ["Disabled copy state must not expose SQL."]),
+  ];
+};
+
 export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFixture[] = [
   {
     name: "ready preview can display SQL but insert and run stay disabled",
@@ -78,6 +99,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
       ...(result.preview.sql ? [] : ["Expected display SQL."]),
       ...(result.preview.actions.canCopySql ? [] : ["Expected copy eligibility for ready SQL."]),
+      ...expectCopyEnabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -92,6 +114,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
       ...(result.preview.sql === null ? [] : ["Expected no SQL for needs_review preview."]),
       ...(result.preview.reasons.length > 0 ? [] : ["Expected needs_review reasons."]),
+      ...expectCopyDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -107,6 +130,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.status === "blocked" ? [] : ["Expected blocked preview."]),
       ...(result.preview.sql === null ? [] : ["Expected no SQL for blocked preview."]),
       ...(result.preview.reasons.length > 0 ? [] : ["Expected blocking reason."]),
+      ...expectCopyDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -137,6 +161,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.rendererTarget === "duckdb" ? [] : ["Expected DuckDB target."]),
       ...(result.preview.guidanceDialect === "oracle" ? [] : ["Expected Oracle guidance metadata."]),
       ...(result.preview.sql?.includes('"orders"') ? [] : ["Expected DuckDB SQL display."]),
+      ...expectCopyEnabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
