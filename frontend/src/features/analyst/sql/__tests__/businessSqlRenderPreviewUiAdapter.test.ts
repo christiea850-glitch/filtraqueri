@@ -7,8 +7,10 @@
 
 import type { AcceptedRelationshipContract } from "../../../workbook";
 import {
+  applyBusinessSqlRenderPreviewManualInsert,
   createBusinessSqlRenderPreviewFromWorkspaceContext,
   getBusinessSqlRenderPreviewCopyState,
+  getBusinessSqlRenderPreviewManualInsertState,
   type BusinessSqlRenderPreviewWorkspaceResult,
 } from "../businessSqlRenderPreviewUiAdapter";
 
@@ -59,6 +61,7 @@ const acceptedContract = (
 });
 
 const activeSqlDraft = 'SELECT * FROM "leases";';
+const emptySqlDraft = "";
 
 const expectInsertRunDisabled = (
   result: BusinessSqlRenderPreviewWorkspaceResult,
@@ -87,9 +90,74 @@ const expectCopyDisabled = (
   ];
 };
 
+const expectManualInsertEnabled = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] => {
+  const insertState = getBusinessSqlRenderPreviewManualInsertState(
+    result.preview,
+    result.activeSqlDraft,
+  );
+  const insertResult = applyBusinessSqlRenderPreviewManualInsert(
+    result.preview,
+    result.activeSqlDraft,
+  );
+
+  return [
+    ...(insertState.canManuallyInsertSqlPreview
+      ? []
+      : ["Manual insert should be enabled for ready SQL preview and empty draft."]),
+    ...(insertState.sql === result.preview.sql ? [] : ["Insert SQL should match preview SQL."]),
+    ...(insertResult.inserted ? [] : ["Expected manual insert result to be inserted."]),
+    ...(insertResult.activeSqlDraft === result.preview.sql
+      ? []
+      : ["Expected allowed manual insert to update the active draft to preview SQL."]),
+    ...(result.preview.actions.canInsertSql
+      ? ["Core preview canInsertSql must remain false."]
+      : []),
+  ];
+};
+
+const expectManualInsertDisabled = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] => {
+  const insertState = getBusinessSqlRenderPreviewManualInsertState(
+    result.preview,
+    result.activeSqlDraft,
+  );
+  const insertResult = applyBusinessSqlRenderPreviewManualInsert(
+    result.preview,
+    result.activeSqlDraft,
+  );
+
+  return [
+    ...(insertState.canManuallyInsertSqlPreview ? ["Manual insert should be disabled."] : []),
+    ...(insertState.sql === null ? [] : ["Disabled manual insert must not expose SQL."]),
+    ...(insertResult.inserted ? ["Disabled manual insert must not insert."] : []),
+    ...(insertResult.activeSqlDraft === result.activeSqlDraft
+      ? []
+      : ["Disabled manual insert must preserve the active draft."]),
+  ];
+};
+
 export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFixture[] = [
   {
-    name: "ready preview can display SQL but insert and run stay disabled",
+    name: "ready preview with empty draft allows manual insert",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "Count leases by status",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft: emptySqlDraft,
+    }),
+    assert: (result) => [
+      ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
+      ...(result.preview.sql ? [] : ["Expected display SQL."]),
+      ...(result.preview.actions.canCopySql ? [] : ["Expected copy eligibility for ready SQL."]),
+      ...expectCopyEnabled(result),
+      ...expectManualInsertEnabled(result),
+      ...expectInsertRunDisabled(result),
+    ],
+  },
+  {
+    name: "ready preview with non-empty different draft does not allow manual insert",
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "duckdb",
@@ -98,8 +166,8 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     assert: (result) => [
       ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
       ...(result.preview.sql ? [] : ["Expected display SQL."]),
-      ...(result.preview.actions.canCopySql ? [] : ["Expected copy eligibility for ready SQL."]),
       ...expectCopyEnabled(result),
+      ...expectManualInsertDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -115,6 +183,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.sql === null ? [] : ["Expected no SQL for needs_review preview."]),
       ...(result.preview.reasons.length > 0 ? [] : ["Expected needs_review reasons."]),
       ...expectCopyDisabled(result),
+      ...expectManualInsertDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -131,6 +200,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.sql === null ? [] : ["Expected no SQL for blocked preview."]),
       ...(result.preview.reasons.length > 0 ? [] : ["Expected blocking reason."]),
       ...expectCopyDisabled(result),
+      ...expectManualInsertDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -145,6 +215,41 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       result.activeSqlDraft === activeSqlDraft
         ? []
         : ["Expected active SQL draft to be preserved unchanged."],
+  },
+  {
+    name: "manual insert action does not mutate preview or core plan contract",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "Count leases by status",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft: emptySqlDraft,
+    }),
+    assert: (result) => {
+      const beforeSummary = [
+        result.preview.status,
+        result.preview.sql,
+        result.preview.actions.canCopySql,
+        result.preview.actions.canInsertSql,
+        result.preview.actions.canRunSql,
+      ].join("|");
+      applyBusinessSqlRenderPreviewManualInsert(result.preview, result.activeSqlDraft);
+      const afterSummary = [
+        result.preview.status,
+        result.preview.sql,
+        result.preview.actions.canCopySql,
+        result.preview.actions.canInsertSql,
+        result.preview.actions.canRunSql,
+      ].join("|");
+
+      return [
+        ...(beforeSummary === afterSummary
+          ? []
+          : ["Manual insert helper must not mutate the preview."]),
+        ...(result.preview.actions.canInsertSql
+          ? ["Core preview canInsertSql must remain false."]
+          : []),
+        ...(result.preview.actions.canRunSql ? ["Run must remain disabled."] : []),
+      ];
+    },
   },
   {
     name: "selected guidance dialect remains metadata only",
@@ -162,6 +267,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.guidanceDialect === "oracle" ? [] : ["Expected Oracle guidance metadata."]),
       ...(result.preview.sql?.includes('"orders"') ? [] : ["Expected DuckDB SQL display."]),
       ...expectCopyEnabled(result),
+      ...expectManualInsertDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },

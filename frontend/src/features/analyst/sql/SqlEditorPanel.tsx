@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
-import { getBusinessSqlRenderPreviewCopyState } from "./businessSqlRenderPreviewUiAdapter";
+import {
+  applyBusinessSqlRenderPreviewManualInsert,
+  getBusinessSqlRenderPreviewCopyState,
+  getBusinessSqlRenderPreviewManualInsertState,
+} from "./businessSqlRenderPreviewUiAdapter";
 import {
   getSqlDialectExecutionAdvisory,
   SQL_DIALECT_EXECUTION_HELPER_TEXT,
@@ -63,7 +67,7 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   error: "Query failed",
 };
 
-type BusinessSqlPreviewCopyFeedback = "idle" | "copied" | "failed";
+type BusinessSqlPreviewFeedback = "idle" | "copied" | "copy_failed" | "inserted";
 
 function SqlExecutionErrorDock({
   insight,
@@ -184,8 +188,8 @@ function SqlEditorPanel({
   const draftConversionPreview = dialectContext.draftConversionPreview?.canConvert
     ? dialectContext.draftConversionPreview
     : null;
-  const [businessSqlCopyFeedback, setBusinessSqlCopyFeedback] =
-    useState<BusinessSqlPreviewCopyFeedback>("idle");
+  const [businessSqlPreviewFeedback, setBusinessSqlPreviewFeedback] =
+    useState<BusinessSqlPreviewFeedback>("idle");
   const businessSqlPreviewCopyState = useMemo(
     () =>
       businessSqlRenderPreview
@@ -193,31 +197,58 @@ function SqlEditorPanel({
         : null,
     [businessSqlRenderPreview],
   );
+  const businessSqlPreviewInsertState = useMemo(
+    () =>
+      businessSqlRenderPreview
+        ? getBusinessSqlRenderPreviewManualInsertState(businessSqlRenderPreview, editor.value)
+        : null,
+    [businessSqlRenderPreview, editor.value],
+  );
 
   useEffect(() => {
-    setBusinessSqlCopyFeedback("idle");
+    setBusinessSqlPreviewFeedback("idle");
   }, [businessSqlRenderPreview?.planId, businessSqlRenderPreview?.sql]);
 
   useEffect(() => {
-    if (businessSqlCopyFeedback === "idle") return undefined;
+    if (businessSqlPreviewFeedback === "idle") return undefined;
 
     const feedbackTimeout = window.setTimeout(() => {
-      setBusinessSqlCopyFeedback("idle");
+      setBusinessSqlPreviewFeedback("idle");
     }, 1600);
 
     return () => window.clearTimeout(feedbackTimeout);
-  }, [businessSqlCopyFeedback]);
+  }, [businessSqlPreviewFeedback]);
 
   const copyBusinessSqlPreview = async () => {
     if (!businessSqlPreviewCopyState?.canCopySql || !businessSqlPreviewCopyState.sql) return;
 
     try {
       await navigator.clipboard.writeText(businessSqlPreviewCopyState.sql);
-      setBusinessSqlCopyFeedback("copied");
+      setBusinessSqlPreviewFeedback("copied");
     } catch {
-      setBusinessSqlCopyFeedback("failed");
+      setBusinessSqlPreviewFeedback("copy_failed");
     }
   };
+
+  const insertBusinessSqlPreview = () => {
+    if (!businessSqlRenderPreview) return;
+
+    const insertResult = applyBusinessSqlRenderPreviewManualInsert(
+      businessSqlRenderPreview,
+      editor.value,
+    );
+
+    if (!insertResult.inserted) return;
+
+    editor.onChange(insertResult.activeSqlDraft);
+    setBusinessSqlPreviewFeedback("inserted");
+  };
+  const businessSqlInsertButtonLabel =
+    businessSqlPreviewFeedback === "inserted"
+      ? "Inserted into editor"
+      : businessSqlPreviewInsertState?.disabledReason?.startsWith("Replace draft")
+        ? "Replace disabled for now"
+        : "Insert SQL";
   const dialectStyleName = dialectContext.selectedDialectProfile.displayName;
 
   return (
@@ -518,18 +549,29 @@ function SqlEditorPanel({
               disabled={!businessSqlPreviewCopyState?.canCopySql}
               title={businessSqlPreviewCopyState?.disabledReason || "Copy preview SQL"}
             >
-              {businessSqlCopyFeedback === "copied" ? "Copied" : "Copy SQL"}
+              {businessSqlPreviewFeedback === "copied" ? "Copied" : "Copy SQL"}
             </button>
-            <button type="button" className="secondary-button" disabled>
-              Insert disabled
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={insertBusinessSqlPreview}
+              disabled={!businessSqlPreviewInsertState?.canManuallyInsertSqlPreview}
+              title={businessSqlPreviewInsertState?.disabledReason || "Insert preview SQL into the empty editor"}
+            >
+              {businessSqlInsertButtonLabel}
             </button>
             <button type="button" className="secondary-button" disabled>
               Run disabled
             </button>
           </div>
-          {businessSqlCopyFeedback === "failed" && (
+          {businessSqlPreviewFeedback === "copy_failed" && (
             <p className="business-sql-preview-feedback" role="status">
               Copy failed. Select the preview SQL and copy it manually.
+            </p>
+          )}
+          {businessSqlPreviewFeedback === "inserted" && (
+            <p className="business-sql-preview-feedback" role="status">
+              Inserted into editor. Review the SQL before running it manually.
             </p>
           )}
         </section>
