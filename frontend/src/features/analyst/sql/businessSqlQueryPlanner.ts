@@ -1,5 +1,10 @@
+import type { SchemaColumn } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
-import type { AcceptedRelationshipContract } from "../../workbook";
+import type {
+  AcceptedRelationshipContract,
+  AnalysisScopeSelection,
+  WorksheetMetadata,
+} from "../../workbook";
 import {
   createEmptyBusinessSqlQueryPlan,
   type BusinessSqlJoinEdge,
@@ -15,16 +20,58 @@ import {
 export type PlanBusinessSqlQueryRequestInput = {
   prompt: string;
   selectedGuidanceDialect?: SqlDialectId;
+  selectedScopeSelections?: readonly AnalysisScopeSelection[];
+  appliedScopeSelections?: readonly AnalysisScopeSelection[];
+  worksheets?: readonly Pick<WorksheetMetadata, "tableName" | "schema">[];
+  entities?: readonly BusinessSqlAvailableEntityMetadata[];
   acceptedRelationshipContracts?: readonly AcceptedRelationshipContract[];
   readyRelationshipContracts?: readonly AcceptedRelationshipContract[];
   missingRelationships?: readonly BusinessSqlMissingRelationship[];
 };
 
-const normalizePrompt = (prompt: string): string =>
-  prompt.toLowerCase().replace(/\s+/g, " ").trim();
+export type BusinessSqlAvailableEntityMetadata = {
+  entity: string;
+  table?: string;
+  columns?: readonly Pick<SchemaColumn, "name">[];
+};
 
-const includesAny = (text: string, values: readonly string[]): boolean =>
-  values.some((value) => text.includes(value));
+type PlannerPattern =
+  | "leased_units_per_property"
+  | "leases_by_status"
+  | "orders_per_customer"
+  | "tickets_per_account";
+
+const normalizePrompt = (prompt: string): string =>
+  prompt
+    .toLowerCase()
+    .replace(/['']/g, "'")
+    .replace(/[^a-z0-9_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const sameName = (left: string | undefined, right: string | undefined): boolean =>
+  Boolean(left && right && left.trim().toLowerCase() === right.trim().toLowerCase());
+
+const tableForEntity = (
+  entity: string,
+  input: PlanBusinessSqlQueryRequestInput,
+): string => {
+  const directEntity = input.entities?.find((candidate) =>
+    sameName(candidate.entity, entity),
+  );
+  if (directEntity?.table) return directEntity.table;
+
+  const scopeTable = [
+    ...(input.appliedScopeSelections || []),
+    ...(input.selectedScopeSelections || []),
+  ].find((selection) => sameName(selection.tableName, entity));
+  if (scopeTable?.tableName) return scopeTable.tableName;
+
+  const worksheet = input.worksheets?.find((candidate) =>
+    sameName(candidate.tableName, entity),
+  );
+  return worksheet?.tableName || entity;
+};
 
 const rendererFor = (
   selectedGuidanceDialect: SqlDialectId | undefined,
@@ -352,51 +399,104 @@ const leasedUnitsPerPropertyPlan = (
   },
 });
 
+const detectPattern = (prompt: string): PlannerPattern | null => {
+  const text = normalizePrompt(prompt);
+  if (!text) return null;
+
+  const leasesByStatus =
+    /\b(count|counts|many|number)\b.*\bleases?\b.*\b(status|statuses)\b/.test(text) ||
+    /\blease status counts?\b/.test(text) ||
+    /\bleases?\b.*\b(each|by|per)\b.*\bstatus\b/.test(text);
+  if (leasesByStatus) return "leases_by_status";
+
+  const leasedUnitsPerProperty =
+    /\bleased units?\b.*\b(by|per|each)\b.*\bpropert/.test(text) ||
+    /\b(count|counts|many|number)\b.*\bleased units?\b.*\bpropert/.test(text) ||
+    (/\bunits?\b.*\b(each|by|per|in)\b.*\bpropert/.test(text) &&
+      /\b(leased|current tenants?|tenants?)\b/.test(text)) ||
+    (/\bcurrent tenants?\b.*\bpropert/.test(text) && /\bunits?\b/.test(text));
+  if (leasedUnitsPerProperty) return "leased_units_per_property";
+
+  const ordersPerCustomer =
+    /\borders?\b.*\b(per|by|each)\b.*\bcustomers?\b/.test(text) ||
+    /\b(count|counts|many|number)\b.*\borders?\b.*\bcustomers?\b/.test(text) ||
+    /\bhow many orders?\b.*\beach customers?\b/.test(text);
+  if (ordersPerCustomer) return "orders_per_customer";
+
+  const ticketsPerAccount =
+    /\btickets?\b.*\b(per|by|for each|each)\b.*\baccounts?\b/.test(text) ||
+    /\b(count|counts|many|number)\b.*\btickets?\b.*\baccounts?\b/.test(text) ||
+    /\bhow many tickets?\b.*\beach accounts?\b/.test(text);
+  if (ticketsPerAccount) return "tickets_per_account";
+
+  return null;
+};
+
 const selectInitialPlan = (
   prompt: string,
   selectedGuidanceDialect: SqlDialectId | undefined,
 ): BusinessSqlQueryPlan => {
-  const text = normalizePrompt(prompt);
+  const pattern = detectPattern(prompt);
 
-  if (
-    includesAny(text, ["leased units per property", "units in each property"]) ||
-    (includesAny(text, ["leased", "current tenant"]) &&
-      includesAny(text, ["unit", "units"]) &&
-      includesAny(text, ["property", "properties"]))
-  ) {
-    return leasedUnitsPerPropertyPlan(prompt, selectedGuidanceDialect);
+  switch (pattern) {
+    case "leased_units_per_property":
+      return leasedUnitsPerPropertyPlan(prompt, selectedGuidanceDialect);
+    case "leases_by_status":
+      return leasesByStatusPlan(prompt, selectedGuidanceDialect);
+    case "orders_per_customer":
+      return ordersPerCustomerPlan(prompt, selectedGuidanceDialect);
+    case "tickets_per_account":
+      return ticketsPerAccountPlan(prompt, selectedGuidanceDialect);
+    default:
+      return unsupportedPlan(prompt, selectedGuidanceDialect);
   }
+};
 
-  if (
-    includesAny(text, ["leases by status", "lease by status"]) ||
-    (includesAny(text, ["lease", "leases"]) && includesAny(text, ["status"]))
-  ) {
-    return leasesByStatusPlan(prompt, selectedGuidanceDialect);
-  }
+const resolvePlanTables = (
+  plan: BusinessSqlQueryPlan,
+  input: PlanBusinessSqlQueryRequestInput,
+): BusinessSqlQueryPlan => {
+  const entities = plan.entities.map((entity) => ({
+    ...entity,
+    table: tableForEntity(entity.entity, input),
+  }));
 
-  if (
-    includesAny(text, ["orders per customer", "orders by customer"]) ||
-    (includesAny(text, ["order", "orders"]) && includesAny(text, ["customer", "customers"]))
-  ) {
-    return ordersPerCustomerPlan(prompt, selectedGuidanceDialect);
-  }
-
-  if (
-    includesAny(text, ["tickets per account", "tickets by account"]) ||
-    (includesAny(text, ["ticket", "tickets"]) && includesAny(text, ["account", "accounts"]))
-  ) {
-    return ticketsPerAccountPlan(prompt, selectedGuidanceDialect);
-  }
-
-  return unsupportedPlan(prompt, selectedGuidanceDialect);
+  return {
+    ...plan,
+    entities,
+    metric: plan.metric
+      ? {
+          ...plan.metric,
+          table: plan.metric.entity
+            ? tableForEntity(plan.metric.entity, input)
+            : plan.metric.table,
+        }
+      : plan.metric,
+    groupings: plan.groupings.map((grouping) => ({
+      ...grouping,
+      table: tableForEntity(grouping.entity, input),
+    })),
+    filters: plan.filters.map((filter) => ({
+      ...filter,
+      table: filter.entity ? tableForEntity(filter.entity, input) : filter.table,
+    })),
+    joinPath: {
+      ...plan.joinPath,
+      edges: plan.joinPath.edges.map((edge) => ({
+        ...edge,
+        fromTable: tableForEntity(edge.fromEntity, input),
+        toTable: tableForEntity(edge.toEntity, input),
+      })),
+    },
+  };
 };
 
 export function planBusinessSqlQueryRequest(
   input: PlanBusinessSqlQueryRequestInput,
 ): BusinessSqlQueryPlan {
-  const initialPlan = selectInitialPlan(
-    input.prompt,
-    input.selectedGuidanceDialect,
+  const initialPlan = resolvePlanTables(
+    selectInitialPlan(input.prompt, input.selectedGuidanceDialect),
+    input,
   );
 
   if (!initialPlan.joinPath.required) {

@@ -59,7 +59,7 @@ const acceptedContract = (
   lastValidatedAt: "2026-01-01T00:00:00.000Z",
 });
 
-const fixtures: BusinessSqlQueryPlannerFixture[] = [
+export const BUSINESS_SQL_QUERY_PLANNER_FIXTURES: BusinessSqlQueryPlannerFixture[] = [
   {
     name: "leased units per property plans distinct units and required joins",
     plan: planBusinessSqlQueryRequest({
@@ -77,6 +77,31 @@ const fixtures: BusinessSqlQueryPlannerFixture[] = [
       }
       if (plan.joinPath.status !== "needs_review") failures.push("Expected review join path.");
       if (plan.renderer.sql) failures.push("Planner must not generate SQL.");
+      return failures;
+    },
+  },
+  {
+    name: "count leased units per property is not represented as leases by status",
+    plan: planBusinessSqlQueryRequest({
+      prompt: "count leased units per property",
+    }),
+    assert: (plan) => {
+      const failures: string[] = [];
+      if (plan.kind !== "multi_table_count_grouping") {
+        failures.push("Expected multi-table grouping.");
+      }
+      if (plan.metric?.kind !== "count_distinct" || plan.metric.entity !== "units") {
+        failures.push("Expected distinct-unit metric.");
+      }
+      if (plan.groupings[0]?.entity !== "properties") {
+        failures.push("Expected property grouping.");
+      }
+      if (plan.groupings.some((grouping) => grouping.field === "lease_status")) {
+        failures.push("Must not group leased units by lease_status.");
+      }
+      if (plan.metric?.entity === "leases") {
+        failures.push("Must not count leases for a leased-units prompt.");
+      }
       return failures;
     },
   },
@@ -168,7 +193,7 @@ const fixtures: BusinessSqlQueryPlannerFixture[] = [
 ];
 
 export function runBusinessSqlQueryPlannerFixtures(): BusinessSqlQueryPlannerFixtureReport {
-  const results = fixtures.map((fixture) => {
+  const results = BUSINESS_SQL_QUERY_PLANNER_FIXTURES.map((fixture) => {
     const failureReasons = fixture.assert(fixture.plan);
     return {
       name: fixture.name,
@@ -183,4 +208,8 @@ export function runBusinessSqlQueryPlannerFixtures(): BusinessSqlQueryPlannerFix
     passed: results.filter((result) => result.ok),
     failed: results.filter((result) => !result.ok),
   };
+}
+
+export function allBusinessSqlQueryPlannerFixturesPass(): boolean {
+  return runBusinessSqlQueryPlannerFixtures().failed.length === 0;
 }
