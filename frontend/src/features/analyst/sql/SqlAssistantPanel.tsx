@@ -49,6 +49,7 @@ import {
 } from "./sqlTemplateRecommender";
 import {
   createAdaptiveReportProposalFallback,
+  createTaskAssistAdaptiveReportProposalFallback,
   type AdaptiveReportProposalFallbackState,
 } from "./adaptiveReportProposalUiAdapter";
 import type { AdaptiveReportProposal } from "./adaptiveReportProposal";
@@ -520,8 +521,10 @@ const renderProposalValues = (values: readonly string[], fallback: string) =>
   values.length > 0 ? values.slice(0, 6).join(", ") : fallback;
 
 function AdaptiveReportProposalCard({
+  introCopy = "No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.",
   state,
 }: {
+  introCopy?: string;
   state: AdaptiveReportProposalFallbackState;
 }) {
   const proposal: AdaptiveReportProposal | null = state.proposal;
@@ -540,9 +543,7 @@ function AdaptiveReportProposalCard({
                 : "Unsupported"}
           </span>
         </div>
-        <span>
-          No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.
-        </span>
+        <span>{introCopy}</span>
         <span>{proposal.proposalNarrative}</span>
       </div>
       <dl>
@@ -1127,6 +1128,37 @@ function SqlAssistantPanel({
       }),
     [appliedScopeLabels, dataset, recommendations, selectedDialect, taskPrompt],
   );
+  const taskAssistRecommendations = useMemo(
+    () =>
+      recommendSqlTemplates({
+        taskPrompt: taskRequest,
+        dataset,
+        appliedScopeLabels,
+        templates,
+        recipes,
+        opportunities: reportOpportunities,
+      }),
+    [appliedScopeLabels, dataset, recipes, reportOpportunities, taskRequest, templates],
+  );
+  const taskAssistAdaptiveProposalFallback = useMemo(
+    () =>
+      createTaskAssistAdaptiveReportProposalFallback({
+        taskPrompt: taskRequest,
+        dataset,
+        selectedDialect,
+        appliedScopeLabels,
+        recommendations: taskAssistRecommendations,
+        generatedDraftCount: generatedDrafts.length,
+      }),
+    [
+      appliedScopeLabels,
+      dataset,
+      generatedDrafts.length,
+      selectedDialect,
+      taskAssistRecommendations,
+      taskRequest,
+    ],
+  );
   const onlyNeedsReviewRecommendations =
     recommendations.length > 0 &&
     recommendations.every((recommendation) => recommendation.support === "needs_review");
@@ -1600,6 +1632,18 @@ function SqlAssistantPanel({
                   </button>
                 </article>
               ))}
+            </div>
+          )}
+          {taskAssistAdaptiveProposalFallback.shouldShow && (
+            <div className="sql-template-recommendation-list" aria-label="Task Assist adaptive proposal">
+              <div className="sql-helper-section-label">
+                <span>Adaptive analysis proposal</span>
+                <small>Read-only</small>
+              </div>
+              <AdaptiveReportProposalCard
+                introCopy="No exact task template matched. FiltraQueri generated an adaptive analysis proposal from your question and dataset metadata."
+                state={taskAssistAdaptiveProposalFallback}
+              />
             </div>
           )}
         </section>

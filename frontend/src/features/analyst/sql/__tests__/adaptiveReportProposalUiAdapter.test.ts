@@ -9,6 +9,7 @@ import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetType
 import type { WorkbookMetadata, WorksheetMetadata } from "../../../workbook";
 import {
   createAdaptiveReportProposalFallback,
+  createTaskAssistAdaptiveReportProposalFallback,
   type AdaptiveReportProposalFallbackState,
 } from "../adaptiveReportProposalUiAdapter";
 import type { SqlTemplateRecommendation } from "../sqlTemplateRecommender";
@@ -157,6 +158,19 @@ const createState = (overrides: Partial<Parameters<typeof createAdaptiveReportPr
     ...overrides,
   });
 
+const createTaskAssistState = (
+  overrides: Partial<Parameters<typeof createTaskAssistAdaptiveReportProposalFallback>[0]> = {},
+) =>
+  createTaskAssistAdaptiveReportProposalFallback({
+    taskPrompt: "Count orders by customer",
+    dataset,
+    selectedDialect: "duckdb",
+    appliedScopeLabels: ["orders", "customers"],
+    recommendations: [],
+    generatedDraftCount: 0,
+    ...overrides,
+  });
+
 const expectDisabled = (state: AdaptiveReportProposalFallbackState): string[] => [
   ...(state.insertDisabled ? [] : ["Insert must remain disabled."]),
   ...(state.runDisabled ? [] : ["Run must remain disabled."]),
@@ -250,6 +264,75 @@ const fixtures: Fixture[] = [
     assert: (state) => [
       ...(JSON.stringify(state).includes("activeSqlDraft")
         ? ["Fallback state must not represent active editor draft."]
+        : []),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Task Assist no grounded match with prompt and scope shows adaptive proposal",
+    state: createTaskAssistState(),
+    assert: (state) => [
+      ...(state.shouldShow ? [] : ["Expected Task Assist adaptive fallback to show."]),
+      ...(state.reason === "available" ? [] : ["Expected Task Assist available reason."]),
+      ...(state.proposal ? [] : ["Expected Task Assist proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "existing grounded Task Assist recommendations suppress fallback",
+    state: createTaskAssistState({ recommendations: [staticRecommendation] }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Task Assist fallback must not show when grounded matches exist."] : []),
+      ...(state.reason === "has_static_matches" ? [] : ["Expected Task Assist static-match suppression reason."]),
+      ...(state.proposal === null ? [] : ["Task Assist matches must not become adaptive proposals."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "existing generated Task Assist drafts suppress fallback",
+    state: createTaskAssistState({ generatedDraftCount: 1 }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Task Assist fallback must not show when generated drafts exist."] : []),
+      ...(state.reason === "has_static_matches" ? [] : ["Expected generated draft suppression reason."]),
+      ...(state.proposal === null ? [] : ["Generated drafts must not become adaptive proposals."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Task Assist adaptive proposal exposes no SQL",
+    state: createTaskAssistState(),
+    assert: (state) => [
+      ...(state.proposal?.sql === null ? [] : ["Expected null SQL for Task Assist fallback."]),
+      ...(state.proposal?.renderer.status === "not_rendered" ? [] : ["Expected Task Assist not_rendered status."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Task Assist missing scope does not show misleading proposal",
+    state: createTaskAssistState({ appliedScopeLabels: [] }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Task Assist fallback must not show without scope."] : []),
+      ...(state.reason === "missing_scope" ? [] : ["Expected Task Assist missing_scope reason."]),
+      ...(state.proposal === null ? [] : ["Missing Task Assist scope must not expose proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Task Assist missing prompt does not show misleading proposal",
+    state: createTaskAssistState({ taskPrompt: "" }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Task Assist fallback must not show without prompt."] : []),
+      ...(state.reason === "missing_prompt" ? [] : ["Expected Task Assist missing_prompt reason."]),
+      ...(state.proposal === null ? [] : ["Missing Task Assist prompt must not expose proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Task Assist active editor draft is not represented or mutated",
+    state: createTaskAssistState(),
+    assert: (state) => [
+      ...(JSON.stringify(state).includes("activeSqlDraft")
+        ? ["Task Assist fallback state must not represent active editor draft."]
         : []),
       ...expectDisabled(state),
     ],

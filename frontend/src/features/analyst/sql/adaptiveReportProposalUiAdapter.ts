@@ -25,6 +25,14 @@ export type CreateAdaptiveReportProposalFallbackInput = {
   recommendations: readonly SqlTemplateRecommendation[];
 };
 
+export type CreateTaskAssistAdaptiveReportProposalFallbackInput = Omit<
+  CreateAdaptiveReportProposalFallbackInput,
+  "recommendations"
+> & {
+  recommendations: readonly SqlTemplateRecommendation[];
+  generatedDraftCount: number;
+};
+
 const normalize = (value: string): string =>
   value
     .toLowerCase()
@@ -172,4 +180,21 @@ export function createAdaptiveReportProposalFallback({
     insertDisabled: true,
     runDisabled: true,
   };
+}
+
+export function createTaskAssistAdaptiveReportProposalFallback({
+  generatedDraftCount,
+  ...input
+}: CreateTaskAssistAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
+  if (generatedDraftCount > 0) {
+    return {
+      shouldShow: false,
+      reason: "has_static_matches",
+      proposal: null,
+      insertDisabled: true,
+      runDisabled: true,
+    };
+  }
+
+  return createAdaptiveReportProposalFallback(input);
 }
