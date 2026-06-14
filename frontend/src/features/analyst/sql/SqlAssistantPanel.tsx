@@ -47,6 +47,11 @@ import {
   recommendSqlTemplates,
   type SqlTemplateRecommendation,
 } from "./sqlTemplateRecommender";
+import {
+  createAdaptiveReportProposalFallback,
+  type AdaptiveReportProposalFallbackState,
+} from "./adaptiveReportProposalUiAdapter";
+import type { AdaptiveReportProposal } from "./adaptiveReportProposal";
 
 type SqlAssistantPanelProps = {
   dataset: DatasetMetadata | null;
@@ -507,6 +512,102 @@ function SqlTemplateRecommendationCard({
       >
         {recommendation.kind === "report" ? SQL_REPORT_INSERT_ACTION_LABEL : "Insert example"}
       </button>
+    </article>
+  );
+}
+
+const renderProposalValues = (values: readonly string[], fallback: string) =>
+  values.length > 0 ? values.slice(0, 6).join(", ") : fallback;
+
+function AdaptiveReportProposalCard({
+  state,
+}: {
+  state: AdaptiveReportProposalFallbackState;
+}) {
+  const proposal: AdaptiveReportProposal | null = state.proposal;
+  if (!state.shouldShow || !proposal) return null;
+
+  return (
+    <article className="sql-template-recommendation-card sql-adaptive-proposal-card">
+      <div>
+        <div className="sql-template-recommendation-title-row">
+          <strong>{proposal.title}</strong>
+          <span className={`sql-grounding-badge ${proposal.support}`}>
+            {proposal.support === "supported"
+              ? "Proposal"
+              : proposal.support === "needs_review"
+                ? "Needs review"
+                : "Unsupported"}
+          </span>
+        </div>
+        <span>
+          No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.
+        </span>
+        <span>{proposal.proposalNarrative}</span>
+      </div>
+      <dl>
+        <div>
+          <dt>Entities</dt>
+          <dd>{renderProposalValues(proposal.entities.map((entity) => entity.label), "No entity binding yet")}</dd>
+        </div>
+        <div>
+          <dt>Metrics</dt>
+          <dd>{renderProposalValues(proposal.metrics.map((metric) => metric.label), "No metric selected")}</dd>
+        </div>
+        <div>
+          <dt>Groupings</dt>
+          <dd>{renderProposalValues(proposal.groupings.map((grouping) => grouping.label), "No grouping selected")}</dd>
+        </div>
+        <div>
+          <dt>Filters</dt>
+          <dd>{renderProposalValues(proposal.filters.map((filter) => filter.label), "No filters proposed")}</dd>
+        </div>
+        <div>
+          <dt>Join needs</dt>
+          <dd>
+            {renderProposalValues(
+              proposal.joinNeeds.map((join) =>
+                join.status === "not_required"
+                  ? "No join required"
+                  : `${join.leftEntity} to ${join.rightEntity}: ${join.status.replace("_", " ")}`,
+              ),
+              "No join metadata needed",
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Assumptions</dt>
+          <dd>{renderProposalValues(proposal.assumptions.map((item) => item.detail), "No assumptions recorded")}</dd>
+        </div>
+        <div>
+          <dt>Warnings</dt>
+          <dd>{renderProposalValues(proposal.warnings.map((warning) => warning.message), "No proposal warnings")}</dd>
+        </div>
+        <div>
+          <dt>Missing requirements</dt>
+          <dd>
+            {renderProposalValues(
+              proposal.missingRequirements.map((requirement) => requirement.message),
+              "No missing metadata requirements",
+            )}
+          </dd>
+        </div>
+      </dl>
+      <ul>
+        <li>SQL not generated.</li>
+        <li>Insert disabled.</li>
+        <li>Run disabled.</li>
+        <li>LLM fallback disabled in this version.</li>
+      </ul>
+      <div className="sql-assistant-card-foot">
+        <small>Read-only proposal. It is not a template, report draft, or SQL validation result.</small>
+        <button type="button" className="secondary-button" disabled={state.insertDisabled}>
+          Insert disabled
+        </button>
+        <button type="button" className="secondary-button" disabled={state.runDisabled}>
+          Run disabled
+        </button>
+      </div>
     </article>
   );
 }
@@ -1015,6 +1116,17 @@ function SqlAssistantPanel({
       }),
     [appliedScopeLabels, dataset, recipes, reportOpportunities, taskPrompt, templates],
   );
+  const adaptiveProposalFallback = useMemo(
+    () =>
+      createAdaptiveReportProposalFallback({
+        taskPrompt,
+        dataset,
+        selectedDialect,
+        appliedScopeLabels,
+        recommendations,
+      }),
+    [appliedScopeLabels, dataset, recommendations, selectedDialect, taskPrompt],
+  );
   const onlyNeedsReviewRecommendations =
     recommendations.length > 0 &&
     recommendations.every((recommendation) => recommendation.support === "needs_review");
@@ -1330,9 +1442,19 @@ function SqlAssistantPanel({
                 ))}
               </div>
             ) : (
-              <p className="sql-template-recommender-empty">
-                {groundingEmptyCopy.noSupportedMatches}
-              </p>
+              adaptiveProposalFallback.shouldShow ? (
+                <div className="sql-template-recommendation-list" aria-label="Adaptive report proposal">
+                  <div className="sql-helper-section-label">
+                    <span>Adaptive report proposal</span>
+                    <small>Read-only</small>
+                  </div>
+                  <AdaptiveReportProposalCard state={adaptiveProposalFallback} />
+                </div>
+              ) : (
+                <p className="sql-template-recommender-empty">
+                  {groundingEmptyCopy.noSupportedMatches}
+                </p>
+              )
             )
           )
         )}
