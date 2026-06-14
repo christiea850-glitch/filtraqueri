@@ -6,12 +6,19 @@ import {
   type AdaptiveReportProposal,
   type AdaptiveReportProposalRequest,
 } from "./adaptiveReportProposal";
+import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SqlTemplateRecommendation } from "./sqlTemplateRecommender";
 
 export type AdaptiveReportProposalFallbackState = {
   shouldShow: boolean;
-  reason: "available" | "has_static_matches" | "missing_prompt" | "missing_scope" | "missing_metadata";
+  reason:
+    | "available"
+    | "has_static_matches"
+    | "has_ready_preview"
+    | "missing_prompt"
+    | "missing_scope"
+    | "missing_metadata";
   proposal: AdaptiveReportProposal | null;
   insertDisabled: true;
   runDisabled: true;
@@ -31,6 +38,14 @@ export type CreateTaskAssistAdaptiveReportProposalFallbackInput = Omit<
 > & {
   recommendations: readonly SqlTemplateRecommendation[];
   generatedDraftCount: number;
+};
+
+export type CreateBusinessSqlPreviewAdaptiveReportProposalFallbackInput = {
+  taskPrompt: string;
+  dataset: DatasetMetadata | null;
+  selectedDialect: SqlDialectId;
+  appliedScopeSelections: readonly AnalysisScopeSelection[];
+  preview: BusinessSqlRenderPreview | null;
 };
 
 const normalize = (value: string): string =>
@@ -107,6 +122,42 @@ const resolveWorksheets = (
   ];
 };
 
+const unavailableState = (
+  reason: AdaptiveReportProposalFallbackState["reason"],
+): AdaptiveReportProposalFallbackState => ({
+  shouldShow: false,
+  reason,
+  proposal: null,
+  insertDisabled: true,
+  runDisabled: true,
+});
+
+const createAvailableState = ({
+  taskPrompt,
+  dataset,
+  selectedDialect,
+  appliedScopeSelections,
+}: {
+  taskPrompt: string;
+  dataset: DatasetMetadata;
+  selectedDialect: SqlDialectId;
+  appliedScopeSelections: readonly AnalysisScopeSelection[];
+}): AdaptiveReportProposalFallbackState => ({
+  shouldShow: true,
+  reason: "available",
+  proposal: proposeAdaptiveReport({
+    prompt: taskPrompt,
+    detectedIntent: detectBusinessIntent(taskPrompt),
+    selectedGuidanceDialect: selectedDialect,
+    appliedScopeSelections,
+    worksheets: resolveWorksheets(dataset),
+    acceptedRelationshipContracts:
+      dataset.workbook_metadata?.acceptedRelationshipContracts || [],
+  }),
+  insertDisabled: true,
+  runDisabled: true,
+});
+
 export function createAdaptiveReportProposalFallback({
   taskPrompt,
   dataset,
@@ -115,71 +166,32 @@ export function createAdaptiveReportProposalFallback({
   recommendations,
 }: CreateAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
   if (recommendations.length > 0) {
-    return {
-      shouldShow: false,
-      reason: "has_static_matches",
-      proposal: null,
-      insertDisabled: true,
-      runDisabled: true,
-    };
+    return unavailableState("has_static_matches");
   }
 
   if (!taskPrompt.trim()) {
-    return {
-      shouldShow: false,
-      reason: "missing_prompt",
-      proposal: null,
-      insertDisabled: true,
-      runDisabled: true,
-    };
+    return unavailableState("missing_prompt");
   }
 
   if (!dataset) {
-    return {
-      shouldShow: false,
-      reason: "missing_metadata",
-      proposal: null,
-      insertDisabled: true,
-      runDisabled: true,
-    };
+    return unavailableState("missing_metadata");
   }
 
   if (appliedScopeLabels.length === 0) {
-    return {
-      shouldShow: false,
-      reason: "missing_scope",
-      proposal: null,
-      insertDisabled: true,
-      runDisabled: true,
-    };
+    return unavailableState("missing_scope");
   }
 
   const appliedScopeSelections = resolveAppliedScopeSelections(dataset, appliedScopeLabels);
   if (appliedScopeSelections.length === 0) {
-    return {
-      shouldShow: false,
-      reason: "missing_scope",
-      proposal: null,
-      insertDisabled: true,
-      runDisabled: true,
-    };
+    return unavailableState("missing_scope");
   }
 
-  return {
-    shouldShow: true,
-    reason: "available",
-    proposal: proposeAdaptiveReport({
-      prompt: taskPrompt,
-      detectedIntent: detectBusinessIntent(taskPrompt),
-      selectedGuidanceDialect: selectedDialect,
-      appliedScopeSelections,
-      worksheets: resolveWorksheets(dataset),
-      acceptedRelationshipContracts:
-        dataset.workbook_metadata?.acceptedRelationshipContracts || [],
-    }),
-    insertDisabled: true,
-    runDisabled: true,
-  };
+  return createAvailableState({
+    taskPrompt,
+    dataset,
+    selectedDialect,
+    appliedScopeSelections,
+  });
 }
 
 export function createTaskAssistAdaptiveReportProposalFallback({
@@ -187,14 +199,39 @@ export function createTaskAssistAdaptiveReportProposalFallback({
   ...input
 }: CreateTaskAssistAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
   if (generatedDraftCount > 0) {
-    return {
-      shouldShow: false,
-      reason: "has_static_matches",
-      proposal: null,
-      insertDisabled: true,
-      runDisabled: true,
-    };
+    return unavailableState("has_static_matches");
   }
 
   return createAdaptiveReportProposalFallback(input);
+}
+
+export function createBusinessSqlPreviewAdaptiveReportProposalFallback({
+  taskPrompt,
+  dataset,
+  selectedDialect,
+  appliedScopeSelections,
+  preview,
+}: CreateBusinessSqlPreviewAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
+  if (preview?.status === "ready" && preview.sql) {
+    return unavailableState("has_ready_preview");
+  }
+
+  if (!taskPrompt.trim()) {
+    return unavailableState("missing_prompt");
+  }
+
+  if (!dataset) {
+    return unavailableState("missing_metadata");
+  }
+
+  if (appliedScopeSelections.length === 0) {
+    return unavailableState("missing_scope");
+  }
+
+  return createAvailableState({
+    taskPrompt,
+    dataset,
+    selectedDialect,
+    appliedScopeSelections,
+  });
 }

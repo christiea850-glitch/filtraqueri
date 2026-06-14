@@ -661,6 +661,7 @@ function SqlWorkspace({
         )}
 
         <SqlEditorPanel
+          dataset={dataset}
           editor={editor}
           executionStatus={editorStatus}
           characterCount={characterCount}

@@ -2841,6 +2841,57 @@
   font-weight: 700;
 }
 
+.business-sql-adaptive-proposal {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.business-sql-adaptive-proposal dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.business-sql-adaptive-proposal dl > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.business-sql-adaptive-proposal dt {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.business-sql-adaptive-proposal dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.business-sql-adaptive-proposal ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .sql-workspace-tab-title {
   min-width: 0;
   overflow: hidden;

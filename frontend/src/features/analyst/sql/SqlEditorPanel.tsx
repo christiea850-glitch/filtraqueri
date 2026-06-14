@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
+import {
+  createBusinessSqlPreviewAdaptiveReportProposalFallback,
+  type AdaptiveReportProposalFallbackState,
+} from "./adaptiveReportProposalUiAdapter";
 import {
   applyBusinessSqlRenderPreviewManualInsert,
   getBusinessSqlRenderPreviewEmptyState,
@@ -57,6 +62,7 @@ type SqlEditorPanelProps = {
   readinessReport?: SqlReadinessReport;
   errorInsight?: SqlPreviewResult["errorInsight"];
   businessSqlRenderPreview?: BusinessSqlRenderPreview;
+  dataset?: DatasetMetadata | null;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -69,6 +75,108 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
 };
 
 type BusinessSqlPreviewFeedback = "idle" | "copied" | "copy_failed" | "inserted";
+
+const renderAdaptiveProposalValues = (values: readonly string[], fallback: string) =>
+  values.length > 0 ? values.slice(0, 6).join(", ") : fallback;
+
+function BusinessSqlAdaptiveProposalSection({
+  state,
+}: {
+  state: AdaptiveReportProposalFallbackState;
+}) {
+  const proposal = state.proposal;
+  if (!state.shouldShow || !proposal) return null;
+
+  return (
+    <section className="business-sql-adaptive-proposal" aria-label="Adaptive analysis proposal">
+      <div className="business-sql-preview-head">
+        <div>
+          <span>Adaptive analysis proposal</span>
+          <strong>{proposal.title}</strong>
+        </div>
+        <div className="business-sql-preview-badges" aria-label="Adaptive proposal metadata">
+          <em>
+            {proposal.support === "supported"
+              ? "Proposal"
+              : proposal.support === "needs_review"
+                ? "Needs review"
+                : "Unsupported"}
+          </em>
+          <em>Read-only</em>
+        </div>
+      </div>
+      <p>
+        Business SQL could not be rendered yet. FiltraQueri generated an adaptive analysis proposal from your question and dataset metadata.
+      </p>
+      <p>{proposal.proposalNarrative}</p>
+      <dl>
+        <div>
+          <dt>Entities</dt>
+          <dd>{renderAdaptiveProposalValues(proposal.entities.map((entity) => entity.label), "No entity binding yet")}</dd>
+        </div>
+        <div>
+          <dt>Metrics</dt>
+          <dd>{renderAdaptiveProposalValues(proposal.metrics.map((metric) => metric.label), "No metric selected")}</dd>
+        </div>
+        <div>
+          <dt>Groupings</dt>
+          <dd>{renderAdaptiveProposalValues(proposal.groupings.map((grouping) => grouping.label), "No grouping selected")}</dd>
+        </div>
+        <div>
+          <dt>Filters</dt>
+          <dd>{renderAdaptiveProposalValues(proposal.filters.map((filter) => filter.label), "No filters proposed")}</dd>
+        </div>
+        <div>
+          <dt>Join needs</dt>
+          <dd>
+            {renderAdaptiveProposalValues(
+              proposal.joinNeeds.map((join) =>
+                join.status === "not_required"
+                  ? "No join required"
+                  : `${join.leftEntity} to ${join.rightEntity}: ${join.status.replace("_", " ")}`,
+              ),
+              "No join metadata needed",
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>Assumptions</dt>
+          <dd>{renderAdaptiveProposalValues(proposal.assumptions.map((item) => item.detail), "No assumptions recorded")}</dd>
+        </div>
+        <div>
+          <dt>Warnings</dt>
+          <dd>{renderAdaptiveProposalValues(proposal.warnings.map((warning) => warning.message), "No proposal warnings")}</dd>
+        </div>
+        <div>
+          <dt>Missing requirements</dt>
+          <dd>
+            {renderAdaptiveProposalValues(
+              proposal.missingRequirements.map((requirement) => requirement.message),
+              "No missing metadata requirements",
+            )}
+          </dd>
+        </div>
+      </dl>
+      <ul>
+        <li>SQL not generated.</li>
+        <li>Insert disabled for adaptive proposal.</li>
+        <li>Run disabled for adaptive proposal.</li>
+        <li>LLM fallback disabled in this version.</li>
+      </ul>
+      <div className="business-sql-preview-actions" aria-label="Adaptive proposal actions">
+        <button type="button" className="secondary-button" disabled={state.insertDisabled}>
+          Insert disabled
+        </button>
+        <button type="button" className="secondary-button" disabled={state.runDisabled}>
+          Run disabled
+        </button>
+      </div>
+      <p className="business-sql-preview-action-note">
+        Read-only proposal. It is not Business SQL, not a validation result for the editor draft, and not executable SQL.
+      </p>
+    </section>
+  );
+}
 
 function SqlExecutionErrorDock({
   insight,
@@ -179,6 +287,7 @@ function SqlEditorPanel({
   readinessReport,
   errorInsight,
   businessSqlRenderPreview,
+  dataset,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -215,6 +324,23 @@ function SqlEditorPanel({
           })
         : null,
     [businessSqlRenderPreview, editor.value, sqlTabs.activeTabCreatedFrom],
+  );
+  const businessSqlAdaptiveProposalFallback = useMemo(
+    () =>
+      createBusinessSqlPreviewAdaptiveReportProposalFallback({
+        taskPrompt: sqlTabs.taskPrompt,
+        dataset: dataset || null,
+        selectedDialect: dialectContext.selectedDialect,
+        appliedScopeSelections: sqlTabs.appliedScopeSelections,
+        preview: businessSqlRenderPreview || null,
+      }),
+    [
+      businessSqlRenderPreview,
+      dataset,
+      dialectContext.selectedDialect,
+      sqlTabs.appliedScopeSelections,
+      sqlTabs.taskPrompt,
+    ],
   );
 
   useEffect(() => {
@@ -593,6 +719,7 @@ function SqlEditorPanel({
               Inserted into editor. Review the SQL before running it manually.
             </p>
           )}
+          <BusinessSqlAdaptiveProposalSection state={businessSqlAdaptiveProposalFallback} />
         </section>
       )}
 

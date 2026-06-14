@@ -9,9 +9,11 @@ import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetType
 import type { WorkbookMetadata, WorksheetMetadata } from "../../../workbook";
 import {
   createAdaptiveReportProposalFallback,
+  createBusinessSqlPreviewAdaptiveReportProposalFallback,
   createTaskAssistAdaptiveReportProposalFallback,
   type AdaptiveReportProposalFallbackState,
 } from "../adaptiveReportProposalUiAdapter";
+import type { BusinessSqlRenderPreview } from "../businessSqlRenderPreview";
 import type { SqlTemplateRecommendation } from "../sqlTemplateRecommender";
 
 type FixtureResult = {
@@ -148,6 +150,25 @@ const staticRecommendation: SqlTemplateRecommendation = {
   support: "supported",
 };
 
+const businessSqlPreview = (
+  status: BusinessSqlRenderPreview["status"],
+): BusinessSqlRenderPreview => ({
+  status,
+  title: status === "ready" ? "SQL preview ready" : "SQL preview not ready",
+  body: status === "ready" ? "Rendered SQL is available." : "SQL cannot be previewed yet.",
+  sql: status === "ready" ? 'SELECT COUNT(*) AS row_count FROM "orders";' : null,
+  planId: `plan:${status}`,
+  rendererTarget: "duckdb",
+  guidanceDialect: "duckdb",
+  reasons: status === "ready" ? [] : ["Planner needs more metadata."],
+  warnings: [],
+  actions: {
+    canCopySql: status === "ready",
+    canInsertSql: false,
+    canRunSql: false,
+  },
+});
+
 const createState = (overrides: Partial<Parameters<typeof createAdaptiveReportProposalFallback>[0]> = {}) =>
   createAdaptiveReportProposalFallback({
     taskPrompt: "Count orders by customer",
@@ -157,6 +178,13 @@ const createState = (overrides: Partial<Parameters<typeof createAdaptiveReportPr
     recommendations: [],
     ...overrides,
   });
+
+const businessScopeSelections = worksheets.map((item) => ({
+  worksheetId: item.worksheetId,
+  sourceType: "original" as const,
+  tableName: item.tableName,
+  originalTableName: item.tableName,
+}));
 
 const createTaskAssistState = (
   overrides: Partial<Parameters<typeof createTaskAssistAdaptiveReportProposalFallback>[0]> = {},
@@ -168,6 +196,18 @@ const createTaskAssistState = (
     appliedScopeLabels: ["orders", "customers"],
     recommendations: [],
     generatedDraftCount: 0,
+    ...overrides,
+  });
+
+const createBusinessSqlPreviewState = (
+  overrides: Partial<Parameters<typeof createBusinessSqlPreviewAdaptiveReportProposalFallback>[0]> = {},
+) =>
+  createBusinessSqlPreviewAdaptiveReportProposalFallback({
+    taskPrompt: "Count orders by customer",
+    dataset,
+    selectedDialect: "duckdb",
+    appliedScopeSelections: businessScopeSelections,
+    preview: businessSqlPreview("needs_review"),
     ...overrides,
   });
 
@@ -333,6 +373,77 @@ const fixtures: Fixture[] = [
     assert: (state) => [
       ...(JSON.stringify(state).includes("activeSqlDraft")
         ? ["Task Assist fallback state must not represent active editor draft."]
+        : []),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL ready preview suppresses adaptive fallback",
+    state: createBusinessSqlPreviewState({ preview: businessSqlPreview("ready") }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Business SQL ready preview must suppress adaptive fallback."] : []),
+      ...(state.reason === "has_ready_preview" ? [] : ["Expected ready-preview suppression reason."]),
+      ...(state.proposal === null ? [] : ["Ready Business SQL must not become an adaptive proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL needs_review with prompt and scope shows adaptive proposal",
+    state: createBusinessSqlPreviewState({ preview: businessSqlPreview("needs_review") }),
+    assert: (state) => [
+      ...(state.shouldShow ? [] : ["Expected needs_review Business SQL fallback to show."]),
+      ...(state.reason === "available" ? [] : ["Expected Business SQL available reason."]),
+      ...(state.proposal ? [] : ["Expected Business SQL adaptive proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL blocked with prompt and scope shows adaptive proposal",
+    state: createBusinessSqlPreviewState({ preview: businessSqlPreview("blocked") }),
+    assert: (state) => [
+      ...(state.shouldShow ? [] : ["Expected blocked Business SQL fallback to show."]),
+      ...(state.reason === "available" ? [] : ["Expected blocked Business SQL available reason."]),
+      ...(state.proposal ? [] : ["Expected blocked Business SQL adaptive proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL missing prompt does not show misleading proposal",
+    state: createBusinessSqlPreviewState({ taskPrompt: "" }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Business SQL fallback must not show without prompt."] : []),
+      ...(state.reason === "missing_prompt" ? [] : ["Expected Business SQL missing_prompt reason."]),
+      ...(state.proposal === null ? [] : ["Missing Business SQL prompt must not expose proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL missing scope does not show misleading proposal",
+    state: createBusinessSqlPreviewState({ appliedScopeSelections: [] }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Business SQL fallback must not show without scope."] : []),
+      ...(state.reason === "missing_scope" ? [] : ["Expected Business SQL missing_scope reason."]),
+      ...(state.proposal === null ? [] : ["Missing Business SQL scope must not expose proposal."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL adaptive proposal exposes no SQL",
+    state: createBusinessSqlPreviewState(),
+    assert: (state) => [
+      ...(state.proposal?.sql === null ? [] : ["Expected null SQL for Business SQL adaptive fallback."]),
+      ...(state.proposal?.renderer.status === "not_rendered"
+        ? []
+        : ["Expected Business SQL adaptive fallback not_rendered status."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "Business SQL active editor draft is not represented or mutated",
+    state: createBusinessSqlPreviewState(),
+    assert: (state) => [
+      ...(JSON.stringify(state).includes("activeSqlDraft")
+        ? ["Business SQL fallback state must not represent active editor draft."]
         : []),
       ...expectDisabled(state),
     ],
