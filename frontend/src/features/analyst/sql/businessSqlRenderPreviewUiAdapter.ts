@@ -10,6 +10,16 @@ import {
   type BusinessSqlRenderPreview,
 } from "./businessSqlRenderPreview";
 import type { BusinessSqlMissingRelationship } from "./businessSqlJoinPathResolver";
+import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
+
+const BUSINESS_SQL_PREVIEW_SEPARATE_EDITOR_DRAFT_COPY =
+  "This preview is for deterministic Business SQL planning. The editor currently contains a separate SQL draft.";
+
+const BUSINESS_SQL_PREVIEW_EMPTY_COPY =
+  "Business SQL Preview has no generated preview for this task.";
+
+const BUSINESS_SQL_PREVIEW_EDITOR_DRAFT_FALLBACK_COPY =
+  "Business SQL Preview has no generated preview for this task. You can still review the SQL currently in the editor and run it manually.";
 
 export type BusinessSqlRenderPreviewWorkspaceInput = {
   taskPrompt: string;
@@ -21,11 +31,18 @@ export type BusinessSqlRenderPreviewWorkspaceInput = {
   readyRelationshipContracts?: readonly AcceptedRelationshipContract[];
   missingRelationships?: readonly BusinessSqlMissingRelationship[];
   activeSqlDraft?: string;
+  activeSqlDraftSource?: SqlWorkspaceTabCreatedFrom | null;
 };
 
 export type BusinessSqlRenderPreviewWorkspaceResult = {
   preview: BusinessSqlRenderPreview;
   activeSqlDraft: string;
+  activeSqlDraftSource: SqlWorkspaceTabCreatedFrom | null;
+};
+
+export type BusinessSqlRenderPreviewEmptyState = {
+  message: string;
+  hasSeparateEditorDraft: boolean;
 };
 
 export type BusinessSqlRenderPreviewCopyState = {
@@ -136,6 +153,41 @@ export function applyBusinessSqlRenderPreviewManualInsert(
   };
 }
 
+export function getBusinessSqlRenderPreviewEmptyState({
+  preview,
+  activeSqlDraft,
+  activeSqlDraftSource,
+}: {
+  preview: BusinessSqlRenderPreview;
+  activeSqlDraft: string;
+  activeSqlDraftSource?: SqlWorkspaceTabCreatedFrom | null;
+}): BusinessSqlRenderPreviewEmptyState {
+  const hasSeparateEditorDraft = Boolean(activeSqlDraft.trim());
+
+  if (preview.sql || !hasSeparateEditorDraft) {
+    return {
+      message: BUSINESS_SQL_PREVIEW_EMPTY_COPY,
+      hasSeparateEditorDraft: false,
+    };
+  }
+
+  if (
+    activeSqlDraftSource === "template" ||
+    activeSqlDraftSource === "report" ||
+    activeSqlDraftSource === "manual"
+  ) {
+    return {
+      message: BUSINESS_SQL_PREVIEW_SEPARATE_EDITOR_DRAFT_COPY,
+      hasSeparateEditorDraft: true,
+    };
+  }
+
+  return {
+    message: BUSINESS_SQL_PREVIEW_EDITOR_DRAFT_FALLBACK_COPY,
+    hasSeparateEditorDraft: true,
+  };
+}
+
 export function createBusinessSqlRenderPreviewFromWorkspaceContext({
   taskPrompt,
   selectedGuidanceDialect,
@@ -146,6 +198,7 @@ export function createBusinessSqlRenderPreviewFromWorkspaceContext({
   readyRelationshipContracts = [],
   missingRelationships = [],
   activeSqlDraft = "",
+  activeSqlDraftSource = null,
 }: BusinessSqlRenderPreviewWorkspaceInput): BusinessSqlRenderPreviewWorkspaceResult {
   const plan = planBusinessSqlQueryRequest({
     prompt: taskPrompt,
@@ -161,5 +214,6 @@ export function createBusinessSqlRenderPreviewFromWorkspaceContext({
   return {
     preview: createBusinessSqlRenderPreview(plan),
     activeSqlDraft,
+    activeSqlDraftSource,
   };
 }

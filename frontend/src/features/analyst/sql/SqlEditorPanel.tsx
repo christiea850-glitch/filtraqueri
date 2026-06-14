@@ -3,6 +3,7 @@ import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import {
   applyBusinessSqlRenderPreviewManualInsert,
+  getBusinessSqlRenderPreviewEmptyState,
   getBusinessSqlRenderPreviewCopyState,
   getBusinessSqlRenderPreviewManualInsertState,
 } from "./businessSqlRenderPreviewUiAdapter";
@@ -203,6 +204,17 @@ function SqlEditorPanel({
         ? getBusinessSqlRenderPreviewManualInsertState(businessSqlRenderPreview, editor.value)
         : null,
     [businessSqlRenderPreview, editor.value],
+  );
+  const businessSqlPreviewEmptyState = useMemo(
+    () =>
+      businessSqlRenderPreview
+        ? getBusinessSqlRenderPreviewEmptyState({
+            preview: businessSqlRenderPreview,
+            activeSqlDraft: editor.value,
+            activeSqlDraftSource: sqlTabs.activeTabCreatedFrom,
+          })
+        : null,
+    [businessSqlRenderPreview, editor.value, sqlTabs.activeTabCreatedFrom],
   );
 
   useEffect(() => {
@@ -516,7 +528,8 @@ function SqlEditorPanel({
             </pre>
           ) : (
             <div className="business-sql-preview-empty" aria-label="No rendered SQL">
-              No SQL is available for this preview yet.
+              {businessSqlPreviewEmptyState?.message ||
+                "Business SQL Preview has no generated preview for this task."}
             </div>
           )}
 

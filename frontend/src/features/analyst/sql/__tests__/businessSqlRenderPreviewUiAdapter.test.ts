@@ -9,6 +9,7 @@ import type { AcceptedRelationshipContract } from "../../../workbook";
 import {
   applyBusinessSqlRenderPreviewManualInsert,
   createBusinessSqlRenderPreviewFromWorkspaceContext,
+  getBusinessSqlRenderPreviewEmptyState,
   getBusinessSqlRenderPreviewCopyState,
   getBusinessSqlRenderPreviewManualInsertState,
   type BusinessSqlRenderPreviewWorkspaceResult,
@@ -61,7 +62,13 @@ const acceptedContract = (
 });
 
 const activeSqlDraft = 'SELECT * FROM "leases";';
+const reportSqlDraft = 'SELECT status, COUNT(*) AS lease_count FROM "leases" GROUP BY status;';
 const emptySqlDraft = "";
+const separateDraftCopy =
+  "This preview is for deterministic Business SQL planning. The editor currently contains a separate SQL draft.";
+const noPreviewCopy = "Business SQL Preview has no generated preview for this task.";
+const fallbackDraftCopy =
+  "Business SQL Preview has no generated preview for this task. You can still review the SQL currently in the editor and run it manually.";
 
 const expectInsertRunDisabled = (
   result: BusinessSqlRenderPreviewWorkspaceResult,
@@ -149,6 +156,33 @@ const expectManualInsertDisabled = (
 
 export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFixture[] = [
   {
+    name: "empty editor and no rendered business preview says no preview available",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft: emptySqlDraft,
+    }),
+    assert: (result) => {
+      const emptyState = getBusinessSqlRenderPreviewEmptyState({
+        preview: result.preview,
+        activeSqlDraft: result.activeSqlDraft,
+        activeSqlDraftSource: result.activeSqlDraftSource,
+      });
+
+      return [
+        ...(result.preview.sql === null ? [] : ["Expected no generated business preview SQL."]),
+        ...(emptyState.message === noPreviewCopy ? [] : ["Expected no-preview empty copy."]),
+        ...(emptyState.hasSeparateEditorDraft
+          ? ["Empty editor must not be described as a separate SQL draft."]
+          : []),
+        ...expectCopyDisabled(result),
+        ...expectManualInsertDisabled(result),
+        ...expectRunDisabledMessagePresent(result),
+        ...expectInsertRunDisabled(result),
+      ];
+    },
+  },
+  {
     name: "ready preview with empty draft exposes insert helper copy",
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
@@ -193,21 +227,90 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     },
   },
   {
-    name: "needs-review preview displays reasons and no SQL",
+    name: "editor SQL with needs-review preview explains separate editor draft",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "tickets per account",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft,
+      activeSqlDraftSource: "manual",
+    }),
+    assert: (result) => {
+      const emptyState = getBusinessSqlRenderPreviewEmptyState({
+        preview: result.preview,
+        activeSqlDraft: result.activeSqlDraft,
+        activeSqlDraftSource: result.activeSqlDraftSource,
+      });
+
+      return [
+        ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
+        ...(result.preview.sql === null ? [] : ["Expected no SQL for needs_review preview."]),
+        ...(result.preview.reasons.length > 0 ? [] : ["Expected needs_review reasons."]),
+        ...(emptyState.message === separateDraftCopy
+          ? []
+          : ["Expected separate editor draft clarification copy."]),
+        ...(emptyState.hasSeparateEditorDraft ? [] : ["Expected separate editor draft flag."]),
+        ...expectCopyDisabled(result),
+        ...expectManualInsertDisabled(result),
+        ...expectRunDisabledMessagePresent(result),
+        ...expectInsertRunDisabled(result),
+      ];
+    },
+  },
+  {
+    name: "report/template draft does not become Business SQL Preview SQL",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "tickets per account",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft: reportSqlDraft,
+      activeSqlDraftSource: "report",
+    }),
+    assert: (result) => {
+      const emptyState = getBusinessSqlRenderPreviewEmptyState({
+        preview: result.preview,
+        activeSqlDraft: result.activeSqlDraft,
+        activeSqlDraftSource: result.activeSqlDraftSource,
+      });
+
+      return [
+        ...(result.activeSqlDraft === reportSqlDraft
+          ? []
+          : ["Expected report SQL draft to remain active editor draft only."]),
+        ...(result.preview.sql === null
+          ? []
+          : ["Report/template draft must not be exposed as Business SQL Preview SQL."]),
+        ...(emptyState.message === separateDraftCopy
+          ? []
+          : ["Expected separate editor draft clarification for report/template draft."]),
+        ...expectCopyDisabled(result),
+        ...expectManualInsertDisabled(result),
+        ...expectRunDisabledMessagePresent(result),
+        ...expectInsertRunDisabled(result),
+      ];
+    },
+  },
+  {
+    name: "unknown draft source uses generic editor-review copy",
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "tickets per account",
       selectedGuidanceDialect: "duckdb",
       activeSqlDraft,
     }),
-    assert: (result) => [
-      ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
-      ...(result.preview.sql === null ? [] : ["Expected no SQL for needs_review preview."]),
-      ...(result.preview.reasons.length > 0 ? [] : ["Expected needs_review reasons."]),
-      ...expectCopyDisabled(result),
-      ...expectManualInsertDisabled(result),
-      ...expectRunDisabledMessagePresent(result),
-      ...expectInsertRunDisabled(result),
-    ],
+    assert: (result) => {
+      const emptyState = getBusinessSqlRenderPreviewEmptyState({
+        preview: result.preview,
+        activeSqlDraft: result.activeSqlDraft,
+        activeSqlDraftSource: result.activeSqlDraftSource,
+      });
+
+      return [
+        ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
+        ...(emptyState.message === fallbackDraftCopy ? [] : ["Expected generic fallback copy."]),
+        ...expectCopyDisabled(result),
+        ...expectManualInsertDisabled(result),
+        ...expectRunDisabledMessagePresent(result),
+        ...expectInsertRunDisabled(result),
+      ];
+    },
   },
   {
     name: "blocked preview displays blocking reason and no SQL",

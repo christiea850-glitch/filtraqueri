@@ -9,6 +9,7 @@ import type {
 import type { AnalysisScopeSelection } from "../../workbook";
 import type { SqlDialectDraftConversion } from "./sqlDialectDraftConversion";
 import type { SqlExecutionErrorInsight } from "./sqlErrorFormatter";
+import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
 
 export type SqlExecutionStatus =
   | "idle"
@@ -115,6 +116,7 @@ export type SqlWorkspaceTabsInterface = {
   activeTabTitle: string;
   activeTabSourceBadge: string | null;
   activeTabSourceKind: "Original" | "Cleaned" | null;
+  activeTabCreatedFrom: SqlWorkspaceTabCreatedFrom | null;
   selectedScopeSelections: AnalysisScopeSelection[];
   appliedScopeSelections: AnalysisScopeSelection[];
   taskPrompt: string;

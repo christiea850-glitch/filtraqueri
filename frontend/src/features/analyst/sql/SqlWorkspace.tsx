@@ -424,6 +424,7 @@ function SqlWorkspace({
         acceptedRelationshipContracts:
           dataset?.workbook_metadata?.acceptedRelationshipContracts || [],
         activeSqlDraft: editor.value,
+        activeSqlDraftSource: sqlTabs.activeTabCreatedFrom || undefined,
       }).preview,
     [
       dataset?.workbook_metadata?.acceptedRelationshipContracts,
@@ -431,6 +432,7 @@ function SqlWorkspace({
       editor.value,
       selectedDialect,
       sqlTabs.appliedScopeSelections,
+      sqlTabs.activeTabCreatedFrom,
       sqlTabs.selectedScopeSelections,
       sqlTabs.taskPrompt,
     ],

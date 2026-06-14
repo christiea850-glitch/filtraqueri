@@ -329,6 +329,7 @@ function useSqlWorkspace(
       activeTabTitle: activeTab.title,
       activeTabSourceBadge: getTabSourceTableLabel(activeTab),
       activeTabSourceKind: activeTab.sourceType === "cleaned_working_copy" ? "Cleaned" : "Original",
+      activeTabCreatedFrom: activeTab.createdFrom || null,
       selectedScopeSelections: activeTab.selectedScopeSelections || [],
       appliedScopeSelections: activeTab.appliedScopeSelections || [],
       taskPrompt: activeTab.taskPrompt || "",
