@@ -9,6 +9,11 @@ import {
   EMPTY_BUSINESS_INTENT,
   type BusinessIntent,
 } from "./businessIntentGrounding";
+import {
+  inferSemanticTableHints,
+  type SemanticColumnHint,
+  type SemanticColumnRole,
+} from "./semanticHintRegistry";
 
 export type AdaptiveProposalSupport = "supported" | "needs_review" | "unsupported";
 
@@ -145,7 +150,8 @@ type WorksheetInput = NonNullable<AdaptiveReportProposalRequest["worksheets"]>[n
 type BoundColumn = {
   worksheet: WorksheetInput;
   column: SchemaColumn;
-  confidence: "high" | "medium";
+  confidence: "high" | "medium" | "low";
+  semanticRoles?: SemanticColumnRole[];
 };
 
 const EMPTY_RENDERER: AdaptiveReportProposal["renderer"] = {
@@ -259,6 +265,145 @@ const allColumns = (worksheets: readonly WorksheetInput[]) =>
     worksheet.schema.map((column) => ({ worksheet, column })),
   );
 
+const createSemanticColumnHints = (
+  worksheets: readonly WorksheetInput[],
+  contracts: readonly AcceptedRelationshipContract[],
+): SemanticColumnHint[] =>
+  inferSemanticTableHints({
+    tables: worksheets.map((worksheet) => ({
+      worksheetId: worksheet.worksheetId,
+      displayName: worksheet.displayName,
+      sheetName: worksheet.sheetName,
+      tableName: worksheet.tableName,
+      schema: worksheet.schema,
+    })),
+    acceptedRelationshipContracts: contracts,
+  }).columns;
+
+const proposalConfidenceFromSemanticHint = (
+  hint: SemanticColumnHint,
+): BoundColumn["confidence"] => hint.confidence;
+
+const semanticColumnToBoundColumn = (
+  hint: SemanticColumnHint,
+  worksheets: readonly WorksheetInput[],
+): BoundColumn | null => {
+  const worksheet = worksheets.find(
+    (candidate) =>
+      candidate.worksheetId === hint.worksheetId ||
+      normalize(candidate.tableName) === normalize(hint.tableName),
+  );
+  const column = worksheet?.schema.find(
+    (candidate) => normalize(candidate.name) === normalize(hint.columnName),
+  );
+  if (!worksheet || !column) return null;
+  return {
+    worksheet,
+    column,
+    confidence: proposalConfidenceFromSemanticHint(hint),
+    semanticRoles: hint.roles,
+  };
+};
+
+const roleMatches = (
+  hint: SemanticColumnHint,
+  roles: readonly SemanticColumnRole[],
+): boolean => roles.some((role) => hint.roles.includes(role));
+
+const promptScoreForSemanticHint = (
+  hint: SemanticColumnHint,
+  prompt: string,
+): number => {
+  const text = normalize(prompt);
+  if (!text) return 0;
+  const tableName = normalize(hint.tableName);
+  const tableStem = singularize(tableName);
+  const columnParts = normalize(hint.columnName).split(" ").filter((part) => part.length > 2);
+  let score = 0;
+  if (text.includes(tableName) || text.includes(tableStem)) score += 4;
+  score += columnParts.filter((part) => text.includes(part)).length;
+  return score;
+};
+
+const findSemanticColumn = ({
+  preferredName,
+  prompt = "",
+  worksheets,
+  semanticColumns,
+  roles,
+}: {
+  preferredName?: string;
+  prompt?: string;
+  worksheets: readonly WorksheetInput[];
+  semanticColumns: readonly SemanticColumnHint[];
+  roles: readonly SemanticColumnRole[];
+}): BoundColumn | null => {
+  const ranked = semanticColumns
+    .filter((hint) => roleMatches(hint, roles))
+    .map((hint) => {
+      const nameConfidence = preferredName ? nameScore(preferredName, hint.columnName) : null;
+      const tableConfidence = preferredName ? nameScore(preferredName, hint.tableName) : null;
+      const confidenceScore =
+        hint.confidence === "high" ? 6 : hint.confidence === "medium" ? 4 : 1;
+      const score =
+        confidenceScore +
+        (roles.includes(hint.primaryRole) ? 3 : 0) +
+        (nameConfidence === "high" ? 8 : nameConfidence === "medium" ? 4 : 0) +
+        (tableConfidence === "high" ? 4 : tableConfidence === "medium" ? 2 : 0) +
+        promptScoreForSemanticHint(hint, prompt);
+      return { hint, score };
+    })
+    .sort(
+      (left, right) =>
+        right.score - left.score ||
+        left.hint.tableName.localeCompare(right.hint.tableName) ||
+        left.hint.columnName.localeCompare(right.hint.columnName),
+    );
+
+  for (const candidate of ranked) {
+    const bound = semanticColumnToBoundColumn(candidate.hint, worksheets);
+    if (bound) return bound;
+  }
+  return null;
+};
+
+const semanticHintsForProposal = (
+  hints: readonly SemanticColumnHint[],
+): SemanticHint[] =>
+  hints
+    .filter((hint) => hint.primaryRole !== "unknown")
+    .map((hint) => {
+      const target: SemanticHint["target"] = hint.roles.includes("foreign_key")
+        ? "relationship"
+        : hint.roles.includes("metric_candidate")
+          ? "metric"
+          : hint.roles.includes("grouping_candidate")
+            ? "grouping"
+            : hint.roles.includes("filter_candidate")
+              ? "filter"
+              : "entity";
+      return {
+        id: `semantic-hint:${compactId(hint.tableName)}:${compactId(hint.columnName)}:${hint.primaryRole}`,
+        target,
+        label: `${hint.columnName}: ${hint.primaryRole.replace("_", " ")}`,
+        worksheetId: hint.worksheetId || undefined,
+        tableName: hint.tableName,
+        columnName: hint.columnName,
+        confidence: hint.confidence,
+      };
+    });
+
+const uniqueSemanticHints = (hints: readonly SemanticHint[]): SemanticHint[] => {
+  const seen = new Set<string>();
+  const unique: SemanticHint[] = [];
+  for (const hint of hints) {
+    if (seen.has(hint.id)) continue;
+    seen.add(hint.id);
+    unique.push(hint);
+  }
+  return unique;
+};
+
 const findWorksheetForEntity = (
   entityName: string,
   worksheets: readonly WorksheetInput[],
@@ -313,6 +458,8 @@ const fallbackEntitiesFromScope = (worksheets: readonly WorksheetInput[]): Propo
 const findColumn = (
   columnName: string,
   worksheets: readonly WorksheetInput[],
+  semanticColumns: readonly SemanticColumnHint[] = [],
+  roles: readonly SemanticColumnRole[] = [],
 ): BoundColumn | null => {
   let best: BoundColumn | null = null;
   for (const item of allColumns(worksheets)) {
@@ -320,7 +467,17 @@ const findColumn = (
     if (confidence === "high") return { ...item, confidence };
     if (confidence === "medium" && !best) best = { ...item, confidence };
   }
-  return best;
+  return (
+    best ||
+    (roles.length > 0
+      ? findSemanticColumn({
+          preferredName: columnName,
+          worksheets,
+          semanticColumns,
+          roles,
+        })
+      : null)
+  );
 };
 
 const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
@@ -334,6 +491,7 @@ const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
 const proposeMetrics = (
   intent: BusinessIntent,
   worksheets: readonly WorksheetInput[],
+  semanticColumns: readonly SemanticColumnHint[],
 ): ProposedMetric[] => {
   if (intent.metrics.length === 0) {
     return [
@@ -351,7 +509,13 @@ const proposeMetrics = (
 
   return intent.metrics.map((metric) => {
     const metricName = metric.replace(/^(count|sum|total|avg|average)_?/, "");
-    const column = findColumn(metricName, worksheets);
+    const column = findColumn(metricName, worksheets, semanticColumns, [
+      "metric_candidate",
+      "amount",
+      "quantity",
+      "countable_entity",
+      "identifier",
+    ]);
     const kind = inferMetricKind(metric.replace(/_/g, " "));
     return {
       id: `metric:${compactId(metric)}`,
@@ -368,9 +532,16 @@ const proposeMetrics = (
 const proposeGroupings = (
   intent: BusinessIntent,
   worksheets: readonly WorksheetInput[],
+  semanticColumns: readonly SemanticColumnHint[],
 ): ProposedGrouping[] =>
   intent.grouping.map((grouping) => {
-    const column = findColumn(grouping, worksheets);
+    const column = findColumn(grouping, worksheets, semanticColumns, [
+      "grouping_candidate",
+      "category",
+      "name",
+      "foreign_key",
+      "identifier",
+    ]);
     return {
       id: `grouping:${compactId(grouping)}`,
       label: grouping,
@@ -400,10 +571,19 @@ const proposeFilters = (
   prompt: string,
   intent: BusinessIntent,
   worksheets: readonly WorksheetInput[],
+  semanticColumns: readonly SemanticColumnHint[],
 ): ProposedFilter[] => {
   const filters: ProposedFilter[] = [];
-  const statusColumn = findColumn("status", worksheets);
-  const dateColumn = firstColumnByKind(worksheets, "date");
+  const statusColumn = findColumn("status", worksheets, semanticColumns, [
+    "status",
+  ]);
+  const dateColumn =
+    findSemanticColumn({
+      prompt,
+      worksheets,
+      semanticColumns,
+      roles: ["date"],
+    }) || firstColumnByKind(worksheets, "date");
 
   if (promptHasAny(prompt, ["status", "active", "inactive", "open", "closed", "current"])) {
     filters.push({
@@ -442,11 +622,17 @@ const proposeFilters = (
   }
 
   if (promptHasAny(prompt, ["unresolved", "low stock", "selling fast", "fast selling", "high turnover"])) {
+    const conditionColumn = findSemanticColumn({
+      prompt,
+      worksheets,
+      semanticColumns,
+      roles: ["status", "quantity", "metric_candidate"],
+    });
     filters.push({
       id: "filter:business-condition-semantics",
       label: "Business condition semantics",
-      tableName: null,
-      columnName: null,
+      tableName: conditionColumn?.worksheet.tableName || null,
+      columnName: conditionColumn?.column.name || null,
       semantics: "needs_review",
       reason: "Condition labels such as unresolved, low stock, selling fast, or high turnover vary by dataset.",
     });
@@ -479,9 +665,31 @@ const likelyRelated = (left: ProposedEntity, right: ProposedEntity): boolean => 
   return leftStem.includes(rightStem) || rightStem.includes(leftStem);
 };
 
+const hasSemanticForeignKeyBetween = (
+  left: ProposedEntity,
+  right: ProposedEntity,
+  semanticColumns: readonly SemanticColumnHint[],
+): boolean => {
+  if (!left.tableName || !right.tableName) return false;
+  const leftTable = normalize(left.tableName);
+  const rightTable = normalize(right.tableName);
+  const leftStem = singularize(left.tableName);
+  const rightStem = singularize(right.tableName);
+  return semanticColumns.some((hint) => {
+    if (!hint.roles.includes("foreign_key")) return false;
+    const hintTable = normalize(hint.tableName);
+    const hintColumn = normalize(hint.columnName);
+    return (
+      (hintTable === leftTable && hintColumn.includes(`${rightStem} id`)) ||
+      (hintTable === rightTable && hintColumn.includes(`${leftStem} id`))
+    );
+  });
+};
+
 const proposeJoinNeeds = (
   entities: readonly ProposedEntity[],
   contracts: readonly AcceptedRelationshipContract[],
+  semanticColumns: readonly SemanticColumnHint[],
 ): ProposedJoinNeed[] => {
   const boundEntities = entities.filter((entity) => entity.tableName);
   if (boundEntities.length <= 1) {
@@ -514,7 +722,7 @@ const proposeJoinNeeds = (
     );
     const status: ProposedJoinNeed["status"] = contract
       ? "verified"
-      : likelyRelated(left, right)
+      : likelyRelated(left, right) || hasSemanticForeignKeyBetween(left, right, semanticColumns)
         ? "needs_review"
         : "missing";
     needs.push({
@@ -528,7 +736,7 @@ const proposeJoinNeeds = (
       reason: contract
         ? "Accepted relationship metadata verifies this join need."
         : status === "needs_review"
-          ? "Entity names suggest a possible relationship, but no accepted contract verifies it."
+          ? "Entity names or semantic foreign-key hints suggest a possible relationship, but no accepted contract verifies it."
           : "No accepted relationship contract connects these entities.",
     });
   }
@@ -777,17 +985,28 @@ export function proposeAdaptiveReport(
   }
 
   const appliedScopeSelections = request.appliedScopeSelections || [];
-  const semanticHints = [...(request.semanticHints || [])];
   const worksheets = scopedWorksheets(request.worksheets || [], appliedScopeSelections);
+  const semanticColumns = createSemanticColumnHints(
+    worksheets,
+    request.acceptedRelationshipContracts || [],
+  );
+  const semanticHints = uniqueSemanticHints([
+    ...(request.semanticHints || []),
+    ...semanticHintsForProposal(semanticColumns),
+  ]);
   const requestedEntities = detectedIntent.entities.length > 0 ? detectedIntent.entities : [];
   const entities =
     requestedEntities.length > 0
       ? requestedEntities.map((entity) => findWorksheetForEntity(entity, worksheets))
       : fallbackEntitiesFromScope(worksheets);
-  const metrics = proposeMetrics(detectedIntent, worksheets);
-  const groupings = proposeGroupings(detectedIntent, worksheets);
-  const filters = proposeFilters(prompt, detectedIntent, worksheets);
-  const joinNeeds = proposeJoinNeeds(entities, request.acceptedRelationshipContracts || []);
+  const metrics = proposeMetrics(detectedIntent, worksheets, semanticColumns);
+  const groupings = proposeGroupings(detectedIntent, worksheets, semanticColumns);
+  const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns);
+  const joinNeeds = proposeJoinNeeds(
+    entities,
+    request.acceptedRelationshipContracts || [],
+    semanticColumns,
+  );
   const missingRequirements = createMissingRequirements({
     prompt,
     intent: detectedIntent,

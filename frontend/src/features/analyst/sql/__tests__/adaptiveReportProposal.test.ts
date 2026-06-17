@@ -134,6 +134,50 @@ const expectNoRawValues = (proposal: AdaptiveReportProposal): string[] => {
     : [];
 };
 
+const expectFilterColumn = (
+  proposal: AdaptiveReportProposal,
+  filterId: string,
+  columnName: string,
+): string[] => {
+  const filter = proposal.filters.find((item) => item.id === filterId);
+  if (!filter) return [`Expected filter ${filterId}.`];
+  return filter.columnName === columnName
+    ? []
+    : [`Expected filter ${filterId} to bind ${columnName}; got ${filter.columnName || "none"}.`];
+};
+
+const expectMetricColumn = (
+  proposal: AdaptiveReportProposal,
+  label: string,
+  columnName: string,
+): string[] => {
+  const metric = proposal.metrics.find((item) => item.label === label);
+  if (!metric) return [`Expected metric ${label}.`];
+  return metric.columnName === columnName
+    ? []
+    : [`Expected metric ${label} to bind ${columnName}; got ${metric.columnName || "none"}.`];
+};
+
+const expectGroupingColumn = (
+  proposal: AdaptiveReportProposal,
+  label: string,
+  columnName: string,
+): string[] => {
+  const grouping = proposal.groupings.find((item) => item.label === label);
+  if (!grouping) return [`Expected grouping ${label}.`];
+  return grouping.columnName === columnName
+    ? []
+    : [`Expected grouping ${label} to bind ${columnName}; got ${grouping.columnName || "none"}.`];
+};
+
+const expectGeneratedSemanticHint = (
+  proposal: AdaptiveReportProposal,
+  columnName: string,
+): string[] =>
+  proposal.semanticHints.some((hint) => hint.columnName === columnName)
+    ? []
+    : [`Expected generated semantic hint for ${columnName}.`];
+
 const salesRequest: AdaptiveReportProposalRequest = {
   prompt: "Which customers have the most orders and payments?",
   detectedIntent: intent({
@@ -152,6 +196,19 @@ const salesRequest: AdaptiveReportProposalRequest = {
     contract("customers", "customer_id", "payments", "customer_id"),
   ],
 };
+
+const semanticBindingRequest = (
+  prompt: string,
+  detectedIntent: BusinessIntent,
+  worksheets: AdaptiveReportProposalRequest["worksheets"],
+  contracts: AcceptedRelationshipContract[] = [],
+): AdaptiveReportProposalRequest => ({
+  prompt,
+  detectedIntent,
+  appliedScopeSelections: scope(...(worksheets || []).map((item) => item.tableName)),
+  worksheets,
+  acceptedRelationshipContracts: contracts,
+});
 
 const realPromptRequest = (
   prompt: string,
@@ -257,6 +314,274 @@ const fixtures: Fixture[] = [
         ...proposals.flatMap(expectNoRawValues),
       ];
     },
+  },
+  {
+    name: "semantic hints improve sales payment date status and amount bindings",
+    request: semanticBindingRequest(
+      "which customers have orders but no recent payments by payment status",
+      intent({
+        primaryIntent: "filtering",
+        entities: ["customers", "orders", "payments"],
+        metrics: ["total_payment_amount"],
+        grouping: ["payment status"],
+        explicitlyTemporal: true,
+      }),
+      [
+        worksheet("customers", [column("customer_id"), column("customer_name")]),
+        worksheet("orders", [column("order_id"), column("customer_id")]),
+        worksheet("payments", [
+          column("payment_id"),
+          column("order_id"),
+          column("payment_date", "date"),
+          column("payment_status", "categorical"),
+          column("payment_amount", "numeric"),
+        ]),
+      ],
+      [
+        contract("customers", "customer_id", "orders", "customer_id"),
+        contract("orders", "order_id", "payments", "order_id"),
+      ],
+    ),
+    assert: (proposal) => [
+      ...expectMetricColumn(proposal, "total payment amount", "payment_amount"),
+      ...expectGroupingColumn(proposal, "payment status", "payment_status"),
+      ...expectFilterColumn(proposal, "filter:date-semantics", "payment_date"),
+      ...expectFilterColumn(proposal, "filter:status-semantics", "payment_status"),
+      ...expectGeneratedSemanticHint(proposal, "payment_amount"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints improve inventory quantity product category and condition bindings",
+    request: semanticBindingRequest(
+      "which products are low stock but still selling fast by product category",
+      intent({
+        primaryIntent: "risk",
+        entities: ["products", "stock"],
+        metrics: ["total_stock_quantity"],
+        grouping: ["product category"],
+      }),
+      [
+        worksheet("products", [
+          column("product_id"),
+          column("product_name"),
+          column("product_category", "categorical"),
+        ]),
+        worksheet("stock", [
+          column("product_id"),
+          column("stock_quantity", "numeric"),
+          column("inventory_status", "categorical"),
+        ]),
+      ],
+      [contract("products", "product_id", "stock", "product_id")],
+    ),
+    assert: (proposal) => [
+      ...expectMetricColumn(proposal, "total stock quantity", "stock_quantity"),
+      ...expectGroupingColumn(proposal, "product category", "product_category"),
+      ...expectFilterColumn(proposal, "filter:business-condition-semantics", "stock_quantity"),
+      ...expectGeneratedSemanticHint(proposal, "stock_quantity"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints improve support ticket unresolved status binding",
+    request: semanticBindingRequest(
+      "which accounts have many unresolved tickets",
+      intent({
+        primaryIntent: "filtering",
+        entities: ["accounts", "tickets"],
+        metrics: ["count_tickets"],
+      }),
+      [
+        worksheet("accounts", [column("account_id"), column("account_name")]),
+        worksheet("tickets", [
+          column("ticket_id"),
+          column("account_id"),
+          column("ticket_status", "categorical"),
+          column("resolved_at", "date"),
+        ]),
+      ],
+      [contract("accounts", "account_id", "tickets", "account_id")],
+    ),
+    assert: (proposal) => [
+      ...expectMetricColumn(proposal, "count tickets", "ticket_id"),
+      ...expectFilterColumn(proposal, "filter:business-condition-semantics", "ticket_status"),
+      ...expectGeneratedSemanticHint(proposal, "ticket_status"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints improve finance date payment status and amount bindings",
+    request: semanticBindingRequest(
+      "which invoices are overdue by customer and payment status",
+      intent({
+        primaryIntent: "risk",
+        entities: ["invoices", "customers", "payments"],
+        metrics: ["total_payment_amount"],
+        grouping: ["payment status"],
+        explicitlyTemporal: true,
+      }),
+      [
+        worksheet("customers", [column("customer_id"), column("customer_name")]),
+        worksheet("invoices", [
+          column("invoice_id"),
+          column("customer_id"),
+          column("invoice_date", "date"),
+          column("due_date", "date"),
+          column("invoice_amount", "numeric"),
+        ]),
+        worksheet("payments", [
+          column("payment_id"),
+          column("invoice_id"),
+          column("payment_status", "categorical"),
+          column("payment_amount", "numeric"),
+        ]),
+      ],
+      [
+        contract("customers", "customer_id", "invoices", "customer_id"),
+        contract("invoices", "invoice_id", "payments", "invoice_id"),
+      ],
+    ),
+    assert: (proposal) => [
+      ...expectMetricColumn(proposal, "total payment amount", "payment_amount"),
+      ...expectGroupingColumn(proposal, "payment status", "payment_status"),
+      ...expectFilterColumn(proposal, "filter:date-semantics", "due_date"),
+      ...expectFilterColumn(proposal, "filter:status-semantics", "payment_status"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints support hr headcount and turnover metrics without noisy entity overclaim",
+    request: semanticBindingRequest(
+      "show employee headcount by department and identify departments with high turnover",
+      intent({
+        primaryIntent: "risk",
+        entities: ["employees", "departments"],
+        metrics: ["count_employees", "turnover"],
+        grouping: ["department"],
+      }),
+      [
+        worksheet("employees", [
+          column("employee_id"),
+          column("department_id"),
+          column("turnover_rate", "numeric"),
+          column("is_active", "boolean"),
+        ]),
+        worksheet("departments", [column("department_id"), column("department_name")]),
+      ],
+      [contract("departments", "department_id", "employees", "department_id")],
+    ),
+    assert: (proposal) => [
+      ...(proposal.entities.map((entity) => entity.requestedName).includes("headcount") ||
+      proposal.entities.map((entity) => entity.requestedName).includes("turnover")
+        ? ["Headcount/turnover should stay metric or signal concepts, not requested entities."]
+        : []),
+      ...expectMetricColumn(proposal, "count employees", "employee_id"),
+      ...expectMetricColumn(proposal, "turnover", "turnover_rate"),
+      ...expectGroupingColumn(proposal, "department", "department_id"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints improve healthcare visit date provider and patient key bindings",
+    request: semanticBindingRequest(
+      "which patients had repeat visits within 30 days by provider",
+      intent({
+        primaryIntent: "filtering",
+        entities: ["patients", "visits", "providers"],
+        metrics: ["count_visits"],
+        grouping: ["provider"],
+        explicitlyTemporal: true,
+      }),
+      [
+        worksheet("patients", [column("patient_id"), column("patient_name")]),
+        worksheet("visits", [
+          column("visit_id"),
+          column("patient_id"),
+          column("provider_id"),
+          column("visit_date", "date"),
+        ]),
+        worksheet("providers", [column("provider_id"), column("provider_name")]),
+      ],
+      [
+        contract("patients", "patient_id", "visits", "patient_id"),
+        contract("providers", "provider_id", "visits", "provider_id"),
+      ],
+    ),
+    assert: (proposal) => [
+      ...expectMetricColumn(proposal, "count visits", "visit_id"),
+      ...expectGroupingColumn(proposal, "provider", "provider_id"),
+      ...expectFilterColumn(proposal, "filter:date-semantics", "visit_date"),
+      ...expectGeneratedSemanticHint(proposal, "patient_id"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints improve property access status tenant unit and property bindings",
+    request: semanticBindingRequest(
+      "find current tenants with expired access codes by unit and property",
+      intent({
+        primaryIntent: "expiration",
+        entities: ["tenants", "access codes", "units", "properties"],
+        metrics: ["count_access_codes"],
+        grouping: ["unit", "property"],
+        explicitlyTemporal: true,
+      }),
+      [
+        worksheet("tenants", [column("tenant_id"), column("tenant_name")]),
+        worksheet("access_codes", [
+          column("access_code_id"),
+          column("tenant_id"),
+          column("unit_id"),
+          column("access_status", "categorical"),
+          column("expires_at", "date"),
+        ]),
+        worksheet("units", [column("unit_id"), column("property_id")]),
+        worksheet("properties", [column("property_id"), column("property_name")]),
+      ],
+      [
+        contract("tenants", "tenant_id", "access_codes", "tenant_id"),
+        contract("units", "unit_id", "access_codes", "unit_id"),
+        contract("properties", "property_id", "units", "property_id"),
+      ],
+    ),
+    assert: (proposal) => [
+      ...expectMetricColumn(proposal, "count access codes", "access_code_id"),
+      ...expectGroupingColumn(proposal, "unit", "unit_id"),
+      ...expectGroupingColumn(proposal, "property", "property_id"),
+      ...expectFilterColumn(proposal, "filter:date-semantics", "expires_at"),
+      ...expectFilterColumn(proposal, "filter:status-semantics", "access_status"),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
+  },
+  {
+    name: "semantic hints keep ambiguous columns low confidence",
+    request: semanticBindingRequest(
+      "summarize total unknown by bucket",
+      intent({
+        entities: ["misc"],
+        metrics: ["total_unknown"],
+        grouping: ["bucket"],
+      }),
+      [worksheet("misc", [column("misc"), column("value_blob")])],
+    ),
+    assert: (proposal) => [
+      ...(proposal.metrics.every((metric) => metric.confidence === "low")
+        ? []
+        : ["Expected ambiguous metric binding to remain low confidence."]),
+      ...(proposal.groupings.every((grouping) => grouping.confidence === "high")
+        ? ["Ambiguous grouping must not become high confidence."]
+        : []),
+      ...expectNoExecutableSurface(proposal),
+      ...expectNoRawValues(proposal),
+    ],
   },
   {
     name: "support tickets accounts adaptive proposal",
@@ -416,7 +741,10 @@ const fixtures: Fixture[] = [
       ],
     },
     assert: (proposal) => [
-      ...(proposal.semanticHints.length === 1 ? [] : ["Expected generic semantic hint pass-through."]),
+      ...(proposal.semanticHints.some((hint) => hint.id === "hint:security")
+        ? []
+        : ["Expected generic semantic hint pass-through."]),
+      ...expectGeneratedSemanticHint(proposal, "access_status"),
       ...(proposal.title.toLowerCase().startsWith("proposal sketch:")
         ? []
         : ["Expected business-friendly proposal sketch title."]),
