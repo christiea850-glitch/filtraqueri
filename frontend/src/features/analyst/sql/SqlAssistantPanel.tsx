@@ -520,6 +520,53 @@ function SqlTemplateRecommendationCard({
 const renderProposalValues = (values: readonly string[], fallback: string) =>
   values.length > 0 ? values.slice(0, 6).join(", ") : fallback;
 
+const adaptivePlanningSafetyCopy = "Planning only · SQL not generated · Insert disabled · Run disabled";
+
+const scopeFallbackDisclosure =
+  "We could not fully match the items in your question to worksheet concepts yet, so this sketch uses your applied scope.";
+
+const isScopeFallbackOnly = (proposal: AdaptiveReportProposal): boolean =>
+  proposal.entities.length > 0 &&
+  proposal.entities.every((entity) => entity.binding === "scope_fallback");
+
+const adaptiveProposalRows = (proposal: AdaptiveReportProposal) =>
+  [
+    {
+      label: "Entities",
+      values: proposal.entities.map((entity) => entity.label),
+    },
+    {
+      label: "Metrics",
+      values: proposal.metrics.map((metric) => metric.label),
+    },
+    {
+      label: "Groupings",
+      values: proposal.groupings.map((grouping) => grouping.label),
+    },
+    {
+      label: "Filters",
+      values: proposal.filters.map((filter) => filter.label),
+    },
+    {
+      label: "Join needs",
+      values: proposal.joinNeeds
+        .filter((join) => join.status !== "not_required")
+        .map((join) => `${join.leftEntity} to ${join.rightEntity}: ${join.status.replace("_", " ")}`),
+    },
+    {
+      label: "Assumptions",
+      values: proposal.assumptions.map((item) => item.detail),
+    },
+    {
+      label: "Warnings",
+      values: proposal.warnings.map((warning) => warning.message),
+    },
+    {
+      label: "Missing requirements",
+      values: proposal.missingRequirements.map((requirement) => requirement.message),
+    },
+  ].filter((row) => row.values.length > 0);
+
 function AdaptiveReportProposalCard({
   introCopy = "No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.",
   state,
@@ -545,69 +592,20 @@ function AdaptiveReportProposalCard({
         </div>
         <span>{introCopy}</span>
         <span>{proposal.proposalNarrative}</span>
+        {isScopeFallbackOnly(proposal) && <span>{scopeFallbackDisclosure}</span>}
       </div>
-      <dl>
-        <div>
-          <dt>Entities</dt>
-          <dd>{renderProposalValues(proposal.entities.map((entity) => entity.label), "No entity binding yet")}</dd>
-        </div>
-        <div>
-          <dt>Metrics</dt>
-          <dd>{renderProposalValues(proposal.metrics.map((metric) => metric.label), "No metric selected")}</dd>
-        </div>
-        <div>
-          <dt>Groupings</dt>
-          <dd>{renderProposalValues(proposal.groupings.map((grouping) => grouping.label), "No grouping selected")}</dd>
-        </div>
-        <div>
-          <dt>Filters</dt>
-          <dd>{renderProposalValues(proposal.filters.map((filter) => filter.label), "No filters proposed")}</dd>
-        </div>
-        <div>
-          <dt>Join needs</dt>
-          <dd>
-            {renderProposalValues(
-              proposal.joinNeeds.map((join) =>
-                join.status === "not_required"
-                  ? "No join required"
-                  : `${join.leftEntity} to ${join.rightEntity}: ${join.status.replace("_", " ")}`,
-              ),
-              "No join metadata needed",
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Assumptions</dt>
-          <dd>{renderProposalValues(proposal.assumptions.map((item) => item.detail), "No assumptions recorded")}</dd>
-        </div>
-        <div>
-          <dt>Warnings</dt>
-          <dd>{renderProposalValues(proposal.warnings.map((warning) => warning.message), "No proposal warnings")}</dd>
-        </div>
-        <div>
-          <dt>Missing requirements</dt>
-          <dd>
-            {renderProposalValues(
-              proposal.missingRequirements.map((requirement) => requirement.message),
-              "No missing metadata requirements",
-            )}
-          </dd>
-        </div>
-      </dl>
-      <ul>
-        <li>SQL not generated.</li>
-        <li>Insert disabled.</li>
-        <li>Run disabled.</li>
-        <li>LLM fallback disabled in this version.</li>
-      </ul>
+      {adaptiveProposalRows(proposal).length > 0 && (
+        <dl>
+          {adaptiveProposalRows(proposal).map((row) => (
+            <div key={row.label}>
+              <dt>{row.label}</dt>
+              <dd>{renderProposalValues(row.values, "")}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <div className="sql-assistant-card-foot">
-        <small>Read-only proposal. It is not a template, report draft, or SQL validation result.</small>
-        <button type="button" className="secondary-button" disabled={state.insertDisabled}>
-          Insert disabled
-        </button>
-        <button type="button" className="secondary-button" disabled={state.runDisabled}>
-          Run disabled
-        </button>
+        <small>{adaptivePlanningSafetyCopy}. It is not a template, report draft, or SQL validation result.</small>
       </div>
     </article>
   );

@@ -97,12 +97,32 @@ const ENTITY_NOUNS: Array<{ token: string; plural: string }> = [
   { token: "unit", plural: "units" },
   { token: "lease", plural: "leases" },
   { token: "tenant", plural: "tenants" },
+  { token: "access", plural: "access" },
+  { token: "code", plural: "codes" },
   { token: "manager", plural: "managers" },
   { token: "vendor", plural: "vendors" },
+  { token: "customer", plural: "customers" },
+  { token: "order", plural: "orders" },
   { token: "payment", plural: "payments" },
   { token: "charge", plural: "charges" },
   { token: "balance", plural: "balances" },
   { token: "contract", plural: "contracts" },
+  { token: "product", plural: "products" },
+  { token: "sku", plural: "skus" },
+  { token: "stock", plural: "stock" },
+  { token: "inventory", plural: "inventory" },
+  { token: "item", plural: "items" },
+  { token: "account", plural: "accounts" },
+  { token: "ticket", plural: "tickets" },
+  { token: "case", plural: "cases" },
+  { token: "employee", plural: "employees" },
+  { token: "department", plural: "departments" },
+  { token: "headcount", plural: "headcount" },
+  { token: "turnover", plural: "turnover" },
+  { token: "patient", plural: "patients" },
+  { token: "visit", plural: "visits" },
+  { token: "provider", plural: "providers" },
+  { token: "encounter", plural: "encounters" },
   { token: "maintenance", plural: "maintenance" },
   { token: "repair", plural: "repairs" },
   { token: "violation", plural: "violations" },
@@ -133,7 +153,7 @@ const matches = (text: string, pattern: RegExp): boolean => pattern.test(text);
 // `in <token>` is temporal when the token (or its quantifier) is a time unit
 // preceded by a quantifier ("the next 90 days", "in 30 days").
 const TEMPORAL_IN_PATTERN = new RegExp(
-  `\\b in (?:the (?:next|last|past|previous|coming) )?(?:\\d+\\s+)?(?:${TIME_UNITS.join("|")})\\b`,
+  `\\b(?:in|within) (?:the (?:next|last|past|previous|coming) )?(?:\\d+\\s+)?(?:${TIME_UNITS.join("|")})\\b`,
   "i",
 );
 
@@ -212,8 +232,11 @@ const scoreRenewal = (text: string): number => {
 
 const scoreRisk = (text: string): number => {
   if (matches(text, /\brisk(s|y)?\b/)) return 0.85;
+  if (includes(text, "security gap") || includes(text, "security gaps")) return 0.85;
   if (includes(text, "exposure")) return 0.7;
   if (matches(text, /\boverdue\b/)) return 0.75;
+  if (includes(text, "low stock")) return 0.75;
+  if (includes(text, "high turnover")) return 0.75;
   if (matches(text, /\bdefault(s|ed|ing)?\b/)) return 0.65;
   if (includes(text, "delinquent")) return 0.75;
   return 0;
@@ -263,13 +286,25 @@ const scoreTopBottom = (text: string): number => {
 
 const scoreFiltering = (text: string): number => {
   if (matches(text, /^which\b/)) return 0.65;
-  if (matches(text, /\bwhich\s+(properties|units|leases|tenants|managers|vendors)\b/))
+  if (
+    matches(
+      text,
+      /\bwhich\s+(properties|units|leases|tenants|managers|vendors|customers|orders|payments|invoices|products|skus|items|accounts|tickets|cases|employees|departments|patients|visits|providers|encounters)\b/,
+    )
+  )
     return 0.65;
   if (includes(text, "that have")) return 0.5;
   if (includes(text, "that are")) return 0.45;
+  if (matches(text, /\b(have|has|had)\s+/)) return 0.45;
   if (matches(text, /\bwhere\s+/) && !matches(text, /\bwhere\s+(is|are|do)\b/)) return 0.6;
   if (includes(text, "with status")) return 0.65;
   if (includes(text, "with type")) return 0.6;
+  if (includes(text, "no recent") || includes(text, "missing recent") || includes(text, "without recent")) return 0.65;
+  if (matches(text, /\bunresolved\b/)) return 0.65;
+  if (includes(text, "low stock")) return 0.65;
+  if (includes(text, "selling fast") || includes(text, "fast selling")) return 0.6;
+  if (includes(text, "high turnover")) return 0.65;
+  if (matches(text, /\boverdue\b/)) return 0.65;
   if (includes(text, "matching ")) return 0.5;
   if (matches(text, /\bvacant\b/)) return 0.55;
   if (matches(text, /\boccupied\b/)) return 0.55;
@@ -316,6 +351,8 @@ const detectMetrics = (text: string, entities: string[]): string[] => {
   // Volume / total / sum — pattern like "by payment volume", "total payments"
   if (matches(text, /\bpayment volume\b/)) metrics.push("payment_volume");
   if (matches(text, /\btotal payments?\b/)) metrics.push("total_payments");
+  if (matches(text, /\bheadcount\b/)) metrics.push("count_employees");
+  if (matches(text, /\bturnover\b/)) metrics.push("turnover");
   if (matches(text, /\baverage [a-z_]+\b/)) {
     const avgMatch = text.match(/\baverage\s+([a-z_]+)\b/);
     if (avgMatch) metrics.push(`avg_${avgMatch[1]}`);
@@ -359,6 +396,7 @@ const detectExplicitlyTemporal = (text: string): boolean => {
   if (matches(text, /\bexpir(e|es|ed|ing|ation|y)\b/)) return true;
   if (matches(text, /\brenewal(s)?\b/) || matches(text, /\brenew(s|ed|ing)?\b/)) return true;
   if (matches(text, /\btrend(s|ed|ing)?\b/) || includes(text, "over time")) return true;
+  if (includes(text, "recent") || includes(text, "overdue")) return true;
   if (matches(text, /\b(today|yesterday|tomorrow)\b/)) return true;
   if (matches(text, /\b(year over year|month by month|yoy)\b/)) return true;
   return false;

@@ -116,6 +116,63 @@ export const BUSINESS_INTENT_FIXTURES: BusinessIntentFixture[] = [
     expectedTemporal: false,
     description: "Explicit preview intent. Must not match expiration or count_grouping.",
   },
+  {
+    prompt:
+      "find how current tenants are using their access code and if expired tenants still have access in each unit in the properties to identify security gap",
+    expectedPrimary: ["expiration", "risk", "filtering"],
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["tenants", "access", "codes", "units", "properties"],
+    expectedTemporal: true,
+    description: "Property/security prompt keeps access vocabulary without dominating other domains.",
+  },
+  {
+    prompt: "which customers have orders but no recent payments",
+    expectedPrimary: "filtering",
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["customers", "orders", "payments"],
+    expectedTemporal: true,
+    description: "Sales/payment prompt detects customer/order/payment entities and recent-date semantics.",
+  },
+  {
+    prompt: "which products are low stock but still selling fast",
+    expectedPrimary: ["risk", "filtering"],
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["products", "stock"],
+    expectedTemporal: false,
+    description: "Inventory prompt detects product and stock vocabulary plus condition semantics.",
+  },
+  {
+    prompt: "which accounts have many unresolved tickets",
+    expectedPrimary: "filtering",
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["accounts", "tickets"],
+    expectedTemporal: false,
+    description: "Support prompt detects account/ticket vocabulary and unresolved status semantics.",
+  },
+  {
+    prompt: "which invoices are overdue by customer and payment status",
+    expectedPrimary: ["risk", "filtering"],
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["invoices", "customers", "payments"],
+    expectedTemporal: true,
+    description: "Finance prompt detects invoice/customer/payment vocabulary and overdue semantics.",
+  },
+  {
+    prompt: "show employee headcount by department and identify departments with high turnover",
+    expectedPrimary: ["risk", "grouping", "count_grouping"],
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["employees", "headcount", "departments", "turnover"],
+    expectedTemporal: false,
+    description: "HR prompt detects employee, department, headcount, and turnover vocabulary.",
+  },
+  {
+    prompt: "which patients had repeat visits within 30 days by provider",
+    expectedPrimary: ["filtering", "grouping"],
+    mustNotInclude: [],
+    expectedEntitiesSubset: ["patients", "visits", "providers"],
+    expectedTemporal: true,
+    description: "Healthcare metadata prompt detects repeat visits within 30 days as temporal.",
+  },
 ];
 
 const matchesExpectedPrimary = (

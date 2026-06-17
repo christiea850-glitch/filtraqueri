@@ -12,6 +12,7 @@ import type {
   WorksheetMetadata,
 } from "../../../workbook";
 import type { BusinessIntent } from "../businessIntentGrounding";
+import { detectBusinessIntent } from "../businessIntentGrounding";
 import {
   EMPTY_ADAPTIVE_REPORT_PROPOSAL,
   proposeAdaptiveReport,
@@ -152,6 +153,72 @@ const salesRequest: AdaptiveReportProposalRequest = {
   ],
 };
 
+const realPromptRequest = (
+  prompt: string,
+  tableNames: string[],
+  dateTables: readonly string[] = [],
+): AdaptiveReportProposalRequest => ({
+  prompt,
+  detectedIntent: detectBusinessIntent(prompt),
+  appliedScopeSelections: scope(...tableNames),
+  worksheets: tableNames.map((tableName) =>
+    worksheet(tableName, [
+      column(`${tableName.replace(/s$/, "")}_id`),
+      column("status", "categorical"),
+      ...(dateTables.includes(tableName) ? [column("event_date", "date")] : []),
+    ]),
+  ),
+});
+
+const realPromptRequests: AdaptiveReportProposalRequest[] = [
+  realPromptRequest(
+    "find how current tenants are using their access code and if expired tenants still have access in each unit in the properties to identify security gap",
+    ["tenants", "access_codes", "units", "properties"],
+    ["tenants"],
+  ),
+  realPromptRequest("which customers have orders but no recent payments", [
+    "customers",
+    "orders",
+    "payments",
+  ], ["payments"]),
+  realPromptRequest("which products are low stock but still selling fast", [
+    "products",
+    "stock",
+    "orders",
+  ]),
+  realPromptRequest("which accounts have many unresolved tickets", [
+    "accounts",
+    "tickets",
+  ]),
+  realPromptRequest("which invoices are overdue by customer and payment status", [
+    "invoices",
+    "customers",
+    "payments",
+  ], ["invoices"]),
+  realPromptRequest(
+    "show employee headcount by department and identify departments with high turnover",
+    ["employees", "departments"],
+  ),
+  realPromptRequest("which patients had repeat visits within 30 days by provider", [
+    "patients",
+    "visits",
+    "providers",
+  ], ["visits"]),
+];
+
+const hasBoundPromptEntity = (proposal: AdaptiveReportProposal): boolean =>
+  proposal.entities.some(
+    (entity) => entity.binding === "exact" || entity.binding === "similar",
+  );
+
+const hasMeaningfulSignal = (proposal: AdaptiveReportProposal): boolean =>
+  proposal.detectedIntent.explicitlyTemporal ||
+  proposal.detectedIntent.grouping.length > 0 ||
+  proposal.filters.length > 0 ||
+  proposal.detectedIntent.metrics.length > 0 ||
+  proposal.detectedIntent.primaryIntent === "filtering" ||
+  proposal.detectedIntent.primaryIntent === "risk";
+
 const fixtures: Fixture[] = [
   {
     name: "sales customers orders payments adaptive proposal",
@@ -165,6 +232,31 @@ const fixtures: Fixture[] = [
       ...expectNoExecutableSurface(proposal),
       ...expectNoRawValues(proposal),
     ],
+  },
+  {
+    name: "seven real cross-domain prompts meet adaptive proposal coverage",
+    request: realPromptRequests[0],
+    assert: () => {
+      const proposals = realPromptRequests.map((request) => proposeAdaptiveReport(request));
+      const entityCoverage = proposals.filter(hasBoundPromptEntity).length;
+      const signalCoverage = proposals.filter(hasMeaningfulSignal).length;
+      const within30Days = proposals.find((proposal) =>
+        proposal.question.includes("within 30 days"),
+      );
+      return [
+        ...(entityCoverage >= 5
+          ? []
+          : [`Expected at least 5 of 7 prompts to bind meaningful entities; got ${entityCoverage}.`]),
+        ...(signalCoverage >= 6
+          ? []
+          : [`Expected at least 6 of 7 prompts to detect a signal; got ${signalCoverage}.`]),
+        ...(within30Days?.detectedIntent.explicitlyTemporal
+          ? []
+          : ["Expected within 30 days to be recognized as temporal."]),
+        ...proposals.flatMap(expectNoExecutableSurface),
+        ...proposals.flatMap(expectNoRawValues),
+      ];
+    },
   },
   {
     name: "support tickets accounts adaptive proposal",
@@ -325,9 +417,9 @@ const fixtures: Fixture[] = [
     },
     assert: (proposal) => [
       ...(proposal.semanticHints.length === 1 ? [] : ["Expected generic semantic hint pass-through."]),
-      ...(proposal.title.toLowerCase().includes("security gap")
-        ? ["Proposal must not hard-code a tenant/security template title."]
-        : []),
+      ...(proposal.title.toLowerCase().startsWith("proposal sketch:")
+        ? []
+        : ["Expected business-friendly proposal sketch title."]),
       ...expectNoExecutableSurface(proposal),
       ...expectNoRawValues(proposal),
     ],

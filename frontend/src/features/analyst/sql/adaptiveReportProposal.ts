@@ -152,13 +152,13 @@ const EMPTY_RENDERER: AdaptiveReportProposal["renderer"] = {
   status: "not_rendered",
   canRender: false,
   targetDialect: "duckdb",
-  notes: ["Adaptive report proposals do not render SQL in T-13M-1."],
+  notes: ["Planning only. SQL is not generated, inserted, or run for adaptive proposals."],
 };
 
 const EMPTY_LLM_READINESS: AdaptiveProposalLlmReadiness = {
   safeToOfferFallback: false,
   payloadShape: "metadata_only",
-  reason: "LLM fallback is disabled in T-13M-1; only metadata-only readiness is described.",
+  reason: "Planning outline from worksheet names, columns, and relationships only.",
 };
 
 export const EMPTY_ADAPTIVE_REPORT_PROPOSAL: AdaptiveReportProposal = {
@@ -192,7 +192,7 @@ export const EMPTY_ADAPTIVE_REPORT_PROPOSAL: AdaptiveReportProposal = {
   llmReadiness: EMPTY_LLM_READINESS,
   payloadFingerprint: "adaptive:v1:empty",
   proposalNarrative:
-    "No adaptive report proposal is available yet. Add a business question and applied worksheet scope to review a metadata-only proposal.",
+    "No adaptive report proposal is available yet. Add a business question and applied worksheet scope to review a draft structure, no SQL yet.",
 };
 
 const normalize = (value: string): string =>
@@ -418,7 +418,18 @@ const proposeFilters = (
 
   if (
     intent.explicitlyTemporal ||
-    promptHasAny(prompt, ["expired", "expires", "overdue", "recent", "before", "after"])
+    promptHasAny(prompt, [
+      "expired",
+      "expires",
+      "overdue",
+      "recent",
+      "within",
+      "before",
+      "after",
+      "no recent",
+      "missing recent",
+      "without recent",
+    ])
   ) {
     filters.push({
       id: "filter:date-semantics",
@@ -427,6 +438,17 @@ const proposeFilters = (
       columnName: dateColumn?.column.name || null,
       semantics: "needs_review",
       reason: "Date windows such as current, expired, recent, or overdue require human confirmation.",
+    });
+  }
+
+  if (promptHasAny(prompt, ["unresolved", "low stock", "selling fast", "fast selling", "high turnover"])) {
+    filters.push({
+      id: "filter:business-condition-semantics",
+      label: "Business condition semantics",
+      tableName: null,
+      columnName: null,
+      semantics: "needs_review",
+      reason: "Condition labels such as unresolved, low stock, selling fast, or high turnover vary by dataset.",
     });
   }
 
@@ -732,14 +754,17 @@ const createNarrative = (
       : "";
   return support === "unsupported"
     ? `FiltraQueri cannot safely propose this report yet because required metadata is missing. Add scope or clarify the task before generating SQL.`
-    : `FiltraQueri can describe a metadata-only report proposal using ${entityText} with ${metricText}.${joinText}`;
+    : `FiltraQueri can outline a draft structure, no SQL yet, using ${entityText} with ${metricText}.${joinText}`;
 };
 
-const createTitle = (intent: BusinessIntent, entities: readonly ProposedEntity[]): string => {
-  const subject =
-    entities.length > 0 ? entities.map((entity) => entity.label).join(" + ") : "applied data";
-  const intentLabel = intent.primaryIntent.replace(/_/g, " ");
-  return `Adaptive ${intentLabel} proposal for ${subject}`;
+const createTitle = (prompt: string): string => {
+  const phrase = normalize(prompt)
+    .replace(/^(please|can you|could you|show me|show|find|identify)\s+/, "")
+    .slice(0, 72)
+    .trim();
+  return phrase
+    ? `Proposal sketch: ${phrase}`
+    : "Proposal sketch: how to answer your question";
 };
 
 export function proposeAdaptiveReport(
@@ -786,7 +811,7 @@ export function proposeAdaptiveReport(
   return {
     proposalKind: "adaptive",
     id: `adaptive-report-proposal:${compactId(payloadFingerprint)}`,
-    title: createTitle(detectedIntent, entities),
+    title: createTitle(prompt),
     question: prompt,
     support,
     confidence,
