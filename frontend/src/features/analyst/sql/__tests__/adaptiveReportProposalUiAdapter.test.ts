@@ -8,9 +8,11 @@
 import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetTypes";
 import type { WorkbookMetadata, WorksheetMetadata } from "../../../workbook";
 import {
+  classifyRecommendationMatchKind,
   createAdaptiveReportProposalFallback,
   createBusinessSqlPreviewAdaptiveReportProposalFallback,
   createTaskAssistAdaptiveReportProposalFallback,
+  shouldShowAdaptiveProposalAlongsideRecommendations,
   type AdaptiveReportProposalFallbackState,
 } from "../adaptiveReportProposalUiAdapter";
 import type { BusinessSqlRenderPreview } from "../businessSqlRenderPreview";
@@ -150,6 +152,23 @@ const staticRecommendation: SqlTemplateRecommendation = {
   support: "supported",
 };
 
+const genericRecommendation = (title: string): SqlTemplateRecommendation => ({
+  id: `generic:${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+  kind: "template",
+  title,
+  description: "Generic syntax helper.",
+  sql: 'SELECT * FROM "orders";',
+  score: 5,
+  reasons: ["Simple syntax example."],
+  support: "supported",
+});
+
+const filterEqualsRecommendation = genericRecommendation("Filter equals");
+const inListRecommendation = genericRecommendation("IN list");
+const containsTextRecommendation = genericRecommendation("Contains text");
+const cteRecommendation = genericRecommendation("CTE");
+const dialectNoteRecommendation = genericRecommendation("Dialect conversion note");
+
 const businessSqlPreview = (
   status: BusinessSqlRenderPreview["status"],
 ): BusinessSqlRenderPreview => ({
@@ -246,6 +265,80 @@ const fixtures: Fixture[] = [
       ...(state.shouldShow ? ["Fallback must not show when static matches exist."] : []),
       ...(state.reason === "has_static_matches" ? [] : ["Expected static-match suppression reason."]),
       ...(state.proposal === null ? [] : ["Static matches must not be wrapped as adaptive proposals."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "recommendation classifier distinguishes no match",
+    state: createState(),
+    assert: () => [
+      ...(classifyRecommendationMatchKind([]) === "no_match"
+        ? []
+        : ["Expected no recommendations to classify as no_match."]),
+      ...(shouldShowAdaptiveProposalAlongsideRecommendations([])
+        ? []
+        : ["Expected adaptive proposal to show when there are no recommendations."]),
+    ],
+  },
+  {
+    name: "recommendation classifier distinguishes meaningful business match",
+    state: createState({ recommendations: [staticRecommendation] }),
+    assert: () => [
+      ...(classifyRecommendationMatchKind([staticRecommendation]) === "meaningful_business_match"
+        ? []
+        : ["Expected static business/report recommendation to classify as meaningful."]),
+      ...(shouldShowAdaptiveProposalAlongsideRecommendations([staticRecommendation])
+        ? ["Meaningful recommendation must suppress adaptive proposal."]
+        : []),
+    ],
+  },
+  {
+    name: "only generic Filter equals recommendation still allows adaptive proposal",
+    state: createState({ recommendations: [filterEqualsRecommendation] }),
+    assert: (state) => [
+      ...(state.shouldShow ? [] : ["Expected adaptive proposal alongside generic Filter equals."]),
+      ...(state.reason === "syntax_helpers_only" ? [] : ["Expected syntax_helpers_only reason."]),
+      ...(classifyRecommendationMatchKind([filterEqualsRecommendation]) === "generic_syntax_helper_match"
+        ? []
+        : ["Expected Filter equals to classify as generic syntax helper."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "only generic IN list recommendation still allows adaptive proposal",
+    state: createState({ recommendations: [inListRecommendation] }),
+    assert: (state) => [
+      ...(state.shouldShow ? [] : ["Expected adaptive proposal alongside generic IN list."]),
+      ...(state.reason === "syntax_helpers_only" ? [] : ["Expected syntax_helpers_only reason."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "only generic Contains text CTE and Dialect note recommendations still allow adaptive proposal",
+    state: createState({
+      recommendations: [
+        containsTextRecommendation,
+        cteRecommendation,
+        dialectNoteRecommendation,
+      ],
+    }),
+    assert: (state) => [
+      ...(state.shouldShow
+        ? []
+        : ["Expected adaptive proposal alongside generic Contains text/CTE/Dialect note helpers."]),
+      ...(state.reason === "syntax_helpers_only" ? [] : ["Expected syntax_helpers_only reason."]),
+      ...expectDisabled(state),
+    ],
+  },
+  {
+    name: "mixed meaningful and generic recommendations suppress adaptive proposal",
+    state: createState({
+      recommendations: [staticRecommendation, filterEqualsRecommendation],
+    }),
+    assert: (state) => [
+      ...(state.shouldShow ? ["Mixed meaningful and generic recommendations must suppress adaptive proposal."] : []),
+      ...(state.reason === "has_static_matches" ? [] : ["Expected static-match suppression reason."]),
+      ...(state.proposal === null ? [] : ["Suppressed adaptive proposal must stay null."]),
       ...expectDisabled(state),
     ],
   },

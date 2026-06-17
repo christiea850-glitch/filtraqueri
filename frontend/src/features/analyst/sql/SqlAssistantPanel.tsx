@@ -1456,20 +1456,34 @@ function SqlAssistantPanel({
           ) : (
             recommendations.length > 0 ? (
               <div className="sql-template-recommendation-list" aria-label="Recommended templates">
-                <div className="sql-helper-section-label">
-                  <span>Matching templates/reports</span>
-                  <small>{recommendations.length.toLocaleString()}</small>
+                <div>
+                  <div className="sql-helper-section-label">
+                    <span>Matching templates/reports</span>
+                    <small>{recommendations.length.toLocaleString()}</small>
+                  </div>
+                  {onlyNeedsReviewRecommendations && (
+                    <p className="sql-grounding-notice">{groundingEmptyCopy.needsReviewOnly}</p>
+                  )}
+                  {recommendations.map((recommendation) => (
+                    <SqlTemplateRecommendationCard
+                      key={`${recommendation.kind}:${recommendation.id}`}
+                      recommendation={recommendation}
+                      onInsertSql={onInsertSql}
+                    />
+                  ))}
                 </div>
-                {onlyNeedsReviewRecommendations && (
-                  <p className="sql-grounding-notice">{groundingEmptyCopy.needsReviewOnly}</p>
+                {adaptiveProposalFallback.shouldShow && (
+                  <div aria-label="Suggested planning outline">
+                    <div className="sql-helper-section-label">
+                      <span>Suggested planning outline</span>
+                      <small>Read-only</small>
+                    </div>
+                    <AdaptiveReportProposalCard
+                      introCopy="These syntax helpers do not fully answer the business question. FiltraQueri also sketched a planning outline from your question and dataset metadata."
+                      state={adaptiveProposalFallback}
+                    />
+                  </div>
                 )}
-                {recommendations.map((recommendation) => (
-                  <SqlTemplateRecommendationCard
-                    key={`${recommendation.kind}:${recommendation.id}`}
-                    recommendation={recommendation}
-                    onInsertSql={onInsertSql}
-                  />
-                ))}
               </div>
             ) : (
               adaptiveProposalFallback.shouldShow ? (

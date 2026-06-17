@@ -10,11 +10,17 @@ import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SqlTemplateRecommendation } from "./sqlTemplateRecommender";
 
+export type RecommendationMatchKind =
+  | "meaningful_business_match"
+  | "generic_syntax_helper_match"
+  | "no_match";
+
 export type AdaptiveReportProposalFallbackState = {
   shouldShow: boolean;
   reason:
     | "available"
     | "has_static_matches"
+    | "syntax_helpers_only"
     | "has_ready_preview"
     | "missing_prompt"
     | "missing_scope"
@@ -55,6 +61,50 @@ const normalize = (value: string): string =>
     .replace(/[^a-z0-9\s]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const GENERIC_SYNTAX_HELPER_PATTERNS = [
+  /\bfilter equals\b/,
+  /\bin list\b/,
+  /\bcontains text\b/,
+  /\bcte\b/,
+  /\bcommon table expression\b/,
+  /\bdialect (conversion )?note\b/,
+  /\bconversion note\b/,
+  /\bsyntax example\b/,
+  /\bsimple syntax\b/,
+];
+
+const isGenericSyntaxHelperRecommendation = (
+  recommendation: SqlTemplateRecommendation,
+): boolean => {
+  if (recommendation.kind === "report") return false;
+  const text = normalize(
+    [
+      recommendation.id,
+      recommendation.title,
+      recommendation.description,
+      recommendation.reasons.join(" "),
+      recommendation.candidateIntent?.primaryIntent || "",
+    ].join(" "),
+  );
+
+  return GENERIC_SYNTAX_HELPER_PATTERNS.some((pattern) => pattern.test(text));
+};
+
+export const classifyRecommendationMatchKind = (
+  recommendations: readonly SqlTemplateRecommendation[],
+): RecommendationMatchKind => {
+  if (recommendations.length === 0) return "no_match";
+
+  return recommendations.every(isGenericSyntaxHelperRecommendation)
+    ? "generic_syntax_helper_match"
+    : "meaningful_business_match";
+};
+
+export const shouldShowAdaptiveProposalAlongsideRecommendations = (
+  recommendations: readonly SqlTemplateRecommendation[],
+): boolean =>
+  classifyRecommendationMatchKind(recommendations) !== "meaningful_business_match";
 
 const matchesScopeLabel = (worksheet: WorksheetMetadata, label: string): boolean => {
   const normalizedLabel = normalize(label);
@@ -137,14 +187,16 @@ const createAvailableState = ({
   dataset,
   selectedDialect,
   appliedScopeSelections,
+  reason = "available",
 }: {
   taskPrompt: string;
   dataset: DatasetMetadata;
   selectedDialect: SqlDialectId;
   appliedScopeSelections: readonly AnalysisScopeSelection[];
+  reason?: Extract<AdaptiveReportProposalFallbackState["reason"], "available" | "syntax_helpers_only">;
 }): AdaptiveReportProposalFallbackState => ({
   shouldShow: true,
-  reason: "available",
+  reason,
   proposal: proposeAdaptiveReport({
     prompt: taskPrompt,
     detectedIntent: detectBusinessIntent(taskPrompt),
@@ -165,7 +217,8 @@ export function createAdaptiveReportProposalFallback({
   appliedScopeLabels,
   recommendations,
 }: CreateAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
-  if (recommendations.length > 0) {
+  const recommendationMatchKind = classifyRecommendationMatchKind(recommendations);
+  if (recommendationMatchKind === "meaningful_business_match") {
     return unavailableState("has_static_matches");
   }
 
@@ -191,6 +244,10 @@ export function createAdaptiveReportProposalFallback({
     dataset,
     selectedDialect,
     appliedScopeSelections,
+    reason:
+      recommendationMatchKind === "generic_syntax_helper_match"
+        ? "syntax_helpers_only"
+        : "available",
   });
 }
 
