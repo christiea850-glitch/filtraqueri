@@ -80,6 +80,18 @@ const JOIN_STATUSES: ProposedJoinNeed["status"][] = [
   "missing",
   "not_required",
 ];
+const ARRAY_FIELD_NAMES = [
+  "entities",
+  "metrics",
+  "groupings",
+  "filters",
+  "joinNeeds",
+  "assumptions",
+  "missingRequirements",
+  "warnings",
+] as const;
+
+type ArrayFieldName = (typeof ARRAY_FIELD_NAMES)[number];
 
 const normalize = (value: string): string =>
   value
@@ -98,6 +110,94 @@ const normalizeText = (value: unknown, maxLength: number): string | null => {
 
 const asRecord = (value: unknown): RawRecord =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as RawRecord) : {};
+
+const isPlainRecord = (value: unknown): value is RawRecord => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
+const hasTextField = (record: RawRecord, keys: readonly string[]): boolean =>
+  keys.some((key) => typeof record[key] === "string" && record[key].trim().length > 0);
+
+const hasJoinEndpointPair = (record: RawRecord): boolean =>
+  (hasTextField(record, ["leftEntity"]) && hasTextField(record, ["rightEntity"])) ||
+  (hasTextField(record, ["leftTable"]) && hasTextField(record, ["rightTable"])) ||
+  (hasTextField(record, ["fromEntity"]) && hasTextField(record, ["toEntity"])) ||
+  (hasTextField(record, ["sourceTable", "sourceEntity"]) &&
+    hasTextField(record, ["targetTable", "targetEntity"]));
+
+const arrayEntryHasExpectedShape = (
+  fieldName: ArrayFieldName,
+  record: RawRecord,
+): boolean => {
+  if (Object.keys(record).length === 0) return false;
+
+  switch (fieldName) {
+    case "entities":
+      return hasTextField(record, ["id", "requestedName", "label", "tableName", "entity"]);
+    case "metrics":
+      return hasTextField(record, ["id", "kind", "label", "name", "columnName", "metric"]);
+    case "groupings":
+      return hasTextField(record, ["id", "label", "name", "tableName", "columnName", "field"]);
+    case "filters":
+      return hasTextField(record, ["id", "kind", "label", "predicate", "reason", "columnName"]);
+    case "joinNeeds":
+      return hasJoinEndpointPair(record);
+    case "assumptions":
+      return hasTextField(record, ["id", "label", "detail"]);
+    case "missingRequirements":
+      return hasTextField(record, ["id", "kind", "label", "message"]);
+    case "warnings":
+      return hasTextField(record, ["id", "severity", "message"]);
+  }
+};
+
+const validateArrayFields = (
+  record: RawRecord,
+  issues: AdaptiveProposalLlmValidationIssue[],
+) => {
+  ARRAY_FIELD_NAMES.forEach((fieldName) => {
+    const value = record[fieldName];
+    if (value === undefined) return;
+
+    if (!Array.isArray(value)) {
+      issues.push({
+        severity: "error",
+        code: "invalid_shape",
+        message: `${fieldName} must be an array when present.`,
+      });
+      return;
+    }
+
+    if (value.length > MAX_ITEMS) {
+      issues.push({
+        severity: "error",
+        code: "invalid_shape",
+        message: `${fieldName} exceeds the maximum allowed item count.`,
+      });
+    }
+
+    value.forEach((item, index) => {
+      if (!isPlainRecord(item)) {
+        issues.push({
+          severity: "error",
+          code: "invalid_shape",
+          message: `${fieldName}[${index}] must be a plain object.`,
+        });
+        return;
+      }
+
+      if (!arrayEntryHasExpectedShape(fieldName, item)) {
+        issues.push({
+          severity: "error",
+          code: "invalid_shape",
+          message: `${fieldName}[${index}] is missing the minimal expected shape.`,
+        });
+      }
+    });
+  });
+};
 
 const collectForbiddenFieldIssues = (
   value: unknown,
@@ -413,7 +513,7 @@ const validateMissingRequirements = (
 };
 
 const normalizeArray = <T>(value: unknown): T[] | undefined =>
-  Array.isArray(value) ? (value.slice(0, MAX_ITEMS) as T[]) : undefined;
+  Array.isArray(value) ? (value as T[]) : undefined;
 
 const sanitizeResponse = (record: RawRecord): AdaptiveProposalLlmResponse => {
   const response: AdaptiveProposalLlmResponse = {
@@ -477,6 +577,7 @@ export const validateAdaptiveProposalLlmResponse = (
   issues.push(...collectForbiddenFieldIssues(candidate));
   issues.push(...collectSqlLikeIssues(candidate));
   validateTextLengths(candidate, issues);
+  validateArrayFields(record, issues);
   validateEnums(record, issues);
   validateReferences(record, payload, issues);
   validateMissingRequirements(record, payload, issues);

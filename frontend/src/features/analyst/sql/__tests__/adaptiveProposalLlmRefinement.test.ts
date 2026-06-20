@@ -235,6 +235,24 @@ const fixtures: Fixture[] = [
     ],
   },
   {
+    name: "invalid array response does not merge into proposal",
+    response: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      metrics: [null],
+      title: "Unsafe array refinement",
+    },
+    assert: (result, original) => [
+      ...(result.changed === false ? [] : ["Invalid array refinement must not report changed."]),
+      ...(result.proposal === original ? [] : ["Invalid array refinement must return original proposal."]),
+      ...(result.validation.ok === false ? [] : ["Invalid array response should fail validation."]),
+      ...(result.validation.issues.some((issue) => issue.code === "invalid_shape")
+        ? []
+        : ["Invalid array response should report invalid_shape."]),
+      ...(original.title === baseProposal.title ? [] : ["Original proposal title was mutated."]),
+      ...expectPlanningOnly(result.proposal),
+    ],
+  },
+  {
     name: "original proposal is not mutated",
     response: validTitleResponse,
     assert: (result, original) => [

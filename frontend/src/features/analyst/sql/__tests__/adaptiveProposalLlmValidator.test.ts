@@ -102,6 +102,12 @@ const redactedColumnId =
   payload.tables.flatMap((table) => table.columns).find((column) => column.redactedColumnId)
     ?.redactedColumnId || "redacted_column_1";
 
+const expectIssue = (
+  result: AdaptiveProposalLlmValidationResult,
+  code: AdaptiveProposalLlmValidationResult["issues"][number]["code"],
+  message: string,
+): string[] => (result.issues.some((issue) => issue.code === code) ? [] : [message]);
+
 const validResponse = {
   schemaVersion: "adaptive-proposal-llm-response:v1",
   title: "Order totals by region",
@@ -135,6 +141,108 @@ const fixtures: Fixture[] = [
     assert: (result) => [
       ...(result.ok ? [] : [`Expected valid response; got ${result.issues.map((issue) => issue.code).join(", ")}.`]),
       ...(result.response?.title === "Order totals by region" ? [] : ["Expected sanitized title."]),
+    ],
+  },
+  {
+    name: "metrics non-array field is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      metrics: "oops",
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected non-array metrics rejection."),
+      ...(result.ok === false ? [] : ["Invalid array field must fail validation."]),
+    ],
+  },
+  {
+    name: "metrics null array entry is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      metrics: [null],
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected null metrics entry rejection."),
+      ...(result.ok === false ? [] : ["Null array entry must fail validation."]),
+    ],
+  },
+  {
+    name: "metrics primitive array entry is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      metrics: ["bad"],
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected primitive metrics entry rejection."),
+      ...(result.ok === false ? [] : ["Primitive array entry must fail validation."]),
+    ],
+  },
+  {
+    name: "metrics empty object array entry is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      metrics: [{}],
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected empty metrics object rejection."),
+      ...(result.ok === false ? [] : ["Empty array object must fail validation."]),
+    ],
+  },
+  {
+    name: "entities null array entry is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      entities: [null],
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected null entities entry rejection."),
+      ...(result.ok === false ? [] : ["Null entity entry must fail validation."]),
+    ],
+  },
+  {
+    name: "filters primitive array entry is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      filters: [123],
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected primitive filters entry rejection."),
+      ...(result.ok === false ? [] : ["Primitive filter entry must fail validation."]),
+    ],
+  },
+  {
+    name: "join need missing endpoints is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      joinNeeds: [
+        {
+          id: "join:missing-endpoints",
+          status: "needs_review",
+          reason: "No endpoints were provided.",
+        },
+      ],
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected join endpoint shape rejection."),
+      ...(result.ok === false ? [] : ["Join without endpoints must fail validation."]),
+    ],
+  },
+  {
+    name: "overlong metrics array is rejected",
+    candidate: {
+      schemaVersion: "adaptive-proposal-llm-response:v1",
+      metrics: Array.from({ length: 31 }, (_, index) => ({
+        id: `metric:${index}`,
+        label: `metric ${index}`,
+        kind: "sum",
+        tableName: "orders",
+        columnName: "order_total",
+        synthesized: false,
+        confidence: "high",
+      })),
+    },
+    assert: (result) => [
+      ...expectIssue(result, "invalid_shape", "Expected overlong metrics array rejection."),
+      ...(result.ok === false ? [] : ["Overlong array must fail validation."]),
     ],
   },
   {
