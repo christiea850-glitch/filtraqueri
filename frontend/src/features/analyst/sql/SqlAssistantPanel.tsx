@@ -53,6 +53,11 @@ import {
   type AdaptiveReportProposalFallbackState,
 } from "./adaptiveReportProposalUiAdapter";
 import type { AdaptiveReportProposal } from "./adaptiveReportProposal";
+import AdaptiveProposalLlmConsentShell from "./AdaptiveProposalLlmConsentShell";
+import {
+  createAdaptiveProposalLlmConsentShellViewModel,
+  type AdaptiveProposalLlmConsentShellViewModel,
+} from "./adaptiveProposalLlmConsentShellAdapter";
 
 type SqlAssistantPanelProps = {
   dataset: DatasetMetadata | null;
@@ -569,9 +574,11 @@ const adaptiveProposalRows = (proposal: AdaptiveReportProposal) =>
 
 function AdaptiveReportProposalCard({
   introCopy = "No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.",
+  consentShell,
   state,
 }: {
   introCopy?: string;
+  consentShell?: AdaptiveProposalLlmConsentShellViewModel | null;
   state: AdaptiveReportProposalFallbackState;
 }) {
   const proposal: AdaptiveReportProposal | null = state.proposal;
@@ -604,6 +611,7 @@ function AdaptiveReportProposalCard({
           ))}
         </dl>
       )}
+      {consentShell && <AdaptiveProposalLlmConsentShell model={consentShell} />}
       <div className="sql-assistant-card-foot">
         <small>{adaptivePlanningSafetyCopy}. It is not a template, report draft, or SQL validation result.</small>
       </div>
@@ -1126,6 +1134,17 @@ function SqlAssistantPanel({
       }),
     [appliedScopeLabels, dataset, recommendations, selectedDialect, taskPrompt],
   );
+  const adaptiveProposalConsentShell = useMemo(
+    () =>
+      adaptiveProposalFallback.proposal
+        ? createAdaptiveProposalLlmConsentShellViewModel({
+            proposal: adaptiveProposalFallback.proposal,
+            dataset,
+            selectedGuidanceDialect: selectedDialect,
+          })
+        : null,
+    [adaptiveProposalFallback.proposal, dataset, selectedDialect],
+  );
   const taskAssistRecommendations = useMemo(
     () =>
       recommendSqlTemplates({
@@ -1480,6 +1499,7 @@ function SqlAssistantPanel({
                     </div>
                     <AdaptiveReportProposalCard
                       introCopy="These syntax helpers do not fully answer the business question. FiltraQueri also sketched a planning outline from your question and dataset metadata."
+                      consentShell={adaptiveProposalConsentShell}
                       state={adaptiveProposalFallback}
                     />
                   </div>
@@ -1492,7 +1512,10 @@ function SqlAssistantPanel({
                     <span>Adaptive report proposal</span>
                     <small>Read-only</small>
                   </div>
-                  <AdaptiveReportProposalCard state={adaptiveProposalFallback} />
+                  <AdaptiveReportProposalCard
+                    consentShell={adaptiveProposalConsentShell}
+                    state={adaptiveProposalFallback}
+                  />
                 </div>
               ) : (
                 <p className="sql-template-recommender-empty">
