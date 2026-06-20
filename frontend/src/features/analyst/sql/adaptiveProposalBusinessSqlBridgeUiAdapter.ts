@@ -8,7 +8,13 @@ import {
   type AdaptiveProposalBusinessSqlBridgeState,
 } from "./adaptiveProposalBusinessSqlBridge";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
+import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
+import type { BusinessSqlRenderReadinessResult } from "./businessSqlRenderReadiness";
 import { isBusinessSqlPreviewReadyRenderable } from "./AdaptiveProposalLlmConsentDisclosure";
+import {
+  getAdaptiveProposalBusinessSqlPreviewHandoffAction,
+  type AdaptiveProposalBusinessSqlPreviewHandoffAction,
+} from "./adaptiveProposalBusinessSqlPreviewHandoff";
 
 export type BusinessSqlPlanCandidateDetail = {
   label: string;
@@ -28,6 +34,10 @@ export type BusinessSqlPlanCandidateViewModel = {
   noInsertAvailable: true;
   noRunAvailable: true;
   noProviderOrLlmUsed: true;
+  plan: BusinessSqlQueryPlan | null;
+  readiness: BusinessSqlRenderReadinessResult | null;
+  bridgeIssues: AdaptiveProposalBusinessSqlBridgeIssue[];
+  previewHandoffAction: AdaptiveProposalBusinessSqlPreviewHandoffAction;
   details: BusinessSqlPlanCandidateDetail[];
   issues: string[];
   readinessStatus: string;
@@ -273,6 +283,17 @@ export const createBusinessSqlPlanCandidateViewModel = ({
     noInsertAvailable: true,
     noRunAvailable: true,
     noProviderOrLlmUsed: true,
+    plan: result.plan,
+    readiness: result.readiness,
+    bridgeIssues: [...result.issues],
+    previewHandoffAction: getAdaptiveProposalBusinessSqlPreviewHandoffAction({
+      candidateState: result.state,
+      plan: result.plan,
+      readiness: result.readiness,
+      issues: result.issues,
+      activeSqlDraft,
+      existingPreview: businessSqlRenderPreview,
+    }),
     details: detailsFor(result),
     issues: issueMessagesFor(result.state, result.issues),
     readinessStatus: result.readiness?.status || "not evaluated",
@@ -281,4 +302,22 @@ export const createBusinessSqlPlanCandidateViewModel = ({
 
 export const serializeBusinessSqlPlanCandidateViewModelForAudit = (
   model: BusinessSqlPlanCandidateViewModel,
-): string => JSON.stringify(model);
+): string =>
+  JSON.stringify({
+    state: model.state,
+    statusLabel: model.statusLabel,
+    heading: model.heading,
+    body: model.body,
+    actionLabel: model.actionLabel,
+    actionDisabled: model.actionDisabled,
+    safetyLine: model.safetyLine,
+    noSqlRendered: model.noSqlRendered,
+    noRenderPreviewCreated: model.noRenderPreviewCreated,
+    noInsertAvailable: model.noInsertAvailable,
+    noRunAvailable: model.noRunAvailable,
+    noProviderOrLlmUsed: model.noProviderOrLlmUsed,
+    previewHandoffAction: model.previewHandoffAction,
+    details: model.details,
+    issues: model.issues,
+    readinessStatus: model.readinessStatus,
+  });

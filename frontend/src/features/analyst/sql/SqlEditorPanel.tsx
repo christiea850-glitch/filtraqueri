@@ -19,6 +19,7 @@ import {
   createBusinessSqlPlanCandidateViewModel,
   type BusinessSqlPlanCandidateViewModel,
 } from "./adaptiveProposalBusinessSqlBridgeUiAdapter";
+import { createAdaptiveProposalBusinessSqlPreviewHandoff } from "./adaptiveProposalBusinessSqlPreviewHandoff";
 import {
   applyBusinessSqlRenderPreviewManualInsert,
   getBusinessSqlRenderPreviewEmptyState,
@@ -141,10 +142,12 @@ const adaptiveProposalRows = (proposal: AdaptiveReportProposal) =>
 
 function BusinessSqlAdaptiveProposalSection({
   consentDisclosure,
+  onPreviewSqlFromCandidate,
   planCandidate,
   state,
 }: {
   consentDisclosure?: AdaptiveProposalLlmConsentShellViewModel | null;
+  onPreviewSqlFromCandidate?: () => void;
   planCandidate?: BusinessSqlPlanCandidateViewModel | null;
   state: AdaptiveReportProposalFallbackState;
 }) {
@@ -185,7 +188,12 @@ function BusinessSqlAdaptiveProposalSection({
         </dl>
       )}
       {consentDisclosure && <AdaptiveProposalLlmConsentDisclosure model={consentDisclosure} />}
-      {planCandidate && <BusinessSqlPlanCandidatePanel model={planCandidate} />}
+      {planCandidate && (
+        <BusinessSqlPlanCandidatePanel
+          model={planCandidate}
+          onPreviewSqlFromCandidate={onPreviewSqlFromCandidate}
+        />
+      )}
       <p className="business-sql-preview-action-note">
         {adaptivePlanningSafetyCopy}. It is not Business SQL, not a validation result for the editor draft, and not executable SQL.
       </p>
@@ -315,30 +323,34 @@ function SqlEditorPanel({
     : null;
   const [businessSqlPreviewFeedback, setBusinessSqlPreviewFeedback] =
     useState<BusinessSqlPreviewFeedback>("idle");
+  const [businessSqlCandidatePreview, setBusinessSqlCandidatePreview] =
+    useState<BusinessSqlRenderPreview | null>(null);
+  const effectiveBusinessSqlRenderPreview =
+    businessSqlCandidatePreview || businessSqlRenderPreview;
   const businessSqlPreviewCopyState = useMemo(
     () =>
-      businessSqlRenderPreview
-        ? getBusinessSqlRenderPreviewCopyState(businessSqlRenderPreview)
+      effectiveBusinessSqlRenderPreview
+        ? getBusinessSqlRenderPreviewCopyState(effectiveBusinessSqlRenderPreview)
         : null,
-    [businessSqlRenderPreview],
+    [effectiveBusinessSqlRenderPreview],
   );
   const businessSqlPreviewInsertState = useMemo(
     () =>
-      businessSqlRenderPreview
-        ? getBusinessSqlRenderPreviewManualInsertState(businessSqlRenderPreview, editor.value)
+      effectiveBusinessSqlRenderPreview
+        ? getBusinessSqlRenderPreviewManualInsertState(effectiveBusinessSqlRenderPreview, editor.value)
         : null,
-    [businessSqlRenderPreview, editor.value],
+    [effectiveBusinessSqlRenderPreview, editor.value],
   );
   const businessSqlPreviewEmptyState = useMemo(
     () =>
-      businessSqlRenderPreview
+      effectiveBusinessSqlRenderPreview
         ? getBusinessSqlRenderPreviewEmptyState({
-            preview: businessSqlRenderPreview,
+            preview: effectiveBusinessSqlRenderPreview,
             activeSqlDraft: editor.value,
             activeSqlDraftSource: sqlTabs.activeTabCreatedFrom,
           })
         : null,
-    [businessSqlRenderPreview, editor.value, sqlTabs.activeTabCreatedFrom],
+    [effectiveBusinessSqlRenderPreview, editor.value, sqlTabs.activeTabCreatedFrom],
   );
   const businessSqlAdaptiveProposalFallback = useMemo(
     () =>
@@ -347,10 +359,10 @@ function SqlEditorPanel({
         dataset: dataset || null,
         selectedDialect: dialectContext.selectedDialect,
         appliedScopeSelections: sqlTabs.appliedScopeSelections,
-        preview: businessSqlRenderPreview || null,
+        preview: effectiveBusinessSqlRenderPreview || null,
       }),
     [
-      businessSqlRenderPreview,
+      effectiveBusinessSqlRenderPreview,
       dataset,
       dialectContext.selectedDialect,
       sqlTabs.appliedScopeSelections,
@@ -369,14 +381,14 @@ function SqlEditorPanel({
 
     return shouldShowAdaptiveProposalLlmConsentDisclosure({
       model,
-      businessSqlRenderPreview: businessSqlRenderPreview || null,
+      businessSqlRenderPreview: effectiveBusinessSqlRenderPreview || null,
       activeSqlDraft: editor.value,
     })
       ? model
       : null;
   }, [
     businessSqlAdaptiveProposalFallback.proposal,
-    businessSqlRenderPreview,
+    effectiveBusinessSqlRenderPreview,
     dataset,
     dialectContext.selectedDialect,
     editor.value,
@@ -386,13 +398,13 @@ function SqlEditorPanel({
       createBusinessSqlPlanCandidateViewModel({
         fallback: businessSqlAdaptiveProposalFallback,
         dataset: dataset || null,
-        businessSqlRenderPreview: businessSqlRenderPreview || null,
+        businessSqlRenderPreview: effectiveBusinessSqlRenderPreview || null,
         activeSqlDraft: editor.value,
         selectedGuidanceDialect: dialectContext.selectedDialect,
       }),
     [
       businessSqlAdaptiveProposalFallback,
-      businessSqlRenderPreview,
+      effectiveBusinessSqlRenderPreview,
       dataset,
       dialectContext.selectedDialect,
       editor.value,
@@ -401,7 +413,18 @@ function SqlEditorPanel({
 
   useEffect(() => {
     setBusinessSqlPreviewFeedback("idle");
-  }, [businessSqlRenderPreview?.planId, businessSqlRenderPreview?.sql]);
+  }, [effectiveBusinessSqlRenderPreview?.planId, effectiveBusinessSqlRenderPreview?.sql]);
+
+  useEffect(() => {
+    setBusinessSqlCandidatePreview(null);
+  }, [
+    businessSqlRenderPreview?.planId,
+    businessSqlRenderPreview?.sql,
+    dataset?.dataset_id,
+    dialectContext.selectedDialect,
+    sqlTabs.taskPrompt,
+    editor.value,
+  ]);
 
   useEffect(() => {
     if (businessSqlPreviewFeedback === "idle") return undefined;
@@ -425,10 +448,10 @@ function SqlEditorPanel({
   };
 
   const insertBusinessSqlPreview = () => {
-    if (!businessSqlRenderPreview) return;
+    if (!effectiveBusinessSqlRenderPreview) return;
 
     const insertResult = applyBusinessSqlRenderPreviewManualInsert(
-      businessSqlRenderPreview,
+      effectiveBusinessSqlRenderPreview,
       editor.value,
     );
 
@@ -449,6 +472,22 @@ function SqlEditorPanel({
       : businessSqlPreviewInsertState?.disabledReason ||
         "Preview actions become available only when SQL is ready.";
   const dialectStyleName = dialectContext.selectedDialectProfile.displayName;
+  const previewSqlFromPlanCandidate = () => {
+    if (!businessSqlPlanCandidate) return;
+
+    const handoff = createAdaptiveProposalBusinessSqlPreviewHandoff({
+      candidateState: businessSqlPlanCandidate.state,
+      plan: businessSqlPlanCandidate.plan,
+      readiness: businessSqlPlanCandidate.readiness,
+      issues: businessSqlPlanCandidate.bridgeIssues,
+      activeSqlDraft: editor.value,
+      existingPreview: effectiveBusinessSqlRenderPreview || null,
+    });
+
+    if (!handoff.preview) return;
+
+    setBusinessSqlCandidatePreview(handoff.preview);
+  };
 
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -681,32 +720,32 @@ function SqlEditorPanel({
         </div>
       )}
 
-      {businessSqlRenderPreview && (
+      {effectiveBusinessSqlRenderPreview && (
         <section
           className={[
             "business-sql-preview-panel",
-            `is-${businessSqlRenderPreview.status.replace("_", "-")}`,
+            `is-${effectiveBusinessSqlRenderPreview.status.replace("_", "-")}`,
           ].join(" ")}
           aria-label="Read-only Business SQL preview"
         >
           <div className="business-sql-preview-head">
             <div>
               <span>Business SQL preview</span>
-              <strong>{businessSqlRenderPreview.title}</strong>
+              <strong>{effectiveBusinessSqlRenderPreview.title}</strong>
             </div>
             <div className="business-sql-preview-badges" aria-label="Preview metadata">
-              <em>{businessSqlRenderPreview.status === "ready" ? "Ready" : businessSqlRenderPreview.status === "blocked" ? "Blocked" : "Needs review"}</em>
+              <em>{effectiveBusinessSqlRenderPreview.status === "ready" ? "Ready" : effectiveBusinessSqlRenderPreview.status === "blocked" ? "Blocked" : "Needs review"}</em>
               <em>DuckDB target</em>
-              {businessSqlRenderPreview.guidanceDialect && (
-                <em>{businessSqlRenderPreview.guidanceDialect.toUpperCase()} guidance</em>
+              {effectiveBusinessSqlRenderPreview.guidanceDialect && (
+                <em>{effectiveBusinessSqlRenderPreview.guidanceDialect.toUpperCase()} guidance</em>
               )}
             </div>
           </div>
-          <p>{businessSqlRenderPreview.body}</p>
+          <p>{effectiveBusinessSqlRenderPreview.body}</p>
 
-          {businessSqlRenderPreview.sql ? (
+          {effectiveBusinessSqlRenderPreview.sql ? (
             <pre className="business-sql-preview-code" aria-label="Read-only rendered SQL">
-              {businessSqlRenderPreview.sql}
+              {effectiveBusinessSqlRenderPreview.sql}
             </pre>
           ) : (
             <div className="business-sql-preview-empty" aria-label="No rendered SQL">
@@ -715,24 +754,24 @@ function SqlEditorPanel({
             </div>
           )}
 
-          {(businessSqlRenderPreview.reasons.length > 0 ||
-            businessSqlRenderPreview.warnings.length > 0) && (
+          {(effectiveBusinessSqlRenderPreview.reasons.length > 0 ||
+            effectiveBusinessSqlRenderPreview.warnings.length > 0) && (
             <div className="business-sql-preview-review-notes">
-              {businessSqlRenderPreview.reasons.length > 0 && (
+              {effectiveBusinessSqlRenderPreview.reasons.length > 0 && (
                 <div>
                   <strong>Reasons</strong>
                   <ul>
-                    {businessSqlRenderPreview.reasons.slice(0, 4).map((reason) => (
+                    {effectiveBusinessSqlRenderPreview.reasons.slice(0, 4).map((reason) => (
                       <li key={reason}>{reason}</li>
                     ))}
                   </ul>
                 </div>
               )}
-              {businessSqlRenderPreview.warnings.length > 0 && (
+              {effectiveBusinessSqlRenderPreview.warnings.length > 0 && (
                 <div>
                   <strong>Warnings</strong>
                   <ul>
-                    {businessSqlRenderPreview.warnings.slice(0, 4).map((warning) => (
+                    {effectiveBusinessSqlRenderPreview.warnings.slice(0, 4).map((warning) => (
                       <li key={warning}>{warning}</li>
                     ))}
                   </ul>
@@ -777,6 +816,7 @@ function SqlEditorPanel({
           )}
           <BusinessSqlAdaptiveProposalSection
             consentDisclosure={businessSqlAdaptiveProposalDisclosure}
+            onPreviewSqlFromCandidate={previewSqlFromPlanCandidate}
             planCandidate={businessSqlPlanCandidate}
             state={businessSqlAdaptiveProposalFallback}
           />

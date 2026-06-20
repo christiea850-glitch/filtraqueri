@@ -3,9 +3,13 @@ import type { BusinessSqlPlanCandidateViewModel } from "./adaptiveProposalBusine
 
 type BusinessSqlPlanCandidatePanelProps = {
   model: BusinessSqlPlanCandidateViewModel | null;
+  onPreviewSqlFromCandidate?: () => void;
 };
 
-function BusinessSqlPlanCandidatePanel({ model }: BusinessSqlPlanCandidatePanelProps) {
+function BusinessSqlPlanCandidatePanel({
+  model,
+  onPreviewSqlFromCandidate,
+}: BusinessSqlPlanCandidatePanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   if (!model) return null;
 
@@ -47,6 +51,15 @@ function BusinessSqlPlanCandidatePanel({ model }: BusinessSqlPlanCandidatePanelP
           <p className="business-sql-preview-action-note">
             No SQL preview was created. Editor changes, execution, backend calls, provider calls, and LLM calls are not available from this candidate.
           </p>
+          {model.previewHandoffAction.canPreview && (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onPreviewSqlFromCandidate}
+            >
+              {model.previewHandoffAction.label}
+            </button>
+          )}
         </div>
       )}
     </section>
