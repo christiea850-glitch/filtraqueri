@@ -10,10 +10,15 @@ import type { AdaptiveReportProposal } from "./adaptiveReportProposal";
 import AdaptiveProposalLlmConsentDisclosure, {
   shouldShowAdaptiveProposalLlmConsentDisclosure,
 } from "./AdaptiveProposalLlmConsentDisclosure";
+import BusinessSqlPlanCandidatePanel from "./BusinessSqlPlanCandidatePanel";
 import {
   createAdaptiveProposalLlmConsentShellViewModel,
   type AdaptiveProposalLlmConsentShellViewModel,
 } from "./adaptiveProposalLlmConsentShellAdapter";
+import {
+  createBusinessSqlPlanCandidateViewModel,
+  type BusinessSqlPlanCandidateViewModel,
+} from "./adaptiveProposalBusinessSqlBridgeUiAdapter";
 import {
   applyBusinessSqlRenderPreviewManualInsert,
   getBusinessSqlRenderPreviewEmptyState,
@@ -136,9 +141,11 @@ const adaptiveProposalRows = (proposal: AdaptiveReportProposal) =>
 
 function BusinessSqlAdaptiveProposalSection({
   consentDisclosure,
+  planCandidate,
   state,
 }: {
   consentDisclosure?: AdaptiveProposalLlmConsentShellViewModel | null;
+  planCandidate?: BusinessSqlPlanCandidateViewModel | null;
   state: AdaptiveReportProposalFallbackState;
 }) {
   const proposal = state.proposal;
@@ -178,6 +185,7 @@ function BusinessSqlAdaptiveProposalSection({
         </dl>
       )}
       {consentDisclosure && <AdaptiveProposalLlmConsentDisclosure model={consentDisclosure} />}
+      {planCandidate && <BusinessSqlPlanCandidatePanel model={planCandidate} />}
       <p className="business-sql-preview-action-note">
         {adaptivePlanningSafetyCopy}. It is not Business SQL, not a validation result for the editor draft, and not executable SQL.
       </p>
@@ -373,6 +381,23 @@ function SqlEditorPanel({
     dialectContext.selectedDialect,
     editor.value,
   ]);
+  const businessSqlPlanCandidate = useMemo(
+    () =>
+      createBusinessSqlPlanCandidateViewModel({
+        fallback: businessSqlAdaptiveProposalFallback,
+        dataset: dataset || null,
+        businessSqlRenderPreview: businessSqlRenderPreview || null,
+        activeSqlDraft: editor.value,
+        selectedGuidanceDialect: dialectContext.selectedDialect,
+      }),
+    [
+      businessSqlAdaptiveProposalFallback,
+      businessSqlRenderPreview,
+      dataset,
+      dialectContext.selectedDialect,
+      editor.value,
+    ],
+  );
 
   useEffect(() => {
     setBusinessSqlPreviewFeedback("idle");
@@ -752,6 +777,7 @@ function SqlEditorPanel({
           )}
           <BusinessSqlAdaptiveProposalSection
             consentDisclosure={businessSqlAdaptiveProposalDisclosure}
+            planCandidate={businessSqlPlanCandidate}
             state={businessSqlAdaptiveProposalFallback}
           />
         </section>

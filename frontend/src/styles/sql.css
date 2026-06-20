@@ -2892,6 +2892,24 @@
   line-height: 1.4;
 }
 
+.business-sql-plan-candidate-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.business-sql-plan-candidate-panel > button {
+  justify-self: flex-start;
+}
+
+.business-sql-plan-candidate-details {
+  display: grid;
+  gap: 8px;
+}
+
 .sql-workspace-tab-title {
   min-width: 0;
   overflow: hidden;
