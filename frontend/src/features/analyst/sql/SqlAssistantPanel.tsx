@@ -1176,6 +1176,17 @@ function SqlAssistantPanel({
       taskRequest,
     ],
   );
+  const taskAssistAdaptiveProposalConsentShell = useMemo(
+    () =>
+      taskAssistAdaptiveProposalFallback.proposal
+        ? createAdaptiveProposalLlmConsentShellViewModel({
+            proposal: taskAssistAdaptiveProposalFallback.proposal,
+            dataset,
+            selectedGuidanceDialect: selectedDialect,
+          })
+        : null,
+    [dataset, selectedDialect, taskAssistAdaptiveProposalFallback.proposal],
+  );
   const onlyNeedsReviewRecommendations =
     recommendations.length > 0 &&
     recommendations.every((recommendation) => recommendation.support === "needs_review");
@@ -1677,6 +1688,7 @@ function SqlAssistantPanel({
               </div>
               <AdaptiveReportProposalCard
                 introCopy="No exact task template matched. FiltraQueri generated an adaptive analysis proposal from your question and dataset metadata."
+                consentShell={taskAssistAdaptiveProposalConsentShell}
                 state={taskAssistAdaptiveProposalFallback}
               />
             </div>

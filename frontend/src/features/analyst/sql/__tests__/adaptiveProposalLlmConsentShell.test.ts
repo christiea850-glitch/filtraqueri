@@ -11,11 +11,13 @@ import { detectBusinessIntent } from "../businessIntentGrounding";
 import { proposeAdaptiveReport } from "../adaptiveReportProposal";
 import type { AdaptiveReportProposal } from "../adaptiveReportProposal";
 import type { AdaptiveProposalLlmValidationResult } from "../adaptiveProposalLlmContract";
+import { createTaskAssistAdaptiveReportProposalFallback } from "../adaptiveReportProposalUiAdapter";
 import {
   createAdaptiveProposalLlmConsentShellViewModel,
   type AdaptiveProposalLlmConsentShellStatus,
   type AdaptiveProposalLlmConsentShellViewModel,
 } from "../adaptiveProposalLlmConsentShellAdapter";
+import type { SqlTemplateRecommendation } from "../sqlTemplateRecommender";
 
 type FixtureResult = {
   name: string;
@@ -38,8 +40,12 @@ type Fixture = {
 const RAW_SAMPLE = "raw sample should not render";
 const RAW_TOP_VALUE = "raw top value should not render";
 const RAW_PROMPT = "show order totals by raw customer prompt text";
+const RAW_ROW = "raw row should not render";
 const RAW_SQL = "select * from orders";
 const RAW_RESULT = "query result row";
+const RAW_CLIPBOARD = "clipboard value should not render";
+const RAW_API_KEY = "sk-test-api-key-should-not-render";
+const RAW_PROVIDER_RESPONSE = "raw provider response should not render";
 
 const column = (
   name: string,
@@ -144,6 +150,46 @@ const createModel = ({
     changedFields,
   });
 
+const meaningfulRecommendation: SqlTemplateRecommendation = {
+  id: "report:orders-by-status",
+  kind: "report",
+  title: "Orders by status",
+  description: "Summarize order counts by status.",
+  sql: RAW_SQL,
+  score: 0.95,
+  reasons: ["Matches the task directly."],
+  support: "supported",
+};
+
+const createTaskAssistModel = ({
+  taskPrompt = RAW_PROMPT,
+  dataset = baseDataset,
+  recommendations = [],
+  generatedDraftCount = 0,
+}: {
+  taskPrompt?: string;
+  dataset?: DatasetMetadata | null;
+  recommendations?: readonly SqlTemplateRecommendation[];
+  generatedDraftCount?: number;
+} = {}) => {
+  const fallback = createTaskAssistAdaptiveReportProposalFallback({
+    taskPrompt,
+    dataset,
+    selectedDialect: "duckdb",
+    appliedScopeLabels: ["orders"],
+    recommendations,
+    generatedDraftCount,
+  });
+
+  return fallback.proposal
+    ? createAdaptiveProposalLlmConsentShellViewModel({
+        proposal: fallback.proposal,
+        dataset,
+        selectedGuidanceDialect: "duckdb",
+      })
+    : null;
+};
+
 const serializedModel = (model: AdaptiveProposalLlmConsentShellViewModel | null): string =>
   JSON.stringify(model);
 
@@ -169,9 +215,19 @@ const expectNoRawContent = (
   model: AdaptiveProposalLlmConsentShellViewModel | null,
 ): string[] => {
   const serialized = serializedModel(model);
-  const forbidden = [RAW_SAMPLE, RAW_TOP_VALUE, RAW_PROMPT, RAW_SQL, RAW_RESULT];
+  const forbidden = [
+    RAW_SAMPLE,
+    RAW_TOP_VALUE,
+    RAW_PROMPT,
+    RAW_ROW,
+    RAW_SQL,
+    RAW_RESULT,
+    RAW_CLIPBOARD,
+    RAW_API_KEY,
+    RAW_PROVIDER_RESPONSE,
+  ];
   return forbidden.some((value) => serialized.includes(value))
-    ? ["Shell model leaked raw prompt/text/rows/samples/SQL/results."]
+    ? ["Shell model leaked raw prompt/text/rows/samples/SQL/results/clipboard/API/provider response."]
     : [];
 };
 
@@ -313,6 +369,64 @@ const fixtures: Fixture[] = [
     name: "no SQL/render/insert/run capability exposed",
     model: createModel({ displayStatus: "refined_planning_only", changedFields: ["title"] }),
     assert: expectShellSafety,
+  },
+  {
+    name: "Task Assist fallback with proposal renders a consent shell view model",
+    model: createTaskAssistModel(),
+    assert: (model) => [
+      ...expectStatus(model, "provider_disabled", "Provider disabled"),
+      ...expectShellSafety(model),
+      ...(model?.payloadSummary.tableCount === 1 ? [] : ["Expected Task Assist table count."]),
+    ],
+  },
+  {
+    name: "Task Assist fallback without proposal does not render consent shell model",
+    model: createTaskAssistModel({ taskPrompt: "" }),
+    assert: (model) => (model === null ? [] : ["Expected no Task Assist shell without proposal."]),
+  },
+  {
+    name: "Task Assist meaningful static recommendations suppress fallback and shell",
+    model: createTaskAssistModel({ recommendations: [meaningfulRecommendation] }),
+    assert: (model) =>
+      model === null ? [] : ["Expected meaningful Task Assist recommendations to suppress shell."],
+  },
+  {
+    name: "Task Assist generated drafts suppress fallback and shell",
+    model: createTaskAssistModel({ generatedDraftCount: 1 }),
+    assert: (model) => (model === null ? [] : ["Expected generated drafts to suppress shell."]),
+  },
+  {
+    name: "Task Assist shell shows metadata-only and non-SQL copy",
+    model: createTaskAssistModel(),
+    assert: (model) => [
+      ...(model?.safetyLine ===
+      "Metadata only. No raw rows, sample values, prompt text, SQL drafts, or query results."
+        ? []
+        : ["Expected Task Assist metadata-only safety copy."]),
+      ...(model?.nonSqlWarning ===
+      "This is not SQL generation. The result can only update the planning outline."
+        ? []
+        : ["Expected Task Assist non-SQL warning."]),
+      ...expectShellSafety(model),
+    ],
+  },
+  {
+    name: "Task Assist payload summary is counts-only and leaks no raw provider-boundary content",
+    model: createTaskAssistModel(),
+    assert: (model) => [
+      ...(model?.payloadSummary.tableCount === 1 ? [] : ["Expected Task Assist count-only table summary."]),
+      ...(model && model.payloadSummary.includedColumnCount > 0
+        ? []
+        : ["Expected Task Assist included column count."]),
+      ...(model?.payloadExclusions.includes("clipboard content")
+        ? []
+        : ["Expected Task Assist clipboard exclusion copy."]),
+      ...(model?.payloadExclusions.includes("API keys")
+        ? []
+        : ["Expected Task Assist API key exclusion copy."]),
+      ...expectNoRawContent(model),
+      ...expectShellSafety(model),
+    ],
   },
 ];
 
