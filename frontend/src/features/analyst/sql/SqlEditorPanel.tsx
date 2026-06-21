@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
@@ -31,6 +31,7 @@ import {
   SQL_DIALECT_EXECUTION_HELPER_TEXT,
   SQL_DIALECT_SELECTOR_LABEL,
 } from "./sqlDialectExecutionGuidance";
+import { createSqlSourceLineModel } from "./sqlSourceLineAdapter";
 import type {
   SqlEditorInterface,
   SqlDialectContext,
@@ -42,6 +43,7 @@ import type {
   SqlValidationSummary,
   SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
+import type { SqlWorkspaceTabSource } from "./sqlTabsTypes";
 
 type SqlEditorPanelProps = {
   editor: SqlEditorInterface;
@@ -53,9 +55,7 @@ type SqlEditorPanelProps = {
   onOpenSavedDrafts: () => void;
   sqlTabs: SqlWorkspaceTabsInterface;
   dialectContext: SqlDialectContext;
-  // Analyst command-bar additions: workbook badge + active source pill +
-  // Switch button (toggles SQL Context). Matches the routing mockup so the
-  // editor toolbar reads as a single calm Analyst command bar.
+  // Analyst command-bar additions: a quiet active source line plus editor actions.
   workbookLabel?: string | null;
   activeSourceLabel?: string | null;
   activeSourceTableLabel?: string | null;
@@ -65,9 +65,8 @@ type SqlEditorPanelProps = {
   selectedScopeCount?: number;
   appliedScopeCount?: number;
   selectedTemplateLabel?: string | null;
-  isContextOpen?: boolean;
-  onToggleContext?: () => void;
-  // Option C — Optional execution-mismatch warning. When the active SQL
+  onOpenSqlSourceTab?: (source: SqlWorkspaceTabSource) => void;
+  // Option C - Optional execution-mismatch warning. When the active SQL
   // tab's source differs from the dataset's currently executable source,
   // this string is rendered as a calm note below the toolbar. Run Query
   // remains enabled; the warning is informational only and never blocks
@@ -304,8 +303,7 @@ function SqlEditorPanel({
   selectedScopeCount = 0,
   appliedScopeCount = 0,
   selectedTemplateLabel,
-  isContextOpen,
-  onToggleContext,
+  onOpenSqlSourceTab,
   sourceMismatchWarning,
   readinessReport,
   errorInsight,
@@ -325,6 +323,10 @@ function SqlEditorPanel({
     useState<BusinessSqlPreviewFeedback>("idle");
   const [businessSqlCandidatePreview, setBusinessSqlCandidatePreview] =
     useState<BusinessSqlRenderPreview | null>(null);
+  const [isSourcePopoverOpen, setIsSourcePopoverOpen] = useState(false);
+  const [pendingSourceOptionId, setPendingSourceOptionId] = useState<string | null>(null);
+  const sourceTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const sourcePopoverRef = useRef<HTMLDivElement | null>(null);
   const effectiveBusinessSqlRenderPreview =
     businessSqlCandidatePreview || businessSqlRenderPreview;
   const businessSqlPreviewCopyState = useMemo(
@@ -410,6 +412,39 @@ function SqlEditorPanel({
       editor.value,
     ],
   );
+  const sourceLine = useMemo(
+    () =>
+      createSqlSourceLineModel({
+        dataset: dataset || null,
+        workbookLabel,
+        activeSourceLabel,
+        activeSourceTableLabel,
+        activeSourceKindLabel,
+        appliedScopeSummary,
+        appliedScopeCount,
+      }),
+    [
+      activeSourceKindLabel,
+      activeSourceLabel,
+      activeSourceTableLabel,
+      appliedScopeCount,
+      appliedScopeSummary,
+      dataset,
+      workbookLabel,
+    ],
+  );
+  const pendingSourceOption =
+    sourceLine.options.find((option) => option.id === pendingSourceOptionId) ||
+    sourceLine.options.find((option) => option.isCurrent) ||
+    sourceLine.options[0] ||
+    null;
+
+  const closeSourcePopover = (returnFocus = true) => {
+    setIsSourcePopoverOpen(false);
+    if (returnFocus) {
+      window.setTimeout(() => sourceTriggerRef.current?.focus(), 0);
+    }
+  };
 
   useEffect(() => {
     setBusinessSqlPreviewFeedback("idle");
@@ -435,6 +470,32 @@ function SqlEditorPanel({
 
     return () => window.clearTimeout(feedbackTimeout);
   }, [businessSqlPreviewFeedback]);
+
+  useEffect(() => {
+    if (!isSourcePopoverOpen) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (sourcePopoverRef.current?.contains(target) ||
+          sourceTriggerRef.current?.contains(target))
+      ) {
+        return;
+      }
+      closeSourcePopover(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSourcePopover();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSourcePopoverOpen]);
 
   const copyBusinessSqlPreview = async () => {
     if (!businessSqlPreviewCopyState?.canCopySql || !businessSqlPreviewCopyState.sql) return;
@@ -487,6 +548,19 @@ function SqlEditorPanel({
     if (!handoff.preview) return;
 
     setBusinessSqlCandidatePreview(handoff.preview);
+  };
+  const openSourcePopover = () => {
+    setPendingSourceOptionId(
+      sourceLine.options.find((option) => option.isCurrent)?.id ||
+        sourceLine.options[0]?.id ||
+        null,
+    );
+    setIsSourcePopoverOpen(true);
+  };
+  const openPendingSource = () => {
+    if (!pendingSourceOption || !onOpenSqlSourceTab) return;
+    onOpenSqlSourceTab(pendingSourceOption.source);
+    closeSourcePopover();
   };
 
   return (
@@ -541,10 +615,10 @@ function SqlEditorPanel({
         <p>
           {appliedScopeSummary
             ? `This tab uses: ${appliedScopeSummary}`
-            : "No worksheet scope applied to this tab yet. Use SQL Context to choose worksheets for this tab."}
+            : sourceLine.emptyScopeCopy}
         </p>
         <div className="sql-tab-task-scope-meta" aria-label="Active tab scope status">
-          <span>{appliedScopeCount} applied</span>
+          <span>{sourceLine.scopeChipLabel}</span>
           {hasUnappliedSelection && (
             <span>{selectedScopeCount} selected, not applied</span>
           )}
@@ -558,53 +632,84 @@ function SqlEditorPanel({
 
       <div className="sql-editor-toolbar sql-command-bar">
         <div className="sql-command-bar-lead">
-          {workbookLabel && (
-            <span
-              className="sql-workbook-badge"
-              title={`Workbook: ${workbookLabel}`}
-            >
-              <span aria-hidden="true" className="sql-workbook-badge-dot" />
-              <span className="sql-workbook-badge-label">{workbookLabel}</span>
-            </span>
-          )}
-          {activeSourceLabel && (
-            <span
-              className="sql-active-source-pill"
-              title={`Active source: ${activeSourceLabel}`}
-            >
-              <span aria-hidden="true" className="sql-active-source-pill-dot" />
-              Active · <strong>{activeSourceLabel}</strong>
-            </span>
-          )}
-          {activeSourceTableLabel && (
-            <span
-              className="sql-active-source-table"
-              title={`Source table: ${activeSourceTableLabel}`}
-            >
-              {activeSourceTableLabel}
-            </span>
-          )}
-          {activeSourceKindLabel && (
-            <span className="sql-active-source-kind">{activeSourceKindLabel}</span>
-          )}
-          {(appliedScopeSummary || selectedScopeSummary) && (
-            <span
-              className="sql-active-scope-pill"
-              title="This scope belongs to the active SQL tab. It helps templates and reports; Run Query still only runs this tab's SQL."
-            >
-              Scope - <strong>{appliedScopeSummary || selectedScopeSummary}</strong>
-            </span>
-          )}
-          {onToggleContext && (
-            <button
-              type="button"
-              className={["sql-switch-pill", isContextOpen ? "is-on" : ""].filter(Boolean).join(" ")}
-              aria-expanded={isContextOpen}
-              onClick={onToggleContext}
-            >
-              Switch <span aria-hidden="true">▾</span>
-            </button>
-          )}
+          <div className="sql-source-line">
+            <span>{sourceLine.text}</span>
+            {onOpenSqlSourceTab && sourceLine.options.length > 0 && (
+              <button
+                ref={sourceTriggerRef}
+                type="button"
+                className="sql-source-line-button"
+                aria-label="Change source for this tab"
+                aria-expanded={isSourcePopoverOpen}
+                aria-controls="sql-source-popover"
+                onClick={() =>
+                  isSourcePopoverOpen ? closeSourcePopover(false) : openSourcePopover()
+                }
+              >
+                Change source
+              </button>
+            )}
+            {isSourcePopoverOpen && (
+              <div
+                id="sql-source-popover"
+                ref={sourcePopoverRef}
+                className="sql-source-popover"
+                role="dialog"
+                aria-labelledby="sql-source-popover-title"
+              >
+                <div className="sql-source-popover-head">
+                  <strong id="sql-source-popover-title">Change source for this tab</strong>
+                  <p>
+                    This opens or reuses a SQL tab for the selected worksheet source. It does not run SQL or change other tabs.
+                  </p>
+                </div>
+                <div className="sql-source-option-list" role="radiogroup" aria-label="Worksheet sources">
+                  {sourceLine.options.map((option) => (
+                    <label
+                      key={option.id}
+                      className={[
+                        "sql-source-option",
+                        option.isCurrent ? "is-current" : "",
+                      ].filter(Boolean).join(" ")}
+                    >
+                      <input
+                        type="radio"
+                        name="sql-source-option"
+                        value={option.id}
+                        checked={pendingSourceOption?.id === option.id}
+                        onChange={() => setPendingSourceOptionId(option.id)}
+                      />
+                      <span>
+                        <strong>{option.worksheetLabel}</strong>
+                        <small>
+                          {option.sourceKindLabel === "Cleaned"
+                            ? "Cleaned working copy"
+                            : "Original worksheet"} · {option.tableName}
+                          {option.isCurrent ? " · Current" : ""}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {sourceLine.noCleanedCopyHelper && (
+                  <p className="sql-source-popover-helper">{sourceLine.noCleanedCopyHelper}</p>
+                )}
+                <div className="sql-source-popover-actions">
+                  <button type="button" className="secondary-button" onClick={() => closeSourcePopover()}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={openPendingSource}
+                    disabled={!pendingSourceOption}
+                  >
+                    Open source
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="sql-actions">
           <div className="sql-dialect-control">

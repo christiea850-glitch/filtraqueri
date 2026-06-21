@@ -691,8 +691,7 @@ function SqlWorkspace({
           selectedScopeCount={sqlTabs.selectedScopeSelections.length}
           appliedScopeCount={sqlTabs.appliedScopeSelections.length}
           selectedTemplateLabel={sqlTabs.selectedTemplateLabel}
-          isContextOpen={isContextOpen}
-          onToggleContext={() => setIsContextOpen((current) => !current)}
+          onOpenSqlSourceTab={openSqlSourceTab}
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
           readinessReport={readinessReport}
           errorInsight={previewResult.errorInsight}
