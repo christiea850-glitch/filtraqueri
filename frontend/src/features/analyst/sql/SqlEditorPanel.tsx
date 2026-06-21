@@ -32,6 +32,12 @@ import {
   SQL_DIALECT_SELECTOR_LABEL,
 } from "./sqlDialectExecutionGuidance";
 import { createSqlSourceLineModel } from "./sqlSourceLineAdapter";
+import {
+  createSqlWorksheetScopeModel,
+  setSqlWorksheetScopeSourceType,
+  toggleSqlWorksheetScopeSelection,
+} from "./sqlWorksheetScopeAdapter";
+import type { AnalysisScopeSourceType } from "../../workbook";
 import type {
   SqlEditorInterface,
   SqlDialectContext,
@@ -325,8 +331,11 @@ function SqlEditorPanel({
     useState<BusinessSqlRenderPreview | null>(null);
   const [isSourcePopoverOpen, setIsSourcePopoverOpen] = useState(false);
   const [pendingSourceOptionId, setPendingSourceOptionId] = useState<string | null>(null);
+  const [isScopePopoverOpen, setIsScopePopoverOpen] = useState(false);
   const sourceTriggerRef = useRef<HTMLButtonElement | null>(null);
   const sourcePopoverRef = useRef<HTMLDivElement | null>(null);
+  const scopeTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const scopePopoverRef = useRef<HTMLDivElement | null>(null);
   const effectiveBusinessSqlRenderPreview =
     businessSqlCandidatePreview || businessSqlRenderPreview;
   const businessSqlPreviewCopyState = useMemo(
@@ -438,11 +447,34 @@ function SqlEditorPanel({
     sourceLine.options.find((option) => option.isCurrent) ||
     sourceLine.options[0] ||
     null;
+  const worksheetScope = useMemo(
+    () =>
+      createSqlWorksheetScopeModel({
+        dataset: dataset || null,
+        selectedScopeSelections: sqlTabs.selectedScopeSelections,
+        appliedScopeSummary,
+        appliedScopeCount,
+        activeSourceLabel,
+      }),
+    [
+      activeSourceLabel,
+      appliedScopeCount,
+      appliedScopeSummary,
+      dataset,
+      sqlTabs.selectedScopeSelections,
+    ],
+  );
 
   const closeSourcePopover = (returnFocus = true) => {
     setIsSourcePopoverOpen(false);
     if (returnFocus) {
       window.setTimeout(() => sourceTriggerRef.current?.focus(), 0);
+    }
+  };
+  const closeScopePopover = (returnFocus = true) => {
+    setIsScopePopoverOpen(false);
+    if (returnFocus) {
+      window.setTimeout(() => scopeTriggerRef.current?.focus(), 0);
     }
   };
 
@@ -497,6 +529,32 @@ function SqlEditorPanel({
     };
   }, [isSourcePopoverOpen]);
 
+  useEffect(() => {
+    if (!isScopePopoverOpen) return undefined;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (
+        target &&
+        (scopePopoverRef.current?.contains(target) ||
+          scopeTriggerRef.current?.contains(target))
+      ) {
+        return;
+      }
+      closeScopePopover();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeScopePopover();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isScopePopoverOpen]);
+
   const copyBusinessSqlPreview = async () => {
     if (!businessSqlPreviewCopyState?.canCopySql || !businessSqlPreviewCopyState.sql) return;
 
@@ -550,6 +608,7 @@ function SqlEditorPanel({
     setBusinessSqlCandidatePreview(handoff.preview);
   };
   const openSourcePopover = () => {
+    setIsScopePopoverOpen(false);
     setPendingSourceOptionId(
       sourceLine.options.find((option) => option.isCurrent)?.id ||
         sourceLine.options[0]?.id ||
@@ -561,6 +620,36 @@ function SqlEditorPanel({
     if (!pendingSourceOption || !onOpenSqlSourceTab) return;
     onOpenSqlSourceTab(pendingSourceOption.source);
     closeSourcePopover();
+  };
+  const openScopePopover = () => {
+    setIsSourcePopoverOpen(false);
+    setIsScopePopoverOpen(true);
+  };
+  const toggleWorksheetScope = (worksheetId: string) => {
+    sqlTabs.onSelectedScopeChange(
+      toggleSqlWorksheetScopeSelection({
+        dataset: dataset || null,
+        selectedScopeSelections: sqlTabs.selectedScopeSelections,
+        worksheetId,
+      }),
+    );
+  };
+  const setWorksheetScopeSource = (
+    worksheetId: string,
+    sourceType: AnalysisScopeSourceType,
+  ) => {
+    sqlTabs.onSelectedScopeChange(
+      setSqlWorksheetScopeSourceType({
+        dataset: dataset || null,
+        selectedScopeSelections: sqlTabs.selectedScopeSelections,
+        worksheetId,
+        sourceType,
+      }),
+    );
+  };
+  const applyWorksheetScope = () => {
+    sqlTabs.onApplyScope();
+    closeScopePopover();
   };
 
   return (
@@ -607,10 +696,39 @@ function SqlEditorPanel({
         </button>
       </div>
 
+      <div className="sql-ask-bar" aria-label="Ask FiltraQueri">
+        <label htmlFor="sql-ask-filtraqueri">Ask FiltraQueri</label>
+        <input
+          id="sql-ask-filtraqueri"
+          type="text"
+          value={sqlTabs.taskPrompt}
+          onChange={(event) => sqlTabs.onTaskPromptChange(event.target.value)}
+          placeholder="Describe the analysis you want, like “Count leases by status”"
+          aria-label="Ask FiltraQueri"
+        />
+      </div>
+
       <div className="sql-tab-task-scope" aria-label="This tab's task scope">
         <div className="sql-tab-task-scope-head">
-          <span>This tab's task scope</span>
-          <strong>{sqlTabs.activeTabTitle || "Active SQL tab"}</strong>
+          <div>
+            <span>This tab's task scope</span>
+            <strong>{sqlTabs.activeTabTitle || "Active SQL tab"}</strong>
+          </div>
+          {worksheetScope.options.length > 0 && (
+            <button
+              ref={scopeTriggerRef}
+              type="button"
+              className="sql-scope-manage-button"
+              aria-label="Manage worksheet scope"
+              aria-expanded={isScopePopoverOpen}
+              aria-controls="sql-worksheet-scope-popover"
+              onClick={() =>
+                isScopePopoverOpen ? closeScopePopover(false) : openScopePopover()
+              }
+            >
+              Manage worksheet scope
+            </button>
+          )}
         </div>
         <p>
           {appliedScopeSummary
@@ -628,6 +746,74 @@ function SqlEditorPanel({
           Each SQL tab keeps its own worksheets, template, and SQL draft. You do not need to
           remove worksheets from another tab.
         </small>
+        {isScopePopoverOpen && (
+          <div
+            id="sql-worksheet-scope-popover"
+            ref={scopePopoverRef}
+            className="sql-scope-popover"
+            role="dialog"
+            aria-labelledby="sql-worksheet-scope-popover-title"
+          >
+            <div className="sql-scope-popover-head">
+              <strong id="sql-worksheet-scope-popover-title">{worksheetScope.title}</strong>
+              <p>{worksheetScope.helperCopy}</p>
+            </div>
+            <div className="sql-scope-option-list" aria-label="Worksheet planning scope">
+              {worksheetScope.options.map((option) => (
+                <div
+                  key={option.worksheetId}
+                  className={[
+                    "sql-scope-option",
+                    option.isSelected ? "is-selected" : "",
+                  ].filter(Boolean).join(" ")}
+                >
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={option.isSelected}
+                      onChange={() => toggleWorksheetScope(option.worksheetId)}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.sourceLabel} · {option.tableName}</small>
+                    </span>
+                  </label>
+                  <label className="sql-scope-source-select">
+                    <span>Planning source</span>
+                    <select
+                      value={option.selectedSourceType}
+                      disabled={!option.isSelected}
+                      onChange={(event) =>
+                        setWorksheetScopeSource(
+                          option.worksheetId,
+                          event.target.value as AnalysisScopeSourceType,
+                        )
+                      }
+                    >
+                      <option value="original">Original worksheet</option>
+                      {option.cleanedCopyAvailable && (
+                        <option value="cleaned_working_copy">Cleaned working copy</option>
+                      )}
+                    </select>
+                  </label>
+                  {!option.cleanedCopyAvailable && (
+                    <small className="sql-scope-option-helper">
+                      No cleaned working copy available for this worksheet.
+                    </small>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="sql-scope-popover-actions">
+              <button type="button" className="secondary-button" onClick={() => closeScopePopover()}>
+                {worksheetScope.cancelLabel}
+              </button>
+              <button type="button" className="primary-button" onClick={applyWorksheetScope}>
+                {worksheetScope.applyLabel}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="sql-editor-toolbar sql-command-bar">
