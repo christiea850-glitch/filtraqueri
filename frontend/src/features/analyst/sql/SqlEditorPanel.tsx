@@ -660,7 +660,7 @@ function SqlEditorPanel({
                 <div className="sql-source-popover-head">
                   <strong id="sql-source-popover-title">Change source for this tab</strong>
                   <p>
-                    This opens or reuses a SQL tab for the selected worksheet source. It does not run SQL or change other tabs.
+                    Executable source. Open or reuse one SQL tab for the worksheet you want to query. This does not change worksheet planning scope.
                   </p>
                 </div>
                 <div className="sql-source-option-list" role="radiogroup" aria-label="Worksheet sources">
