@@ -1508,7 +1508,7 @@ function WorkbookContextPanel({
           </div>
           <p className="workbook-analysis-scope-copy">
             {isTabControlledScope
-              ? "This scope belongs to the active SQL tab. It helps templates and reports. Run Query still only runs the SQL written in this tab."
+              ? "Planning context only. Choose worksheets FiltraQueri can use for suggestions, joins, and Business SQL planning. This does not change the SQL editor source."
               : "Choose the tables or sheets that belong to this analysis. FiltraQueri will use this scope to prepare safer suggestions and reports."}
           </p>
           <div className="workbook-analysis-scope-layout">
