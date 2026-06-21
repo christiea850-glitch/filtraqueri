@@ -90,10 +90,12 @@ export function resolveSqlTabSourceContext(
       : dataset.schema) || [];
 
   const sourceLabel =
-    activeTab.title ||
     tabWorksheet?.displayName ||
     tabWorksheet?.sheetName ||
+    activeTab.originalTableName ||
+    activeTab.tableName ||
     dataset.table_name ||
+    activeTab.title ||
     "Active source";
 
   const originalTableName =
