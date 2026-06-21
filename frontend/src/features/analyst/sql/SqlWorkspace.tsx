@@ -691,6 +691,7 @@ function SqlWorkspace({
           selectedScopeCount={sqlTabs.selectedScopeSelections.length}
           appliedScopeCount={sqlTabs.appliedScopeSelections.length}
           selectedTemplateLabel={sqlTabs.selectedTemplateLabel}
+          onInsertSql={insertSql}
           onOpenSqlSourceTab={openSqlSourceTab}
           sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
           readinessReport={readinessReport}
