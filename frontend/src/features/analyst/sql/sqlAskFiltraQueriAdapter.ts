@@ -10,6 +10,15 @@ import {
   recommendSqlTemplates,
   type SqlTemplateRecommendation,
 } from "./sqlTemplateRecommender";
+import {
+  classifySqlBusinessQuestion,
+  createBlockedRelationshipAskPlan,
+  createSafeGroupedCountAskRecommendation,
+  createSafeStatusBreakdownAskRecommendation,
+  rankSqlAskRecommendationsForQuestionShape,
+  type SqlAskBlockedPlanRecommendation,
+  type SqlBusinessQuestionShape,
+} from "./sqlBusinessQuestionShape";
 
 export const ASK_FILTRAQUERI_BUTTON_LABEL = "Ask FiltraQueri";
 
@@ -64,6 +73,8 @@ export type SqlAskFiltraQueriSuggestionModel = {
   hasSubmittedAsk: boolean;
   recommendations: SqlTemplateRecommendation[];
   scopeRecommendations: SqlScopeRecommendation[];
+  questionShape: SqlBusinessQuestionShape | null;
+  blockedPlan: SqlAskBlockedPlanRecommendation | null;
   guidanceTitle: string;
   guidanceCopy: string;
   noRunQuery: true;
@@ -119,6 +130,63 @@ const formatNeededTables = (scopeRecommendations: readonly SqlScopeRecommendatio
 const isApplicableAskRecommendation = (recommendation: SqlTemplateRecommendation): boolean =>
   recommendation.score > 3;
 
+const uniqueRecommendations = (
+  recommendations: readonly SqlTemplateRecommendation[],
+): SqlTemplateRecommendation[] => {
+  const seen = new Set<string>();
+  return recommendations.filter((recommendation) => {
+    const key = `${recommendation.kind}:${recommendation.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const formatRelationshipGaps = (shape: SqlBusinessQuestionShape): string =>
+  shape.relationshipGaps
+    .map((gap) => `${gap.fromTable} to ${gap.toTable}`)
+    .join(", ");
+
+const createGuidanceForQuestionShape = ({
+  hasTemplate,
+  neededTables,
+  shape,
+}: {
+  hasTemplate: boolean;
+  neededTables: string;
+  shape: SqlBusinessQuestionShape | null;
+}) => {
+  if (shape?.preferredOutputShape === "blocked_relationship_plan") {
+    const relationshipGaps = formatRelationshipGaps(shape);
+    return {
+      guidanceTitle: "Relationship needed before SQL can be inserted",
+      guidanceCopy: relationshipGaps
+        ? `This question needs related worksheets (${shape.mentionedEntities.map((entity) => entity.label).join(", ")}), but FiltraQueri cannot safely join ${relationshipGaps} from accepted relationship metadata yet.`
+        : "This question needs related worksheets, but FiltraQueri cannot safely verify the required relationship metadata yet.",
+    };
+  }
+
+  if (hasTemplate) {
+    return {
+      guidanceTitle: "Suggested template",
+      guidanceCopy:
+        "FiltraQueri found a deterministic template or report pattern for your question. Review it before inserting or running anything.",
+    };
+  }
+
+  if (neededTables) {
+    return {
+      guidanceTitle: "Relevant worksheets",
+      guidanceCopy: `This question appears to need: ${neededTables}. Review these worksheets before choosing a template.`,
+    };
+  }
+
+  return {
+    guidanceTitle: BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_TITLE,
+    guidanceCopy: BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_HELPER,
+  };
+};
+
 export const createSqlAskFiltraQueriSuggestionModel = ({
   hasSubmittedAsk,
   prompt,
@@ -147,7 +215,14 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
           appliedScopeLabels,
         })
       : [];
-  const recommendations =
+  const questionShape =
+    hasSubmittedAsk && trimmedPrompt
+      ? classifySqlBusinessQuestion({
+          prompt: trimmedPrompt,
+          dataset,
+        })
+      : null;
+  const rawRecommendations =
     hasSubmittedAsk && trimmedPrompt
       ? recommendSqlTemplates({
           taskPrompt: trimmedPrompt,
@@ -158,23 +233,51 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
           opportunities,
         }).filter(isApplicableAskRecommendation)
       : [];
+  const groupedCountRecommendation =
+    questionShape && hasSubmittedAsk && trimmedPrompt
+      ? createSafeGroupedCountAskRecommendation({
+          dataset,
+          selectedDialect,
+          shape: questionShape,
+        })
+      : null;
+  const statusBreakdownRecommendation =
+    questionShape && hasSubmittedAsk && trimmedPrompt
+      ? createSafeStatusBreakdownAskRecommendation({
+          dataset,
+          selectedDialect,
+          shape: questionShape,
+        })
+      : null;
+  const recommendations = questionShape
+    ? uniqueRecommendations([
+        ...(groupedCountRecommendation ? [groupedCountRecommendation] : []),
+        ...(statusBreakdownRecommendation ? [statusBreakdownRecommendation] : []),
+        ...rankSqlAskRecommendationsForQuestionShape(rawRecommendations, questionShape),
+      ]).slice(0, 3)
+    : rawRecommendations;
+  const blockedPlan = questionShape
+    ? createBlockedRelationshipAskPlan({
+        dataset,
+        shape: questionShape,
+      })
+    : null;
   const neededTables = formatNeededTables(scopeRecommendations);
   const hasTemplate = recommendations.length > 0;
+  const guidance = createGuidanceForQuestionShape({
+    hasTemplate,
+    neededTables,
+    shape: questionShape,
+  });
 
   return {
     hasSubmittedAsk,
     recommendations,
     scopeRecommendations,
-    guidanceTitle: hasTemplate
-      ? "Suggested template"
-      : scopeRecommendations.length > 0
-        ? "Relevant worksheets"
-        : BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_TITLE,
-    guidanceCopy: hasTemplate
-      ? "FiltraQueri found a deterministic template or report pattern for your question. Review it before inserting or running anything."
-      : neededTables
-        ? `This question appears to need: ${neededTables}. Review these worksheets before choosing a template.`
-        : BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_HELPER,
+    questionShape,
+    blockedPlan,
+    guidanceTitle: guidance.guidanceTitle,
+    guidanceCopy: guidance.guidanceCopy,
     noRunQuery: true,
     noBackendCall: true,
     noEditorMutation: true,

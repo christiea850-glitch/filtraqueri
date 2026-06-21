@@ -8,7 +8,7 @@
 
 import type { BusinessSqlRenderPreview } from "../businessSqlRenderPreview";
 import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetTypes";
-import type { WorkbookMetadata, WorksheetMetadata } from "../../../workbook";
+import type { AcceptedRelationshipContract, WorkbookMetadata, WorksheetMetadata } from "../../../workbook";
 import {
   ASK_FILTRAQUERI_BUTTON_LABEL,
   ADVANCED_PLANNING_DETAILS_COPY,
@@ -23,6 +23,7 @@ import {
   createSqlAskFiltraQueriSuggestionModel,
   shouldSubmitSqlAskFiltraQueriKey,
 } from "../sqlAskFiltraQueriAdapter";
+import { classifySqlBusinessQuestion } from "../sqlBusinessQuestionShape";
 
 type FixtureResult = {
   name: string;
@@ -162,6 +163,164 @@ const dataset = (): DatasetMetadata => ({
   column_count: leasesWorksheet.columnCount,
   schema: leasesWorksheet.schema,
   workbook_metadata: workbook(),
+});
+
+const relationshipContract = (
+  source: WorksheetMetadata,
+  sourceColumnName: string,
+  target: WorksheetMetadata,
+  targetColumnName: string,
+): AcceptedRelationshipContract => ({
+  contractId: `contract:${source.tableName}:${target.tableName}`,
+  sourceWorksheetId: source.worksheetId,
+  sourceTableName: source.tableName,
+  sourceColumnName,
+  targetWorksheetId: target.worksheetId,
+  targetTableName: target.tableName,
+  targetColumnName,
+  relationshipType: "one_to_many_candidate",
+  confidence: 0.98,
+  acceptedFromCandidateId: `candidate:${source.tableName}:${target.tableName}`,
+  acceptedAt: "2026-01-01T00:00:00.000Z",
+  acceptedBy: null,
+  status: "active",
+  validationState: "valid",
+  validationSummary: ["Fixture relationship."],
+  overlapRatio: 1,
+  sourceUniqueRatio: 1,
+  targetUniqueRatio: 0.2,
+  inferredTypeCompatible: true,
+  lastValidatedAt: "2026-01-01T00:00:00.000Z",
+});
+
+const businessWorkbookDataset = ({
+  sheets,
+  activeSheet,
+  acceptedRelationshipContracts = [],
+}: {
+  sheets: WorksheetMetadata[];
+  activeSheet: WorksheetMetadata;
+  acceptedRelationshipContracts?: AcceptedRelationshipContract[];
+}): DatasetMetadata => {
+  const workbookMetadata: WorkbookMetadata = {
+    ...workbook(),
+    worksheetIds: sheets.map((sheet) => sheet.worksheetId),
+    activeWorksheetId: activeSheet.worksheetId,
+    activeAnalysisSource: {
+      type: "original",
+      worksheetId: activeSheet.worksheetId,
+      tableName: activeSheet.tableName,
+      originalTableName: activeSheet.tableName,
+      activatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    worksheets: sheets,
+    acceptedRelationshipContracts,
+  };
+
+  return {
+    dataset_id: `dataset:${activeSheet.tableName}`,
+    filename: "business-workbook.xlsx",
+    original_filename: "business-workbook.xlsx",
+    table_name: activeSheet.tableName,
+    uploaded_at: "2026-01-01T00:00:00.000Z",
+    row_count: activeSheet.rowCount,
+    column_count: activeSheet.columnCount,
+    schema: activeSheet.schema,
+    workbook_metadata: workbookMetadata,
+  };
+};
+
+const customersSheet = worksheet("worksheet:customers", "customers", "customers", [
+  column("customer_id"),
+  column("customer_name", "categorical"),
+  column("status", "categorical"),
+  column("segment", "categorical"),
+]);
+
+const ordersSheet = worksheet("worksheet:orders", "orders", "orders", [
+  column("order_id"),
+  column("customer_id"),
+  column("status", "categorical"),
+  column("order_value", "numeric"),
+]);
+
+const ordersStatusSheet = worksheet("worksheet:orders-status", "orders", "orders", [
+  column("status", "categorical"),
+  column("order_id"),
+  column("customer_id"),
+  column("order_value", "numeric"),
+]);
+
+const productsSheet = worksheet("worksheet:products", "products", "products", [
+  column("product_id"),
+  column("product_category", "categorical"),
+  column("revenue", "numeric"),
+]);
+
+const unitsSheet = worksheet("worksheet:units", "units", "units", [
+  column("unit_id"),
+  column("unit_number", "categorical"),
+]);
+
+const tenantsSheet = worksheet("worksheet:tenants", "tenants", "tenants", [
+  column("tenant_id"),
+  column("unit_id"),
+  column("tenant_name", "categorical"),
+]);
+
+const accessCodesSheet = worksheet("worksheet:access-codes", "access_codes", "access_codes", [
+  column("access_code_id"),
+  column("tenant_id"),
+  column("code_status", "categorical"),
+]);
+
+const instructionsSheet = worksheet("worksheet:instructions", "Instructions", "instructions", [
+  column("instruction_id"),
+  column("tenant_id"),
+  column("access_code_notes"),
+]);
+
+const catOwnersSheet = worksheet("worksheet:cat-owners", "cat_owners", "cat_owners", [
+  column("owner_id"),
+  column("tenant_id"),
+  column("unit_id"),
+]);
+
+const ordersCustomersDataset = businessWorkbookDataset({
+  sheets: [ordersSheet, customersSheet],
+  activeSheet: ordersSheet,
+  acceptedRelationshipContracts: [
+    relationshipContract(customersSheet, "customer_id", ordersSheet, "customer_id"),
+  ],
+});
+
+const ordersStatusDataset = businessWorkbookDataset({
+  sheets: [ordersStatusSheet],
+  activeSheet: ordersStatusSheet,
+});
+
+const productsDataset = businessWorkbookDataset({
+  sheets: [productsSheet],
+  activeSheet: productsSheet,
+});
+
+const missingTenantAccessDataset = businessWorkbookDataset({
+  sheets: [tenantsSheet, unitsSheet, accessCodesSheet],
+  activeSheet: tenantsSheet,
+});
+
+const noisyMissingTenantAccessDataset = businessWorkbookDataset({
+  sheets: [tenantsSheet, unitsSheet, accessCodesSheet, instructionsSheet, catOwnersSheet],
+  activeSheet: tenantsSheet,
+});
+
+const safeTenantAccessDataset = businessWorkbookDataset({
+  sheets: [tenantsSheet, unitsSheet, accessCodesSheet],
+  activeSheet: tenantsSheet,
+  acceptedRelationshipContracts: [
+    relationshipContract(unitsSheet, "unit_id", tenantsSheet, "unit_id"),
+    relationshipContract(tenantsSheet, "tenant_id", accessCodesSheet, "tenant_id"),
+  ],
 });
 
 const failedPreview: BusinessSqlRenderPreview = {
@@ -304,6 +463,221 @@ const fixtures: Fixture[] = [
         ...(model.guidanceTitle === "Suggested template"
           ? []
           : [`Expected suggested-template guidance, received ${model.guidanceTitle}.`]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "grouped-count questions rank grouped-count recommendations above status summaries",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many orders by customer?",
+        dataset: ordersCustomersDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const top = model.recommendations[0];
+
+      return [
+        ...(model.questionShape?.preferredOutputShape === "grouped_count"
+          ? []
+          : [`Expected grouped_count shape, received ${model.questionShape?.preferredOutputShape}.`]),
+        ...(top?.title.toLowerCase().includes("count orders") && top.title.toLowerCase().includes("customer")
+          ? []
+          : [`Expected grouped-count top recommendation, received ${top?.title || "none"}.`]),
+        ...(top?.sql.includes("order_count") || top?.sql.includes("customer_label")
+          ? []
+          : ["Expected grouped-count SQL shape with customer/order output columns."]),
+        ...(top?.title.toLowerCase().includes("status summary")
+          ? ["Generic status summary must not be top for grouped-count prompt."]
+          : []),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "cross-entity grouped-count questions block generic insertable status summaries when relationships are missing",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many tenants in every unit have access codes?",
+        dataset: noisyMissingTenantAccessDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+
+      return [
+        ...(model.questionShape?.hasCountIntent ? [] : ["Expected count intent."]),
+        ...(model.questionShape?.isCrossEntity ? [] : ["Expected multi-entity intent."]),
+        ...(model.questionShape?.hasGroupingIntent ? [] : ["Expected by/every grouping intent."]),
+        ...(model.questionShape?.relationshipDependent ? [] : ["Expected relationship-dependent classification."]),
+        ...(model.questionShape?.preferredOutputShape === "blocked_relationship_plan"
+          ? []
+          : [`Expected blocked relationship plan, received ${model.questionShape?.preferredOutputShape}.`]),
+        ...(model.recommendations.length === 0
+          ? []
+          : [`Expected no insertable recommendations without relationships, received ${model.recommendations.map((item) => item.title).join(", ")}.`]),
+        ...(model.blockedPlan
+          ? []
+          : ["Expected visible blocked plan recommendation card model."]),
+        ...(model.blockedPlan?.title === "Count tenants with access codes by unit"
+          ? []
+          : [`Expected inferred blocked plan title, received ${model.blockedPlan?.title || "none"}.`]),
+        ...(model.blockedPlan?.title.includes("Instructions") || model.blockedPlan?.title.includes("cat owners")
+          ? ["Blocked plan title must not include unrelated weak worksheet matches."]
+          : []),
+        ...(model.blockedPlan?.expectedOutput === "Expected output: unit_number, tenants_with_access_codes_count"
+          ? []
+          : [`Expected blocked plan output shape, received ${model.blockedPlan?.expectedOutput || "none"}.`]),
+        ...(model.blockedPlan?.expectedOutput.includes("instructions") ||
+          model.blockedPlan?.expectedOutput.includes("cat_owners")
+          ? ["Blocked plan output must not include unrelated weak worksheet matches."]
+          : []),
+        ...(model.blockedPlan?.statusLabel === "Needs relationship metadata"
+          ? []
+          : ["Expected blocked plan relationship status label."]),
+        ...(model.blockedPlan?.actionLabel === "Relationships needed"
+          ? []
+          : [`Expected blocked action label, received ${model.blockedPlan?.actionLabel || "none"}.`]),
+        ...(model.blockedPlan?.relevantEntities.join(",") === "tenants,units,access_codes"
+          ? []
+          : [`Expected relevant worksheet list, received ${model.blockedPlan?.relevantEntities.join(",") || "none"}.`]),
+        ...(model.blockedPlan?.relevantEntities.includes("Instructions") ||
+          model.blockedPlan?.relevantEntities.includes("cat_owners")
+          ? ["Relevant worksheets must exclude unrelated weak matches."]
+          : []),
+        ...(model.blockedPlan?.missingRelationships.includes("tenants to units") &&
+          model.blockedPlan.missingRelationships.includes("tenants to access_codes") &&
+          model.blockedPlan.missingRelationships.length === 2
+          ? []
+          : [`Expected missing relationship list, received ${model.blockedPlan?.missingRelationships.join(", ") || "none"}.`]),
+        ...(model.blockedPlan?.disabledReason === "Confirm worksheet relationships before inserting SQL."
+          ? []
+          : ["Expected user-facing blocked insert reason."]),
+        ...(model.blockedPlan ? [] : ["Expected blocked relationship card to remain visible."]),
+        ...(model.guidanceTitle === "Relationship needed before SQL can be inserted"
+          ? []
+          : [`Expected relationship guidance, received ${model.guidanceTitle}.`]),
+        ...(model.guidanceCopy.includes("tenants") && model.guidanceCopy.includes("access_codes")
+          ? []
+          : [`Expected relevant entity guidance, received ${model.guidanceCopy}.`]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "status-summary questions still rank status summaries high",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many orders are pending vs completed?",
+        dataset: ordersStatusDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const top = model.recommendations[0];
+
+      return [
+        ...(model.questionShape?.preferredOutputShape === "status_breakdown"
+          ? []
+          : [`Expected status_breakdown shape, received ${model.questionShape?.preferredOutputShape}.`]),
+        ...(top && /status|category|count/i.test(`${top.title} ${top.description} ${top.sql}`)
+          ? []
+          : [`Expected status/category summary recommendation, received ${top?.title || "none"}.`]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "metric-by-dimension questions prefer aggregation-by-dimension",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "Total revenue by product category.",
+        dataset: productsDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const top = model.recommendations[0];
+
+      return [
+        ...(model.questionShape?.preferredOutputShape === "metric_by_dimension"
+          ? []
+          : [`Expected metric_by_dimension shape, received ${model.questionShape?.preferredOutputShape}.`]),
+        ...(top && /sum|total/i.test(`${top.title} ${top.description} ${top.sql}`)
+          ? []
+          : [`Expected sum/total aggregation top recommendation, received ${top?.title || "none"}.`]),
+        ...(top?.title.toLowerCase().includes("status summary")
+          ? ["Generic status summary must not be top for metric-by-dimension prompt."]
+          : []),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "filtered-count questions identify filter terms",
+    assert: () => {
+      const shape = classifySqlBusinessQuestion({
+        prompt: "How many customers are active?",
+        dataset: ordersCustomersDataset,
+      });
+
+      return [
+        ...(shape.preferredOutputShape === "filtered_count"
+          ? []
+          : [`Expected filtered_count shape, received ${shape.preferredOutputShape}.`]),
+        ...(shape.filterTerms.includes("active") ? [] : ["Expected active filter term."]),
+        ...(shape.hasCountIntent ? [] : ["Expected count intent."]),
+      ];
+    },
+  },
+  {
+    name: "detail/list requests are not treated as status summaries",
+    assert: () => {
+      const shape = classifySqlBusinessQuestion({
+        prompt: "List units without access codes.",
+        dataset: missingTenantAccessDataset,
+      });
+
+      return [
+        ...(shape.preferredOutputShape === "blocked_relationship_plan" || shape.preferredOutputShape === "detail_list"
+          ? []
+          : [`Expected detail/list or blocked relationship shape, received ${shape.preferredOutputShape}.`]),
+        ...(shape.hasDetailIntent ? [] : ["Expected detail/list intent."]),
+        ...(shape.preferredOutputShape === "status_breakdown"
+          ? ["Detail/list request must not be classified as status breakdown."]
+          : []),
+      ];
+    },
+  },
+  {
+    name: "safe deterministic relationships can produce grouped-count output",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many tenants in every units have access codes",
+        dataset: safeTenantAccessDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const top = model.recommendations[0];
+
+      return [
+        ...(model.questionShape?.preferredOutputShape === "grouped_count"
+          ? []
+          : [`Expected grouped_count shape, received ${model.questionShape?.preferredOutputShape}.`]),
+        ...(model.questionShape?.relationshipDependent ? [] : ["Expected relationship-dependent classification."]),
+        ...(top?.title === "Count tenants with access codes by unit"
+          ? []
+          : [`Expected safe grouped-count top suggestion, received ${top?.title || "none"}.`]),
+        ...(model.blockedPlan === null ? [] : ["Safe relationships should not show blocked plan card."]),
+        ...(top?.sql.includes("JOIN") && top.sql.includes("COUNT(DISTINCT")
+          ? []
+          : ["Expected safe grouped-count SQL to use accepted relationship joins."]),
+        ...(top?.title.toLowerCase().includes("status summary")
+          ? ["Generic status summary must not be top for the specific cross-entity question."]
+          : []),
         ...expectNoBehaviorChange(model),
       ];
     },

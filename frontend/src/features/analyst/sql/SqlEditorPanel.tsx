@@ -961,12 +961,49 @@ function SqlEditorPanel({
               </div>
             </div>
           )}
-          {askFiltraQueriSuggestions.recommendations.length > 0 ? (
+          {askFiltraQueriSuggestions.blockedPlan || askFiltraQueriSuggestions.recommendations.length > 0 ? (
             <div className="sql-template-recommendation-list" aria-label="Recommended templates">
               <div className="sql-helper-section-label">
                 <span>Recommended templates</span>
-                <small>{askFiltraQueriSuggestions.recommendations.length}</small>
+                <small>
+                  {askFiltraQueriSuggestions.recommendations.length +
+                    (askFiltraQueriSuggestions.blockedPlan ? 1 : 0)}
+                </small>
               </div>
+              {askFiltraQueriSuggestions.blockedPlan && (
+                <article className="sql-template-recommendation-card">
+                  <div>
+                    <div className="sql-template-recommendation-title-row">
+                      <strong>{askFiltraQueriSuggestions.blockedPlan.title}</strong>
+                      <span className="sql-grounding-badge needs_review">
+                        {askFiltraQueriSuggestions.blockedPlan.statusLabel}
+                      </span>
+                    </div>
+                    <span>{askFiltraQueriSuggestions.blockedPlan.expectedOutput}</span>
+                  </div>
+                  <ul>
+                    <li>
+                      Relevant worksheets:{" "}
+                      {askFiltraQueriSuggestions.blockedPlan.relevantEntities.join(", ")}
+                    </li>
+                    <li>
+                      Missing relationships:{" "}
+                      {askFiltraQueriSuggestions.blockedPlan.missingRelationships.join(", ")}
+                    </li>
+                    <li>{askFiltraQueriSuggestions.blockedPlan.explanation}</li>
+                  </ul>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled
+                    title={askFiltraQueriSuggestions.blockedPlan.disabledReason}
+                    aria-label={askFiltraQueriSuggestions.blockedPlan.disabledReason}
+                  >
+                    {askFiltraQueriSuggestions.blockedPlan.actionLabel}
+                  </button>
+                  <small>{askFiltraQueriSuggestions.blockedPlan.disabledReason}</small>
+                </article>
+              )}
               {askFiltraQueriSuggestions.recommendations.map((recommendation) => {
                 const insertState = createSqlAskRecommendationInsertModel(recommendation, {
                   activeSqlDraft: editor.value,
