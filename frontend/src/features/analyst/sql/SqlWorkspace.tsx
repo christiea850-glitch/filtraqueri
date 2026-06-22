@@ -14,6 +14,7 @@ import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
+import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
 import useSqlWorkspace from "./useSqlWorkspace";
 
 type SqlWorkspaceProps = {
@@ -76,9 +77,13 @@ const formatSqlTabScopeSummary = (
 
 function SqlFocusedResultPreview({
   previewResult,
+  currentTaskPrompt,
+  currentSqlDraft,
   onBack,
 }: {
   previewResult: SqlPreviewResult;
+  currentTaskPrompt: string;
+  currentSqlDraft: string;
   onBack: () => void;
 }) {
   const [isWrapped, setIsWrapped] = useState(false);
@@ -89,6 +94,11 @@ function SqlFocusedResultPreview({
   const getColumnWidth = (columnName: string) => columnWidths[columnName] ?? baseColumnWidth;
   const totalTableWidth =
     52 + previewResult.columns.reduce((sum, column) => sum + getColumnWidth(column), 0);
+  const provenance = createSqlResultProvenanceViewModel({
+    previewResult,
+    currentTaskPrompt,
+    currentSqlDraft,
+  });
 
   const startColumnResize = (
     event: ReactPointerEvent<HTMLSpanElement>,
@@ -148,6 +158,14 @@ function SqlFocusedResultPreview({
         <div>
           <p className="section-label">Analyst SQL</p>
           <h2>Result Preview</h2>
+          <div className="sql-result-provenance" aria-label="Result provenance">
+            <p>{provenance.summaryText}</p>
+            {provenance.sourceText ? <p>{provenance.sourceText}</p> : null}
+            {provenance.ranAtText ? <p>{provenance.ranAtText}</p> : null}
+            {provenance.driftWarningText ? (
+              <p className="sql-result-provenance-warning">{provenance.driftWarningText}</p>
+            ) : null}
+          </div>
           <p>{previewResult.message}</p>
         </div>
         <div className="sql-result-page-actions" aria-label="Future result actions">
@@ -549,6 +567,8 @@ function SqlWorkspace({
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
         <SqlFocusedResultPreview
           previewResult={previewResult}
+          currentTaskPrompt={sqlTabs.taskPrompt}
+          currentSqlDraft={editor.value}
           onBack={() => setFocusedView("editor")}
         />
       </section>
