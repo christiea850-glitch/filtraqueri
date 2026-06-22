@@ -1,6 +1,7 @@
 import type { SqlAnalyticalStrategy } from "../sqlAnalyticalStrategies";
 import type { SqlBusinessQuestionShape } from "../sqlBusinessQuestionShape";
 import type { SqlRelationshipReviewPair } from "../sqlRelationshipReview";
+import type { SqlTemplateAdaptiveMetadata } from "../sqlTemplateAdaptiveMetadata";
 import type { SqlTemplateRecommendation } from "../sqlTemplateRecommender";
 import {
   classifySqlAdaptiveFits,
@@ -115,6 +116,34 @@ const relationshipReviewPair = (
   suggestedColumns: null,
   ...override,
 });
+
+const metadata = (
+  override: Partial<SqlTemplateAdaptiveMetadata>,
+): SqlTemplateAdaptiveMetadata => {
+  const {
+    safety: safetyOverride,
+    ...metadataOverride
+  } = override;
+
+  return {
+    templateKind: "business_answer",
+    outputShape: "grouped_count",
+    semanticRoles: [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "grouping", fieldHint: "categorical column", required: true, source: "schema_detection" },
+    ],
+    relationshipMode: "single_table",
+    adaptationSupport: "none",
+    ...metadataOverride,
+    safety: {
+      canInsertExistingSql: safetyOverride?.canInsertExistingSql ?? true,
+      canAdaptSql: safetyOverride?.canAdaptSql ?? false,
+      requiresGrounding: safetyOverride?.requiresGrounding ?? true,
+      requiresAcceptedRelationships: safetyOverride?.requiresAcceptedRelationships ?? false,
+      manualInsertOnly: true,
+    },
+  };
+};
 
 const expectSafetyFlags = (fits: readonly SqlAdaptiveCandidateFit[]): string[] =>
   fits.flatMap((fit) => [
@@ -276,6 +305,311 @@ const fixtures: Fixture[] = [
         ...(fit?.confidence === "low"
           ? []
           : [`Expected low confidence, received ${fit?.confidence || "none"}.`]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "syntax helper metadata prevents exact fit for business questions",
+    assert: () => {
+      const fits = classifySqlAdaptiveFits({
+        prompt: "How many orders by customer?",
+        questionShape: shape("grouped_count"),
+        recommendations: [
+          recommendation({
+            id: "count-helper",
+            title: "Count helper",
+            description: "Count rows by a column.",
+            adaptiveMetadata: metadata({
+              templateKind: "syntax_helper",
+              outputShape: "grouped_count",
+              adaptationSupport: "field_binding",
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.category === "poor_fit"
+          ? []
+          : [`Expected syntax helper metadata to produce poor_fit, received ${fit?.category || "none"}.`]),
+        ...(fit?.insertState === "read_only"
+          ? []
+          : [`Expected read_only, received ${fit?.insertState || "none"}.`]),
+        ...(fit?.reasons.some((reason) => reason.includes("syntax helper"))
+          ? []
+          : ["Expected syntax helper metadata reason."]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "business-answer grouped-count metadata supports exact fit when insertable and safe",
+    assert: () => {
+      const fits = classifySqlAdaptiveFits({
+        prompt: "How many orders by customer?",
+        questionShape: shape("grouped_count"),
+        recommendations: [
+          recommendation({
+            id: "metadata-grouped-count",
+            title: "Orders summary",
+            description: "Summarize orders.",
+            reasons: ["Existing suggestion."],
+            adaptiveMetadata: metadata({
+              templateKind: "business_answer",
+              outputShape: "grouped_count",
+              relationshipMode: "single_table",
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.category === "exact_fit"
+          ? []
+          : [`Expected exact_fit, received ${fit?.category || "none"}.`]),
+        ...(fit?.insertState === "insertable_existing_sql"
+          ? []
+          : [`Expected insertable_existing_sql, received ${fit?.insertState || "none"}.`]),
+        ...(fit?.reasons.some((reason) => reason.includes("Adaptive metadata confirms"))
+          ? []
+          : ["Expected metadata confirmation reason."]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "single-table metadata does not trigger relationship blocking",
+    assert: () => {
+      const fits = classifySqlAdaptiveFits({
+        prompt: "How many orders by customer?",
+        questionShape: shape("grouped_count", {
+          isCrossEntity: false,
+          relationshipDependent: false,
+          relationshipGaps: [],
+        }),
+        recommendations: [
+          recommendation({
+            id: "single-table-count",
+            adaptiveMetadata: metadata({
+              relationshipMode: "single_table",
+              safety: {
+                canInsertExistingSql: true,
+                canAdaptSql: false,
+                requiresGrounding: true,
+                requiresAcceptedRelationships: false,
+                manualInsertOnly: true,
+              },
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.insertState !== "blocked_relationships"
+          ? []
+          : ["Single-table metadata must not trigger relationship blocking."]),
+        ...(fit?.reasons.some((reason) => reason.includes("single-table"))
+          ? []
+          : ["Expected single-table metadata reason."]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "requires-relationships metadata supports blocked fit when relationships are missing",
+    assert: () => {
+      const relationshipShape = shape("grouped_count", {
+        relationshipDependent: true,
+        relationshipGaps: [{ fromTable: "orders", toTable: "customers" }],
+      });
+      const fits = classifySqlAdaptiveFits({
+        prompt: relationshipShape.prompt,
+        questionShape: relationshipShape,
+        recommendations: [
+          recommendation({
+            id: "relationship-template",
+            adaptiveMetadata: metadata({
+              relationshipMode: "requires_relationships",
+              adaptationSupport: "relationship_blocked",
+              safety: {
+                canInsertExistingSql: false,
+                canAdaptSql: false,
+                requiresGrounding: true,
+                requiresAcceptedRelationships: true,
+                manualInsertOnly: true,
+              },
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.category === "blocked_fit"
+          ? []
+          : [`Expected blocked_fit, received ${fit?.category || "none"}.`]),
+        ...(fit?.insertState === "blocked_relationships"
+          ? []
+          : [`Expected blocked_relationships, received ${fit?.insertState || "none"}.`]),
+        ...(fit?.requiredRelationships.includes("orders to customers")
+          ? []
+          : ["Expected missing relationship from question shape."]),
+        ...(fit?.reasons.some((reason) => reason.includes("accepted worksheet relationships"))
+          ? []
+          : ["Expected relationship metadata reason."]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "field-binding metadata supports adapted read-only fit without generating SQL",
+    assert: () => {
+      const fits = classifySqlAdaptiveFits({
+        prompt: "How many orders by customer?",
+        questionShape: shape("grouped_count"),
+        recommendations: [
+          recommendation({
+            id: "field-binding-template",
+            support: "needs_review",
+            adaptiveMetadata: metadata({
+              templateKind: "business_answer",
+              outputShape: "grouped_count",
+              adaptationSupport: "field_binding",
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.category === "adapted_fit"
+          ? []
+          : [`Expected adapted_fit, received ${fit?.category || "none"}.`]),
+        ...(fit?.insertState === "read_only"
+          ? []
+          : [`Expected read_only, received ${fit?.insertState || "none"}.`]),
+        ...(fits.some((item) => "sql" in item) ? ["Classifier fit must not include generated SQL."] : []),
+        ...(fit?.reasons.some((reason) => reason.includes("field binding"))
+          ? []
+          : ["Expected field binding metadata reason."]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "canAdaptSql false is reflected in read-only classifier reasons",
+    assert: () => {
+      const fits = classifySqlAdaptiveFits({
+        prompt: "How many orders by customer?",
+        questionShape: shape("grouped_count"),
+        recommendations: [
+          recommendation({
+            id: "no-adapt-template",
+            support: "needs_review",
+            adaptiveMetadata: metadata({
+              outputShape: "grouped_count",
+              adaptationSupport: "field_binding",
+              safety: {
+                canInsertExistingSql: true,
+                canAdaptSql: false,
+                requiresGrounding: true,
+                requiresAcceptedRelationships: false,
+                manualInsertOnly: true,
+              },
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.insertState === "read_only"
+          ? []
+          : [`Expected read_only, received ${fit?.insertState || "none"}.`]),
+        ...(fit?.reasons.some((reason) => reason.includes("does not allow SQL adaptation"))
+          ? []
+          : ["Expected canAdaptSql false reason."]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "metadata does not override existing blocked relationship state",
+    assert: () => {
+      const blockedShape = shape("grouped_count", {
+        relationshipDependent: true,
+        relationshipGaps: [{ fromTable: "orders", toTable: "customers" }],
+      });
+      const fits = classifySqlAdaptiveFits({
+        prompt: blockedShape.prompt,
+        questionShape: blockedShape,
+        recommendations: [
+          recommendation({
+            id: "single-table-but-question-blocked",
+            adaptiveMetadata: metadata({
+              relationshipMode: "single_table",
+              outputShape: "grouped_count",
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.category === "blocked_fit"
+          ? []
+          : [`Expected blocked_fit, received ${fit?.category || "none"}.`]),
+        ...(fit?.insertState === "blocked_relationships"
+          ? []
+          : [`Expected blocked_relationships, received ${fit?.insertState || "none"}.`]),
+        ...expectSafetyFlags(fits),
+      ];
+    },
+  },
+  {
+    name: "metadata does not override existing non-insertable state",
+    assert: () => {
+      const fits = classifySqlAdaptiveFits({
+        prompt: "How many orders by customer?",
+        questionShape: shape("grouped_count"),
+        recommendations: [
+          recommendation({
+            id: "needs-review-with-insertable-metadata",
+            support: "needs_review",
+            adaptiveMetadata: metadata({
+              outputShape: "grouped_count",
+              safety: {
+                canInsertExistingSql: true,
+                canAdaptSql: false,
+                requiresGrounding: true,
+                requiresAcceptedRelationships: false,
+                manualInsertOnly: true,
+              },
+            }),
+          }),
+        ],
+        strategies: [],
+      });
+      const fit = fits[0];
+
+      return [
+        ...(fit?.insertState === "read_only"
+          ? []
+          : [`Expected read_only despite insertable metadata, received ${fit?.insertState || "none"}.`]),
+        ...(fit?.category !== "exact_fit"
+          ? []
+          : ["Metadata must not turn an existing needs_review candidate into exact insertable fit."]),
         ...expectSafetyFlags(fits),
       ];
     },

@@ -1,6 +1,7 @@
 import type { SqlAnalyticalStrategy } from "./sqlAnalyticalStrategies";
 import type { SqlBusinessQuestionShape } from "./sqlBusinessQuestionShape";
 import type { SqlRelationshipReviewPair } from "./sqlRelationshipReview";
+import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 import type { SqlTemplateRecommendation } from "./sqlTemplateRecommender";
 
 export type SqlAdaptiveFitCategory =
@@ -217,6 +218,107 @@ const needsFutureAdaptation = (
 const isStatusSummaryText = (text: string): boolean =>
   /\b(status|state|category|type)\b/.test(text) && /\b(count|summary|breakdown)\b/.test(text);
 
+const isSyntaxHelpPrompt = (prompt: string): boolean =>
+  /\b(sql syntax|syntax|example query|where clause|how do i write|show me sql|sql helper)\b/i.test(prompt);
+
+const metadataOutputMatchesShape = (
+  metadata: SqlTemplateAdaptiveMetadata | undefined,
+  questionShape: SqlBusinessQuestionShape,
+): boolean => {
+  if (!metadata) return false;
+  if (metadata.outputShape === questionShape.preferredOutputShape) return true;
+
+  if (
+    questionShape.preferredOutputShape === "grouped_count" &&
+    metadata.outputShape === "status_breakdown" &&
+    questionShape.hasStatusBreakdownIntent
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+const metadataOutputPartiallyMatchesShape = (
+  metadata: SqlTemplateAdaptiveMetadata | undefined,
+  questionShape: SqlBusinessQuestionShape,
+): boolean => {
+  if (!metadata) return false;
+  if (metadataOutputMatchesShape(metadata, questionShape)) return true;
+
+  if (
+    questionShape.hasCountIntent &&
+    ["grouped_count", "filtered_count", "single_metric", "status_breakdown"].includes(metadata.outputShape)
+  ) {
+    return true;
+  }
+
+  if (
+    questionShape.preferredOutputShape === "metric_by_dimension" &&
+    ["ranked_summary", "grouped_count"].includes(metadata.outputShape)
+  ) {
+    return true;
+  }
+
+  if (
+    questionShape.preferredOutputShape === "detail_list" &&
+    ["detail_list", "ranked_summary"].includes(metadata.outputShape)
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
+const metadataRequiresRelationshipBlock = (
+  metadata: SqlTemplateAdaptiveMetadata | undefined,
+  requiredRelationships: readonly string[],
+  questionShape: SqlBusinessQuestionShape,
+): boolean => {
+  if (!metadata) return false;
+  const metadataNeedsAcceptedRelationships =
+    metadata.relationshipMode === "requires_relationships" ||
+    metadata.adaptationSupport === "relationship_blocked" ||
+    metadata.safety.requiresAcceptedRelationships;
+
+  return metadataNeedsAcceptedRelationships && (
+    requiredRelationships.length > 0 ||
+    (questionShape.relationshipDependent && questionShape.relationshipGaps.length > 0)
+  );
+};
+
+const metadataEvidenceReasons = (
+  metadata: SqlTemplateAdaptiveMetadata | undefined,
+): string[] => {
+  if (!metadata) return [];
+
+  const reasons = [
+    `Adaptive metadata marks this as ${metadata.templateKind.replace(/_/g, " ")} with ${metadata.outputShape.replace(/_/g, " ")} output.`,
+  ];
+
+  if (metadata.relationshipMode === "single_table") {
+    reasons.push("Adaptive metadata says this pattern is single-table and does not need worksheet relationships.");
+  }
+
+  if (metadata.relationshipMode === "requires_relationships" || metadata.safety.requiresAcceptedRelationships) {
+    reasons.push("Adaptive metadata says accepted worksheet relationships are required before this pattern is safe.");
+  }
+
+  if (metadata.adaptationSupport === "field_binding") {
+    reasons.push("Adaptive metadata says this pattern may need field binding before it becomes a business answer.");
+  }
+
+  if (metadata.adaptationSupport === "relationship_blocked") {
+    reasons.push("Adaptive metadata marks this pattern as relationship-blocked.");
+  }
+
+  if (!metadata.safety.canAdaptSql) {
+    reasons.push("Adaptive metadata does not allow SQL adaptation in this slice.");
+  }
+
+  return reasons;
+};
+
 const hasMissingRelationshipBlock = (
   requiredRelationships: readonly string[],
   questionShape: SqlBusinessQuestionShape,
@@ -235,15 +337,18 @@ const createFit = (
 });
 
 const classifyRecommendation = ({
+  prompt,
   recommendation,
   questionShape,
   requiredRelationships,
 }: {
+  prompt: string;
   recommendation: SqlTemplateRecommendation;
   questionShape: SqlBusinessQuestionShape;
   requiredRelationships: readonly string[];
 }): SqlAdaptiveCandidateFit => {
   const text = candidateText(recommendation);
+  const metadata = recommendation.adaptiveMetadata;
   const source = inferRecommendationSource(recommendation);
   const missingFields = detectMissingFields(text);
   const insertableExistingSql =
@@ -251,12 +356,18 @@ const classifyRecommendation = ({
     recommendation.support !== "needs_review" &&
     missingFields.length === 0 &&
     requiredRelationships.length === 0;
-  const aligned = shapeAlignedWithText(text, questionShape);
+  const metadataAligned = metadataOutputMatchesShape(metadata, questionShape);
+  const metadataPartial = metadataOutputPartiallyMatchesShape(metadata, questionShape);
+  const aligned = shapeAlignedWithText(text, questionShape) || metadataAligned;
   const mismatchedStatusSummary =
     isStatusSummaryText(text) && questionShape.preferredOutputShape !== "status_breakdown";
-  const partial = partiallyAlignedWithText(text, questionShape);
+  const partial = partiallyAlignedWithText(text, questionShape) || metadataPartial;
+  const metadataReasons = metadataEvidenceReasons(metadata);
 
-  if (hasMissingRelationshipBlock(requiredRelationships, questionShape)) {
+  if (
+    hasMissingRelationshipBlock(requiredRelationships, questionShape) ||
+    metadataRequiresRelationshipBlock(metadata, requiredRelationships, questionShape)
+  ) {
     return createFit({
       candidateId: recommendation.id,
       source,
@@ -269,6 +380,7 @@ const classifyRecommendation = ({
       missingFields,
       reasons: [
         "FiltraQueri understands the analysis, but cross-table SQL is blocked until worksheet relationships are confirmed.",
+        ...metadataReasons,
       ],
     });
   }
@@ -284,11 +396,17 @@ const classifyRecommendation = ({
       requiredEntities: questionShape.mentionedEntities.map((entity) => entity.label),
       requiredRelationships: [],
       missingFields,
-      reasons: ["This candidate needs fields that are not available in the current deterministic metadata."],
+      reasons: [
+        "This candidate needs fields that are not available in the current deterministic metadata.",
+        ...metadataReasons,
+      ],
     });
   }
 
-  if (isGenericSyntaxHelper(recommendation)) {
+  if (
+    isGenericSyntaxHelper(recommendation) ||
+    (metadata?.templateKind === "syntax_helper" && !isSyntaxHelpPrompt(prompt))
+  ) {
     return createFit({
       candidateId: recommendation.id,
       source,
@@ -299,7 +417,10 @@ const classifyRecommendation = ({
       requiredEntities: questionShape.mentionedEntities.map((entity) => entity.label),
       requiredRelationships: [],
       missingFields,
-      reasons: ["This looks like a generic SQL syntax helper rather than a business answer for the question."],
+      reasons: [
+        "This looks like a generic SQL syntax helper rather than a business answer for the question.",
+        ...metadataReasons,
+      ],
     });
   }
 
@@ -314,11 +435,21 @@ const classifyRecommendation = ({
       requiredEntities: questionShape.mentionedEntities.map((entity) => entity.label),
       requiredRelationships: [],
       missingFields: [],
-      reasons: ["This existing SQL suggestion directly matches the detected question shape."],
+      reasons: [
+        metadataAligned
+          ? "Adaptive metadata confirms this existing SQL suggestion matches the detected question shape."
+          : "This existing SQL suggestion directly matches the detected question shape.",
+        ...metadataReasons,
+      ],
     });
   }
 
-  if (needsFutureAdaptation(recommendation, text) && (aligned || partial)) {
+  if (
+    (needsFutureAdaptation(recommendation, text) ||
+      metadata?.adaptationSupport === "field_binding" ||
+      (metadataAligned && !insertableExistingSql)) &&
+    (aligned || partial)
+  ) {
     return createFit({
       candidateId: recommendation.id,
       source,
@@ -329,7 +460,10 @@ const classifyRecommendation = ({
       requiredEntities: questionShape.mentionedEntities.map((entity) => entity.label),
       requiredRelationships: [],
       missingFields: [],
-      reasons: ["This matches the analysis pattern but would require future deterministic adaptation before insertion."],
+      reasons: [
+        "This matches the analysis pattern but would require future deterministic adaptation before insertion.",
+        ...metadataReasons,
+      ],
     });
   }
 
@@ -344,7 +478,12 @@ const classifyRecommendation = ({
       requiredEntities: questionShape.mentionedEntities.map((entity) => entity.label),
       requiredRelationships: [],
       missingFields: [],
-      reasons: ["This matches part of the question but not the full requested output shape."],
+      reasons: [
+        metadataPartial
+          ? "Adaptive metadata matches part of the requested analysis shape."
+          : "This matches part of the question but not the full requested output shape.",
+        ...metadataReasons,
+      ],
     });
   }
 
@@ -358,7 +497,10 @@ const classifyRecommendation = ({
     requiredEntities: questionShape.mentionedEntities.map((entity) => entity.label),
     requiredRelationships: [],
     missingFields: [],
-    reasons: ["This is a weak deterministic match for the requested question shape."],
+    reasons: [
+      "This is a weak deterministic match for the requested question shape.",
+      ...metadataReasons,
+    ],
   });
 };
 
@@ -372,10 +514,17 @@ const classifyStrategy = ({
   composedStrategyCount: number;
 }): SqlAdaptiveCandidateFit => {
   const text = strategyText(strategy);
+  const metadata = strategy.adaptiveMetadata;
   const missingFields = detectMissingFields(text);
   const requiredRelationships = strategy.requiredRelationships;
+  const metadataAligned = metadataOutputMatchesShape(metadata, questionShape);
+  const metadataPartial = metadataOutputPartiallyMatchesShape(metadata, questionShape);
+  const metadataReasons = metadataEvidenceReasons(metadata);
 
-  if (hasMissingRelationshipBlock(requiredRelationships, questionShape)) {
+  if (
+    hasMissingRelationshipBlock(requiredRelationships, questionShape) ||
+    metadataRequiresRelationshipBlock(metadata, requiredRelationships, questionShape)
+  ) {
     return createFit({
       candidateId: strategy.id,
       source: strategy.strategyKind === "blocked_relationship_plan" ? "blocked_plan" : "strategy",
@@ -388,6 +537,7 @@ const classifyStrategy = ({
       missingFields,
       reasons: [
         "FiltraQueri understands the analysis, but cross-table SQL is blocked until worksheet relationships are confirmed.",
+        ...metadataReasons,
       ],
     });
   }
@@ -403,7 +553,10 @@ const classifyStrategy = ({
       requiredEntities: strategy.requiredEntities,
       requiredRelationships: [],
       missingFields,
-      reasons: ["This strategy needs fields that are not available in the current deterministic metadata."],
+      reasons: [
+        "This strategy needs fields that are not available in the current deterministic metadata.",
+        ...metadataReasons,
+      ],
     });
   }
 
@@ -418,11 +571,14 @@ const classifyStrategy = ({
       requiredEntities: strategy.requiredEntities,
       requiredRelationships: [],
       missingFields: [],
-      reasons: ["This strategy is part of a deterministic multi-step analytical path, but no single safe SQL insertion is ready yet."],
+      reasons: [
+        "This strategy is part of a deterministic multi-step analytical path, but no single safe SQL insertion is ready yet.",
+        ...metadataReasons,
+      ],
     });
   }
 
-  if (strategy.isInsertable && shapeAlignedWithText(text, questionShape)) {
+  if (strategy.isInsertable && (shapeAlignedWithText(text, questionShape) || metadataAligned)) {
     return createFit({
       candidateId: strategy.id,
       source: "strategy",
@@ -433,11 +589,38 @@ const classifyStrategy = ({
       requiredEntities: strategy.requiredEntities,
       requiredRelationships: [],
       missingFields: [],
-      reasons: ["This strategy wraps existing deterministic SQL that matches the detected question shape."],
+      reasons: [
+        metadataAligned
+          ? "Adaptive metadata confirms this insertable strategy matches the detected question shape."
+          : "This strategy wraps existing deterministic SQL that matches the detected question shape.",
+        ...metadataReasons,
+      ],
     });
   }
 
-  if (partiallyAlignedWithText(text, questionShape)) {
+  if (
+    (metadata?.adaptationSupport === "field_binding" || metadataAligned) &&
+    !strategy.isInsertable &&
+    (metadataAligned || metadataPartial || partiallyAlignedWithText(text, questionShape))
+  ) {
+    return createFit({
+      candidateId: strategy.id,
+      source: "strategy",
+      title: strategy.title,
+      category: "adapted_fit",
+      confidence: strategy.confidence,
+      insertState: "read_only",
+      requiredEntities: strategy.requiredEntities,
+      requiredRelationships: [],
+      missingFields: [],
+      reasons: [
+        "This strategy matches the analysis pattern but would require future deterministic adaptation before insertion.",
+        ...metadataReasons,
+      ],
+    });
+  }
+
+  if (partiallyAlignedWithText(text, questionShape) || metadataPartial) {
     return createFit({
       candidateId: strategy.id,
       source: "strategy",
@@ -448,7 +631,12 @@ const classifyStrategy = ({
       requiredEntities: strategy.requiredEntities,
       requiredRelationships: [],
       missingFields: [],
-      reasons: ["This strategy matches part of the question but is not ready as an insertable SQL answer."],
+      reasons: [
+        metadataPartial
+          ? "Adaptive metadata matches part of the requested analysis shape."
+          : "This strategy matches part of the question but is not ready as an insertable SQL answer.",
+        ...metadataReasons,
+      ],
     });
   }
 
@@ -462,11 +650,15 @@ const classifyStrategy = ({
     requiredEntities: strategy.requiredEntities,
     requiredRelationships: [],
     missingFields: [],
-    reasons: ["This strategy is a weak deterministic match for the requested question shape."],
+    reasons: [
+      "This strategy is a weak deterministic match for the requested question shape.",
+      ...metadataReasons,
+    ],
   });
 };
 
 export function classifySqlAdaptiveFits({
+  prompt,
   questionShape,
   recommendations,
   strategies,
@@ -483,6 +675,7 @@ export function classifySqlAdaptiveFits({
   return [
     ...recommendations.map((recommendation) =>
       classifyRecommendation({
+        prompt,
         recommendation,
         questionShape,
         requiredRelationships,

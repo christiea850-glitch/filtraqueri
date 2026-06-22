@@ -1,6 +1,7 @@
 import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
 import type { ReportOpportunity } from "./reportIntelligencePlanner";
 import type { SqlReportRecipe } from "./sqlReportRecipes";
+import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 import type { SqlAssistantTemplate } from "./sqlTemplateLibrary";
 import { detectBusinessIntent, type BusinessIntent } from "./businessIntentGrounding";
 import {
@@ -28,6 +29,7 @@ export type SqlTemplateRecommendation = {
   unsupportedReasons?: string[];
   warnings?: string[];
   verifiedJoinKeys?: VerifiedJoinKey[];
+  adaptiveMetadata?: SqlTemplateAdaptiveMetadata;
 };
 
 type RecommendSqlTemplatesInput = {
@@ -49,6 +51,7 @@ type Candidate = {
   metadataText: string;
   tableText: string;
   reportLike: boolean;
+  adaptiveMetadata?: SqlTemplateAdaptiveMetadata;
 };
 
 const stopWords = new Set([
@@ -325,6 +328,7 @@ const buildOriginalCandidateMetadata = ({
       metadataText: template.dialectLabel,
       tableText: template.sql,
       reportLike: false,
+      adaptiveMetadata: template.adaptiveMetadata,
     });
   }
 
@@ -344,6 +348,7 @@ const buildOriginalCandidateMetadata = ({
       ].join(" "),
       tableText: recipe.worksheetsUsed?.join(" ") || "",
       reportLike: true,
+      adaptiveMetadata: recipe.adaptiveMetadata,
     });
   }
 
@@ -376,6 +381,7 @@ const buildOriginalCandidateMetadata = ({
           opportunity.needsDateLogic ||
           opportunity.needsJoins ||
           opportunity.needsAnomalyDetection,
+        adaptiveMetadata: opportunity.adaptiveMetadata,
       },
     );
   }
@@ -404,6 +410,7 @@ const metadataForGroundedCandidate = (
     ].join(" "),
     tableText: [...candidate.requiredTables, ...candidate.usedTables].join(" "),
     reportLike: candidate.source !== "template",
+    adaptiveMetadata: undefined,
   };
 };
 
@@ -494,6 +501,7 @@ export const recommendSqlTemplates = ({
         unsupportedReasons: candidate.unsupportedReasons,
         warnings: candidate.warnings,
         verifiedJoinKeys: candidate.verifiedJoinKeys,
+        adaptiveMetadata: metadata.adaptiveMetadata,
       };
     })
     .sort(
