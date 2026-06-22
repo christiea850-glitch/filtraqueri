@@ -15,6 +15,7 @@ import SqlSchemaPanel from "./SqlSchemaPanel";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 import { frameResultValue, labelResultColumns } from "./resultLabeling";
+import { createResultNarration } from "./resultNarration";
 import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -135,6 +136,14 @@ function SqlFocusedResultPreview({
     sourceLabel: previewResult.executedQuestion?.sourceLabel,
     sourceTableName: previewResult.executedQuestion?.sourceTableName,
   });
+  const resultNarration = createResultNarration({
+    columns: previewResult.columns,
+    rows: previewResult.rows,
+    taskPrompt: previewResult.executedQuestion?.taskPrompt,
+    detectedIntent: previewResult.executedQuestion?.detectedIntent,
+    questionShape: previewResult.executedQuestion?.questionShape,
+    labeledColumns,
+  });
   const sqlResultColumns: DataTableColumn[] = labeledColumns.map((column) => ({
     key: column.key,
     width: getColumnWidth(column.key),
@@ -182,6 +191,11 @@ function SqlFocusedResultPreview({
             ) : null}
           </div>
           <p>{previewResult.message}</p>
+          {resultNarration ? (
+            <p className="sql-result-narration" aria-label="Result summary">
+              {resultNarration.text}
+            </p>
+          ) : null}
         </div>
         <div className="sql-result-page-actions" aria-label="Future result actions">
           <button
