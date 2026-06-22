@@ -27,7 +27,6 @@ const keysFor = (columns: string[], taskPrompt?: string) =>
 
 
 const framedDisplayFor = (args: Parameters<typeof frameResultValue>[0]) => frameResultValue(args).display;
-const framedOriginFor = (args: Parameters<typeof frameResultValue>[0]) => frameResultValue(args).origin;
 
 const assertEqual = (actual: unknown, expected: unknown, message: string) =>
   JSON.stringify(actual) === JSON.stringify(expected)
