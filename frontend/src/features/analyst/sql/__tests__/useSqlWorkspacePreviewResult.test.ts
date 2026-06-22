@@ -10,9 +10,10 @@ import type { WorkspaceExecutionResult } from "../../../execution/workspaceExecu
 import type { AnalysisScopeSelection } from "../../../workbook";
 import type { SqlTabSourceContext } from "../resolveSqlTabSourceContext";
 import {
+  createExecutedQuestionSnapshot,
   createSqlErrorPreviewResult,
   createSqlSuccessPreviewResult,
-} from "../useSqlWorkspace";
+} from "../sqlPreviewResultAdapter";
 
 type SqlWorkspacePreviewFixtureResult = {
   name: string;
@@ -118,6 +119,7 @@ export function runSqlWorkspacePreviewFixtures(): SqlWorkspacePreviewFixtureRepo
   const successPreview = createSqlSuccessPreviewResult(successExecutionResult);
   expect(successPreview.errorInsight === null, "Expected success preview to clear errorInsight.", successFailureReasons);
   expect(successPreview.message === "Query completed.", "Expected success preview message to preserve execution message.", successFailureReasons);
+  expect(successPreview.executedQuestion === undefined, "Existing consumers should work without executedQuestion.", successFailureReasons);
   fixtures.push({
     name: "Successful SQL preview clears errorInsight",
     ok: successFailureReasons.length === 0,
@@ -125,7 +127,71 @@ export function runSqlWorkspacePreviewFixtures(): SqlWorkspacePreviewFixtureRepo
     failureReasons: successFailureReasons,
   });
 
+  const snapshotFailureReasons: string[] = [];
+  let taskPrompt = "How many orders by customer?";
+  let sqlAtRun = "SELECT customer_id, COUNT(*) AS order_count FROM orders GROUP BY customer_id;";
+  const executedQuestion = createExecutedQuestionSnapshot({
+    taskPrompt,
+    sqlAtRun,
+    ranAt: "2026-02-03T04:05:06.000Z",
+    sourceLabel: "Orders",
+    sourceTableName: "orders",
+    dataset,
+  });
+  const snapshotPreview = createSqlSuccessPreviewResult(successExecutionResult, executedQuestion);
+  taskPrompt = "List customers instead";
+  sqlAtRun = "SELECT * FROM customers;";
+  expect(
+    snapshotPreview.executedQuestion?.taskPrompt === "How many orders by customer?",
+    "Expected snapshot to capture task prompt at Run time.",
+    snapshotFailureReasons,
+  );
+  expect(
+    snapshotPreview.executedQuestion?.sqlAtRun === "SELECT customer_id, COUNT(*) AS order_count FROM orders GROUP BY customer_id;",
+    "Expected snapshot to capture exact SQL at Run time.",
+    snapshotFailureReasons,
+  );
+  expect(
+    snapshotPreview.executedQuestion?.ranAt === "2026-02-03T04:05:06.000Z",
+    "Expected snapshot to capture Run timestamp.",
+    snapshotFailureReasons,
+  );
+  expect(
+    snapshotPreview.executedQuestion?.sourceLabel === "Orders",
+    "Expected snapshot to capture source label.",
+    snapshotFailureReasons,
+  );
+  expect(
+    snapshotPreview.executedQuestion?.sourceTableName === "orders",
+    "Expected snapshot to capture source table name.",
+    snapshotFailureReasons,
+  );
+  expect(
+    snapshotPreview.executedQuestion?.detectedIntent?.primaryIntent === "count_grouping",
+    "Expected snapshot to include deterministic intent metadata.",
+    snapshotFailureReasons,
+  );
+  expect(
+    snapshotPreview.executedQuestion?.questionShape?.preferredOutputShape === "grouped_count",
+    "Expected snapshot to include deterministic question-shape metadata when available.",
+    snapshotFailureReasons,
+  );
+  fixtures.push({
+    name: "SQL preview can carry immutable executed-question snapshot",
+    ok: snapshotFailureReasons.length === 0,
+    category: snapshotPreview.errorInsight?.category || null,
+    failureReasons: snapshotFailureReasons,
+  });
+
   const tableFailureReasons: string[] = [];
+  const errorExecutedQuestion = createExecutedQuestionSnapshot({
+    taskPrompt: "Show missing table",
+    sqlAtRun: "SELECT * FROM orders_2025;",
+    ranAt: "2026-02-03T04:05:07.000Z",
+    sourceLabel: activeTabSourceContext.sourceLabel,
+    sourceTableName: activeTabSourceContext.sourceTableName,
+    dataset,
+  });
   const tablePreview = createSqlErrorPreviewResult({
     error: new Error('Query failed: Catalog Error: Table with name orders_2025 does not exist! Did you mean "orders"?'),
     sqlText: "SELECT * FROM orders_2025;",
@@ -133,9 +199,15 @@ export function runSqlWorkspacePreviewFixtures(): SqlWorkspacePreviewFixtureRepo
     dataset,
     activeTabSourceContext,
     appliedScopeSelections: noAppliedScopeSelections,
+    executedQuestion: errorExecutedQuestion,
   });
   expect(tablePreview.errorInsight?.category === "table_not_found", "Expected table error to attach table_not_found insight.", tableFailureReasons);
   expect(tablePreview.message === tablePreview.errorInsight?.title, "Expected error preview message to use insight title.", tableFailureReasons);
+  expect(
+    tablePreview.executedQuestion?.sqlAtRun === "SELECT * FROM orders_2025;",
+    "Expected error preview to preserve executed-question snapshot.",
+    tableFailureReasons,
+  );
   fixtures.push({
     name: "SQL error preview attaches table_not_found insight",
     ok: tableFailureReasons.length === 0,

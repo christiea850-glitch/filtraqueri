@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
-import type { AnalysisScopeSelection } from "../../workbook";
+import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { executeWorkspaceQuery } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
 import {
@@ -26,9 +25,13 @@ import {
   resolveSqlTabSourceContext,
   type SqlTabSourceContext,
 } from "./resolveSqlTabSourceContext";
-import { formatSqlExecutionError } from "./sqlErrorFormatter";
 import { getDialectDraftConversion } from "./sqlDialectDraftConversion";
 import { formatRowLimitClause } from "./sqlTemplateLibrary";
+import {
+  createExecutedQuestionSnapshot,
+  createSqlErrorPreviewResult,
+  createSqlSuccessPreviewResult,
+} from "./sqlPreviewResultAdapter";
 import type {
   SqlEditorInterface,
   SqlExecutionStatus,
@@ -75,103 +78,6 @@ const getTabSourceTableLabel = (tab: {
   tab.sourceType === "cleaned_working_copy"
     ? tab.cleanedTableName || tab.tableName || "cleaned copy"
     : tab.originalTableName || tab.tableName || null;
-
-const uniqueDefined = (values: Array<string | null | undefined>) =>
-  Array.from(new Set(values.map((value) => value?.trim() || "").filter(Boolean)));
-
-const getSchemaColumnNames = (schema: SchemaColumn[] | null | undefined) =>
-  (schema || []).map((column) => column.name);
-
-const getAppliedScopeSchemaColumns = (
-  dataset: DatasetMetadata | null,
-  appliedScopeSelections: AnalysisScopeSelection[],
-) =>
-  appliedScopeSelections.flatMap((selection) => {
-    const worksheet = dataset?.workbook_metadata?.worksheets.find(
-      (candidate) =>
-        candidate.worksheetId === selection.worksheetId ||
-        candidate.tableName === selection.originalTableName ||
-        candidate.tableName === selection.tableName,
-    );
-
-    return getSchemaColumnNames(worksheet?.schema);
-  });
-
-const getAvailableTableNames = (
-  dataset: DatasetMetadata | null,
-  activeTabSourceContext: SqlTabSourceContext,
-  appliedScopeSelections: AnalysisScopeSelection[],
-) =>
-  uniqueDefined([
-    dataset?.table_name,
-    activeTabSourceContext.tableName,
-    activeTabSourceContext.sourceTableName,
-    activeTabSourceContext.originalTableName,
-    activeTabSourceContext.cleanedTableName,
-    ...appliedScopeSelections.map((selection) => selection.tableName),
-    ...appliedScopeSelections.map((selection) => selection.originalTableName),
-    ...appliedScopeSelections.map((selection) => selection.cleanedTableName),
-    ...(dataset?.workbook_metadata?.worksheets.map((worksheet) => worksheet.tableName) || []),
-    ...(dataset?.workbook_metadata?.cleanedWorkingCopies.map((copy) => copy.cleanedTableName) || []),
-  ]);
-
-const getAvailableColumnNames = (
-  dataset: DatasetMetadata | null,
-  activeTabSourceContext: SqlTabSourceContext,
-  appliedScopeSelections: AnalysisScopeSelection[],
-) =>
-  uniqueDefined([
-    ...getSchemaColumnNames(dataset?.schema),
-    ...getSchemaColumnNames(activeTabSourceContext.schema),
-    ...getAppliedScopeSchemaColumns(dataset, appliedScopeSelections),
-  ]);
-
-export function createSqlSuccessPreviewResult(
-  executionResult: WorkspaceExecutionResult,
-): SqlPreviewResult {
-  return {
-    columns: executionResult.outputVisibleColumns,
-    rows: executionResult.outputRows,
-    message: executionResult.sql?.message || createPreviewMessage("success"),
-    errorInsight: null,
-  };
-}
-
-export function createSqlErrorPreviewResult({
-  error,
-  sqlText,
-  selectedDialect,
-  dataset,
-  activeTabSourceContext,
-  appliedScopeSelections,
-}: {
-  error: unknown;
-  sqlText: string;
-  selectedDialect?: SqlDialectId;
-  dataset: DatasetMetadata | null;
-  activeTabSourceContext: SqlTabSourceContext;
-  appliedScopeSelections: AnalysisScopeSelection[];
-}): SqlPreviewResult {
-  const rawMessage = error instanceof Error ? error.message : createPreviewMessage("error");
-  const errorInsight = formatSqlExecutionError({
-    rawMessage,
-    sqlText,
-    selectedDialect,
-    activeTable: activeTabSourceContext.tableName || dataset?.table_name,
-    availableTables: getAvailableTableNames(dataset, activeTabSourceContext, appliedScopeSelections),
-    availableColumns: getAvailableColumnNames(dataset, activeTabSourceContext, appliedScopeSelections),
-    appliedScopeTables: uniqueDefined(
-      appliedScopeSelections.map((selection) => selection.tableName),
-    ),
-  });
-
-  return {
-    columns: [],
-    rows: [],
-    message: errorInsight.title,
-    errorInsight,
-  };
-}
 
 function useSqlWorkspace(
   dataset: DatasetMetadata | null,
@@ -631,6 +537,15 @@ function useSqlWorkspace(
       return;
     }
 
+    const executedQuestion = createExecutedQuestionSnapshot({
+      taskPrompt: activeTab.taskPrompt || "",
+      sqlAtRun: trimmedSql,
+      ranAt: new Date().toISOString(),
+      sourceLabel: activeTabSourceContext.sourceLabel,
+      sourceTableName: activeTabSourceContext.sourceTableName || activeTabSourceContext.tableName,
+      dataset: scopedDatasetForTab,
+    });
+
     setActiveEditorStatus("running");
     setActivePreviewResult({
       columns: [],
@@ -654,7 +569,7 @@ function useSqlWorkspace(
       });
 
       setActiveEditorStatus("success");
-      setActivePreviewResult(createSqlSuccessPreviewResult(executionResult));
+      setActivePreviewResult(createSqlSuccessPreviewResult(executionResult, executedQuestion));
       onExecutionResult?.(executionResult);
     } catch (error) {
       setActiveEditorStatus("error");
@@ -666,6 +581,7 @@ function useSqlWorkspace(
           dataset,
           activeTabSourceContext,
           appliedScopeSelections: activeTab.appliedScopeSelections || [],
+          executedQuestion,
         }),
       );
     }

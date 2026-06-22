@@ -10,6 +10,8 @@ import type { AnalysisScopeSelection } from "../../workbook";
 import type { SqlDialectDraftConversion } from "./sqlDialectDraftConversion";
 import type { SqlExecutionErrorInsight } from "./sqlErrorFormatter";
 import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
+import type { BusinessIntent } from "./businessIntentGrounding";
+import type { SqlBusinessQuestionShape } from "./sqlBusinessQuestionShape";
 
 export type SqlExecutionStatus =
   | "idle"
@@ -32,6 +34,17 @@ export type SqlPreviewResult = {
   rows: Record<string, unknown>[];
   message: string;
   errorInsight?: SqlExecutionErrorInsight | null;
+  executedQuestion?: ExecutedQuestionSnapshot;
+};
+
+export type ExecutedQuestionSnapshot = {
+  taskPrompt: string;
+  detectedIntent?: BusinessIntent;
+  questionShape?: SqlBusinessQuestionShape;
+  sqlAtRun: string;
+  ranAt: string;
+  sourceLabel: string | null;
+  sourceTableName: string | null;
 };
 
 export type SqlSuggestion = {
