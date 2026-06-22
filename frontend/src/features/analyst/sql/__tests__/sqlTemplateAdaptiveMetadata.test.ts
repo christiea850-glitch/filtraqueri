@@ -1,10 +1,11 @@
+import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetTypes";
 import type { ReportOpportunity } from "../reportIntelligencePlanner";
 import type { SqlAnalyticalStrategy } from "../sqlAnalyticalStrategies";
-import type { SqlReportRecipe } from "../sqlReportRecipes";
+import { createSqlReportRecipes, type SqlReportRecipe } from "../sqlReportRecipes";
 import type {
   SqlTemplateAdaptiveMetadata,
 } from "../sqlTemplateAdaptiveMetadata";
-import type { SqlAssistantTemplate } from "../sqlTemplateLibrary";
+import { createSqlAssistantTemplates, type SqlAssistantTemplate } from "../sqlTemplateLibrary";
 
 type FixtureResult = {
   name: string;
@@ -22,6 +23,48 @@ type Fixture = {
   name: string;
   assert: () => string[];
 };
+
+const column = (
+  name: string,
+  inferredType: SchemaColumn["inferred_type"] = "text",
+): SchemaColumn => ({
+  name,
+  type: inferredType === "numeric" ? "DOUBLE" : "VARCHAR",
+  inferred_type: inferredType,
+  null_count: 0,
+  unique_count: 3,
+  sample_values: [],
+});
+
+const metadataDataset: DatasetMetadata = {
+  dataset_id: "dataset:metadata",
+  filename: "metadata.csv",
+  original_filename: "metadata.csv",
+  table_name: "orders",
+  uploaded_at: "2026-01-01T00:00:00.000Z",
+  row_count: 12,
+  column_count: 4,
+  schema: [
+    column("order_id", "numeric"),
+    column("status"),
+    column("region"),
+    column("revenue", "numeric"),
+  ],
+};
+
+const enrichedTemplateIds = [
+  "count-rows",
+  "count-by-category",
+  "sum-by-category",
+  "average-by-category",
+  "missing-values",
+  "filter-equals",
+  "distinct-values",
+  "top-n",
+  "bottom-n",
+];
+
+const enrichedRecipeIds = ["category-summary", "top-performers", "data-quality"];
 
 const syntaxHelperMetadata: SqlTemplateAdaptiveMetadata = {
   templateKind: "syntax_helper",
@@ -212,6 +255,128 @@ const fixtures: Fixture[] = [
         ...(recipeWithMetadata.sql === recipeWithoutMetadata.sql ? [] : ["Recipe SQL changed."]),
         ...(opportunityWithMetadata.support === opportunityWithoutMetadata.support ? [] : ["Opportunity support changed."]),
         ...(strategyWithMetadata.isInsertable === strategyWithoutMetadata.isInsertable ? [] : ["Strategy insertability changed."]),
+      ];
+    },
+  },
+  {
+    name: "safe static templates expose narrow adaptive metadata",
+    assert: () => {
+      const templates = createSqlAssistantTemplates(metadataDataset, "duckdb");
+      const byId = new Map(templates.map((template) => [template.id, template]));
+      const enrichedTemplates = enrichedTemplateIds.map((id) => byId.get(id));
+      const unenrichedJoin = byId.get("inner-join");
+
+      return [
+        ...enrichedTemplateIds.flatMap((id, index) => {
+          const template = enrichedTemplates[index];
+          return template?.adaptiveMetadata
+            ? []
+            : [`Expected ${id} to include adaptive metadata.`];
+        }),
+        ...(byId.get("count-rows")?.adaptiveMetadata?.templateKind === "business_answer"
+          ? []
+          : ["count-rows should be a business-answer template."]),
+        ...(byId.get("count-by-category")?.adaptiveMetadata?.outputShape === "grouped_count"
+          ? []
+          : ["count-by-category should describe grouped-count output."]),
+        ...(byId.get("sum-by-category")?.adaptiveMetadata?.outputShape === "metric_by_dimension" &&
+          byId.get("average-by-category")?.adaptiveMetadata?.outputShape === "metric_by_dimension"
+          ? []
+          : ["sum/average by category should describe metric-by-dimension output."]),
+        ...(byId.get("missing-values")?.adaptiveMetadata?.templateKind === "diagnostic" &&
+          byId.get("missing-values")?.adaptiveMetadata?.outputShape === "data_quality_summary"
+          ? []
+          : ["missing-values should be diagnostic data-quality metadata."]),
+        ...(byId.get("filter-equals")?.adaptiveMetadata?.templateKind === "syntax_helper" &&
+          byId.get("filter-equals")?.adaptiveMetadata?.adaptationSupport === "field_binding"
+          ? []
+          : ["filter-equals should be a syntax helper with field-binding metadata."]),
+        ...(unenrichedJoin?.adaptiveMetadata === undefined
+          ? []
+          : ["Join templates should remain unenriched in T-17F."]),
+        ...(enrichedTemplates.every(
+          (template) =>
+            template?.adaptiveMetadata?.relationshipMode === "single_table" &&
+            template.adaptiveMetadata.safety.manualInsertOnly &&
+            template.adaptiveMetadata.safety.canAdaptSql === false &&
+            template.adaptiveMetadata.safety.requiresAcceptedRelationships === false,
+        )
+          ? []
+          : ["Enriched templates should stay single-table, manual-insert-only, and non-adaptive."]),
+      ];
+    },
+  },
+  {
+    name: "safe report recipes expose narrow adaptive metadata",
+    assert: () => {
+      const recipes = createSqlReportRecipes(metadataDataset, "duckdb");
+      const byId = new Map(recipes.map((recipe) => [recipe.id, recipe]));
+
+      return [
+        ...enrichedRecipeIds.flatMap((id) => {
+          const recipe = byId.get(id as SqlReportRecipe["id"]);
+          return recipe?.adaptiveMetadata
+            ? []
+            : [`Expected ${id} report recipe to include adaptive metadata.`];
+        }),
+        ...(byId.get("category-summary")?.adaptiveMetadata?.outputShape === "metric_by_dimension"
+          ? []
+          : ["category-summary should describe metric-by-dimension output."]),
+        ...(byId.get("top-performers")?.adaptiveMetadata?.outputShape === "ranked_summary"
+          ? []
+          : ["top-performers should describe ranked-summary output."]),
+        ...(byId.get("data-quality")?.adaptiveMetadata?.templateKind === "report_recipe" &&
+          byId.get("data-quality")?.adaptiveMetadata?.outputShape === "data_quality_summary"
+          ? []
+          : ["data-quality should describe report recipe data-quality metadata."]),
+        ...(enrichedRecipeIds.every((id) => {
+          const metadata = byId.get(id as SqlReportRecipe["id"])?.adaptiveMetadata;
+          return metadata?.relationshipMode === "single_table" &&
+            metadata.safety.manualInsertOnly &&
+            metadata.safety.canAdaptSql === false &&
+            metadata.safety.requiresAcceptedRelationships === false;
+        })
+          ? []
+          : ["Enriched recipes should stay single-table, manual-insert-only, and non-adaptive."]),
+      ];
+    },
+  },
+  {
+    name: "metadata enrichment does not change generated template order, SQL, or insertability",
+    assert: () => {
+      const templates = createSqlAssistantTemplates(metadataDataset, "duckdb");
+      const templateIds = templates.map((template) => template.id);
+      const countRows = templates.find((template) => template.id === "count-rows");
+      const filterEquals = templates.find((template) => template.id === "filter-equals");
+      const templateSqlWithoutMetadata = countRows?.sql;
+      const recipes = createSqlReportRecipes(metadataDataset, "duckdb");
+      const recipeIds = recipes.map((recipe) => recipe.id);
+      const dataQuality = recipes.find((recipe) => recipe.id === "data-quality");
+
+      return [
+        ...(templateIds.slice(0, 3).join("|") === "preview-select|count-rows|filter-equals"
+          ? []
+          : [`Expected leading template order to stay unchanged, received ${templateIds.slice(0, 3).join("|")}.`]),
+        ...(recipeIds.includes("category-summary") &&
+          recipeIds.includes("top-performers") &&
+          recipeIds.includes("data-quality")
+          ? []
+          : [`Expected enriched recipe ids in generated recipes, received ${recipeIds.join(",")}.`]),
+        ...(templateSqlWithoutMetadata === `SELECT
+  COUNT(*) AS row_count
+FROM "orders";`
+          ? []
+          : ["count-rows SQL string changed."]),
+        ...(filterEquals?.sql.includes("WHERE") && filterEquals.sql.includes("LIMIT 100")
+          ? []
+          : ["filter-equals SQL shape changed."]),
+        ...(dataQuality?.sql?.includes("COUNT(*) AS record_count")
+          ? []
+          : ["data-quality SQL shape changed."]),
+        ...(countRows?.adaptiveMetadata?.safety.canInsertExistingSql === true &&
+          dataQuality?.adaptiveMetadata?.safety.canInsertExistingSql === true
+          ? []
+          : ["Metadata should only mark existing SQL insertable when SQL exists today."]),
       ];
     },
   },

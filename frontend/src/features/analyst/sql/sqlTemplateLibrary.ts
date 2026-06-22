@@ -63,6 +63,89 @@ const commonSqlReviewLabel = "Common SQL · review before running";
 const limitSyntaxReviewLabel = "Runs in DuckDB";
 const dialectReviewLabel = "Review dialect before running";
 
+const singleTableTemplateMetadata = (
+  templateKind: SqlTemplateAdaptiveMetadata["templateKind"],
+  outputShape: SqlTemplateAdaptiveMetadata["outputShape"],
+  semanticRoles: SqlTemplateAdaptiveMetadata["semanticRoles"],
+  adaptationSupport: SqlTemplateAdaptiveMetadata["adaptationSupport"] = "none",
+): SqlTemplateAdaptiveMetadata => ({
+  templateKind,
+  outputShape,
+  semanticRoles,
+  relationshipMode: "single_table",
+  adaptationSupport,
+  safety: {
+    canInsertExistingSql: true,
+    canAdaptSql: false,
+    requiresGrounding: true,
+    requiresAcceptedRelationships: false,
+    manualInsertOnly: true,
+  },
+});
+
+const countRowsAdaptiveMetadata = singleTableTemplateMetadata(
+  "business_answer",
+  "single_metric",
+  [{ role: "entity", fieldHint: "active table", required: true, source: "schema_detection" }],
+);
+
+const groupedCountAdaptiveMetadata = singleTableTemplateMetadata(
+  "business_answer",
+  "grouped_count",
+  [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "grouping", fieldHint: "categorical column", required: true, source: "schema_detection" },
+    { role: "metric", fieldHint: "row count", required: true, source: "schema_detection" },
+  ],
+);
+
+const metricByDimensionAdaptiveMetadata = singleTableTemplateMetadata(
+  "business_answer",
+  "metric_by_dimension",
+  [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "grouping", fieldHint: "categorical column", required: true, source: "schema_detection" },
+    { role: "metric", fieldHint: "numeric column", required: true, source: "schema_detection" },
+  ],
+);
+
+const filterEqualsAdaptiveMetadata = singleTableTemplateMetadata(
+  "syntax_helper",
+  "detail_list",
+  [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "filter", fieldHint: "categorical column", required: true, source: "schema_detection" },
+  ],
+  "field_binding",
+);
+
+const dataQualityAdaptiveMetadata = singleTableTemplateMetadata(
+  "diagnostic",
+  "data_quality_summary",
+  [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "metric", fieldHint: "missing value count", required: true, source: "schema_detection" },
+  ],
+);
+
+const rankedSummaryAdaptiveMetadata = singleTableTemplateMetadata(
+  "business_answer",
+  "ranked_summary",
+  [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "metric", fieldHint: "sortable column", required: true, source: "schema_detection" },
+  ],
+);
+
+const distinctValuesAdaptiveMetadata = singleTableTemplateMetadata(
+  "diagnostic",
+  "detail_list",
+  [
+    { role: "entity", fieldHint: "active table", required: true, source: "schema_detection" },
+    { role: "grouping", fieldHint: "categorical column", required: true, source: "schema_detection" },
+  ],
+);
+
 const sqlAssistantDialectDisplayNames: Record<
   SqlDialectId | SqlAssistantFutureDialectId,
   string
@@ -229,6 +312,7 @@ LIMIT 100;`,
       category: "Preview and counts",
       explanation: "Count all rows in the active dataset.",
       dialectLabel: commonSqlReviewLabel,
+      adaptiveMetadata: countRowsAdaptiveMetadata,
       sql: `SELECT
   COUNT(*) AS row_count
 FROM ${tableName};`,
@@ -239,6 +323,7 @@ FROM ${tableName};`,
       category: "Filtering",
       explanation: `Filter records where ${labelColumn(categoryColumn)} matches one value.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: filterEqualsAdaptiveMetadata,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -311,6 +396,7 @@ LIMIT 100;`,
       category: "Aggregation",
       explanation: `Count records grouped by ${labelColumn(categoryColumn)}.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: groupedCountAdaptiveMetadata,
       sql: `SELECT
   ${categoryExpression},
   COUNT(*) AS row_count
@@ -325,6 +411,7 @@ LIMIT 100;`,
       category: "Aggregation",
       explanation: `Sum ${labelColumn(numericColumn)} by ${labelColumn(categoryColumn)}.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: metricByDimensionAdaptiveMetadata,
       sql: `SELECT
   ${categoryExpression},
   SUM(${numericExpression}) AS total_value
@@ -339,6 +426,7 @@ LIMIT 100;`,
       category: "Aggregation",
       explanation: `Average ${labelColumn(numericColumn)} by ${labelColumn(categoryColumn)}.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: metricByDimensionAdaptiveMetadata,
       sql: `SELECT
   ${categoryExpression},
   AVG(${numericExpression}) AS average_value
@@ -379,6 +467,7 @@ ORDER BY row_count DESC;`,
       category: "Sorting and limits",
       explanation: `Find rows with the highest ${labelColumn(sortableColumn || numericColumn)} values.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: rankedSummaryAdaptiveMetadata,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -391,6 +480,7 @@ LIMIT 10;`,
       category: "Sorting and limits",
       explanation: `Find rows with the lowest ${labelColumn(sortableColumn || numericColumn)} values.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: rankedSummaryAdaptiveMetadata,
       sql: `SELECT
   ${selectList}
 FROM ${tableName}
@@ -445,6 +535,7 @@ ORDER BY record_month;`,
       category: "Data quality",
       explanation: `Count missing values in ${labelColumn(categoryColumn || numericColumn)}.`,
       dialectLabel: commonSqlReviewLabel,
+      adaptiveMetadata: dataQualityAdaptiveMetadata,
       sql: `SELECT
   COUNT(*) AS row_count,
   SUM(CASE WHEN ${placeholderColumn(categoryColumn || numericColumn)} IS NULL THEN 1 ELSE 0 END) AS missing_count
@@ -471,6 +562,7 @@ LIMIT 100;`,
       category: "Data quality",
       explanation: `List distinct values from ${labelColumn(categoryColumn)}.`,
       dialectLabel: limitSyntaxReviewLabel,
+      adaptiveMetadata: distinctValuesAdaptiveMetadata,
       sql: `SELECT DISTINCT
   ${categoryExpression}
 FROM ${tableName}

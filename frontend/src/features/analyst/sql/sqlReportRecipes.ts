@@ -73,6 +73,57 @@ const columnText = (column: SchemaColumn) => normalizeText(column.name);
 const includesAny = (value: string, terms: string[]) =>
   terms.some((term) => value.includes(term));
 
+const singleTableReportRecipeMetadata = (
+  outputShape: SqlTemplateAdaptiveMetadata["outputShape"],
+  semanticRoles: SqlTemplateAdaptiveMetadata["semanticRoles"],
+  canInsertExistingSql: boolean,
+): SqlTemplateAdaptiveMetadata => ({
+  templateKind: "report_recipe",
+  outputShape,
+  semanticRoles,
+  relationshipMode: "single_table",
+  adaptationSupport: "label_only",
+  safety: {
+    canInsertExistingSql,
+    canAdaptSql: false,
+    requiresGrounding: true,
+    requiresAcceptedRelationships: false,
+    manualInsertOnly: true,
+  },
+});
+
+const topPerformersAdaptiveMetadata = (canInsertExistingSql: boolean) =>
+  singleTableReportRecipeMetadata(
+    "ranked_summary",
+    [
+      { role: "entity", fieldHint: "active table", required: true, source: "recipe_role" },
+      { role: "grouping", fieldHint: "category or segment", required: true, source: "recipe_role" },
+      { role: "metric", fieldHint: "numeric measure", required: true, source: "recipe_role" },
+    ],
+    canInsertExistingSql,
+  );
+
+const dataQualityAdaptiveMetadata = (canInsertExistingSql: boolean) =>
+  singleTableReportRecipeMetadata(
+    "data_quality_summary",
+    [
+      { role: "entity", fieldHint: "active table schema", required: true, source: "recipe_role" },
+      { role: "metric", fieldHint: "missing value counts", required: true, source: "recipe_role" },
+    ],
+    canInsertExistingSql,
+  );
+
+const categorySummaryAdaptiveMetadata = (canInsertExistingSql: boolean) =>
+  singleTableReportRecipeMetadata(
+    "metric_by_dimension",
+    [
+      { role: "entity", fieldHint: "active table", required: true, source: "recipe_role" },
+      { role: "grouping", fieldHint: "category or segment", required: true, source: "recipe_role" },
+      { role: "metric", fieldHint: "optional numeric measure", required: false, source: "recipe_role" },
+    ],
+    canInsertExistingSql,
+  );
+
 type InactiveEntityKind = "person" | "asset" | "workflow" | "generic";
 
 type InactiveEntityDetection = {
@@ -364,6 +415,7 @@ ${topFiftyLimit};`,
             dialectSupportNote: "Uses selected-dialect row-limit guidance; review or convert for DuckDB execution before running.",
             supportSummary: blockedSummary(topPerformerMissing),
             dialects: ["duckdb"],
+            adaptiveMetadata: topPerformersAdaptiveMetadata(false),
           },
           topPerformerMissing,
           ["A top performers report needs both a grouping field and a numeric measure."],
@@ -388,6 +440,7 @@ ${topTenLimit};`,
           warnings,
           missingRequirements: [],
           dialects: ["duckdb"],
+          adaptiveMetadata: topPerformersAdaptiveMetadata(true),
         },
   );
 
@@ -415,6 +468,7 @@ FROM ${context.tableName};`
         : ["No active schema was available, so a data quality draft cannot be created yet."],
     missingRequirements: context.schema.length > 0 ? [] : ["active table schema"],
     dialects: ["duckdb"],
+    adaptiveMetadata: dataQualityAdaptiveMetadata(context.schema.length > 0),
   });
 
   const summaryMissing = requireFields([["category or segment field", segmentColumn]]);
@@ -430,6 +484,7 @@ FROM ${context.tableName};`
             dialectSupportNote: "Uses the selected dialect row-limit style when a row limit is needed.",
             supportSummary: blockedSummary(summaryMissing),
             dialects: ["duckdb"],
+            adaptiveMetadata: categorySummaryAdaptiveMetadata(false),
           },
           summaryMissing,
           ["A category summary needs at least one grouping field."],
@@ -464,6 +519,7 @@ ${topTwentyFiveLimit};`,
           warnings,
           missingRequirements: [],
           dialects: ["duckdb"],
+          adaptiveMetadata: categorySummaryAdaptiveMetadata(true),
         },
   );
 
