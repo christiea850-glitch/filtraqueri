@@ -1,5 +1,5 @@
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
-import type { DatasetMetadata } from "../../dataset/datasetTypes";
+import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { AnalysisScopeSelection } from "../../workbook";
 import { createReportOpportunities } from "./reportIntelligencePlanner";
@@ -11,7 +11,11 @@ import {
 import { recommendAnalyticalStrategies, type SqlAnalyticalStrategy } from "./sqlAnalyticalStrategies";
 import { createSqlRelationshipReviewModel } from "./sqlRelationshipReview";
 import { createSqlReportRecipes } from "./sqlReportRecipes";
-import { createSqlAssistantTemplates } from "./sqlTemplateLibrary";
+import {
+  adaptSingleTableTemplate,
+  type SqlSingleTableAdaptationResult,
+} from "./sqlSingleTableTemplateAdapter";
+import { createSqlAssistantTemplates, type SqlAssistantTemplate } from "./sqlTemplateLibrary";
 import { recommendSqlScope, type SqlScopeRecommendation } from "./sqlScopeRecommender";
 import {
   recommendSqlTemplates,
@@ -52,6 +56,15 @@ export const ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE =
 export const ASK_RELATIONSHIP_BLOCK_COMPACT_COPY =
   "FiltraQueri understands the analysis, but worksheet connections must be reviewed before SQL can be inserted.";
 
+export const ASK_ADAPTED_TEMPLATE_BADGE = "Adapted template";
+export const ASK_ADAPTED_TEMPLATE_READY_STATUS = "Ready for review";
+export const ASK_ADAPTED_TEMPLATE_READY_COPY =
+  "FiltraQueri matched this template to the selected worksheet. Review before inserting.";
+export const ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS = "Needs a clearer worksheet or column";
+export const ASK_ADAPTED_TEMPLATE_BLOCKED_COPY =
+  "FiltraQueri needs a clearer worksheet or column before adapting this template.";
+export const ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY = "This is a preview only.";
+
 export type SqlAskFiltraQueriModel = {
   buttonLabel: typeof ASK_FILTRAQUERI_BUTTON_LABEL;
   canSubmit: boolean;
@@ -90,9 +103,29 @@ export type SqlAskFiltraQueriSuggestionModel = {
   blockedPlan: SqlAskBlockedPlanRecommendation | null;
   analyticalStrategies: SqlAnalyticalStrategy[];
   adaptiveFitSummaries: SqlAskAdaptiveFitSummary[];
+  adaptedTemplateEvidence: SqlAskAdaptedTemplateEvidence[];
   recommendedAnalysis: SqlAskRecommendedAnalysisModel;
   guidanceTitle: string;
   guidanceCopy: string;
+  noRunQuery: true;
+  noBackendCall: true;
+  noEditorMutation: true;
+};
+
+export type SqlAskAdaptedTemplateEvidence = {
+  id: string;
+  recommendationId: string;
+  templateId: string;
+  title: string;
+  badge: typeof ASK_ADAPTED_TEMPLATE_BADGE;
+  statusLabel: typeof ASK_ADAPTED_TEMPLATE_READY_STATUS | typeof ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS;
+  helperCopy: typeof ASK_ADAPTED_TEMPLATE_READY_COPY | typeof ASK_ADAPTED_TEMPLATE_BLOCKED_COPY;
+  previewOnlyCopy: typeof ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY;
+  canInsertSql: false;
+  sql: string | null;
+  expectedOutputColumns: string[];
+  reasons: string[];
+  adapterStatus: SqlSingleTableAdaptationResult["status"];
   noRunQuery: true;
   noBackendCall: true;
   noEditorMutation: true;
@@ -189,6 +222,57 @@ const worksheetLabelForSelection = (
   );
 
   return worksheet?.displayName || worksheet?.sheetName || selection.tableName;
+};
+
+const selectedTableForAskAdaptation = ({
+  dataset,
+  appliedScopeSelections,
+}: {
+  dataset: DatasetMetadata | null;
+  appliedScopeSelections: readonly AnalysisScopeSelection[];
+}): {
+  worksheetId: string | null;
+  worksheetLabel: string;
+  tableName: string;
+  schema: SchemaColumn[];
+} | null => {
+  if (!dataset) return null;
+  if (appliedScopeSelections.length > 1) return null;
+
+  const workbook = dataset.workbook_metadata;
+  const scopedSelection = appliedScopeSelections[0] || null;
+  if (scopedSelection) {
+    const worksheet =
+      workbook?.worksheets.find((candidate) => candidate.worksheetId === scopedSelection.worksheetId) || null;
+    return {
+      worksheetId: scopedSelection.worksheetId,
+      worksheetLabel: worksheet?.displayName || worksheet?.sheetName || scopedSelection.tableName,
+      tableName: scopedSelection.tableName,
+      schema: worksheet?.schema || dataset.schema,
+    };
+  }
+
+  const activeWorksheetId =
+    workbook?.activeAnalysisSource?.worksheetId ||
+    workbook?.activeWorksheetId ||
+    null;
+  const activeWorksheet = activeWorksheetId
+    ? workbook?.worksheets.find((worksheet) => worksheet.worksheetId === activeWorksheetId) || null
+    : null;
+
+  return {
+    worksheetId: activeWorksheet?.worksheetId || null,
+    worksheetLabel:
+      activeWorksheet?.displayName ||
+      activeWorksheet?.sheetName ||
+      dataset.table_name ||
+      "Selected worksheet",
+    tableName:
+      workbook?.activeAnalysisSource?.tableName ||
+      activeWorksheet?.tableName ||
+      dataset.table_name,
+    schema: activeWorksheet?.schema || dataset.schema,
+  };
 };
 
 const formatNeededTables = (scopeRecommendations: readonly SqlScopeRecommendation[]): string =>
@@ -521,6 +605,126 @@ export const createSqlAskAdaptiveFitSummaries = ({
     });
 };
 
+const userFacingAdaptationCopy = (
+  result: SqlSingleTableAdaptationResult,
+): Pick<SqlAskAdaptedTemplateEvidence, "statusLabel" | "helperCopy"> =>
+  result.status === "ready"
+    ? {
+        statusLabel: ASK_ADAPTED_TEMPLATE_READY_STATUS,
+        helperCopy: ASK_ADAPTED_TEMPLATE_READY_COPY,
+      }
+    : {
+        statusLabel: ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS,
+        helperCopy: ASK_ADAPTED_TEMPLATE_BLOCKED_COPY,
+      };
+
+const shouldCreateAdaptedTemplateEvidence = (
+  questionShape: SqlBusinessQuestionShape | null,
+  blockedPlan: SqlAskBlockedPlanRecommendation | null,
+): questionShape is SqlBusinessQuestionShape =>
+  Boolean(
+    questionShape &&
+      !blockedPlan &&
+      questionShape.preferredOutputShape !== "blocked_relationship_plan" &&
+      !questionShape.relationshipDependent &&
+      questionShape.relationshipGaps.length === 0,
+  );
+
+export const createSqlAskAdaptedTemplateEvidence = ({
+  prompt,
+  questionShape,
+  recommendations,
+  templateCandidates = [],
+  dataset,
+  selectedDialect,
+  appliedScopeSelections,
+  blockedPlan,
+}: {
+  prompt: string;
+  questionShape: SqlBusinessQuestionShape | null;
+  recommendations: readonly SqlTemplateRecommendation[];
+  templateCandidates?: readonly SqlAssistantTemplate[];
+  dataset: DatasetMetadata | null;
+  selectedDialect: SqlDialectId;
+  appliedScopeSelections: readonly AnalysisScopeSelection[];
+  blockedPlan: SqlAskBlockedPlanRecommendation | null;
+}): SqlAskAdaptedTemplateEvidence[] => {
+  if (selectedDialect !== "duckdb") return [];
+  if (!shouldCreateAdaptedTemplateEvidence(questionShape, blockedPlan)) return [];
+
+  const selectedTable = selectedTableForAskAdaptation({
+    dataset,
+    appliedScopeSelections,
+  });
+  const evidence: SqlAskAdaptedTemplateEvidence[] = [];
+  const candidates = uniqueRecommendations([
+    ...recommendations,
+    ...templateCandidates.map((template): SqlTemplateRecommendation => ({
+      id: template.id,
+      kind: "template",
+      title: template.title,
+      description: template.explanation,
+      sql: template.sql,
+      score: 0,
+      reasons: [],
+      support: "supported",
+      adaptiveMetadata: template.adaptiveMetadata,
+    })),
+  ]);
+
+  for (const recommendation of candidates) {
+    if (recommendation.kind !== "template" || !recommendation.adaptiveMetadata) continue;
+
+    const result = adaptSingleTableTemplate({
+      prompt,
+      questionShape,
+      selectedTable,
+      template: {
+        id: recommendation.id,
+        title: recommendation.title,
+        adaptiveMetadata: recommendation.adaptiveMetadata,
+      },
+      dialect: "duckdb",
+    });
+
+    if (
+      result.status !== "ready" &&
+      ![
+        "blocked_missing_grouping",
+        "blocked_missing_metric",
+        "blocked_missing_filter",
+        "blocked_missing_sort",
+        "blocked_missing_table",
+      ].includes(result.status)
+    ) {
+      continue;
+    }
+
+    const copy = userFacingAdaptationCopy(result);
+    evidence.push({
+      id: `adapted-template:${recommendation.id}`,
+      recommendationId: recommendation.id,
+      templateId: recommendation.id,
+      title: result.adaptedTitle,
+      badge: ASK_ADAPTED_TEMPLATE_BADGE,
+      statusLabel: copy.statusLabel,
+      helperCopy: copy.helperCopy,
+      previewOnlyCopy: ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY,
+      canInsertSql: false,
+      sql: result.status === "ready" ? result.sql : null,
+      expectedOutputColumns: result.expectedOutputColumns,
+      reasons: result.reasons,
+      adapterStatus: result.status,
+      noRunQuery: true,
+      noBackendCall: true,
+      noEditorMutation: true,
+    });
+  }
+
+  const readyEvidence = evidence.filter((item) => item.adapterStatus === "ready");
+  return readyEvidence.length > 0 ? readyEvidence.slice(0, 1) : evidence.slice(0, 1);
+};
+
 export const createSqlAskFiltraQueriSuggestionModel = ({
   hasSubmittedAsk,
   prompt,
@@ -613,6 +817,16 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     blockedPlan,
     dataset,
   });
+  const adaptedTemplateEvidence = createSqlAskAdaptedTemplateEvidence({
+    prompt: trimmedPrompt,
+    questionShape,
+    recommendations: uniqueRecommendations([...recommendations, ...rawRecommendations]),
+    templateCandidates: templates,
+    dataset,
+    selectedDialect,
+    appliedScopeSelections,
+    blockedPlan,
+  });
   const recommendedAnalysis = createSqlAskRecommendedAnalysisModel({
     adaptiveFitSummaries,
     analyticalStrategies,
@@ -634,6 +848,7 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     blockedPlan,
     analyticalStrategies,
     adaptiveFitSummaries,
+    adaptedTemplateEvidence,
     recommendedAnalysis,
     guidanceTitle: guidance.guidanceTitle,
     guidanceCopy: guidance.guidanceCopy,

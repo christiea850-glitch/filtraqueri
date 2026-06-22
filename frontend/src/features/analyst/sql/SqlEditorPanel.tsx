@@ -1039,6 +1039,29 @@ function SqlEditorPanel({
                   </button>
                 </div>
               )}
+              {askFiltraQueriSuggestions.adaptedTemplateEvidence.length > 0 && (
+                <div className="sql-recommended-analysis-alternatives" aria-label="Adapted template evidence">
+                  {askFiltraQueriSuggestions.adaptedTemplateEvidence.map((evidence) => (
+                    <article className="sql-recommended-analysis-card" key={evidence.id}>
+                      <div className="sql-template-recommendation-title-row">
+                        <strong>{evidence.title}</strong>
+                        <span className="sql-grounding-badge supported">{evidence.badge}</span>
+                      </div>
+                      <p>{evidence.helperCopy}</p>
+                      <div className="sql-adaptive-fit-meta">
+                        <span>{evidence.statusLabel}</span>
+                        <span>{evidence.previewOnlyCopy}</span>
+                      </div>
+                      {evidence.expectedOutputColumns.length > 0 && (
+                        <p>Expected output: {evidence.expectedOutputColumns.join(", ")}</p>
+                      )}
+                      <button type="button" className="secondary-button" disabled>
+                        Review first
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
               {[askFiltraQueriSuggestions.recommendedAnalysis.primary].map((card) => {
                 const canInsert = card.action === "insert_recommendation" || card.action === "insert_strategy";
                 return (

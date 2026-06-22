@@ -22,6 +22,12 @@ import {
   BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_HELPER,
   BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_TITLE,
   ASK_RECOMMENDATION_ALREADY_INSERTED_COPY,
+  ASK_ADAPTED_TEMPLATE_BADGE,
+  ASK_ADAPTED_TEMPLATE_BLOCKED_COPY,
+  ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS,
+  ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY,
+  ASK_ADAPTED_TEMPLATE_READY_COPY,
+  ASK_ADAPTED_TEMPLATE_READY_STATUS,
   ASK_RELATIONSHIP_BLOCK_COMPACT_COPY,
   ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE,
   createBusinessSqlPreviewVisibilityModel,
@@ -480,8 +486,15 @@ const fixtures: Fixture[] = [
         appliedScopeSelections: [],
       });
       const recommendationIds = model.recommendations.map((recommendation) => recommendation.id);
-      const insertState = model.recommendations[0]
-        ? createSqlAskRecommendationInsertModel(model.recommendations[0])
+      const insertableModel = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "Count leases by status",
+        dataset: dataset(),
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const insertState = insertableModel.recommendations[0]
+        ? createSqlAskRecommendationInsertModel(insertableModel.recommendations[0])
         : null;
 
       return [
@@ -500,6 +513,155 @@ const fixtures: Fixture[] = [
         ...(recommendationIds.join("|") === model.recommendations.map((recommendation) => recommendation.id).join("|")
           ? []
           : ["Adaptive summaries must not reorder recommendations."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17J Ask model includes read-only adapted-template evidence for safe count-by-category",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many products by product category?",
+        dataset: productsDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const evidence = model.adaptedTemplateEvidence[0];
+
+      return [
+        ...(evidence ? [] : ["Expected adapted-template evidence."]),
+        ...(evidence?.badge === ASK_ADAPTED_TEMPLATE_BADGE
+          ? []
+          : [`Expected Adapted template badge, received ${evidence?.badge || "none"}.`]),
+        ...(evidence?.statusLabel === ASK_ADAPTED_TEMPLATE_READY_STATUS
+          ? []
+          : [`Expected Ready for review status, received ${evidence?.statusLabel || "none"}.`]),
+        ...(evidence?.helperCopy === ASK_ADAPTED_TEMPLATE_READY_COPY
+          ? []
+          : ["Expected user-facing adapted-template helper copy."]),
+        ...(evidence?.previewOnlyCopy === ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY
+          ? []
+          : ["Expected preview-only copy."]),
+        ...(evidence?.canInsertSql === false ? [] : ["Adapted evidence must not be insertable in T-17J."]),
+        ...(evidence?.sql && evidence.sql.includes('FROM "products"') ? [] : ["Expected internal adapted SQL preview for products."]),
+        ...(evidence?.sql && !/\bjoin\b/i.test(evidence.sql) ? [] : ["Adapted evidence SQL must be JOIN-free."]),
+        ...(evidence?.expectedOutputColumns.includes("product_category") &&
+          evidence.expectedOutputColumns.includes("row_count")
+          ? []
+          : [`Expected product_category and row_count output, received ${evidence?.expectedOutputColumns.join(",") || "none"}.`]),
+        ...(evidence?.adapterStatus.includes("blocked_")
+          ? ["Ready evidence must not expose blocked status."]
+          : []),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17J adapted-template evidence remains read-only and does not change recommendation order",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many products by product category?",
+        dataset: productsDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const beforeIds = model.recommendations.map((recommendation) => recommendation.id).join("|");
+      const evidence = model.adaptedTemplateEvidence;
+      const afterIds = model.recommendations.map((recommendation) => recommendation.id).join("|");
+      const insertableModel = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "Count leases by status",
+        dataset: dataset(),
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const insertState = insertableModel.recommendations[0]
+        ? createSqlAskRecommendationInsertModel(insertableModel.recommendations[0])
+        : null;
+
+      return [
+        ...(beforeIds === afterIds ? [] : ["Adapted evidence must not reorder recommendations."]),
+        ...(evidence.every((item) => item.canInsertSql === false)
+          ? []
+          : ["Adapted evidence must not enable Insert."]),
+        ...(evidence.some((item) => item.id.startsWith("adapted-template:"))
+          ? []
+          : ["Expected supplemental adapted-template evidence id."]),
+        ...(model.recommendations.some((recommendation) => recommendation.id.startsWith("adapted-template:"))
+          ? ["Adapted evidence must not be inserted into recommendation ordering."]
+          : []),
+        ...(insertState?.canInsert ? [] : ["Existing exact insertable recommendation behavior should remain unchanged."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17J relationship-dependent questions keep relationship review and no adapted SQL",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many tenants in every unit have access codes?",
+        dataset: missingTenantAccessDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+
+      return [
+        ...(model.blockedPlan ? [] : ["Expected existing relationship blocked plan."]),
+        ...(model.recommendedAnalysis.relationshipAction ? [] : ["Expected relationship review action."]),
+        ...(model.adaptedTemplateEvidence.length === 0
+          ? []
+          : ["Relationship-blocked Ask must not expose adapted SQL evidence."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17J blocked adapter evidence uses user-facing copy only",
+    assert: () => {
+      const data = businessWorkbookDataset({
+        sheets: [
+          worksheet("worksheet:ambiguous-products", "products", "products", [
+            column("status", "categorical"),
+            column("segment", "categorical"),
+            column("revenue", "numeric"),
+          ]),
+        ],
+        activeSheet: worksheet("worksheet:ambiguous-products", "products", "products", [
+          column("status", "categorical"),
+          column("segment", "categorical"),
+          column("revenue", "numeric"),
+        ]),
+      });
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many products by category?",
+        dataset: data,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const evidence = model.adaptedTemplateEvidence[0];
+      const visibleCopy = `${evidence?.statusLabel || ""} ${evidence?.helperCopy || ""} ${evidence?.badge || ""}`;
+
+      return [
+        ...(evidence ? [] : ["Expected soft blocked adapted-template evidence."]),
+        ...(evidence?.canInsertSql === false ? [] : ["Blocked evidence must not be insertable."]),
+        ...(evidence?.sql === null ? [] : ["Blocked evidence must not expose SQL."]),
+        ...(evidence?.statusLabel === ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS
+          ? []
+          : [`Expected user-facing blocked status, received ${evidence?.statusLabel || "none"}.`]),
+        ...(evidence?.helperCopy === ASK_ADAPTED_TEMPLATE_BLOCKED_COPY
+          ? []
+          : ["Expected user-facing blocked helper copy."]),
+        ...(visibleCopy.includes("blocked_missing") ||
+          visibleCopy.includes("metadata") ||
+          visibleCopy.includes("adapter") ||
+          visibleCopy.includes("deterministic") ||
+          visibleCopy.includes("field binding")
+          ? [`Internal language leaked into adapted-template copy: ${visibleCopy}`]
+          : []),
         ...expectNoBehaviorChange(model),
       ];
     },
