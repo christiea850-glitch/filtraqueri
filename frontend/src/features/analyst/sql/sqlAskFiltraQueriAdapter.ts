@@ -3,6 +3,7 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { AnalysisScopeSelection } from "../../workbook";
 import { createReportOpportunities } from "./reportIntelligencePlanner";
+import { recommendAnalyticalStrategies, type SqlAnalyticalStrategy } from "./sqlAnalyticalStrategies";
 import { createSqlReportRecipes } from "./sqlReportRecipes";
 import { createSqlAssistantTemplates } from "./sqlTemplateLibrary";
 import { recommendSqlScope, type SqlScopeRecommendation } from "./sqlScopeRecommender";
@@ -75,6 +76,7 @@ export type SqlAskFiltraQueriSuggestionModel = {
   scopeRecommendations: SqlScopeRecommendation[];
   questionShape: SqlBusinessQuestionShape | null;
   blockedPlan: SqlAskBlockedPlanRecommendation | null;
+  analyticalStrategies: SqlAnalyticalStrategy[];
   guidanceTitle: string;
   guidanceCopy: string;
   noRunQuery: true;
@@ -262,6 +264,15 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
         shape: questionShape,
       })
     : null;
+  const analyticalStrategies = questionShape
+    ? recommendAnalyticalStrategies({
+        prompt: trimmedPrompt,
+        questionShape,
+        relevantWorksheets: scopeRecommendations,
+        acceptedRelationships: dataset?.workbook_metadata?.acceptedRelationshipContracts || [],
+        existingRecommendations: recommendations,
+      })
+    : [];
   const neededTables = formatNeededTables(scopeRecommendations);
   const hasTemplate = recommendations.length > 0;
   const guidance = createGuidanceForQuestionShape({
@@ -276,6 +287,7 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     scopeRecommendations,
     questionShape,
     blockedPlan,
+    analyticalStrategies,
     guidanceTitle: guidance.guidanceTitle,
     guidanceCopy: guidance.guidanceCopy,
     noRunQuery: true,

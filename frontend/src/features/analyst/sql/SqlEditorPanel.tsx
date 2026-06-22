@@ -40,6 +40,7 @@ import {
   createSqlAskFiltraQueriSuggestionModel,
   shouldSubmitSqlAskFiltraQueriKey,
 } from "./sqlAskFiltraQueriAdapter";
+import { sqlAnalyticalStrategyStatusLabel } from "./sqlAnalyticalStrategies";
 import { createSqlSourceLineModel } from "./sqlSourceLineAdapter";
 import {
   createSqlWorksheetScopeModel,
@@ -713,6 +714,24 @@ function SqlEditorPanel({
     if (!askFiltraQueri.canSubmit) return;
     setHasBusinessSqlPreviewAttempt(true);
   };
+  const insertAnalyticalStrategy = (
+    strategy: typeof askFiltraQueriSuggestions.analyticalStrategies[number],
+  ) => {
+    const recommendationId = `strategy:${strategy.id}:${strategy.sourceRecommendationId || "review"}`;
+    const insertState = createSqlAskRecommendationInsertModel(
+      { id: recommendationId, sql: strategy.sql || "" },
+      { activeSqlDraft: editor.value, insertedAskRecommendationId },
+    );
+    if (!strategy.isInsertable || !insertState.canInsert || !insertState.sql) return;
+
+    onInsertSql?.(insertState.sql, {
+      id: recommendationId,
+      label: strategy.title,
+      createdFrom: "template",
+    });
+    setInsertedAskRecommendationId(recommendationId);
+  };
+
   const insertAskRecommendation = (
     recommendation: typeof askFiltraQueriSuggestions.recommendations[number],
   ) => {
@@ -959,6 +978,72 @@ function SqlEditorPanel({
                   </article>
                 ))}
               </div>
+            </div>
+          )}
+          {askFiltraQueriSuggestions.analyticalStrategies.length > 1 && (
+            <div className="sql-template-recommendation-list" aria-label="Analysis options">
+              <div className="sql-helper-section-label">
+                <span>Analysis options</span>
+                <small>{askFiltraQueriSuggestions.analyticalStrategies.length}</small>
+              </div>
+              {askFiltraQueriSuggestions.analyticalStrategies.map((strategy) => {
+                const statusLabel = sqlAnalyticalStrategyStatusLabel(strategy);
+                const insertState = createSqlAskRecommendationInsertModel(
+                  {
+                    id: `strategy:${strategy.id}:${strategy.sourceRecommendationId || "review"}`,
+                    sql: strategy.sql || "",
+                  },
+                  {
+                    activeSqlDraft: editor.value,
+                    insertedAskRecommendationId,
+                  },
+                );
+
+                return (
+                  <article className="sql-template-recommendation-card" key={strategy.id}>
+                    <div>
+                      <div className="sql-template-recommendation-title-row">
+                        <strong>{strategy.title}</strong>
+                        <span className={`sql-grounding-badge ${statusLabel === "Relationships needed" ? "needs_review" : "supported"}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <span>{strategy.description}</span>
+                    </div>
+                    <ul>
+                      <li>Expected output: {strategy.outputShape.join(", ")}</li>
+                      {strategy.requiredRelationships.length > 0 && (
+                        <li>Missing relationships: {strategy.requiredRelationships.join(", ")}</li>
+                      )}
+                      {statusLabel === "Relationships needed" && (
+                        <li>Confirm worksheet relationships before inserting SQL.</li>
+                      )}
+                    </ul>
+                    {strategy.isInsertable ? (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={!insertState.canInsert || !onInsertSql}
+                        title={insertState.disabledReason || "Insert this analysis option into the SQL editor"}
+                        onClick={() => insertAnalyticalStrategy(strategy)}
+                      >
+                        {insertState.isInsertedRecommendation ? "Inserted" : "Insert into editor"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled
+                        title={strategy.disabledReason}
+                        aria-label={strategy.disabledReason}
+                      >
+                        {statusLabel === "Relationships needed" ? "Relationships needed" : "Review first"}
+                      </button>
+                    )}
+                    {!strategy.isInsertable && strategy.disabledReason && <small>{strategy.disabledReason}</small>}
+                  </article>
+                );
+              })}
             </div>
           )}
           {askFiltraQueriSuggestions.blockedPlan || askFiltraQueriSuggestions.recommendations.length > 0 ? (
