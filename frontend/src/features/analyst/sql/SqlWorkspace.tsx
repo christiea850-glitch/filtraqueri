@@ -16,6 +16,10 @@ import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSq
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 import { frameResultValue, labelResultColumns } from "./resultLabeling";
 import { createResultNarration } from "./resultNarration";
+import {
+  createSqlRelationshipReviewModel,
+  type SqlRelationshipReviewModel,
+} from "./sqlRelationshipReview";
 import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -32,15 +36,16 @@ type SqlWorkspaceProps = {
   onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
 };
 
-type BottomTab = "guidance";
+type BottomTab = "guidance" | "relationships";
 type FocusedSqlView = "editor" | "result" | "drafts" | "draft-detail";
 type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts" | "context";
 
 const bottomTabLabels: Record<BottomTab, string> = {
   guidance: "SQL diagnostics",
+  relationships: "Worksheet relationships",
 };
 
-const bottomTabOrder: BottomTab[] = ["guidance"];
+const bottomTabOrder: BottomTab[] = ["guidance", "relationships"];
 
 const formatDraftTimestamp = (value: string) => {
   const date = new Date(value);
@@ -431,6 +436,72 @@ function DraftDetailPage({
   );
 }
 
+function SqlRelationshipReviewPanel({
+  model,
+}: {
+  model: SqlRelationshipReviewModel;
+}) {
+  return (
+    <section className="sql-relationship-review-panel" aria-label={model.title}>
+      <div className="business-sql-preview-head">
+        <div>
+          <span>Read-only review</span>
+          <strong>{model.title}</strong>
+        </div>
+        <div className="business-sql-preview-badges" aria-label="Relationship review safety">
+          <em>Read-only</em>
+          <em>No SQL generated</em>
+        </div>
+      </div>
+      <p>{model.description}</p>
+      <p>{model.safetyCopy}</p>
+
+      {model.relevantWorksheets.length > 0 && (
+        <div className="sql-relationship-review-worksheets" aria-label="Relevant worksheets">
+          <strong>Relevant worksheets</strong>
+          <span>{model.relevantWorksheets.join(", ")}</span>
+        </div>
+      )}
+
+      {model.pairs.length > 0 ? (
+        <div className="sql-relationship-review-list" aria-label="Required relationship pairs">
+          {model.pairs.map((pair) => (
+            <article className="sql-relationship-review-card" key={pair.id}>
+              <div className="sql-relationship-review-card-head">
+                <strong>
+                  {pair.fromWorksheet} to {pair.toWorksheet}
+                </strong>
+                <span className={`sql-grounding-badge ${pair.status === "accepted" ? "supported" : "needs_review"}`}>
+                  {pair.statusLabel}
+                </span>
+              </div>
+              <dl>
+                <div>
+                  <dt>From worksheet</dt>
+                  <dd>{pair.fromWorksheet}</dd>
+                </div>
+                <div>
+                  <dt>To worksheet</dt>
+                  <dd>{pair.toWorksheet}</dd>
+                </div>
+              </dl>
+              <p>
+                {pair.suggestedColumns
+                  ? `Possible match: ${pair.suggestedColumns.fromColumn} ↔ ${pair.suggestedColumns.toColumn}`
+                  : "No confident column match found"}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="business-sql-preview-empty">
+          No required relationship pairs are available for review yet.
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SqlWorkspace({
   dataset,
   onExecutionResult,
@@ -447,6 +518,7 @@ function SqlWorkspace({
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
+  const [relationshipReviewRequirements, setRelationshipReviewRequirements] = useState<string[]>([]);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
   const {
@@ -516,6 +588,14 @@ function SqlWorkspace({
       sqlTabs.taskPrompt,
     ],
   );
+  const relationshipReviewModel = useMemo(
+    () =>
+      createSqlRelationshipReviewModel({
+        dataset,
+        requiredRelationships: relationshipReviewRequirements,
+      }),
+    [dataset, relationshipReviewRequirements],
+  );
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
@@ -564,6 +644,11 @@ function SqlWorkspace({
   const openDraftInEditor = (draft: SqlQueryDraft) => {
     loadDraft(draft);
     setFocusedView("editor");
+  };
+  const openRelationshipReview = (requiredRelationships: string[]) => {
+    setFocusedView("editor");
+    setRelationshipReviewRequirements(requiredRelationships);
+    setBottomTab("relationships");
   };
 
   useEffect(() => {
@@ -778,6 +863,7 @@ function SqlWorkspace({
           readinessReport={readinessReport}
           errorInsight={previewResult.errorInsight}
           businessSqlRenderPreview={businessSqlRenderPreview}
+          onReviewRelationships={openRelationshipReview}
         />
 
         {bottomTab && (
@@ -814,6 +900,9 @@ function SqlWorkspace({
                     dialectContext={{ selectedDialectProfile }}
                     validation={sqlAnalysis.validation}
                   />
+                )}
+                {bottomTab === "relationships" && (
+                  <SqlRelationshipReviewPanel model={relationshipReviewModel} />
                 )}
               </div>
             </section>

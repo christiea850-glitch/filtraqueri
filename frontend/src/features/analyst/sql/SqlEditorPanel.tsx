@@ -41,6 +41,7 @@ import {
   shouldSubmitSqlAskFiltraQueriKey,
 } from "./sqlAskFiltraQueriAdapter";
 import { sqlAnalyticalStrategyStatusLabel } from "./sqlAnalyticalStrategies";
+import { RELATIONSHIP_REVIEW_ACTION_LABEL } from "./sqlRelationshipReview";
 import { createSqlSourceLineModel } from "./sqlSourceLineAdapter";
 import {
   createSqlWorksheetScopeModel,
@@ -96,6 +97,7 @@ type SqlEditorPanelProps = {
   errorInsight?: SqlPreviewResult["errorInsight"];
   businessSqlRenderPreview?: BusinessSqlRenderPreview;
   dataset?: DatasetMetadata | null;
+  onReviewRelationships?: (requiredRelationships: string[]) => void;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -330,6 +332,7 @@ function SqlEditorPanel({
   errorInsight,
   businessSqlRenderPreview,
   dataset,
+  onReviewRelationships,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -1029,6 +1032,14 @@ function SqlEditorPanel({
                       >
                         {insertState.isInsertedRecommendation ? "Inserted" : "Insert into editor"}
                       </button>
+                    ) : statusLabel === "Relationships needed" ? (
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => onReviewRelationships?.(strategy.requiredRelationships)}
+                      >
+                        {RELATIONSHIP_REVIEW_ACTION_LABEL}
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -1037,7 +1048,7 @@ function SqlEditorPanel({
                         title={strategy.disabledReason}
                         aria-label={strategy.disabledReason}
                       >
-                        {statusLabel === "Relationships needed" ? "Relationships needed" : "Review first"}
+                        Review first
                       </button>
                     )}
                     {!strategy.isInsertable && strategy.disabledReason && <small>{strategy.disabledReason}</small>}
@@ -1080,11 +1091,14 @@ function SqlEditorPanel({
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled
+                    onClick={() =>
+                      onReviewRelationships?.(
+                        askFiltraQueriSuggestions.blockedPlan?.missingRelationships || [],
+                      )
+                    }
                     title={askFiltraQueriSuggestions.blockedPlan.disabledReason}
-                    aria-label={askFiltraQueriSuggestions.blockedPlan.disabledReason}
                   >
-                    {askFiltraQueriSuggestions.blockedPlan.actionLabel}
+                    {RELATIONSHIP_REVIEW_ACTION_LABEL}
                   </button>
                   <small>{askFiltraQueriSuggestions.blockedPlan.disabledReason}</small>
                 </article>

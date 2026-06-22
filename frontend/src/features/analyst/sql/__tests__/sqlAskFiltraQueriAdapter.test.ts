@@ -8,7 +8,12 @@
 
 import type { BusinessSqlRenderPreview } from "../businessSqlRenderPreview";
 import type { DatasetMetadata, SchemaColumn } from "../../../dataset/datasetTypes";
-import type { AcceptedRelationshipContract, WorkbookMetadata, WorksheetMetadata } from "../../../workbook";
+import type {
+  AcceptedRelationshipContract,
+  WorkbookMetadata,
+  WorksheetMetadata,
+  WorksheetRelationshipCandidate,
+} from "../../../workbook";
 import {
   ASK_FILTRAQUERI_BUTTON_LABEL,
   ADVANCED_PLANNING_DETAILS_COPY,
@@ -25,6 +30,12 @@ import {
 } from "../sqlAskFiltraQueriAdapter";
 import { classifySqlBusinessQuestion } from "../sqlBusinessQuestionShape";
 import { recommendAnalyticalStrategies, sqlAnalyticalStrategyStatusLabel } from "../sqlAnalyticalStrategies";
+import {
+  RELATIONSHIP_REVIEW_ACTION_LABEL,
+  RELATIONSHIP_REVIEW_PANEL_DESCRIPTION,
+  RELATIONSHIP_REVIEW_PANEL_TITLE,
+  createSqlRelationshipReviewModel,
+} from "../sqlRelationshipReview";
 
 type FixtureResult = {
   name: string;
@@ -220,14 +231,52 @@ const relationshipContract = (
   lastValidatedAt: "2026-01-01T00:00:00.000Z",
 });
 
+const relationshipCandidate = (
+  source: WorksheetMetadata,
+  sourceColumn: string,
+  target: WorksheetMetadata,
+  targetColumn: string,
+): WorksheetRelationshipCandidate => ({
+  relationshipId: `candidate:${source.tableName}:${target.tableName}`,
+  workbookId: "workbook:ask-fixture",
+  sourceWorksheetId: source.worksheetId,
+  sourceWorksheetName: source.displayName,
+  sourceTable: source.tableName,
+  sourceColumn,
+  targetWorksheetId: target.worksheetId,
+  targetWorksheetName: target.displayName,
+  targetTable: target.tableName,
+  targetColumn,
+  confidence: 0.92,
+  confidenceLabel: "high",
+  relationshipType: "one_to_many_candidate",
+  direction: "source_to_target",
+  evidence: {
+    nameSimilarity: 1,
+    typeCompatible: true,
+    sourceUniqueRatio: 1,
+    targetUniqueRatio: 0.5,
+    sampledOverlapRatio: 0.9,
+    sampledRowCount: 25,
+    summaries: ["Fixture deterministic relationship candidate."],
+  },
+  status: "candidate",
+  reviewStatus: "pending",
+  reviewedAt: null,
+  reviewedBy: null,
+  reviewNotes: null,
+});
+
 const businessWorkbookDataset = ({
   sheets,
   activeSheet,
   acceptedRelationshipContracts = [],
+  relationshipCandidates = [],
 }: {
   sheets: WorksheetMetadata[];
   activeSheet: WorksheetMetadata;
   acceptedRelationshipContracts?: AcceptedRelationshipContract[];
+  relationshipCandidates?: WorksheetRelationshipCandidate[];
 }): DatasetMetadata => {
   const workbookMetadata: WorkbookMetadata = {
     ...workbook(),
@@ -242,6 +291,7 @@ const businessWorkbookDataset = ({
     },
     worksheets: sheets,
     acceptedRelationshipContracts,
+    relationshipCandidates,
   };
 
   return {
@@ -339,6 +389,15 @@ const missingTenantAccessDataset = businessWorkbookDataset({
 const noisyMissingTenantAccessDataset = businessWorkbookDataset({
   sheets: [tenantsSheet, unitsSheet, accessCodesSheet, instructionsSheet, catOwnersSheet],
   activeSheet: tenantsSheet,
+});
+
+const reviewCandidateTenantAccessDataset = businessWorkbookDataset({
+  sheets: [tenantsSheet, unitsSheet, accessCodesSheet],
+  activeSheet: tenantsSheet,
+  relationshipCandidates: [
+    relationshipCandidate(unitsSheet, "unit_id", tenantsSheet, "unit_id"),
+    relationshipCandidate(tenantsSheet, "tenant_id", accessCodesSheet, "tenant_id"),
+  ],
 });
 
 const safeTenantAccessDataset = businessWorkbookDataset({
@@ -656,6 +715,158 @@ const fixtures: Fixture[] = [
           ? []
           : [`Expected relevant entity guidance, received ${model.guidanceCopy}.`]),
         ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-16A blocked Ask recommendation exposes relationship review entry point",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many tenants in every unit have access codes?",
+        dataset: noisyMissingTenantAccessDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const review = createSqlRelationshipReviewModel({
+        dataset: noisyMissingTenantAccessDataset,
+        requiredRelationships: model.blockedPlan?.missingRelationships || [],
+      });
+
+      return [
+        ...(RELATIONSHIP_REVIEW_ACTION_LABEL === "Review relationships"
+          ? []
+          : ["Expected blocked Ask card action copy to be Review relationships."]),
+        ...(review.actionLabel === "Review relationships"
+          ? []
+          : [`Expected review action label, received ${review.actionLabel}.`]),
+        ...(review.title === RELATIONSHIP_REVIEW_PANEL_TITLE &&
+          review.title === "Worksheet relationships needed"
+          ? []
+          : [`Expected relationship review panel title, received ${review.title}.`]),
+        ...(review.description === RELATIONSHIP_REVIEW_PANEL_DESCRIPTION &&
+          review.description.includes("cross-table SQL is blocked")
+          ? []
+          : ["Expected relationship review panel description copy."]),
+        ...(review.pairs.length === 2 ? [] : [`Expected two missing relationship pairs, received ${review.pairs.length}.`]),
+        ...(review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "units")
+          ? []
+          : ["Expected tenants to units relationship pair."]),
+        ...(review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "access_codes")
+          ? []
+          : ["Expected tenants to access_codes relationship pair."]),
+        ...(review.relevantWorksheets.includes("tenants") &&
+          review.relevantWorksheets.includes("units") &&
+          review.relevantWorksheets.includes("access_codes") &&
+          review.relevantWorksheets.length === 3
+          ? []
+          : [`Expected relevant worksheets tenants, units, access_codes; received ${review.relevantWorksheets.join(",")}.`]),
+        ...(review.pairs.every((pair) => pair.status === "missing" && pair.statusLabel === "Missing relationship")
+          ? []
+          : ["Expected missing relationship status for all blocked Ask pairs."]),
+        ...(review.pairs.every((pair) => pair.suggestedColumns === null)
+          ? []
+          : ["Expected no suggested columns without deterministic relationship candidates."]),
+        ...(review.noPersistence && review.noAcceptance && review.noSqlGeneration && review.noBackendCall && review.noRunQuery
+          ? []
+          : ["Relationship review must be read-only with no persistence, acceptance, SQL, backend, or Run Query side effects."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-16A blocked analytical strategy can open read-only relationship review",
+    assert: () => {
+      const data = businessWorkbookDataset({ sheets: [tenantsWorksheet, unitsWorksheet], activeSheet: tenantsWorksheet });
+      const shape = classifySqlBusinessQuestion({
+        prompt: "How many tenants in every unit have access codes?",
+        dataset: data,
+      });
+      const strategies = recommendAnalyticalStrategies({
+        prompt: shape.prompt,
+        questionShape: shape,
+        relevantWorksheets: [],
+      });
+      const blockedStrategy = strategies.find(
+        (strategy) => sqlAnalyticalStrategyStatusLabel(strategy) === "Relationships needed",
+      );
+      const review = createSqlRelationshipReviewModel({
+        dataset: data,
+        requiredRelationships: blockedStrategy?.requiredRelationships || [],
+      });
+
+      return [
+        ...(blockedStrategy ? [] : ["Expected blocked analytical strategy."]),
+        ...(RELATIONSHIP_REVIEW_ACTION_LABEL === "Review relationships"
+          ? []
+          : ["Expected blocked analytical strategy review action copy."]),
+        ...(review.pairs.length > 0 ? [] : ["Expected strategy relationship review pairs."]),
+        ...(review.pairs.every((pair) => pair.statusLabel === "Missing relationship")
+          ? []
+          : ["Expected strategy review status to show missing relationship."]),
+        ...(blockedStrategy?.sql ? ["Blocked analytical strategy must not expose SQL."] : []),
+        ...(review.noPersistence && review.noAcceptance && review.noSqlGeneration && review.noBackendCall && review.noRunQuery
+          ? []
+          : ["Strategy relationship review must not persist, accept, generate SQL, call backend, or run queries."]),
+      ];
+    },
+  },
+  {
+    name: "T-16A relationship review shows deterministic candidate columns as suggestions only",
+    assert: () => {
+      const requiredRelationships = ["tenants to units", "tenants to access_codes"];
+      const review = createSqlRelationshipReviewModel({
+        dataset: reviewCandidateTenantAccessDataset,
+        requiredRelationships,
+      });
+
+      return [
+        ...(review.pairs.length === 2 ? [] : [`Expected two candidate review pairs, received ${review.pairs.length}.`]),
+        ...(review.pairs.every((pair) => pair.status === "needs_confirmation" && pair.statusLabel === "Needs confirmation")
+          ? []
+          : ["Expected candidate relationships to require confirmation, not be accepted."]),
+        ...(review.pairs.some(
+          (pair) =>
+            pair.fromTable === "tenants" &&
+            pair.toTable === "units" &&
+            pair.suggestedColumns?.fromColumn === "unit_id" &&
+            pair.suggestedColumns.toColumn === "unit_id",
+        )
+          ? []
+          : ["Expected possible match unit_id ↔ unit_id from deterministic candidate metadata."]),
+        ...(review.pairs.some(
+          (pair) =>
+            pair.fromTable === "tenants" &&
+            pair.toTable === "access_codes" &&
+            pair.suggestedColumns?.fromColumn === "tenant_id" &&
+            pair.suggestedColumns.toColumn === "tenant_id",
+        )
+          ? []
+          : ["Expected possible match tenant_id ↔ tenant_id from deterministic candidate metadata."]),
+        ...(review.pairs.some((pair) => pair.status === "accepted")
+          ? ["Candidate-only review must not mark relationships accepted."]
+          : []),
+        ...(review.noPersistence && review.noAcceptance && review.noSqlGeneration && review.noBackendCall && review.noRunQuery
+          ? []
+          : ["Candidate relationship review must remain read-only."]),
+      ];
+    },
+  },
+  {
+    name: "T-16A accepted relationship status is display-only and does not persist review changes",
+    assert: () => {
+      const review = createSqlRelationshipReviewModel({
+        dataset: safeTenantAccessDataset,
+        requiredRelationships: ["tenants to units", "tenants to access_codes"],
+      });
+
+      return [
+        ...(review.pairs.every((pair) => pair.status === "accepted" && pair.statusLabel === "Accepted")
+          ? []
+          : ["Expected already accepted relationships to display as accepted."]),
+        ...(review.noPersistence && review.noAcceptance && review.noSqlGeneration && review.noBackendCall && review.noRunQuery
+          ? []
+          : ["Accepted display state must not add persistence, acceptance, SQL, backend, or Run Query behavior."]),
       ];
     },
   },

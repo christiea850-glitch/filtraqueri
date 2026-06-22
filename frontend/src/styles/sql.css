@@ -3215,6 +3215,97 @@
   gap: 8px;
 }
 
+.sql-relationship-review-panel {
+  display: grid;
+  gap: 10px;
+  color: #334155;
+}
+
+.sql-relationship-review-panel p {
+  margin: 0;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.sql-relationship-review-worksheets {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.sql-relationship-review-worksheets strong {
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sql-relationship-review-worksheets span {
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.sql-relationship-review-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sql-relationship-review-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.sql-relationship-review-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sql-relationship-review-card-head strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sql-relationship-review-card dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.sql-relationship-review-card dl > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sql-relationship-review-card dt {
+  color: #64748b;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sql-relationship-review-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
 .sql-workspace-tab-title {
   min-width: 0;
   overflow: hidden;
