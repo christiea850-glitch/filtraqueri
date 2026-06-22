@@ -983,6 +983,52 @@ function SqlEditorPanel({
               </div>
             </div>
           )}
+          {askFiltraQueriSuggestions.adaptiveFitSummaries.length > 0 && (
+            <div className="sql-adaptive-fit-summary" aria-label="Analysis fit">
+              <div className="sql-helper-section-label">
+                <span>Analysis fit</span>
+                <small>{askFiltraQueriSuggestions.adaptiveFitSummaries.length}</small>
+              </div>
+              <div className="sql-adaptive-fit-summary-grid">
+                {askFiltraQueriSuggestions.adaptiveFitSummaries.map((summary) => (
+                  <article
+                    className={[
+                      "sql-adaptive-fit-card",
+                      `is-${summary.category.replace(/_/g, "-")}`,
+                    ].join(" ")}
+                    key={summary.id}
+                  >
+                    <div className="sql-template-recommendation-title-row">
+                      <strong>{summary.title}</strong>
+                      <span className="sql-grounding-badge supported">{summary.label}</span>
+                    </div>
+                    <p>{summary.description}</p>
+                    <div className="sql-adaptive-fit-meta">
+                      <span>{summary.statusLabel}</span>
+                      <span>Read-only explanation</span>
+                    </div>
+                    {summary.missingFields.length > 0 && (
+                      <p>Missing fields: {summary.missingFields.join(", ")}</p>
+                    )}
+                    {summary.requiredRelationships.length > 0 && (
+                      <p>Relationships: {summary.requiredRelationships.join(", ")}</p>
+                    )}
+                    {summary.insertState === "blocked_relationships" &&
+                      summary.requiredRelationships.length > 0 &&
+                      onReviewRelationships && (
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => onReviewRelationships(summary.requiredRelationships)}
+                        >
+                          {RELATIONSHIP_REVIEW_ACTION_LABEL}
+                        </button>
+                      )}
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
           {askFiltraQueriSuggestions.analyticalStrategies.length > 1 && (
             <div className="sql-template-recommendation-list" aria-label="Analysis options">
               <div className="sql-helper-section-label">

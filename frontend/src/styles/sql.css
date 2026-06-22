@@ -3215,6 +3215,65 @@
   gap: 8px;
 }
 
+.sql-adaptive-fit-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.sql-adaptive-fit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.sql-adaptive-fit-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+}
+
+.sql-adaptive-fit-card.is-blocked-fit {
+  border-color: #fecaca;
+  background: #fff8f8;
+}
+
+.sql-adaptive-fit-card.is-exact-fit {
+  border-color: #bbf7d0;
+  background: #f7fef9;
+}
+
+.sql-adaptive-fit-card p {
+  margin: 0;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.sql-adaptive-fit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sql-adaptive-fit-meta span {
+  padding: 3px 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sql-adaptive-fit-card > button {
+  justify-self: flex-start;
+}
+
 .sql-relationship-review-panel {
   display: grid;
   gap: 10px;

@@ -3,7 +3,13 @@ import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { AnalysisScopeSelection } from "../../workbook";
 import { createReportOpportunities } from "./reportIntelligencePlanner";
+import {
+  classifySqlAdaptiveFits,
+  type SqlAdaptiveFitCategory,
+  type SqlAdaptiveInsertState,
+} from "./sqlAdaptiveFitClassifier";
 import { recommendAnalyticalStrategies, type SqlAnalyticalStrategy } from "./sqlAnalyticalStrategies";
+import { createSqlRelationshipReviewModel } from "./sqlRelationshipReview";
 import { createSqlReportRecipes } from "./sqlReportRecipes";
 import { createSqlAssistantTemplates } from "./sqlTemplateLibrary";
 import { recommendSqlScope, type SqlScopeRecommendation } from "./sqlScopeRecommender";
@@ -77,11 +83,25 @@ export type SqlAskFiltraQueriSuggestionModel = {
   questionShape: SqlBusinessQuestionShape | null;
   blockedPlan: SqlAskBlockedPlanRecommendation | null;
   analyticalStrategies: SqlAnalyticalStrategy[];
+  adaptiveFitSummaries: SqlAskAdaptiveFitSummary[];
   guidanceTitle: string;
   guidanceCopy: string;
   noRunQuery: true;
   noBackendCall: true;
   noEditorMutation: true;
+};
+
+export type SqlAskAdaptiveFitSummary = {
+  id: string;
+  label: string;
+  title: string;
+  description: string;
+  statusLabel: string;
+  category: SqlAdaptiveFitCategory;
+  insertState: SqlAdaptiveInsertState;
+  reasons: string[];
+  requiredRelationships: string[];
+  missingFields: string[];
 };
 
 export type SqlAskRecommendationInsertModel = {
@@ -189,6 +209,97 @@ const createGuidanceForQuestionShape = ({
   };
 };
 
+const adaptiveFitLabels: Record<SqlAdaptiveFitCategory, string> = {
+  exact_fit: "Exact match",
+  adapted_fit: "Can be adapted",
+  partial_fit: "Partial match",
+  composed_solution: "Composed analysis",
+  blocked_fit: "Needs worksheet relationships",
+  poor_fit: "Weak match",
+};
+
+const adaptiveFitStatusLabels: Record<SqlAdaptiveInsertState, string> = {
+  insertable_existing_sql: "Ready to insert",
+  read_only: "Read-only for now",
+  blocked_relationships: "Relationships needed",
+  blocked_missing_fields: "Missing fields",
+  needs_confirmation: "Needs confirmation",
+};
+
+const adaptiveFitCategoryRank: Record<SqlAdaptiveFitCategory, number> = {
+  exact_fit: 0,
+  blocked_fit: 1,
+  adapted_fit: 2,
+  composed_solution: 3,
+  partial_fit: 4,
+  poor_fit: 5,
+};
+
+const confidenceRank: Record<"high" | "medium" | "low", number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+export const createSqlAskAdaptiveFitSummaries = ({
+  prompt,
+  questionShape,
+  recommendations,
+  analyticalStrategies,
+  blockedPlan,
+  dataset,
+}: {
+  prompt: string;
+  questionShape: SqlBusinessQuestionShape | null;
+  recommendations: readonly SqlTemplateRecommendation[];
+  analyticalStrategies: readonly SqlAnalyticalStrategy[];
+  blockedPlan: SqlAskBlockedPlanRecommendation | null;
+  dataset: DatasetMetadata | null;
+}): SqlAskAdaptiveFitSummary[] => {
+  if (!questionShape) return [];
+
+  const relationshipReviewItems =
+    blockedPlan && blockedPlan.missingRelationships.length > 0
+      ? createSqlRelationshipReviewModel({
+          dataset,
+          requiredRelationships: blockedPlan.missingRelationships,
+        }).pairs
+      : [];
+  const fits = classifySqlAdaptiveFits({
+    prompt,
+    questionShape,
+    recommendations,
+    strategies: analyticalStrategies,
+    relationshipReviewItems,
+  });
+  const visibleFits = fits.some((fit) => fit.category !== "poor_fit")
+    ? fits.filter((fit) => fit.category !== "poor_fit")
+    : fits;
+
+  return [...visibleFits]
+    .sort(
+      (a, b) =>
+        confidenceRank[a.confidence] - confidenceRank[b.confidence] ||
+        adaptiveFitCategoryRank[a.category] - adaptiveFitCategoryRank[b.category],
+    )
+    .slice(0, 2)
+    .map((fit): SqlAskAdaptiveFitSummary => {
+      const firstReason = fit.reasons[0] || "Deterministic fit metadata is available for this suggestion.";
+      return {
+        id: `${fit.source}:${fit.candidateId}`,
+        label: adaptiveFitLabels[fit.category],
+        title: fit.title,
+        description: firstReason,
+        statusLabel: adaptiveFitStatusLabels[fit.insertState],
+        category: fit.category,
+        insertState: fit.insertState,
+        reasons: fit.reasons,
+        requiredRelationships: fit.requiredRelationships,
+        missingFields: fit.missingFields,
+      };
+    });
+};
+
 export const createSqlAskFiltraQueriSuggestionModel = ({
   hasSubmittedAsk,
   prompt,
@@ -273,6 +384,14 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
         existingRecommendations: recommendations,
       })
     : [];
+  const adaptiveFitSummaries = createSqlAskAdaptiveFitSummaries({
+    prompt: trimmedPrompt,
+    questionShape,
+    recommendations,
+    analyticalStrategies,
+    blockedPlan,
+    dataset,
+  });
   const neededTables = formatNeededTables(scopeRecommendations);
   const hasTemplate = recommendations.length > 0;
   const guidance = createGuidanceForQuestionShape({
@@ -288,6 +407,7 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     questionShape,
     blockedPlan,
     analyticalStrategies,
+    adaptiveFitSummaries,
     guidanceTitle: guidance.guidanceTitle,
     guidanceCopy: guidance.guidanceCopy,
     noRunQuery: true,

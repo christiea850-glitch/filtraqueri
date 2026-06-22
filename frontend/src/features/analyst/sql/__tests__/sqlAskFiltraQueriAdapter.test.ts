@@ -23,6 +23,7 @@ import {
   BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_TITLE,
   ASK_RECOMMENDATION_ALREADY_INSERTED_COPY,
   createBusinessSqlPreviewVisibilityModel,
+  createSqlAskAdaptiveFitSummaries,
   createSqlAskRecommendationInsertModel,
   createSqlAskFiltraQueriModel,
   createSqlAskFiltraQueriSuggestionModel,
@@ -465,6 +466,267 @@ const expectNoInsertSideEffects = (model: {
 ];
 
 const fixtures: Fixture[] = [
+  {
+    name: "T-17C Ask suggestion model includes compact adaptive fit summaries",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many orders by customer?",
+        dataset: ordersCustomersDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const recommendationIds = model.recommendations.map((recommendation) => recommendation.id);
+      const insertState = model.recommendations[0]
+        ? createSqlAskRecommendationInsertModel(model.recommendations[0])
+        : null;
+
+      return [
+        ...(model.adaptiveFitSummaries.length > 0
+          ? []
+          : ["Expected adaptive fit summaries after Ask submission."]),
+        ...(model.adaptiveFitSummaries.length <= 2
+          ? []
+          : [`Expected at most two adaptive fit summaries, received ${model.adaptiveFitSummaries.length}.`]),
+        ...(model.adaptiveFitSummaries.some(
+          (summary) => summary.label === "Exact match" && summary.statusLabel === "Ready to insert",
+        )
+          ? []
+          : ["Expected Exact match / Ready to insert summary for safe grouped-count SQL."]),
+        ...(insertState?.canInsert ? [] : ["Expected existing insert behavior to remain insertable."]),
+        ...(recommendationIds.join("|") === model.recommendations.map((recommendation) => recommendation.id).join("|")
+          ? []
+          : ["Adaptive summaries must not reorder recommendations."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17C blocked relationship fit summary opens existing review path",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many tenants in every unit have access codes?",
+        dataset: missingTenantAccessDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const blockedSummary = model.adaptiveFitSummaries.find(
+        (summary) => summary.category === "blocked_fit",
+      );
+
+      return [
+        ...(blockedSummary ? [] : ["Expected blocked adaptive fit summary."]),
+        ...(blockedSummary?.label === "Needs worksheet relationships"
+          ? []
+          : [`Expected Needs worksheet relationships label, received ${blockedSummary?.label || "none"}.`]),
+        ...(blockedSummary?.statusLabel === "Relationships needed"
+          ? []
+          : [`Expected Relationships needed status, received ${blockedSummary?.statusLabel || "none"}.`]),
+        ...(blockedSummary?.requiredRelationships.includes("tenants to units") &&
+          blockedSummary.requiredRelationships.includes("tenants to access_codes")
+          ? []
+          : [`Expected required relationship pairs, received ${blockedSummary?.requiredRelationships.join(", ") || "none"}.`]),
+        ...(model.blockedPlan?.missingRelationships.join("|") === blockedSummary?.requiredRelationships.join("|")
+          ? []
+          : ["Blocked fit summary should reuse the same relationship review inputs as the blocked Ask card."]),
+        ...(model.blockedPlan ? [] : ["Expected existing blocked relationship card to remain available."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17C summary labels partial adapted composed and weak fits without enabling insert",
+    assert: () => {
+      const groupedShape = classifySqlBusinessQuestion({
+        prompt: "How many orders by customer?",
+        dataset: ordersCustomersDataset,
+      });
+      const partial = createSqlAskAdaptiveFitSummaries({
+        prompt: groupedShape.prompt,
+        questionShape: groupedShape,
+        recommendations: [
+          {
+            id: "status-summary",
+            kind: "template",
+            title: "Status summary - orders",
+            description: "Count orders by status.",
+            sql: 'SELECT status, COUNT(*) AS order_count FROM "orders" GROUP BY status;',
+            score: 90,
+            reasons: ["Matches status breakdown question shape."],
+            support: "supported",
+          },
+        ],
+        analyticalStrategies: [],
+        blockedPlan: null,
+        dataset: ordersCustomersDataset,
+      });
+      const adapted = createSqlAskAdaptiveFitSummaries({
+        prompt: groupedShape.prompt,
+        questionShape: groupedShape,
+        recommendations: [
+          {
+            id: "orders-by-customer-needs-review",
+            kind: "template",
+            title: "Count orders by customer",
+            description: "Count orders for each customer.",
+            sql: 'SELECT customer_id, COUNT(*) AS order_count FROM "orders" GROUP BY customer_id;',
+            score: 90,
+            reasons: ["Matches grouped count question shape."],
+            support: "needs_review",
+            warnings: ["Needs review before insertion because the label must be verified."],
+          },
+        ],
+        analyticalStrategies: [],
+        blockedPlan: null,
+        dataset: ordersCustomersDataset,
+      });
+      const composed = createSqlAskAdaptiveFitSummaries({
+        prompt: "Which accounts have missing customer coverage?",
+        questionShape: {
+          ...groupedShape,
+          prompt: "Which accounts have missing customer coverage?",
+          preferredOutputShape: "detail_list",
+          hasDetailIntent: true,
+          hasFilterIntent: true,
+          filterTerms: ["missing"],
+          relationshipDependent: false,
+          relationshipGaps: [],
+        },
+        recommendations: [],
+        analyticalStrategies: [
+          {
+            id: "coverage-percent",
+            title: "customer coverage percentage by account",
+            description: "Calculate coverage percentage for customers matching the requested condition.",
+            outputShape: ["account_name", "customer_count", "coverage_percent"],
+            strategyKind: "coverage_percent",
+            requiredEntities: ["customers", "accounts"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "medium",
+          },
+          {
+            id: "gap-detection",
+            title: "accounts missing customer coverage",
+            description: "Find accounts with missing or no matching customers.",
+            outputShape: ["account_name", "customers_without_coverage_count"],
+            strategyKind: "gap_detection",
+            requiredEntities: ["customers", "accounts"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "medium",
+          },
+        ],
+        blockedPlan: null,
+        dataset: ordersCustomersDataset,
+      });
+      const weak = createSqlAskAdaptiveFitSummaries({
+        prompt: groupedShape.prompt,
+        questionShape: groupedShape,
+        recommendations: [
+          {
+            id: "filter-equals",
+            kind: "template",
+            title: "Filter equals",
+            description: "Simple syntax example for a WHERE filter equals predicate.",
+            sql: 'SELECT * FROM "orders" WHERE status = ?;',
+            score: 10,
+            reasons: ["Generic syntax helper."],
+            support: "supported",
+          },
+        ],
+        analyticalStrategies: [],
+        blockedPlan: null,
+        dataset: ordersCustomersDataset,
+      });
+
+      return [
+        ...(partial[0]?.label === "Partial match" && partial[0].statusLabel !== "Ready to insert"
+          ? []
+          : [`Expected Partial match without Ready to insert, received ${partial[0]?.label || "none"} / ${partial[0]?.statusLabel || "none"}.`]),
+        ...(adapted[0]?.label === "Can be adapted" && adapted[0].statusLabel === "Read-only for now"
+          ? []
+          : [`Expected Can be adapted / Read-only for now, received ${adapted[0]?.label || "none"} / ${adapted[0]?.statusLabel || "none"}.`]),
+        ...(composed.some(
+          (summary) => summary.label === "Composed analysis" && summary.statusLabel === "Read-only for now",
+        )
+          ? []
+          : ["Expected Composed analysis / Read-only for now summary."]),
+        ...(weak[0]?.label === "Weak match"
+          ? []
+          : [`Expected Weak match label, received ${weak[0]?.label || "none"}.`]),
+      ];
+    },
+  },
+  {
+    name: "T-17C fit summaries are capped and do not mutate SQL or recommendations",
+    assert: () => {
+      const groupedShape = classifySqlBusinessQuestion({
+        prompt: "How many orders by customer?",
+        dataset: ordersCustomersDataset,
+      });
+      const recommendations = [
+        {
+          id: "exact-one",
+          kind: "template" as const,
+          title: "Count orders by customer",
+          description: "Count orders for each customer.",
+          sql: 'SELECT customer_id, COUNT(*) AS order_count FROM "orders" GROUP BY customer_id;',
+          score: 100,
+          reasons: ["Matches grouped count question shape."],
+          support: "supported" as const,
+        },
+        {
+          id: "filter-equals",
+          kind: "template" as const,
+          title: "Filter equals",
+          description: "Simple syntax example for a WHERE filter equals predicate.",
+          sql: 'SELECT * FROM "orders" WHERE status = ?;',
+          score: 10,
+          reasons: ["Generic syntax helper."],
+          support: "supported" as const,
+        },
+        {
+          id: "status-summary",
+          kind: "template" as const,
+          title: "Status summary - orders",
+          description: "Count orders by status.",
+          sql: 'SELECT status, COUNT(*) AS order_count FROM "orders" GROUP BY status;',
+          score: 90,
+          reasons: ["Matches status breakdown question shape."],
+          support: "supported" as const,
+        },
+      ];
+      const beforeIds = recommendations.map((recommendation) => recommendation.id).join("|");
+      const beforeSql = recommendations.map((recommendation) => recommendation.sql).join("|");
+      const beforeSnapshot = JSON.stringify(recommendations);
+      const summaries = createSqlAskAdaptiveFitSummaries({
+        prompt: groupedShape.prompt,
+        questionShape: groupedShape,
+        recommendations,
+        analyticalStrategies: [],
+        blockedPlan: null,
+        dataset: ordersCustomersDataset,
+      });
+
+      return [
+        ...(summaries.length <= 2 ? [] : [`Expected at most two summaries, received ${summaries.length}.`]),
+        ...(summaries.some((summary) => summary.label === "Weak match")
+          ? ["Weak match should be deprioritized when stronger summaries are available."]
+          : []),
+        ...(beforeIds === recommendations.map((recommendation) => recommendation.id).join("|")
+          ? []
+          : ["Summary creation must not reorder recommendations."]),
+        ...(beforeSql === recommendations.map((recommendation) => recommendation.sql).join("|")
+          ? []
+          : ["Summary creation must not modify recommendation SQL."]),
+        ...(beforeSnapshot === JSON.stringify(recommendations)
+          ? []
+          : ["Summary creation must not mutate recommendation objects."]),
+      ];
+    },
+  },
   {
     name: "T-15-5 grouped-count question generates multiple analytical strategies",
     assert: () => {
