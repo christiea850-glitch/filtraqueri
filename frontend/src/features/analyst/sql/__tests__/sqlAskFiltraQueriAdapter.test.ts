@@ -24,6 +24,7 @@ import {
   shouldSubmitSqlAskFiltraQueriKey,
 } from "../sqlAskFiltraQueriAdapter";
 import { classifySqlBusinessQuestion } from "../sqlBusinessQuestionShape";
+import { recommendAnalyticalStrategies, sqlAnalyticalStrategyStatusLabel } from "../sqlAnalyticalStrategies";
 
 type FixtureResult = {
   name: string;
@@ -108,6 +109,32 @@ const managersWorksheet = worksheet("worksheet:managers", "managers", "managers"
   column("email"),
   column("phone"),
 ]);
+const ordersWorksheet = worksheet("worksheet:orders", "orders", "orders", [
+  column("order_id"),
+  column("customer_id"),
+  column("status", "categorical"),
+  column("revenue", "numeric"),
+]);
+const customersWorksheet = worksheet("worksheet:customers", "customers", "customers", [
+  column("customer_id"),
+  column("customer_name", "categorical"),
+]);
+const productsWorksheet = worksheet("worksheet:products", "products", "products", [
+  column("product_id"),
+  column("product_category", "categorical"),
+  column("revenue", "numeric"),
+]);
+const tenantsWorksheet = worksheet("worksheet:tenants", "tenants", "tenants", [
+  column("tenant_id"),
+  column("unit_id"),
+  column("access_code"),
+]);
+const unitsWorksheet = worksheet("worksheet:units", "units", "units", [
+  column("unit_id"),
+  column("unit_number", "categorical"),
+]);
+
+
 
 const workbook = (): WorkbookMetadata => ({
   workbookId: "workbook:ask-fixture",
@@ -379,6 +406,72 @@ const expectNoInsertSideEffects = (model: {
 ];
 
 const fixtures: Fixture[] = [
+  {
+    name: "T-15-5 grouped-count question generates multiple analytical strategies",
+    assert: () => {
+      const data = businessWorkbookDataset({ sheets: [ordersWorksheet, customersWorksheet], activeSheet: ordersWorksheet });
+      const shape = classifySqlBusinessQuestion({ prompt: "How many orders by customer?", dataset: data });
+      const strategies = recommendAnalyticalStrategies({ prompt: shape.prompt, questionShape: shape, relevantWorksheets: [], existingRecommendations: [{ id: "orders-by-customer", title: "Count orders by customer", description: "Count orders by customer", sql: "select customer_id, count(*) from orders group by customer_id" }] });
+      const titles = strategies.map((strategy) => strategy.title);
+      return [
+        ...(titles.includes("Count orders by customers") || titles.includes("Count orders by customer") ? [] : [`Expected count strategy, received ${titles.join(" | ")}.`]),
+        ...(strategies.some((strategy) => strategy.strategyKind === "ranked_summary") ? [] : ["Expected ranked summary strategy."]),
+        ...(strategies.length >= 2 && strategies.length <= 3 ? [] : [`Expected 2-3 strategies, received ${strategies.length}.`]),
+      ];
+    },
+  },
+  {
+    name: "T-15-5 missing cross-entity relationships block all tenant/unit strategies",
+    assert: () => {
+      const data = businessWorkbookDataset({ sheets: [tenantsWorksheet, unitsWorksheet], activeSheet: tenantsWorksheet });
+      const shape = classifySqlBusinessQuestion({ prompt: "How many tenants in every unit have access codes?", dataset: data });
+      const strategies = recommendAnalyticalStrategies({ prompt: shape.prompt, questionShape: shape, relevantWorksheets: [] });
+      return [
+        ...(strategies.length === 3 ? [] : [`Expected three blocked strategies, received ${strategies.length}.`]),
+        ...(strategies.every((strategy) => !strategy.isInsertable) ? [] : ["Expected no insertable relationship-dependent strategies."]),
+        ...(strategies.every((strategy) => sqlAnalyticalStrategyStatusLabel(strategy) === "Relationships needed") ? [] : ["Expected relationships-needed status for blocked strategies."]),
+        ...(strategies.some((strategy) => strategy.strategyKind === "blocked_relationship_plan") ? [] : ["Expected blocked relationship gap strategy."]),
+      ];
+    },
+  },
+  {
+    name: "T-15-5 metric-by-dimension question generates metric and ranking strategies",
+    assert: () => {
+      const data = businessWorkbookDataset({ sheets: [ordersWorksheet, productsWorksheet], activeSheet: ordersWorksheet, acceptedRelationshipContracts: [relationshipContract(productsWorksheet, "product_id", ordersWorksheet, "product_id")] });
+      const shape = classifySqlBusinessQuestion({ prompt: "Total revenue by product category", dataset: data });
+      const strategies = recommendAnalyticalStrategies({ prompt: shape.prompt, questionShape: shape, relevantWorksheets: [], existingRecommendations: [{ id: "revenue-category", title: "Total revenue by product category", description: "Total revenue by product category", sql: "select product_category, sum(revenue) from orders group by product_category" }] });
+      return [
+        ...(strategies.some((strategy) => strategy.strategyKind === "metric_by_dimension") ? [] : ["Expected metric-by-dimension strategy."]),
+        ...(strategies.some((strategy) => strategy.strategyKind === "ranked_summary") ? [] : ["Expected ranked metric strategy."]),
+      ];
+    },
+  },
+  {
+    name: "T-15-5 status-breakdown and detail-list strategies remain deterministic",
+    assert: () => {
+      const data = businessWorkbookDataset({ sheets: [ordersWorksheet, unitsWorksheet], activeSheet: ordersWorksheet });
+      const statusShape = classifySqlBusinessQuestion({ prompt: "How many orders are pending vs completed?", dataset: data });
+      const statusStrategies = recommendAnalyticalStrategies({ prompt: statusShape.prompt, questionShape: statusShape, relevantWorksheets: [] });
+      const listShape = classifySqlBusinessQuestion({ prompt: "List units without access codes", dataset: data });
+      const listStrategies = recommendAnalyticalStrategies({ prompt: listShape.prompt, questionShape: listShape, relevantWorksheets: [] });
+      return [
+        ...(statusStrategies.some((strategy) => strategy.strategyKind === "status_breakdown" && strategy.title === "orders by status") ? [] : ["Expected orders by status strategy."]),
+        ...(listStrategies.some((strategy) => strategy.strategyKind === "detail_list") ? [] : ["Expected detail list strategy."]),
+        ...(listStrategies.every((strategy) => !strategy.isInsertable) ? [] : ["Expected detail strategies to require review without safe SQL."]),
+      ];
+    },
+  },
+  {
+    name: "T-15-5 Ask suggestion model exposes analysis options without backend or execution",
+    assert: () => {
+      const data = businessWorkbookDataset({ sheets: [ordersWorksheet, customersWorksheet], activeSheet: ordersWorksheet });
+      const model = createSqlAskFiltraQueriSuggestionModel({ hasSubmittedAsk: true, prompt: "How many orders by customer?", dataset: data, selectedDialect: "duckdb", appliedScopeSelections: [] });
+      return [
+        ...(model.analyticalStrategies.length >= 2 ? [] : ["Expected multiple analysis options in Ask model."]),
+        ...(model.noBackendCall && model.noRunQuery && model.noEditorMutation ? [] : ["Ask analysis options must not call backend, run SQL, or mutate editor."]),
+      ];
+    },
+  },
   {
     name: "Ask FiltraQueri input model exposes visible button label",
     assert: () => {
