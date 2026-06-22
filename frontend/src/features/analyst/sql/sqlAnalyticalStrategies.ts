@@ -1,5 +1,6 @@
 import type { SqlBusinessQuestionShape } from "./sqlBusinessQuestionShape";
 import type { SqlTemplateRecommendation } from "./sqlTemplateRecommender";
+import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 
 export type SqlAnalyticalStrategyKind =
   | "grouped_count"
@@ -24,6 +25,7 @@ export type SqlAnalyticalStrategy = {
   confidence: "high" | "medium";
   sql?: string;
   sourceRecommendationId?: string;
+  adaptiveMetadata?: SqlTemplateAdaptiveMetadata;
 };
 
 type StrategyRecommendation = Pick<SqlTemplateRecommendation, "id" | "title" | "description" | "sql">;

@@ -9,6 +9,7 @@ import {
   formatRowLimitClause,
   type SqlAssistantFutureDialectId,
 } from "./sqlTemplateLibrary";
+import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 
 export type SqlReportRecipeId =
   | "inactive-records"
@@ -50,6 +51,7 @@ export type SqlReportRecipe = {
   missingRequirements: string[];
   dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
   domains?: SqlReportRecipeDomain[];
+  adaptiveMetadata?: SqlTemplateAdaptiveMetadata;
   /**
    * K9: For workbook-aware multi-worksheet recipes, the display names of the
    * worksheets the generated SQL will join. Surfaced as chips on the card so

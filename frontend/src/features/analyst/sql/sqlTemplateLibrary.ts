@@ -1,5 +1,6 @@
 import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
 import { getDialectProfile, type SqlDialectId } from "../../sqlIntelligence";
+import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 import {
   buildSampleValueHint,
   buildSelectList,
@@ -33,6 +34,7 @@ export type SqlAssistantTemplate = {
   dialectLabel: string;
   sql: string;
   dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
+  adaptiveMetadata?: SqlTemplateAdaptiveMetadata;
 };
 
 export type SqlAssistantGenerationInput = {

@@ -31,6 +31,7 @@ import {
 } from "../../workbook";
 import { createMultiWorksheetRecipes } from "./multiWorksheetRecipes";
 import { formatRowLimitClause, type SqlAssistantFutureDialectId } from "./sqlTemplateLibrary";
+import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 import type { SqlReportRecipe } from "./sqlReportRecipes";
 
 // ---------- Public types ----------
@@ -88,6 +89,7 @@ export type ReportOpportunity = {
   dialects?: Array<SqlDialectId | SqlAssistantFutureDialectId>;
   /** When this opportunity is backed by a K9 compiled recipe, its recipe ID. */
   compiledRecipeId?: string;
+  adaptiveMetadata?: SqlTemplateAdaptiveMetadata;
 };
 
 // ---------- Internal helpers ----------
