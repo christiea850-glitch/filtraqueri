@@ -37,7 +37,13 @@ type SqlWorkspaceProps = {
 };
 
 type BottomTab = "guidance" | "relationships";
-type FocusedSqlView = "editor" | "result" | "drafts" | "draft-detail";
+type FocusedSqlView =
+  | "editor"
+  | "result"
+  | "drafts"
+  | "draft-detail"
+  | "planning-details"
+  | "relationship-review";
 type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts" | "context";
 
 const bottomTabLabels: Record<BottomTab, string> = {
@@ -436,6 +442,36 @@ function DraftDetailPage({
   );
 }
 
+function SqlWorkspaceDetailPlaceholder({
+  title,
+  emptyStateCopy,
+  onBack,
+}: {
+  title: string;
+  emptyStateCopy: string;
+  onBack: () => void;
+}) {
+  return (
+    <section className="sql-detail-placeholder-page" aria-label={title}>
+      <div className="sql-result-page-header">
+        <button type="button" className="secondary-button" onClick={onBack}>
+          ← Back to SQL workspace
+        </button>
+        <div>
+          <p className="section-label">Analyst SQL</p>
+          <h2>{title}</h2>
+          <p>Read-only view. Nothing here runs SQL or changes worksheet connections.</p>
+        </div>
+      </div>
+      <div className="empty-state compact-empty">
+        <p className="section-label">Details</p>
+        <h2>{title}</h2>
+        <p>{emptyStateCopy}</p>
+      </div>
+    </section>
+  );
+}
+
 function SqlRelationshipReviewPanel({
   model,
 }: {
@@ -757,6 +793,30 @@ function SqlWorkspace({
           onLoadDraft={openDraftInEditor}
           onRenameDraft={requestRenameDraft}
           onDeleteDraft={requestDeleteDraft}
+        />
+      </section>
+    );
+  }
+
+  if (focusedView === "planning-details") {
+    return (
+      <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
+        <SqlWorkspaceDetailPlaceholder
+          title="Planning details"
+          emptyStateCopy="No planning details yet. Ask FiltraQueri a question to generate a plan."
+          onBack={() => setFocusedView("editor")}
+        />
+      </section>
+    );
+  }
+
+  if (focusedView === "relationship-review") {
+    return (
+      <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
+        <SqlWorkspaceDetailPlaceholder
+          title="Review worksheet connections"
+          emptyStateCopy="No worksheets need connection review for this question."
+          onBack={() => setFocusedView("editor")}
         />
       </section>
     );
