@@ -1,4 +1,4 @@
-import { labelResultColumns } from "./resultLabeling";
+import { frameResultValue, labelResultColumns } from "./resultLabeling";
 import type { SqlPreviewResult } from "./sqlTypes";
 
 type SqlPreviewGridProps = {
@@ -47,9 +47,29 @@ function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
             <tbody>
               {previewResult.rows.map((row, rowIndex) => (
                 <tr key={rowIndex}>
-                  {previewResult.columns.map((column) => (
-                    <td key={column}>{String(row[column] ?? "")}</td>
-                  ))}
+                  {labeledColumns.map((column) => {
+                    const framedValue = frameResultValue({
+                      value: row[column.key],
+                      columnKey: column.key,
+                      columnLabel: column.label,
+                      taskPrompt: previewResult.executedQuestion?.taskPrompt,
+                      detectedIntent: previewResult.executedQuestion?.detectedIntent,
+                      questionShape: previewResult.executedQuestion?.questionShape,
+                    });
+                    return (
+                      <td
+                        key={column.key}
+                        title={framedValue.origin === "framed" ? `Raw value: ${String(framedValue.raw ?? "")}` : undefined}
+                        aria-label={
+                          framedValue.origin === "framed"
+                            ? `${framedValue.display} (raw value: ${String(framedValue.raw ?? "")})`
+                            : undefined
+                        }
+                      >
+                        {framedValue.display}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

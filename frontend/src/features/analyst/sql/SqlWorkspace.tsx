@@ -14,7 +14,7 @@ import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
-import { labelResultColumns } from "./resultLabeling";
+import { frameResultValue, labelResultColumns } from "./resultLabeling";
 import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -216,10 +216,42 @@ function SqlFocusedResultPreview({
           rowNumberHeaderClassName="dataset-preview-rownum"
           rowNumberColumnWidth={52}
           emptyRowContent={hasRows ? undefined : "The query returned no rows."}
-          renderCell={(row, column) => (
-            <span className="dataset-preview-cell">{String(row.values[column.key] ?? "")}</span>
-          )}
-          getCellTitle={(row, column) => String(row.values[column.key] ?? "")}
+          renderCell={(row, column) => {
+            const framedValue = frameResultValue({
+              value: row.values[column.key],
+              columnKey: column.key,
+              columnLabel: labeledColumns.find((labeledColumn) => labeledColumn.key === column.key)?.label,
+              taskPrompt: previewResult.executedQuestion?.taskPrompt,
+              detectedIntent: previewResult.executedQuestion?.detectedIntent,
+              questionShape: previewResult.executedQuestion?.questionShape,
+            });
+            return (
+              <span
+                className="dataset-preview-cell"
+                title={framedValue.origin === "framed" ? `Raw value: ${String(framedValue.raw ?? "")}` : undefined}
+                aria-label={
+                  framedValue.origin === "framed"
+                    ? `${framedValue.display} (raw value: ${String(framedValue.raw ?? "")})`
+                    : undefined
+                }
+              >
+                {framedValue.display}
+              </span>
+            );
+          }}
+          getCellTitle={(row, column) => {
+            const framedValue = frameResultValue({
+              value: row.values[column.key],
+              columnKey: column.key,
+              columnLabel: labeledColumns.find((labeledColumn) => labeledColumn.key === column.key)?.label,
+              taskPrompt: previewResult.executedQuestion?.taskPrompt,
+              detectedIntent: previewResult.executedQuestion?.detectedIntent,
+              questionShape: previewResult.executedQuestion?.questionShape,
+            });
+            return framedValue.origin === "framed"
+              ? `${framedValue.display} (raw: ${String(framedValue.raw ?? "")})`
+              : framedValue.display;
+          }}
         />
       ) : (
         <div className="empty-state compact-empty">
