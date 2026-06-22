@@ -31,6 +31,7 @@ import {
   ASK_RELATIONSHIP_BLOCK_COMPACT_COPY,
   ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE,
   createBusinessSqlPreviewVisibilityModel,
+  createSqlAskAdaptedTemplateInsertModel,
   createSqlAskAdaptiveFitSummaries,
   createSqlAskRecommendedAnalysisModel,
   createSqlAskRecommendationInsertModel,
@@ -528,6 +529,7 @@ const fixtures: Fixture[] = [
         appliedScopeSelections: [],
       });
       const evidence = model.adaptedTemplateEvidence[0];
+      const insertState = evidence ? createSqlAskAdaptedTemplateInsertModel(evidence) : null;
 
       return [
         ...(evidence ? [] : ["Expected adapted-template evidence."]),
@@ -543,7 +545,9 @@ const fixtures: Fixture[] = [
         ...(evidence?.previewOnlyCopy === ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY
           ? []
           : ["Expected preview-only copy."]),
-        ...(evidence?.canInsertSql === false ? [] : ["Adapted evidence must not be insertable in T-17J."]),
+        ...(evidence?.canInsertSql === true ? [] : ["Safe adapted evidence should be insertable in T-17K."]),
+        ...(insertState?.canInsert === true ? [] : ["Safe adapted evidence insert model should allow manual insert."]),
+        ...(insertState?.buttonLabel === "Insert SQL" ? [] : ["Expected Insert SQL button label."]),
         ...(evidence?.sql && evidence.sql.includes('FROM "products"') ? [] : ["Expected internal adapted SQL preview for products."]),
         ...(evidence?.sql && !/\bjoin\b/i.test(evidence.sql) ? [] : ["Adapted evidence SQL must be JOIN-free."]),
         ...(evidence?.expectedOutputColumns.includes("product_category") &&
@@ -558,7 +562,7 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "T-17J adapted-template evidence remains read-only and does not change recommendation order",
+    name: "T-17K adapted-template evidence can insert manually and does not change recommendation order",
     assert: () => {
       const model = createSqlAskFiltraQueriSuggestionModel({
         hasSubmittedAsk: true,
@@ -569,6 +573,7 @@ const fixtures: Fixture[] = [
       });
       const beforeIds = model.recommendations.map((recommendation) => recommendation.id).join("|");
       const evidence = model.adaptedTemplateEvidence;
+      const adaptedInsertState = evidence[0] ? createSqlAskAdaptedTemplateInsertModel(evidence[0]) : null;
       const afterIds = model.recommendations.map((recommendation) => recommendation.id).join("|");
       const insertableModel = createSqlAskFiltraQueriSuggestionModel({
         hasSubmittedAsk: true,
@@ -583,9 +588,13 @@ const fixtures: Fixture[] = [
 
       return [
         ...(beforeIds === afterIds ? [] : ["Adapted evidence must not reorder recommendations."]),
-        ...(evidence.every((item) => item.canInsertSql === false)
+        ...(evidence.every((item) => item.adapterStatus === "ready" ? item.canInsertSql === true : item.canInsertSql === false)
           ? []
-          : ["Adapted evidence must not enable Insert."]),
+          : ["Only ready adapted evidence may enable manual Insert."]),
+        ...(adaptedInsertState?.canInsert ? [] : ["Ready adapted evidence should be manually insertable."]),
+        ...(adaptedInsertState?.sql?.includes('FROM "products"')
+          ? []
+          : ["Expected adapted insert SQL to target products."]),
         ...(evidence.some((item) => item.id.startsWith("adapted-template:"))
           ? []
           : ["Expected supplemental adapted-template evidence id."]),
@@ -661,6 +670,139 @@ const fixtures: Fixture[] = [
           visibleCopy.includes("deterministic") ||
           visibleCopy.includes("field binding")
           ? [`Internal language leaked into adapted-template copy: ${visibleCopy}`]
+          : []),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17K adapted SQL insert guard blocks unsafe SQL and context",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many products by product category?",
+        dataset: productsDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const evidence = model.adaptedTemplateEvidence[0];
+      if (!evidence) return ["Expected ready adapted evidence."];
+
+      const joinState = createSqlAskAdaptedTemplateInsertModel({
+        ...evidence,
+        sql: `${evidence.sql || ""}\nJOIN \"other\" ON true`,
+      });
+      const missingContextState = createSqlAskAdaptedTemplateInsertModel({
+        ...evidence,
+        selectedTableName: null,
+        schemaColumnNames: [],
+      });
+      const relationshipState = createSqlAskAdaptedTemplateInsertModel({
+        ...evidence,
+        relationshipSafe: false,
+      });
+      const nonSchemaState = createSqlAskAdaptedTemplateInsertModel({
+        ...evidence,
+        bindings: {
+          ...evidence.bindings,
+          groupingColumn: "not_in_schema",
+        },
+      });
+      const differentTableState = createSqlAskAdaptedTemplateInsertModel({
+        ...evidence,
+        sql: evidence.sql?.replace('FROM "products"', 'FROM "other_products"') || null,
+      });
+      const blockedStatusState = createSqlAskAdaptedTemplateInsertModel({
+        ...evidence,
+        adapterStatus: "blocked_missing_grouping",
+        canInsertSql: false,
+        sql: null,
+      });
+
+      return [
+        ...(joinState.canInsert ? ["Insert must be disabled when adapted SQL contains JOIN."] : []),
+        ...(missingContextState.canInsert ? ["Insert must be disabled without selected table/schema context."] : []),
+        ...(relationshipState.canInsert ? ["Insert must be disabled for relationship-dependent evidence."] : []),
+        ...(nonSchemaState.canInsert ? ["Insert must be disabled for non-schema column bindings."] : []),
+        ...(differentTableState.canInsert ? ["Insert must be disabled when SQL references a different table."] : []),
+        ...(blockedStatusState.canInsert ? ["Insert must be disabled when adapter status is blocked."] : []),
+        ...(joinState.sql === null &&
+          missingContextState.sql === null &&
+          relationshipState.sql === null &&
+          nonSchemaState.sql === null &&
+          differentTableState.sql === null &&
+          blockedStatusState.sql === null
+          ? []
+          : ["Blocked adapted insert states must not expose SQL."]),
+        ...expectNoInsertSideEffects(joinState),
+        ...expectNoInsertSideEffects(missingContextState),
+        ...expectNoInsertSideEffects(relationshipState),
+        ...expectNoInsertSideEffects(nonSchemaState),
+        ...expectNoInsertSideEffects(differentTableState),
+        ...expectNoInsertSideEffects(blockedStatusState),
+      ];
+    },
+  },
+  {
+    name: "T-17K adapted SQL insert guard preserves draft and already-inserted protections",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many products by product category?",
+        dataset: productsDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const evidence = model.adaptedTemplateEvidence[0];
+      if (!evidence) return ["Expected ready adapted evidence."];
+
+      const draftState = createSqlAskAdaptedTemplateInsertModel(evidence, {
+        activeSqlDraft: 'SELECT * FROM "products";',
+        insertedAskRecommendationId: null,
+      });
+      const insertedState = createSqlAskAdaptedTemplateInsertModel(evidence, {
+        activeSqlDraft: evidence.sql || "",
+        insertedAskRecommendationId: evidence.id,
+      });
+      const cleanState = createSqlAskAdaptedTemplateInsertModel(evidence);
+
+      return [
+        ...(cleanState.canInsert ? [] : ["Clean adapted evidence should be manually insertable."]),
+        ...(draftState.canInsert ? ["Insert must be disabled when editor draft is not empty."] : []),
+        ...(draftState.disabledReason === ASK_RECOMMENDATION_ALREADY_INSERTED_COPY
+          ? []
+          : ["Expected existing active-draft helper copy."]),
+        ...(insertedState.canInsert ? ["Insert must be disabled after adapted SQL has already been inserted."] : []),
+        ...(insertedState.isInsertedAdaptedTemplate
+          ? []
+          : ["Expected inserted adapted template state to be tracked."]),
+        ...(cleanState.sql === evidence.sql ? [] : ["Manual insert should expose only the adapted SQL draft."]),
+        ...(cleanState.noRunQuery && cleanState.noBackendCall ? [] : ["Manual adapted insert must not run SQL or call backend/API."]),
+        ...expectNoInsertSideEffects(cleanState),
+        ...expectNoInsertSideEffects(draftState),
+        ...expectNoInsertSideEffects(insertedState),
+      ];
+    },
+  },
+  {
+    name: "T-17K adapted evidence visible copy avoids internal status and safety names",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many products by product category?",
+        dataset: productsDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const evidence = model.adaptedTemplateEvidence[0];
+      const visibleCopy = `${evidence?.badge || ""} ${evidence?.statusLabel || ""} ${evidence?.helperCopy || ""} ${evidence?.previewOnlyCopy || ""}`;
+
+      return [
+        ...(visibleCopy.includes("blocked_missing") ||
+          visibleCopy.includes("manualInsertOnly") ||
+          visibleCopy.includes("noJoins") ||
+          visibleCopy.includes("schema-backed")
+          ? [`Internal status or safety copy leaked: ${visibleCopy}`]
           : []),
         ...expectNoBehaviorChange(model),
       ];

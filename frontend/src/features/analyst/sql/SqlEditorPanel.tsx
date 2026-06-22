@@ -35,6 +35,7 @@ import {
   BUSINESS_SQL_PREVIEW_IDLE_COPY,
   ASK_FILTRAQUERI_BUTTON_LABEL,
   createBusinessSqlPreviewVisibilityModel,
+  createSqlAskAdaptedTemplateInsertModel,
   createSqlAskRecommendationInsertModel,
   createSqlAskFiltraQueriModel,
   createSqlAskFiltraQueriSuggestionModel,
@@ -750,6 +751,22 @@ function SqlEditorPanel({
     });
     setInsertedAskRecommendationId(recommendation.id);
   };
+  const insertAdaptedTemplateEvidence = (
+    evidence: typeof askFiltraQueriSuggestions.adaptedTemplateEvidence[number],
+  ) => {
+    const insertState = createSqlAskAdaptedTemplateInsertModel(evidence, {
+      activeSqlDraft: editor.value,
+      insertedAskRecommendationId,
+    });
+    if (!insertState.canInsert || !insertState.sql) return;
+
+    onInsertSql?.(insertState.sql, {
+      id: evidence.id,
+      label: evidence.title,
+      createdFrom: "template",
+    });
+    setInsertedAskRecommendationId(evidence.id);
+  };
   const relationshipReviewRelationships =
     askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction?.requiredRelationships ||
     askFiltraQueriSuggestions.blockedPlan?.missingRelationships ||
@@ -1041,25 +1058,39 @@ function SqlEditorPanel({
               )}
               {askFiltraQueriSuggestions.adaptedTemplateEvidence.length > 0 && (
                 <div className="sql-recommended-analysis-alternatives" aria-label="Adapted template evidence">
-                  {askFiltraQueriSuggestions.adaptedTemplateEvidence.map((evidence) => (
-                    <article className="sql-recommended-analysis-card" key={evidence.id}>
-                      <div className="sql-template-recommendation-title-row">
-                        <strong>{evidence.title}</strong>
-                        <span className="sql-grounding-badge supported">{evidence.badge}</span>
-                      </div>
-                      <p>{evidence.helperCopy}</p>
-                      <div className="sql-adaptive-fit-meta">
-                        <span>{evidence.statusLabel}</span>
-                        <span>{evidence.previewOnlyCopy}</span>
-                      </div>
-                      {evidence.expectedOutputColumns.length > 0 && (
-                        <p>Expected output: {evidence.expectedOutputColumns.join(", ")}</p>
-                      )}
-                      <button type="button" className="secondary-button" disabled>
-                        Review first
-                      </button>
-                    </article>
-                  ))}
+                  {askFiltraQueriSuggestions.adaptedTemplateEvidence.map((evidence) => {
+                    const insertState = createSqlAskAdaptedTemplateInsertModel(evidence, {
+                      activeSqlDraft: editor.value,
+                      insertedAskRecommendationId,
+                    });
+                    return (
+                      <article className="sql-recommended-analysis-card" key={evidence.id}>
+                        <div className="sql-template-recommendation-title-row">
+                          <strong>{evidence.title}</strong>
+                          <span className="sql-grounding-badge supported">{evidence.badge}</span>
+                        </div>
+                        <p>{evidence.helperCopy}</p>
+                        <div className="sql-adaptive-fit-meta">
+                          <span>{evidence.statusLabel}</span>
+                          <span>{evidence.previewOnlyCopy}</span>
+                        </div>
+                        {evidence.expectedOutputColumns.length > 0 && (
+                          <p>Expected output: {evidence.expectedOutputColumns.join(", ")}</p>
+                        )}
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={!insertState.canInsert || !onInsertSql}
+                          onClick={() => insertAdaptedTemplateEvidence(evidence)}
+                        >
+                          {insertState.buttonLabel}
+                        </button>
+                        {!insertState.canInsert && insertState.disabledReason && (
+                          <p>{insertState.disabledReason}</p>
+                        )}
+                      </article>
+                    );
+                  })}
                 </div>
               )}
               {[askFiltraQueriSuggestions.recommendedAnalysis.primary].map((card) => {

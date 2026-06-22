@@ -57,7 +57,7 @@ export const ASK_RELATIONSHIP_BLOCK_COMPACT_COPY =
   "FiltraQueri understands the analysis, but worksheet connections must be reviewed before SQL can be inserted.";
 
 export const ASK_ADAPTED_TEMPLATE_BADGE = "Adapted template";
-export const ASK_ADAPTED_TEMPLATE_READY_STATUS = "Ready for review";
+export const ASK_ADAPTED_TEMPLATE_READY_STATUS = "Ready to insert";
 export const ASK_ADAPTED_TEMPLATE_READY_COPY =
   "FiltraQueri matched this template to the selected worksheet. Review before inserting.";
 export const ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS = "Needs a clearer worksheet or column";
@@ -121,14 +121,29 @@ export type SqlAskAdaptedTemplateEvidence = {
   statusLabel: typeof ASK_ADAPTED_TEMPLATE_READY_STATUS | typeof ASK_ADAPTED_TEMPLATE_BLOCKED_STATUS;
   helperCopy: typeof ASK_ADAPTED_TEMPLATE_READY_COPY | typeof ASK_ADAPTED_TEMPLATE_BLOCKED_COPY;
   previewOnlyCopy: typeof ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY;
-  canInsertSql: false;
+  canInsertSql: boolean;
   sql: string | null;
   expectedOutputColumns: string[];
   reasons: string[];
   adapterStatus: SqlSingleTableAdaptationResult["status"];
+  selectedTableName: string | null;
+  schemaColumnNames: string[];
+  bindings: SqlSingleTableAdaptationResult["bindings"];
+  relationshipSafe: boolean;
+  adapterSafety: SqlSingleTableAdaptationResult["safety"];
   noRunQuery: true;
   noBackendCall: true;
   noEditorMutation: true;
+};
+
+export type SqlAskAdaptedTemplateInsertModel = {
+  buttonLabel: "Insert SQL";
+  canInsert: boolean;
+  sql: string | null;
+  disabledReason: string | null;
+  isInsertedAdaptedTemplate: boolean;
+  noRunQuery: true;
+  noBackendCall: true;
 };
 
 export type SqlAskAdaptiveFitSummary = {
@@ -710,11 +725,19 @@ export const createSqlAskAdaptedTemplateEvidence = ({
       statusLabel: copy.statusLabel,
       helperCopy: copy.helperCopy,
       previewOnlyCopy: ASK_ADAPTED_TEMPLATE_PREVIEW_ONLY_COPY,
-      canInsertSql: false,
+      canInsertSql: result.status === "ready",
       sql: result.status === "ready" ? result.sql : null,
       expectedOutputColumns: result.expectedOutputColumns,
       reasons: result.reasons,
       adapterStatus: result.status,
+      selectedTableName: selectedTable?.tableName || null,
+      schemaColumnNames: selectedTable?.schema.map((column) => column.name) || [],
+      bindings: result.bindings,
+      relationshipSafe:
+        !questionShape.relationshipDependent &&
+        questionShape.relationshipGaps.length === 0 &&
+        questionShape.preferredOutputShape !== "blocked_relationship_plan",
+      adapterSafety: result.safety,
       noRunQuery: true,
       noBackendCall: true,
       noEditorMutation: true,
@@ -902,6 +925,112 @@ export const createSqlAskRecommendationInsertModel = (
     sql: recommendation.sql,
     disabledReason: null,
     isInsertedRecommendation: false,
+    noRunQuery: true,
+    noBackendCall: true,
+  };
+};
+
+const quotedIdentifier = (value: string): string =>
+  `"${value.replace(/"/g, '""')}"`;
+
+const hasJoinKeyword = (sql: string): boolean => /\bjoin\b/i.test(sql);
+
+const referencesSelectedTableOnly = (
+  sql: string,
+  selectedTableName: string | null,
+): boolean => {
+  if (!selectedTableName) return false;
+  const fromMatches = Array.from(sql.matchAll(/\bFROM\s+"([^"]+)"/gi)).map((match) => match[1]);
+  return fromMatches.length === 1 && fromMatches[0] === selectedTableName;
+};
+
+const bindingsAreSchemaBacked = (
+  evidence: SqlAskAdaptedTemplateEvidence,
+): boolean => {
+  const schemaNames = new Set(evidence.schemaColumnNames);
+  const columns = [
+    evidence.bindings.groupingColumn,
+    evidence.bindings.metricColumn,
+    evidence.bindings.filterColumn,
+    evidence.bindings.sortColumn,
+  ].filter((value): value is string => Boolean(value));
+
+  return columns.length > 0 && columns.every((column) => schemaNames.has(column));
+};
+
+const sqlUsesKnownBindingColumns = (
+  evidence: SqlAskAdaptedTemplateEvidence,
+): boolean => {
+  const sql = evidence.sql || "";
+  const allowed = new Set([
+    ...(evidence.selectedTableName ? [evidence.selectedTableName] : []),
+    ...evidence.schemaColumnNames,
+    "row_count",
+    "total_value",
+    "average_value",
+  ].map(quotedIdentifier));
+  const identifiers = Array.from(sql.matchAll(/"((?:[^"]|"")+)"/g)).map((match) => `"${match[1]}"`);
+  return identifiers.every((identifier) => allowed.has(identifier));
+};
+
+const adaptedTemplateInsertDisabled = (
+  disabledReason: string,
+  isInsertedAdaptedTemplate = false,
+): SqlAskAdaptedTemplateInsertModel => ({
+  buttonLabel: "Insert SQL",
+  canInsert: false,
+  sql: null,
+  disabledReason,
+  isInsertedAdaptedTemplate,
+  noRunQuery: true,
+  noBackendCall: true,
+});
+
+export const createSqlAskAdaptedTemplateInsertModel = (
+  evidence: SqlAskAdaptedTemplateEvidence,
+  options: {
+    activeSqlDraft?: string;
+    insertedAskRecommendationId?: string | null;
+  } = {},
+): SqlAskAdaptedTemplateInsertModel => {
+  const sql = evidence.sql?.trim() || "";
+  const hasActiveDraft = Boolean(options.activeSqlDraft?.trim());
+  const isInsertedAdaptedTemplate =
+    hasActiveDraft && options.insertedAskRecommendationId === evidence.id;
+
+  if (isInsertedAdaptedTemplate) {
+    return adaptedTemplateInsertDisabled("This adapted SQL is already inserted in the editor.", true);
+  }
+
+  if (hasActiveDraft) {
+    return adaptedTemplateInsertDisabled(ASK_RECOMMENDATION_ALREADY_INSERTED_COPY);
+  }
+
+  if (
+    !evidence.canInsertSql ||
+    evidence.adapterStatus !== "ready" ||
+    !sql ||
+    !evidence.adapterSafety.noBackendCall ||
+    !evidence.adapterSafety.noRunQuery ||
+    !evidence.adapterSafety.manualInsertOnly ||
+    !evidence.adapterSafety.singleTableOnly ||
+    !evidence.adapterSafety.noJoins ||
+    !evidence.adapterSafety.noEditorMutationUntilManualInsert ||
+    hasJoinKeyword(sql) ||
+    !referencesSelectedTableOnly(sql, evidence.selectedTableName) ||
+    !bindingsAreSchemaBacked(evidence) ||
+    !sqlUsesKnownBindingColumns(evidence) ||
+    !evidence.relationshipSafe
+  ) {
+    return adaptedTemplateInsertDisabled("This adapted SQL needs review before it can be inserted.");
+  }
+
+  return {
+    buttonLabel: "Insert SQL",
+    canInsert: true,
+    sql,
+    disabledReason: null,
+    isInsertedAdaptedTemplate: false,
     noRunQuery: true,
     noBackendCall: true,
   };
