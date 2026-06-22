@@ -112,7 +112,10 @@ export function createResultNarration(args: CreateResultNarrationArgs): ResultNa
 
   if (args.rows.some((row) => toFiniteNumber(row[metricColumn.key]) === null)) return null;
 
-  if (args.rows.length === 1) {
+  const dimensionColumn = findColumn(labeledColumns, (column) => column.key !== metricColumn.key);
+
+  if (!dimensionColumn) {
+    if (args.rows.length !== 1) return null;
     const numericMetrics = labeledColumns.filter((column) => toFiniteNumber(args.rows[0][column.key]) !== null);
     if (numericMetrics.length === 0 || numericMetrics.length !== labeledColumns.length) return null;
     const parts = numericMetrics.map((column) => {
@@ -122,8 +125,7 @@ export function createResultNarration(args: CreateResultNarrationArgs): ResultNa
     return { text: `This result shows ${joinParts(parts)}.`, confidence: "high", reason: "single-row numeric metric result" };
   }
 
-  const dimensionColumn = findColumn(labeledColumns, (column) => column.key !== metricColumn.key);
-  if (!dimensionColumn || !args.rows.every((row) => isSafeShortText(row[dimensionColumn.key]))) return null;
+  if (!args.rows.every((row) => isSafeShortText(row[dimensionColumn.key]))) return null;
 
   const isCountMetric = COUNT_COLUMN_PATTERN.test(metricColumn.key) || COUNT_COLUMN_PATTERN.test(metricColumn.label);
   const entity = metricEntityFromLabel(metricColumn.label) ?? promptEntity(args.taskPrompt);
@@ -143,6 +145,16 @@ export function createResultNarration(args: CreateResultNarrationArgs): ResultNa
       return `${formatNumber(metric ?? 0)} ${lowerFirst(framed.display)}`;
     });
     return { text: `This result shows ${joinParts(parts)}.`, confidence: "high", reason: "small status count breakdown" };
+  }
+
+  if (args.rows.length === 1) {
+    const numericMetrics = labeledColumns.filter((column) => toFiniteNumber(args.rows[0][column.key]) !== null);
+    if (numericMetrics.length === 0 || numericMetrics.length !== labeledColumns.length) return null;
+    const parts = numericMetrics.map((column) => {
+      const value = toFiniteNumber(args.rows[0][column.key]);
+      return `${lowerFirst(column.label)} of ${formatNumber(value ?? 0)}`;
+    });
+    return { text: `This result shows ${joinParts(parts)}.`, confidence: "high", reason: "single-row numeric metric result" };
   }
 
   if (isCountMetric && args.columns.length === 2) {
