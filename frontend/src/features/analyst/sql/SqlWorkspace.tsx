@@ -441,16 +441,25 @@ function SqlRelationshipReviewPanel({
 }: {
   model: SqlRelationshipReviewModel;
 }) {
+  const friendlyWorksheetLabel = (value: string): string => {
+    const label = value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+    return label
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+      .join(" ");
+  };
+
   return (
     <section className="sql-relationship-review-panel" aria-label={model.title}>
       <div className="business-sql-preview-head">
         <div>
-          <span>Read-only review</span>
+          <span>Review only</span>
           <strong>{model.title}</strong>
         </div>
         <div className="business-sql-preview-badges" aria-label="Relationship review safety">
-          <em>Read-only</em>
-          <em>No SQL generated</em>
+          <em>Review only</em>
+          <em>Nothing has been inserted</em>
         </div>
       </div>
       <p>{model.description}</p>
@@ -459,7 +468,7 @@ function SqlRelationshipReviewPanel({
       {model.relevantWorksheets.length > 0 && (
         <div className="sql-relationship-review-worksheets" aria-label="Relevant worksheets">
           <strong>Relevant worksheets</strong>
-          <span>{model.relevantWorksheets.join(", ")}</span>
+          <span>{model.relevantWorksheets.map(friendlyWorksheetLabel).join(", ")}</span>
         </div>
       )}
 
@@ -469,7 +478,7 @@ function SqlRelationshipReviewPanel({
             <article className="sql-relationship-review-card" key={pair.id}>
               <div className="sql-relationship-review-card-head">
                 <strong>
-                  {pair.fromWorksheet} to {pair.toWorksheet}
+                  {friendlyWorksheetLabel(pair.fromWorksheet)} ↔ {friendlyWorksheetLabel(pair.toWorksheet)}
                 </strong>
                 <span className={`sql-grounding-badge ${pair.status === "accepted" ? "supported" : "needs_review"}`}>
                   {pair.statusLabel}
@@ -477,18 +486,18 @@ function SqlRelationshipReviewPanel({
               </div>
               <dl>
                 <div>
-                  <dt>From worksheet</dt>
-                  <dd>{pair.fromWorksheet}</dd>
+                  <dt>Worksheet</dt>
+                  <dd>{friendlyWorksheetLabel(pair.fromWorksheet)}</dd>
                 </div>
                 <div>
-                  <dt>To worksheet</dt>
-                  <dd>{pair.toWorksheet}</dd>
+                  <dt>Connects to</dt>
+                  <dd>{friendlyWorksheetLabel(pair.toWorksheet)}</dd>
                 </div>
               </dl>
               <p>
                 {pair.suggestedColumns
-                  ? `Possible match: ${pair.suggestedColumns.fromColumn} ↔ ${pair.suggestedColumns.toColumn}`
-                  : "No confident column match found"}
+                  ? `Suggested match: ${pair.suggestedColumns.fromColumn} connects both worksheets`
+                  : "FiltraQueri could not find a clear matching column yet."}
               </p>
             </article>
           ))}

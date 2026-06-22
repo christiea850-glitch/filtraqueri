@@ -1065,7 +1065,7 @@ function SqlEditorPanel({
                       <p>Expected output: {card.expectedOutput.join(", ")}</p>
                     )}
                     {card.requiredRelationships.length > 0 && (
-                      <p>Relationships needed before SQL can be inserted.</p>
+                      <p>Review worksheet connections before inserting SQL.</p>
                     )}
                     {canInsert ? (
                       <button
@@ -1111,7 +1111,7 @@ function SqlEditorPanel({
                         <p>Expected output: {card.expectedOutput.join(", ")}</p>
                       )}
                       {card.requiredRelationships.length > 0 && (
-                        <p>Relationships needed before SQL can be inserted.</p>
+                        <p>Review worksheet connections before inserting SQL.</p>
                       )}
                     </article>
                   ))}
@@ -1136,7 +1136,7 @@ function SqlEditorPanel({
                           <p>Expected output: {card.expectedOutput.join(", ")}</p>
                         )}
                         {card.requiredRelationships.length > 0 && (
-                          <p>Relationships needed before SQL can be inserted.</p>
+                          <p>Review worksheet connections before inserting SQL.</p>
                         )}
                       </article>
                     ))}
@@ -1171,7 +1171,7 @@ function SqlEditorPanel({
                       Relevant worksheets:{" "}
                       {askFiltraQueriSuggestions.blockedPlan.relevantEntities.join(", ")}
                     </li>
-                    <li>Relationships needed before SQL can be inserted.</li>
+                    <li>Review worksheet connections before inserting SQL.</li>
                     <li>{askFiltraQueriSuggestions.blockedPlan.explanation}</li>
                   </ul>
                   {!relationshipReviewActionShownInRecommendedAnalysis && (

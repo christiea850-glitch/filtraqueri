@@ -6,12 +6,12 @@ import type {
   WorksheetRelationshipCandidate,
 } from "../../workbook";
 
-export const RELATIONSHIP_REVIEW_ACTION_LABEL = "Review relationships";
-export const RELATIONSHIP_REVIEW_PANEL_TITLE = "Worksheet relationships needed";
+export const RELATIONSHIP_REVIEW_ACTION_LABEL = "Review worksheet connections";
+export const RELATIONSHIP_REVIEW_PANEL_TITLE = "Review worksheet connections";
 export const RELATIONSHIP_REVIEW_PANEL_DESCRIPTION =
-  "FiltraQueri understands the question, but cross-table SQL is blocked until these worksheet relationships are confirmed.";
+  "FiltraQueri found the worksheets needed for this question. Review how they connect before preparing SQL.";
 export const RELATIONSHIP_REVIEW_SQL_SAFETY_COPY =
-  "FiltraQueri needs confirmed worksheet relationships before it can safely generate cross-table SQL.";
+  "Nothing has been inserted, and no worksheet connections have been changed.";
 
 export type SqlRelationshipReviewStatus =
   | "missing"
@@ -25,7 +25,7 @@ export type SqlRelationshipReviewPair = {
   toWorksheet: string;
   toTable: string;
   status: SqlRelationshipReviewStatus;
-  statusLabel: "Missing relationship" | "Needs confirmation" | "Accepted";
+  statusLabel: "Needs review" | "Suggested match" | "Confirmed";
   suggestedColumns: {
     fromColumn: string;
     toColumn: string;
@@ -139,9 +139,9 @@ const orientCandidateColumns = (
 const statusLabelFor = (
   status: SqlRelationshipReviewStatus,
 ): SqlRelationshipReviewPair["statusLabel"] => {
-  if (status === "accepted") return "Accepted";
-  if (status === "needs_confirmation") return "Needs confirmation";
-  return "Missing relationship";
+  if (status === "accepted") return "Confirmed";
+  if (status === "needs_confirmation") return "Suggested match";
+  return "Needs review";
 };
 
 export const createSqlRelationshipReviewModel = ({

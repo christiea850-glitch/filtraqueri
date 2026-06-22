@@ -533,7 +533,7 @@ const fixtures: Fixture[] = [
         ...(blockedSummary?.description === ASK_RELATIONSHIP_BLOCK_COMPACT_COPY
           ? []
           : [`Expected compact blocked summary copy, received ${blockedSummary?.description || "none"}.`]),
-        ...(ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE === "Relationships needed before SQL can be inserted."
+        ...(ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE === "Review worksheet connections before inserting SQL."
           ? []
           : ["Expected compact relationship block title copy."]),
         ...(blockedSummary?.description.includes("tenants to units") ||
@@ -637,7 +637,7 @@ const fixtures: Fixture[] = [
         ...(recommended.primary?.statusLabel === "Relationships needed"
           ? []
           : [`Expected Relationships needed status, received ${recommended.primary?.statusLabel || "none"}.`]),
-        ...(recommended.relationshipAction?.actionLabel === "Review relationships"
+        ...(recommended.relationshipAction?.actionLabel === "Review worksheet connections"
           ? []
           : ["Expected one shared relationship review action for blocked top options."]),
         ...(visibleCards.every((card) => card.requiredRelationships.length > 0)
@@ -1166,7 +1166,7 @@ const fixtures: Fixture[] = [
           ? []
           : ["Expected user-facing blocked insert reason."]),
         ...(model.blockedPlan ? [] : ["Expected blocked relationship card to remain visible."]),
-        ...(model.guidanceTitle === "Relationship needed before SQL can be inserted"
+        ...(model.guidanceTitle === "Review worksheet connections before inserting SQL"
           ? []
           : [`Expected relationship guidance, received ${model.guidanceTitle}.`]),
         ...(model.guidanceCopy.includes("tenants") && model.guidanceCopy.includes("access_codes")
@@ -1192,20 +1192,25 @@ const fixtures: Fixture[] = [
       });
 
       return [
-        ...(RELATIONSHIP_REVIEW_ACTION_LABEL === "Review relationships"
+        ...(RELATIONSHIP_REVIEW_ACTION_LABEL === "Review worksheet connections"
           ? []
-          : ["Expected blocked Ask card action copy to be Review relationships."]),
-        ...(review.actionLabel === "Review relationships"
+          : ["Expected blocked Ask card action copy to be Review worksheet connections."]),
+        ...(review.actionLabel === "Review worksheet connections"
           ? []
           : [`Expected review action label, received ${review.actionLabel}.`]),
         ...(review.title === RELATIONSHIP_REVIEW_PANEL_TITLE &&
-          review.title === "Worksheet relationships needed"
+          review.title === "Review worksheet connections"
           ? []
           : [`Expected relationship review panel title, received ${review.title}.`]),
         ...(review.description === RELATIONSHIP_REVIEW_PANEL_DESCRIPTION &&
-          review.description.includes("cross-table SQL is blocked")
+          review.description.includes("Review how they connect before preparing SQL")
           ? []
           : ["Expected relationship review panel description copy."]),
+        ...(review.description.includes("cross-table SQL") ||
+          review.safetyCopy.includes("No SQL generated") ||
+          review.safetyCopy.includes("accepted relationship metadata")
+          ? ["Relationship review panel copy must not expose internal relationship or SQL labels."]
+          : []),
         ...(review.pairs.length === 2 ? [] : [`Expected two missing relationship pairs, received ${review.pairs.length}.`]),
         ...(review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "units")
           ? []
@@ -1219,7 +1224,7 @@ const fixtures: Fixture[] = [
           review.relevantWorksheets.length === 3
           ? []
           : [`Expected relevant worksheets tenants, units, access_codes; received ${review.relevantWorksheets.join(",")}.`]),
-        ...(review.pairs.every((pair) => pair.status === "missing" && pair.statusLabel === "Missing relationship")
+        ...(review.pairs.every((pair) => pair.status === "missing" && pair.statusLabel === "Needs review")
           ? []
           : ["Expected missing relationship status for all blocked Ask pairs."]),
         ...(review.pairs.every((pair) => pair.suggestedColumns === null)
@@ -1255,13 +1260,13 @@ const fixtures: Fixture[] = [
 
       return [
         ...(blockedStrategy ? [] : ["Expected blocked analytical strategy."]),
-        ...(RELATIONSHIP_REVIEW_ACTION_LABEL === "Review relationships"
+        ...(RELATIONSHIP_REVIEW_ACTION_LABEL === "Review worksheet connections"
           ? []
           : ["Expected blocked analytical strategy review action copy."]),
         ...(review.pairs.length > 0 ? [] : ["Expected strategy relationship review pairs."]),
-        ...(review.pairs.every((pair) => pair.statusLabel === "Missing relationship")
+        ...(review.pairs.every((pair) => pair.statusLabel === "Needs review")
           ? []
-          : ["Expected strategy review status to show missing relationship."]),
+          : ["Expected strategy review status to show needs review."]),
         ...(blockedStrategy?.sql ? ["Blocked analytical strategy must not expose SQL."] : []),
         ...(review.noPersistence && review.noAcceptance && review.noSqlGeneration && review.noBackendCall && review.noRunQuery
           ? []
@@ -1280,7 +1285,7 @@ const fixtures: Fixture[] = [
 
       return [
         ...(review.pairs.length === 2 ? [] : [`Expected two candidate review pairs, received ${review.pairs.length}.`]),
-        ...(review.pairs.every((pair) => pair.status === "needs_confirmation" && pair.statusLabel === "Needs confirmation")
+        ...(review.pairs.every((pair) => pair.status === "needs_confirmation" && pair.statusLabel === "Suggested match")
           ? []
           : ["Expected candidate relationships to require confirmation, not be accepted."]),
         ...(review.pairs.some(
@@ -1319,9 +1324,9 @@ const fixtures: Fixture[] = [
       });
 
       return [
-        ...(review.pairs.every((pair) => pair.status === "accepted" && pair.statusLabel === "Accepted")
+        ...(review.pairs.every((pair) => pair.status === "accepted" && pair.statusLabel === "Confirmed")
           ? []
-          : ["Expected already accepted relationships to display as accepted."]),
+          : ["Expected already accepted relationships to display as confirmed."]),
         ...(review.noPersistence && review.noAcceptance && review.noSqlGeneration && review.noBackendCall && review.noRunQuery
           ? []
           : ["Accepted display state must not add persistence, acceptance, SQL, backend, or Run Query behavior."]),

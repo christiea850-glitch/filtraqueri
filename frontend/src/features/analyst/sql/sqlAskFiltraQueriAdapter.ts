@@ -47,10 +47,10 @@ export const ASK_RECOMMENDATION_ALREADY_INSERTED_COPY =
   "One suggestion is already inserted. Clear the editor or start a new tab before inserting another suggestion.";
 
 export const ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE =
-  "Relationships needed before SQL can be inserted.";
+  "Review worksheet connections before inserting SQL.";
 
 export const ASK_RELATIONSHIP_BLOCK_COMPACT_COPY =
-  "FiltraQueri understands the analysis, but cross-table SQL is blocked until worksheet relationships are confirmed.";
+  "FiltraQueri understands the analysis, but worksheet connections must be reviewed before SQL can be inserted.";
 
 export type SqlAskFiltraQueriModel = {
   buttonLabel: typeof ASK_FILTRAQUERI_BUTTON_LABEL;
@@ -144,7 +144,7 @@ export type SqlAskRecommendedAnalysisModel = {
   relationshipAction: {
     title: string;
     copy: string;
-    actionLabel: "Review relationships";
+    actionLabel: "Review worksheet connections";
     requiredRelationships: string[];
   } | null;
   noRunQuery: true;
@@ -232,10 +232,10 @@ const createGuidanceForQuestionShape = ({
   if (shape?.preferredOutputShape === "blocked_relationship_plan") {
     const relationshipGaps = formatRelationshipGaps(shape);
     return {
-      guidanceTitle: "Relationship needed before SQL can be inserted",
+      guidanceTitle: "Review worksheet connections before inserting SQL",
       guidanceCopy: relationshipGaps
-        ? `This question needs related worksheets (${shape.mentionedEntities.map((entity) => entity.label).join(", ")}), but FiltraQueri cannot safely join ${relationshipGaps} from accepted relationship metadata yet.`
-        : "This question needs related worksheets, but FiltraQueri cannot safely verify the required relationship metadata yet.",
+        ? `This question needs related worksheets (${shape.mentionedEntities.map((entity) => entity.label).join(", ")}). Review the worksheet connections before inserting SQL.`
+        : "This question needs related worksheets. Review the worksheet connections before inserting SQL.",
     };
   }
 
@@ -273,8 +273,8 @@ const adaptiveFitStatusLabels: Record<SqlAdaptiveInsertState, string> = {
   insertable_existing_sql: "Ready to insert",
   read_only: "Read-only for now",
   blocked_relationships: "Relationships needed",
-  blocked_missing_fields: "Missing fields",
-  needs_confirmation: "Needs confirmation",
+  blocked_missing_fields: "Fields needed",
+  needs_confirmation: "Review suggested match",
 };
 
 const adaptiveFitCategoryRank: Record<SqlAdaptiveFitCategory, number> = {
@@ -439,8 +439,8 @@ export const createSqlAskRecommendedAnalysisModel = ({
     topCards.some((card) => card.requiredRelationships.length > 0)
       ? {
           title: ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE,
-          copy: "FiltraQueri understands the analysis, but worksheet relationships must be reviewed before SQL can be inserted.",
-          actionLabel: "Review relationships" as const,
+          copy: ASK_RELATIONSHIP_BLOCK_COMPACT_COPY,
+          actionLabel: "Review worksheet connections" as const,
           requiredRelationships: uniqueStrings(topCards.flatMap((card) => card.requiredRelationships)),
         }
       : null;

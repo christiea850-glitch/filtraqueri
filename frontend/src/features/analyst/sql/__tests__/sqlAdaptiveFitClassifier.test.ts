@@ -111,7 +111,7 @@ const relationshipReviewPair = (
   toWorksheet: "units",
   toTable: "units",
   status: "missing",
-  statusLabel: "Missing relationship",
+  statusLabel: "Needs review",
   suggestedColumns: null,
   ...override,
 });
