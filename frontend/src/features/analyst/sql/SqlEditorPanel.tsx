@@ -40,7 +40,6 @@ import {
   createSqlAskFiltraQueriSuggestionModel,
   shouldSubmitSqlAskFiltraQueriKey,
 } from "./sqlAskFiltraQueriAdapter";
-import { sqlAnalyticalStrategyStatusLabel } from "./sqlAnalyticalStrategies";
 import { RELATIONSHIP_REVIEW_ACTION_LABEL } from "./sqlRelationshipReview";
 import { createSqlSourceLineModel } from "./sqlSourceLineAdapter";
 import {
@@ -751,6 +750,36 @@ function SqlEditorPanel({
     });
     setInsertedAskRecommendationId(recommendation.id);
   };
+  const relationshipReviewRelationships =
+    askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction?.requiredRelationships ||
+    askFiltraQueriSuggestions.blockedPlan?.missingRelationships ||
+    askFiltraQueriSuggestions.analyticalStrategies.find(
+      (strategy) => strategy.requiredRelationships.length > 0,
+    )?.requiredRelationships ||
+    [];
+  const showRelationshipReviewAction =
+    relationshipReviewRelationships.length > 0 && Boolean(onReviewRelationships);
+  const relationshipReviewActionShownInRecommendedAnalysis =
+    Boolean(askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction) &&
+    showRelationshipReviewAction;
+  const insertRecommendedAnalysisCard = (
+    card: NonNullable<typeof askFiltraQueriSuggestions.recommendedAnalysis.primary>,
+  ) => {
+    if (card.action === "insert_strategy" && card.strategyId) {
+      const strategy = askFiltraQueriSuggestions.analyticalStrategies.find(
+        (candidate) => candidate.id === card.strategyId,
+      );
+      if (strategy) insertAnalyticalStrategy(strategy);
+      return;
+    }
+
+    if (card.action === "insert_recommendation" && card.recommendationId) {
+      const recommendation = askFiltraQueriSuggestions.recommendations.find(
+        (candidate) => candidate.id === card.recommendationId,
+      );
+      if (recommendation) insertAskRecommendation(recommendation);
+    }
+  };
   const businessSqlPreviewPanel = effectiveBusinessSqlRenderPreview ? (
     <section
       className={[
@@ -983,127 +1012,141 @@ function SqlEditorPanel({
               </div>
             </div>
           )}
-          {askFiltraQueriSuggestions.adaptiveFitSummaries.length > 0 && (
-            <div className="sql-adaptive-fit-summary" aria-label="Analysis fit">
+          {askFiltraQueriSuggestions.recommendedAnalysis.primary && (
+            <div className="sql-recommended-analysis" aria-label="Recommended analysis">
               <div className="sql-helper-section-label">
-                <span>Analysis fit</span>
-                <small>{askFiltraQueriSuggestions.adaptiveFitSummaries.length}</small>
+                <span>{askFiltraQueriSuggestions.recommendedAnalysis.title}</span>
+                <small>
+                  {1 + askFiltraQueriSuggestions.recommendedAnalysis.alternatives.length}
+                </small>
               </div>
-              <div className="sql-adaptive-fit-summary-grid">
-                {askFiltraQueriSuggestions.adaptiveFitSummaries.map((summary) => (
+              {askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction && (
+                <div className="sql-adaptive-fit-relationship-action">
+                  <div>
+                    <strong>{askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.title}</strong>
+                    <span>{askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.copy}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      onReviewRelationships?.(
+                        askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction?.requiredRelationships || [],
+                      )
+                    }
+                  >
+                    {RELATIONSHIP_REVIEW_ACTION_LABEL}
+                  </button>
+                </div>
+              )}
+              {[askFiltraQueriSuggestions.recommendedAnalysis.primary].map((card) => {
+                const canInsert = card.action === "insert_recommendation" || card.action === "insert_strategy";
+                return (
                   <article
                     className={[
-                      "sql-adaptive-fit-card",
-                      `is-${summary.category.replace(/_/g, "-")}`,
+                      "sql-recommended-analysis-card",
+                      "is-primary",
+                      `is-${card.category.replace(/_/g, "-")}`,
                     ].join(" ")}
-                    key={summary.id}
+                    key={card.id}
                   >
                     <div className="sql-template-recommendation-title-row">
-                      <strong>{summary.title}</strong>
-                      <span className="sql-grounding-badge supported">{summary.label}</span>
+                      <strong>{card.title}</strong>
+                      <span className={`sql-grounding-badge ${card.insertState === "blocked_relationships" ? "needs_review" : "supported"}`}>
+                        {card.fitLabel}
+                      </span>
                     </div>
-                    <p>{summary.description}</p>
+                    <p>{card.description}</p>
                     <div className="sql-adaptive-fit-meta">
-                      <span>{summary.statusLabel}</span>
-                      <span>Read-only explanation</span>
+                      <span>{card.statusLabel}</span>
+                      <span>{card.isPrimary ? "Primary recommendation" : "Alternative"}</span>
                     </div>
-                    {summary.missingFields.length > 0 && (
-                      <p>Missing fields: {summary.missingFields.join(", ")}</p>
+                    {card.expectedOutput.length > 0 && (
+                      <p>Expected output: {card.expectedOutput.join(", ")}</p>
                     )}
-                    {summary.requiredRelationships.length > 0 && (
-                      <p>Relationships: {summary.requiredRelationships.join(", ")}</p>
+                    {card.requiredRelationships.length > 0 && (
+                      <p>Relationships needed before SQL can be inserted.</p>
                     )}
-                    {summary.insertState === "blocked_relationships" &&
-                      summary.requiredRelationships.length > 0 &&
-                      onReviewRelationships && (
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => onReviewRelationships(summary.requiredRelationships)}
-                        >
-                          {RELATIONSHIP_REVIEW_ACTION_LABEL}
-                        </button>
-                      )}
-                  </article>
-                ))}
-              </div>
-            </div>
-          )}
-          {askFiltraQueriSuggestions.analyticalStrategies.length > 1 && (
-            <div className="sql-template-recommendation-list" aria-label="Analysis options">
-              <div className="sql-helper-section-label">
-                <span>Analysis options</span>
-                <small>{askFiltraQueriSuggestions.analyticalStrategies.length}</small>
-              </div>
-              {askFiltraQueriSuggestions.analyticalStrategies.map((strategy) => {
-                const statusLabel = sqlAnalyticalStrategyStatusLabel(strategy);
-                const insertState = createSqlAskRecommendationInsertModel(
-                  {
-                    id: `strategy:${strategy.id}:${strategy.sourceRecommendationId || "review"}`,
-                    sql: strategy.sql || "",
-                  },
-                  {
-                    activeSqlDraft: editor.value,
-                    insertedAskRecommendationId,
-                  },
-                );
-
-                return (
-                  <article className="sql-template-recommendation-card" key={strategy.id}>
-                    <div>
-                      <div className="sql-template-recommendation-title-row">
-                        <strong>{strategy.title}</strong>
-                        <span className={`sql-grounding-badge ${statusLabel === "Relationships needed" ? "needs_review" : "supported"}`}>
-                          {statusLabel}
-                        </span>
-                      </div>
-                      <span>{strategy.description}</span>
-                    </div>
-                    <ul>
-                      <li>Expected output: {strategy.outputShape.join(", ")}</li>
-                      {strategy.requiredRelationships.length > 0 && (
-                        <li>Missing relationships: {strategy.requiredRelationships.join(", ")}</li>
-                      )}
-                      {statusLabel === "Relationships needed" && (
-                        <li>Confirm worksheet relationships before inserting SQL.</li>
-                      )}
-                    </ul>
-                    {strategy.isInsertable ? (
+                    {canInsert ? (
                       <button
                         type="button"
                         className="secondary-button"
-                        disabled={!insertState.canInsert || !onInsertSql}
-                        title={insertState.disabledReason || "Insert this analysis option into the SQL editor"}
-                        onClick={() => insertAnalyticalStrategy(strategy)}
+                        disabled={!onInsertSql}
+                        onClick={() => insertRecommendedAnalysisCard(card)}
                       >
-                        {insertState.isInsertedRecommendation ? "Inserted" : "Insert into editor"}
+                        Insert into editor
                       </button>
-                    ) : statusLabel === "Relationships needed" ? (
+                    ) : card.action === "review_relationships" && !relationshipReviewActionShownInRecommendedAnalysis ? (
                       <button
                         type="button"
                         className="secondary-button"
-                        onClick={() => onReviewRelationships?.(strategy.requiredRelationships)}
+                        onClick={() => onReviewRelationships?.(card.requiredRelationships)}
                       >
                         {RELATIONSHIP_REVIEW_ACTION_LABEL}
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled
-                        title={strategy.disabledReason}
-                        aria-label={strategy.disabledReason}
-                      >
+                      <button type="button" className="secondary-button" disabled>
                         Review first
                       </button>
                     )}
-                    {!strategy.isInsertable && strategy.disabledReason && <small>{strategy.disabledReason}</small>}
                   </article>
                 );
               })}
+              {askFiltraQueriSuggestions.recommendedAnalysis.alternatives.length > 0 && (
+                <div className="sql-recommended-analysis-alternatives" aria-label="Alternative analysis options">
+                  {askFiltraQueriSuggestions.recommendedAnalysis.alternatives.map((card) => (
+                    <article className="sql-recommended-analysis-card" key={card.id}>
+                      <div className="sql-template-recommendation-title-row">
+                        <strong>{card.title}</strong>
+                        <span className={`sql-grounding-badge ${card.insertState === "blocked_relationships" ? "needs_review" : "supported"}`}>
+                          {card.fitLabel}
+                        </span>
+                      </div>
+                      <p>{card.description}</p>
+                      <div className="sql-adaptive-fit-meta">
+                        <span>{card.statusLabel}</span>
+                        <span>Alternative</span>
+                      </div>
+                      {card.expectedOutput.length > 0 && (
+                        <p>Expected output: {card.expectedOutput.join(", ")}</p>
+                      )}
+                      {card.requiredRelationships.length > 0 && (
+                        <p>Relationships needed before SQL can be inserted.</p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+              {askFiltraQueriSuggestions.recommendedAnalysis.hiddenAlternatives.length > 0 && (
+                <details className="sql-more-analysis-options">
+                  <summary>
+                    More analysis options ({askFiltraQueriSuggestions.recommendedAnalysis.hiddenAlternatives.length})
+                  </summary>
+                  <div className="sql-more-analysis-options-list">
+                    {askFiltraQueriSuggestions.recommendedAnalysis.hiddenAlternatives.map((card) => (
+                      <article className="sql-recommended-analysis-card" key={card.id}>
+                        <div className="sql-template-recommendation-title-row">
+                          <strong>{card.title}</strong>
+                          <span className={`sql-grounding-badge ${card.insertState === "blocked_relationships" ? "needs_review" : "supported"}`}>
+                            {card.fitLabel}
+                          </span>
+                        </div>
+                        <p>{card.description}</p>
+                        {card.expectedOutput.length > 0 && (
+                          <p>Expected output: {card.expectedOutput.join(", ")}</p>
+                        )}
+                        {card.requiredRelationships.length > 0 && (
+                          <p>Relationships needed before SQL can be inserted.</p>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
-          {askFiltraQueriSuggestions.blockedPlan || askFiltraQueriSuggestions.recommendations.length > 0 ? (
+          {!askFiltraQueriSuggestions.recommendedAnalysis.primary &&
+          (askFiltraQueriSuggestions.blockedPlan || askFiltraQueriSuggestions.recommendations.length > 0) ? (
             <div className="sql-template-recommendation-list" aria-label="Recommended templates">
               <div className="sql-helper-section-label">
                 <span>Recommended templates</span>
@@ -1128,24 +1171,23 @@ function SqlEditorPanel({
                       Relevant worksheets:{" "}
                       {askFiltraQueriSuggestions.blockedPlan.relevantEntities.join(", ")}
                     </li>
-                    <li>
-                      Missing relationships:{" "}
-                      {askFiltraQueriSuggestions.blockedPlan.missingRelationships.join(", ")}
-                    </li>
+                    <li>Relationships needed before SQL can be inserted.</li>
                     <li>{askFiltraQueriSuggestions.blockedPlan.explanation}</li>
                   </ul>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() =>
-                      onReviewRelationships?.(
-                        askFiltraQueriSuggestions.blockedPlan?.missingRelationships || [],
-                      )
-                    }
-                    title={askFiltraQueriSuggestions.blockedPlan.disabledReason}
-                  >
-                    {RELATIONSHIP_REVIEW_ACTION_LABEL}
-                  </button>
+                  {!relationshipReviewActionShownInRecommendedAnalysis && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() =>
+                        onReviewRelationships?.(
+                          askFiltraQueriSuggestions.blockedPlan?.missingRelationships || [],
+                        )
+                      }
+                      title={askFiltraQueriSuggestions.blockedPlan.disabledReason}
+                    >
+                      {RELATIONSHIP_REVIEW_ACTION_LABEL}
+                    </button>
+                  )}
                   <small>{askFiltraQueriSuggestions.blockedPlan.disabledReason}</small>
                 </article>
               )}

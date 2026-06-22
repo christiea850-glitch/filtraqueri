@@ -46,6 +46,12 @@ export const ADVANCED_PLANNING_DETAILS_COPY =
 export const ASK_RECOMMENDATION_ALREADY_INSERTED_COPY =
   "One suggestion is already inserted. Clear the editor or start a new tab before inserting another suggestion.";
 
+export const ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE =
+  "Relationships needed before SQL can be inserted.";
+
+export const ASK_RELATIONSHIP_BLOCK_COMPACT_COPY =
+  "FiltraQueri understands the analysis, but cross-table SQL is blocked until worksheet relationships are confirmed.";
+
 export type SqlAskFiltraQueriModel = {
   buttonLabel: typeof ASK_FILTRAQUERI_BUTTON_LABEL;
   canSubmit: boolean;
@@ -84,6 +90,7 @@ export type SqlAskFiltraQueriSuggestionModel = {
   blockedPlan: SqlAskBlockedPlanRecommendation | null;
   analyticalStrategies: SqlAnalyticalStrategy[];
   adaptiveFitSummaries: SqlAskAdaptiveFitSummary[];
+  recommendedAnalysis: SqlAskRecommendedAnalysisModel;
   guidanceTitle: string;
   guidanceCopy: string;
   noRunQuery: true;
@@ -93,6 +100,8 @@ export type SqlAskFiltraQueriSuggestionModel = {
 
 export type SqlAskAdaptiveFitSummary = {
   id: string;
+  candidateId: string;
+  source: "template" | "recipe" | "opportunity" | "generated" | "strategy" | "blocked_plan";
   label: string;
   title: string;
   description: string;
@@ -102,6 +111,45 @@ export type SqlAskAdaptiveFitSummary = {
   reasons: string[];
   requiredRelationships: string[];
   missingFields: string[];
+};
+
+export type SqlAskRecommendedAnalysisAction =
+  | "insert_recommendation"
+  | "insert_strategy"
+  | "review_relationships"
+  | "review_first";
+
+export type SqlAskRecommendedAnalysisCard = {
+  id: string;
+  title: string;
+  description: string;
+  fitLabel: string;
+  statusLabel: string;
+  category: SqlAdaptiveFitCategory;
+  insertState: SqlAdaptiveInsertState;
+  expectedOutput: string[];
+  action: SqlAskRecommendedAnalysisAction;
+  recommendationId: string | null;
+  strategyId: string | null;
+  requiredRelationships: string[];
+  missingFields: string[];
+  isPrimary: boolean;
+};
+
+export type SqlAskRecommendedAnalysisModel = {
+  title: "Recommended analysis";
+  primary: SqlAskRecommendedAnalysisCard | null;
+  alternatives: SqlAskRecommendedAnalysisCard[];
+  hiddenAlternatives: SqlAskRecommendedAnalysisCard[];
+  relationshipAction: {
+    title: string;
+    copy: string;
+    actionLabel: "Review relationships";
+    requiredRelationships: string[];
+  } | null;
+  noRunQuery: true;
+  noBackendCall: true;
+  noEditorMutation: true;
 };
 
 export type SqlAskRecommendationInsertModel = {
@@ -163,6 +211,9 @@ const uniqueRecommendations = (
     return true;
   });
 };
+
+const uniqueStrings = (values: readonly string[]): string[] =>
+  Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
 const formatRelationshipGaps = (shape: SqlBusinessQuestionShape): string =>
   shape.relationshipGaps
@@ -241,6 +292,171 @@ const confidenceRank: Record<"high" | "medium" | "low", number> = {
   low: 2,
 };
 
+const emptyRecommendedAnalysis = (): SqlAskRecommendedAnalysisModel => ({
+  title: "Recommended analysis",
+  primary: null,
+  alternatives: [],
+  hiddenAlternatives: [],
+  relationshipAction: null,
+  noRunQuery: true,
+  noBackendCall: true,
+  noEditorMutation: true,
+});
+
+const normalizeAnalysisKey = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[_%()]+/g, " ")
+    .replace(/[^a-z0-9\s]+/g, " ")
+    .replace(/\b(records?|rows?|sql|query|analysis)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const actionForFit = (
+  fit: Pick<SqlAskAdaptiveFitSummary, "insertState" | "source" | "candidateId">,
+): SqlAskRecommendedAnalysisAction => {
+  if (fit.insertState === "blocked_relationships") return "review_relationships";
+  if (fit.insertState === "insertable_existing_sql") {
+    return fit.source === "strategy" ? "insert_strategy" : "insert_recommendation";
+  }
+  return "review_first";
+};
+
+const actionForStrategy = (
+  strategy: Pick<SqlAnalyticalStrategy, "isInsertable" | "requiredRelationships">,
+): SqlAskRecommendedAnalysisAction => {
+  if (strategy.requiredRelationships.length > 0) return "review_relationships";
+  return strategy.isInsertable ? "insert_strategy" : "review_first";
+};
+
+const statusLabelForStrategy = (
+  strategy: Pick<SqlAnalyticalStrategy, "isInsertable" | "requiredRelationships">,
+): string => {
+  if (strategy.requiredRelationships.length > 0) return "Relationships needed";
+  return strategy.isInsertable ? "Ready to insert" : "Read-only for now";
+};
+
+const strategyCategory = (
+  strategy: Pick<SqlAnalyticalStrategy, "isInsertable" | "requiredRelationships">,
+): SqlAdaptiveFitCategory => {
+  if (strategy.requiredRelationships.length > 0) return "blocked_fit";
+  return strategy.isInsertable ? "exact_fit" : "composed_solution";
+};
+
+const matchingStrategyForFit = (
+  fit: SqlAskAdaptiveFitSummary,
+  strategies: readonly SqlAnalyticalStrategy[],
+): SqlAnalyticalStrategy | null =>
+  strategies.find((strategy) => strategy.id === fit.candidateId) ||
+  strategies.find((strategy) => normalizeAnalysisKey(strategy.title) === normalizeAnalysisKey(fit.title)) ||
+  strategies.find((strategy) => strategy.sourceRecommendationId === fit.candidateId) ||
+  null;
+
+const matchingRecommendationForFit = (
+  fit: SqlAskAdaptiveFitSummary,
+  recommendations: readonly SqlTemplateRecommendation[],
+): SqlTemplateRecommendation | null =>
+  recommendations.find((recommendation) => recommendation.id === fit.candidateId) ||
+  recommendations.find((recommendation) => normalizeAnalysisKey(recommendation.title) === normalizeAnalysisKey(fit.title)) ||
+  null;
+
+export const createSqlAskRecommendedAnalysisModel = ({
+  adaptiveFitSummaries,
+  analyticalStrategies,
+  recommendations,
+}: {
+  adaptiveFitSummaries: readonly SqlAskAdaptiveFitSummary[];
+  analyticalStrategies: readonly SqlAnalyticalStrategy[];
+  recommendations: readonly SqlTemplateRecommendation[];
+}): SqlAskRecommendedAnalysisModel => {
+  if (adaptiveFitSummaries.length === 0 && analyticalStrategies.length === 0) {
+    return emptyRecommendedAnalysis();
+  }
+
+  const seen = new Set<string>();
+  const cards: SqlAskRecommendedAnalysisCard[] = [];
+  const addCard = (card: SqlAskRecommendedAnalysisCard) => {
+    const key = normalizeAnalysisKey(`${card.title} ${card.expectedOutput.join(" ")}`);
+    if (seen.has(key)) return;
+    seen.add(key);
+    cards.push(card);
+  };
+
+  adaptiveFitSummaries.forEach((fit, index) => {
+    const strategy = matchingStrategyForFit(fit, analyticalStrategies);
+    const recommendation = matchingRecommendationForFit(fit, recommendations);
+    addCard({
+      id: `fit:${fit.id}`,
+      title: fit.title,
+      description: fit.description,
+      fitLabel: index === 0 ? "Best fit" : fit.label,
+      statusLabel: fit.statusLabel,
+      category: fit.category,
+      insertState: fit.insertState,
+      expectedOutput: strategy?.outputShape || [],
+      action: actionForFit(fit),
+      recommendationId: recommendation?.id || (fit.source === "strategy" ? null : fit.candidateId),
+      strategyId: strategy?.id || (fit.source === "strategy" ? fit.candidateId : null),
+      requiredRelationships: fit.requiredRelationships,
+      missingFields: fit.missingFields,
+      isPrimary: index === 0,
+    });
+  });
+
+  analyticalStrategies.forEach((strategy) => {
+    addCard({
+      id: `strategy:${strategy.id}`,
+      title: strategy.title,
+      description: strategy.description,
+      fitLabel: strategy.requiredRelationships.length > 0 ? "Needs worksheet relationships" : "Analysis option",
+      statusLabel: statusLabelForStrategy(strategy),
+      category: strategyCategory(strategy),
+      insertState:
+        strategy.requiredRelationships.length > 0
+          ? "blocked_relationships"
+          : strategy.isInsertable
+            ? "insertable_existing_sql"
+            : "read_only",
+      expectedOutput: strategy.outputShape,
+      action: actionForStrategy(strategy),
+      recommendationId: null,
+      strategyId: strategy.id,
+      requiredRelationships: strategy.requiredRelationships,
+      missingFields: [],
+      isPrimary: cards.length === 0,
+    });
+  });
+
+  const [primary = null, ...remaining] = cards.map((card, index) => ({
+    ...card,
+    isPrimary: index === 0,
+  }));
+  const visibleCards = remaining.slice(0, 2);
+  const topCards = [primary, ...visibleCards].filter((card): card is SqlAskRecommendedAnalysisCard => Boolean(card));
+  const relationshipAction =
+    topCards.length > 0 &&
+    topCards.every((card) => card.insertState === "blocked_relationships") &&
+    topCards.some((card) => card.requiredRelationships.length > 0)
+      ? {
+          title: ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE,
+          copy: "FiltraQueri understands the analysis, but worksheet relationships must be reviewed before SQL can be inserted.",
+          actionLabel: "Review relationships" as const,
+          requiredRelationships: uniqueStrings(topCards.flatMap((card) => card.requiredRelationships)),
+        }
+      : null;
+
+  return {
+    title: "Recommended analysis",
+    primary,
+    alternatives: visibleCards,
+    hiddenAlternatives: remaining.slice(2),
+    relationshipAction,
+    noRunQuery: true,
+    noBackendCall: true,
+    noEditorMutation: true,
+  };
+};
+
 export const createSqlAskAdaptiveFitSummaries = ({
   prompt,
   questionShape,
@@ -284,9 +500,14 @@ export const createSqlAskAdaptiveFitSummaries = ({
     )
     .slice(0, 2)
     .map((fit): SqlAskAdaptiveFitSummary => {
-      const firstReason = fit.reasons[0] || "Deterministic fit metadata is available for this suggestion.";
+      const firstReason =
+        fit.category === "blocked_fit"
+          ? ASK_RELATIONSHIP_BLOCK_COMPACT_COPY
+          : fit.reasons[0] || "Deterministic fit metadata is available for this suggestion.";
       return {
         id: `${fit.source}:${fit.candidateId}`,
+        candidateId: fit.candidateId,
+        source: fit.source,
         label: adaptiveFitLabels[fit.category],
         title: fit.title,
         description: firstReason,
@@ -392,6 +613,11 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     blockedPlan,
     dataset,
   });
+  const recommendedAnalysis = createSqlAskRecommendedAnalysisModel({
+    adaptiveFitSummaries,
+    analyticalStrategies,
+    recommendations,
+  });
   const neededTables = formatNeededTables(scopeRecommendations);
   const hasTemplate = recommendations.length > 0;
   const guidance = createGuidanceForQuestionShape({
@@ -408,6 +634,7 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     blockedPlan,
     analyticalStrategies,
     adaptiveFitSummaries,
+    recommendedAnalysis,
     guidanceTitle: guidance.guidanceTitle,
     guidanceCopy: guidance.guidanceCopy,
     noRunQuery: true,

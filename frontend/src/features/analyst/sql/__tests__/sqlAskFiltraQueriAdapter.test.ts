@@ -22,8 +22,11 @@ import {
   BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_HELPER,
   BUSINESS_SQL_PREVIEW_NEEDS_DETAILS_TITLE,
   ASK_RECOMMENDATION_ALREADY_INSERTED_COPY,
+  ASK_RELATIONSHIP_BLOCK_COMPACT_COPY,
+  ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE,
   createBusinessSqlPreviewVisibilityModel,
   createSqlAskAdaptiveFitSummaries,
+  createSqlAskRecommendedAnalysisModel,
   createSqlAskRecommendationInsertModel,
   createSqlAskFiltraQueriModel,
   createSqlAskFiltraQueriSuggestionModel,
@@ -514,6 +517,10 @@ const fixtures: Fixture[] = [
       const blockedSummary = model.adaptiveFitSummaries.find(
         (summary) => summary.category === "blocked_fit",
       );
+      const review = createSqlRelationshipReviewModel({
+        dataset: missingTenantAccessDataset,
+        requiredRelationships: model.blockedPlan?.missingRelationships || [],
+      });
 
       return [
         ...(blockedSummary ? [] : ["Expected blocked adaptive fit summary."]),
@@ -523,6 +530,16 @@ const fixtures: Fixture[] = [
         ...(blockedSummary?.statusLabel === "Relationships needed"
           ? []
           : [`Expected Relationships needed status, received ${blockedSummary?.statusLabel || "none"}.`]),
+        ...(blockedSummary?.description === ASK_RELATIONSHIP_BLOCK_COMPACT_COPY
+          ? []
+          : [`Expected compact blocked summary copy, received ${blockedSummary?.description || "none"}.`]),
+        ...(ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE === "Relationships needed before SQL can be inserted."
+          ? []
+          : ["Expected compact relationship block title copy."]),
+        ...(blockedSummary?.description.includes("tenants to units") ||
+          blockedSummary?.description.includes("tenants to access_codes")
+          ? ["Main Ask relationship summary must not repeat detailed relationship pairs."]
+          : []),
         ...(blockedSummary?.requiredRelationships.includes("tenants to units") &&
           blockedSummary.requiredRelationships.includes("tenants to access_codes")
           ? []
@@ -530,8 +547,187 @@ const fixtures: Fixture[] = [
         ...(model.blockedPlan?.missingRelationships.join("|") === blockedSummary?.requiredRelationships.join("|")
           ? []
           : ["Blocked fit summary should reuse the same relationship review inputs as the blocked Ask card."]),
+        ...(review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "units") &&
+          review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "access_codes")
+          ? []
+          : ["Detailed relationship pairs must remain available in the read-only review panel."]),
         ...(model.blockedPlan ? [] : ["Expected existing blocked relationship card to remain available."]),
         ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17C-Fix-2 Recommended analysis merges fit metadata and analysis options",
+    assert: () => {
+      const model = createSqlAskFiltraQueriSuggestionModel({
+        hasSubmittedAsk: true,
+        prompt: "How many tenants in every unit have access codes?",
+        dataset: missingTenantAccessDataset,
+        selectedDialect: "duckdb",
+        appliedScopeSelections: [],
+      });
+      const recommended = model.recommendedAnalysis;
+      const visibleCards = [
+        ...(recommended.primary ? [recommended.primary] : []),
+        ...recommended.alternatives,
+      ];
+      const review = createSqlRelationshipReviewModel({
+        dataset: missingTenantAccessDataset,
+        requiredRelationships: recommended.relationshipAction?.requiredRelationships || [],
+      });
+      const overflow = createSqlAskRecommendedAnalysisModel({
+        adaptiveFitSummaries: [],
+        analyticalStrategies: [
+          {
+            id: "one",
+            title: "Count orders by customer",
+            description: "Count orders for each customer.",
+            outputShape: ["customer_name", "order_count"],
+            strategyKind: "grouped_count",
+            requiredEntities: ["orders", "customers"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "high",
+          },
+          {
+            id: "two",
+            title: "Rank customers by order count",
+            description: "Sort customers by order count.",
+            outputShape: ["customer_name", "order_count", "rank"],
+            strategyKind: "ranked_summary",
+            requiredEntities: ["orders", "customers"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "high",
+          },
+          {
+            id: "three",
+            title: "Customer coverage percentage",
+            description: "Calculate coverage percentage.",
+            outputShape: ["customer_name", "coverage_percent"],
+            strategyKind: "coverage_percent",
+            requiredEntities: ["orders", "customers"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "medium",
+          },
+          {
+            id: "four",
+            title: "Customers missing orders",
+            description: "Find customers with no orders.",
+            outputShape: ["customer_name", "missing_order_count"],
+            strategyKind: "gap_detection",
+            requiredEntities: ["orders", "customers"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "medium",
+          },
+        ],
+        recommendations: [],
+      });
+
+      return [
+        ...(recommended.title === "Recommended analysis"
+          ? []
+          : [`Expected Recommended analysis title, received ${recommended.title}.`]),
+        ...(recommended.primary ? [] : ["Expected primary Recommended analysis card."]),
+        ...(recommended.primary?.fitLabel
+          ? []
+          : ["Expected fit metadata badge inside the primary card."]),
+        ...(recommended.primary?.statusLabel === "Relationships needed"
+          ? []
+          : [`Expected Relationships needed status, received ${recommended.primary?.statusLabel || "none"}.`]),
+        ...(recommended.relationshipAction?.actionLabel === "Review relationships"
+          ? []
+          : ["Expected one shared relationship review action for blocked top options."]),
+        ...(visibleCards.every((card) => card.requiredRelationships.length > 0)
+          ? []
+          : ["Expected visible blocked cards to preserve relationship requirements behind the scenes."]),
+        ...(visibleCards.every((card) => card.description.includes("tenants to units") === false)
+          ? []
+          : ["Visible Recommended analysis cards must not repeat detailed relationship pairs in descriptions."]),
+        ...(recommended.alternatives.length <= 2
+          ? []
+          : [`Expected at most two visible alternatives, received ${recommended.alternatives.length}.`]),
+        ...(overflow.hiddenAlternatives.length > 0
+          ? []
+          : ["Expected extra analysis options to be collapsed under More analysis options."]),
+        ...(review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "units") &&
+          review.pairs.some((pair) => pair.fromTable === "tenants" && pair.toTable === "access_codes")
+          ? []
+          : ["Detailed missing relationship pairs must remain available in the review panel."]),
+        ...(recommended.noBackendCall && recommended.noRunQuery && recommended.noEditorMutation
+          ? []
+          : ["Recommended analysis must not add backend, Run Query, or editor mutation behavior."]),
+        ...expectNoBehaviorChange(model),
+      ];
+    },
+  },
+  {
+    name: "T-17C-Fix-2 Recommended analysis dedupes overlapping fit and option cards",
+    assert: () => {
+      const merged = createSqlAskRecommendedAnalysisModel({
+        adaptiveFitSummaries: [
+          {
+            id: "strategy:grouped-count",
+            candidateId: "grouped-count",
+            source: "strategy",
+            label: "Exact match",
+            title: "Count orders by customer",
+            description: "This existing SQL suggestion directly matches the detected question shape.",
+            statusLabel: "Ready to insert",
+            category: "exact_fit",
+            insertState: "insertable_existing_sql",
+            reasons: ["This existing SQL suggestion directly matches the detected question shape."],
+            requiredRelationships: [],
+            missingFields: [],
+          },
+        ],
+        analyticalStrategies: [
+          {
+            id: "grouped-count",
+            title: "Count orders by customer",
+            description: "Count orders for each customer.",
+            outputShape: ["customer_name", "order_count"],
+            strategyKind: "grouped_count",
+            requiredEntities: ["orders", "customers"],
+            requiredRelationships: [],
+            isInsertable: true,
+            confidence: "high",
+            sql: "select customer_id, count(*) from orders group by customer_id",
+            sourceRecommendationId: "orders-by-customer",
+          },
+          {
+            id: "ranked-count",
+            title: "Rank customers by order count",
+            description: "Show the highest customers by order count.",
+            outputShape: ["customer_name", "order_count", "rank"],
+            strategyKind: "ranked_summary",
+            requiredEntities: ["orders", "customers"],
+            requiredRelationships: [],
+            isInsertable: false,
+            confidence: "high",
+          },
+        ],
+        recommendations: [],
+      });
+
+      return [
+        ...(merged.primary?.title === "Count orders by customer"
+          ? []
+          : [`Expected primary card from merged fit, received ${merged.primary?.title || "none"}.`]),
+        ...(merged.primary?.fitLabel === "Best fit"
+          ? []
+          : [`Expected Best fit badge, received ${merged.primary?.fitLabel || "none"}.`]),
+        ...(merged.primary?.expectedOutput.join(", ") === "customer_name, order_count"
+          ? []
+          : [`Expected strategy output on primary card, received ${merged.primary?.expectedOutput.join(", ") || "none"}.`]),
+        ...(merged.alternatives.some((card) => card.title === "Count orders by customer")
+          ? ["Duplicate fit/strategy card should not appear as an alternative."]
+          : []),
+        ...(merged.alternatives.some((card) => card.title === "Rank customers by order count")
+          ? []
+          : ["Expected non-duplicate strategy to remain as a compact alternative."]),
       ];
     },
   },
