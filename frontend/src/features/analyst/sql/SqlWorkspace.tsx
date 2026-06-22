@@ -14,6 +14,7 @@ import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
+import { labelResultColumns } from "./resultLabeling";
 import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -126,18 +127,32 @@ function SqlFocusedResultPreview({
     handle.addEventListener("pointermove", onMove);
     handle.addEventListener("pointerup", onRelease);
   };
-  const sqlResultColumns: DataTableColumn[] = previewResult.columns.map((column) => ({
-    key: column,
-    width: getColumnWidth(column),
+  const labeledColumns = labelResultColumns({
+    columns: previewResult.columns,
+    taskPrompt: previewResult.executedQuestion?.taskPrompt,
+    detectedIntent: previewResult.executedQuestion?.detectedIntent,
+    questionShape: previewResult.executedQuestion?.questionShape,
+    sourceLabel: previewResult.executedQuestion?.sourceLabel,
+    sourceTableName: previewResult.executedQuestion?.sourceTableName,
+  });
+  const sqlResultColumns: DataTableColumn[] = labeledColumns.map((column) => ({
+    key: column.key,
+    width: getColumnWidth(column.key),
+    title: column.label === column.key ? column.key : `${column.label} (${column.key})`,
     header: (
       <>
-        <span className="dataset-preview-cell">{column}</span>
+        <span className="dataset-preview-cell">{column.label}</span>
+        {column.label !== column.key ? (
+          <span className="dataset-preview-column-raw" aria-label={`Raw column ${column.key}`}>
+            {column.key}
+          </span>
+        ) : null}
         <span
           className="dataset-preview-resizer"
           role="separator"
           aria-orientation="vertical"
-          aria-label={`Resize ${column} column`}
-          onPointerDown={(event) => startColumnResize(event, column)}
+          aria-label={`Resize ${column.label} column`}
+          onPointerDown={(event) => startColumnResize(event, column.key)}
         />
       </>
     ),

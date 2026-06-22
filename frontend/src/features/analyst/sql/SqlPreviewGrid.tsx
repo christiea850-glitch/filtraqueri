@@ -1,3 +1,4 @@
+import { labelResultColumns } from "./resultLabeling";
 import type { SqlPreviewResult } from "./sqlTypes";
 
 type SqlPreviewGridProps = {
@@ -6,6 +7,14 @@ type SqlPreviewGridProps = {
 
 function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
   const hasRows = previewResult.rows.length > 0 && previewResult.columns.length > 0;
+  const labeledColumns = labelResultColumns({
+    columns: previewResult.columns,
+    taskPrompt: previewResult.executedQuestion?.taskPrompt,
+    detectedIntent: previewResult.executedQuestion?.detectedIntent,
+    questionShape: previewResult.executedQuestion?.questionShape,
+    sourceLabel: previewResult.executedQuestion?.sourceLabel,
+    sourceTableName: previewResult.executedQuestion?.sourceTableName,
+  });
 
   return (
     <section className="sql-preview-panel" aria-label="SQL preview result">
@@ -22,8 +31,16 @@ function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
           <table>
             <thead>
               <tr>
-                {previewResult.columns.map((column) => (
-                  <th key={column}>{column}</th>
+                {labeledColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    title={column.label === column.key ? column.key : `${column.label} (${column.key})`}
+                  >
+                    <span>{column.label}</span>
+                    {column.label !== column.key ? (
+                      <span className="dataset-preview-column-raw">{column.key}</span>
+                    ) : null}
+                  </th>
                 ))}
               </tr>
             </thead>
