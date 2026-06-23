@@ -107,6 +107,11 @@ const fixtures = [
     exportName: "runLlmPrivacyModeFixtures",
   },
   {
+    label: "LLM shadow data policy",
+    modulePath: "/src/features/analyst/llm/__tests__/llmShadowDataPolicy.test.ts",
+    exportName: "runLlmShadowDataPolicyFixtures",
+  },
+  {
     label: "Business intent grounding",
     modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
     exportName: "runBusinessIntentFixtures",

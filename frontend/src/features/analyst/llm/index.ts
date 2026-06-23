@@ -140,3 +140,17 @@ export {
   isRawDataCategory,
   requiresPrivacyConsent,
 } from "./llmPrivacyModes";
+export type {
+  AIRareValueRiskLevel,
+  AIShadowDataPolicyDecision,
+  AIShadowValuePolicy,
+  AIUniquenessRiskLevel,
+  ResolveShadowValuePolicyInput,
+} from "./llmShadowDataPolicy";
+export {
+  getDefaultRareValueThresholdForPrivacyMode,
+  isRawValueProhibitedForSensitivity,
+  isTokenizationAllowedForPrivacyMode,
+  requiresRareValueSuppression,
+  resolveShadowValuePolicyForSensitivity,
+} from "./llmShadowDataPolicy";
