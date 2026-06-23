@@ -2107,6 +2107,32 @@
     justify-content: flex-start;
   }
 
+  .sql-result-page,
+  .sql-drafts-page,
+  .sql-draft-detail-page,
+  .sql-detail-placeholder-page {
+    gap: 12px;
+    min-height: auto;
+    padding: 14px;
+  }
+
+  .sql-result-page-header {
+    gap: 10px;
+  }
+
+  .sql-result-page-header > button:first-child {
+    justify-self: flex-start;
+  }
+
+  .sql-result-table-wrap {
+    min-height: 360px;
+    max-height: calc(100vh - 240px);
+  }
+
+  .sql-draft-detail-body {
+    min-height: 360px;
+  }
+
   .sql-draft-row {
     grid-template-columns: auto minmax(0, 1fr);
   }
@@ -4111,6 +4137,130 @@
 
   .business-sql-planning-status-row .secondary-button {
     width: 100%;
+  }
+
+  .sql-result-page,
+  .sql-drafts-page,
+  .sql-draft-detail-page,
+  .sql-detail-placeholder-page {
+    gap: 10px;
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .sql-result-page-header {
+    gap: 8px;
+  }
+
+  .sql-result-page-header h2 {
+    font-size: 20px;
+    line-height: 1.15;
+  }
+
+  .sql-result-page-header p:last-child {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .sql-result-page-actions,
+  .business-sql-preview-actions,
+  .sql-draft-actions,
+  .sql-draft-detail-nav {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sql-result-page-actions > button,
+  .business-sql-preview-actions > button,
+  .sql-draft-actions > button,
+  .sql-draft-detail-nav > button {
+    width: 100%;
+  }
+
+  .business-sql-preview-panel {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .business-sql-preview-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .business-sql-preview-badges {
+    justify-content: flex-start;
+  }
+
+  .business-sql-preview-code {
+    max-height: 180px;
+    font-size: 11.5px;
+  }
+
+  .business-sql-preview-review-notes,
+  .sql-adaptive-fit-summary-grid,
+  .sql-recommended-analysis-alternatives,
+  .sql-relationship-review-card dl {
+    grid-template-columns: 1fr;
+  }
+
+  .sql-adaptive-fit-relationship-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sql-adaptive-fit-relationship-action > button,
+  .business-sql-plan-candidate-panel > button,
+  .sql-adaptive-fit-card > button {
+    width: 100%;
+  }
+
+  .sql-relationship-review-panel {
+    gap: 8px;
+  }
+
+  .sql-relationship-review-card {
+    padding: 9px;
+  }
+
+  .sql-relationship-review-card-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sql-relationship-review-worksheets span,
+  .sql-relationship-review-card dd {
+    overflow-wrap: anywhere;
+  }
+
+  .sql-draft-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .sql-draft-actions {
+    grid-column: 1 / -1;
+  }
+
+  .sql-draft-open p,
+  .sql-draft-open strong {
+    white-space: normal;
+  }
+
+  .sql-draft-detail-body {
+    min-height: 280px;
+  }
+
+  .sql-draft-detail-body pre {
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .sql-result-table-wrap {
+    min-height: 300px;
+    max-height: calc(100vh - 220px);
   }
 
   .sql-workspace-v2 > .sql-context-panel {
