@@ -97,6 +97,11 @@ const fixtures = [
     exportName: "runSqlWorkspacePreviewFixtures",
   },
   {
+    label: "Relationship confirmation",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlRelationshipConfirmation.test.ts",
+    exportName: "runSqlRelationshipConfirmationFixtures",
+  },
+  {
     label: "Business intent grounding",
     modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
     exportName: "runBusinessIntentFixtures",
