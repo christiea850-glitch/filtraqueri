@@ -16,7 +16,32 @@ export type AIPayloadProvenance = {
   rawRowsIncluded: false;
   sampleRowsIncluded: false;
   promptTextIncluded: false;
+  topValuesIncluded: false;
+  sqlDraftsIncluded: false;
+  queryResultsIncluded: false;
+  providerResponsesIncluded: false;
+  tokenizationVaultIncluded: false;
   deterministicReportSource: "k10_report_intelligence";
+  notes: string[];
+};
+
+export type AIMetadataPayloadSafetySummary = AIMetadataPayloadCategorySummary & {
+  rawRowsIncluded: false;
+  previewRowsIncluded: false;
+  sampleValuesIncluded: false;
+  topValuesIncluded: false;
+  promptTextIncluded: false;
+  sqlDraftsIncluded: false;
+  queryResultsIncluded: false;
+  providerResponsesIncluded: false;
+  apiSecretsIncluded: false;
+  tokenizationVaultIncluded: false;
+  rawFreeTextValuesIncluded: false;
+  rawSensitiveValuesIncluded: false;
+  blockedCategories: string[];
+  allowedCategories: string[];
+  excludedCategories: string[];
+  providerReady: boolean;
   notes: string[];
 };
 
@@ -30,6 +55,9 @@ export type AIColumnProfileSummary = {
   hasNumericStats: boolean;
   hasDateRange: boolean;
   hasTextLengthStats: boolean;
+  sampleValuesIncluded: false;
+  topValuesIncluded: false;
+  rawValuesIncluded: false;
 };
 
 export type AIColumnSensitivityCategory =
@@ -181,6 +209,13 @@ export type AIMetadataPayloadCategorySummary = {
   rawRowsIncluded: false;
   sampleRowsIncluded: false;
   promptTextIncluded: false;
+  sampleValuesIncluded: false;
+  topValuesIncluded: false;
+  sqlDraftsIncluded: false;
+  queryResultsIncluded: false;
+  providerResponsesIncluded: false;
+  tokenizationVaultIncluded: false;
+  blockedCategoriesExcluded: boolean;
   datasetIncluded: boolean;
   worksheetCount: number;
   columnCount: number;

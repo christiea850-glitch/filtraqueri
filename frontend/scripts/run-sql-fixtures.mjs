@@ -112,6 +112,11 @@ const fixtures = [
     exportName: "runLlmShadowDataPolicyFixtures",
   },
   {
+    label: "LLM metadata payload builder",
+    modulePath: "/src/features/analyst/llm/__tests__/llmMetadataPayloadBuilder.test.ts",
+    exportName: "runLlmMetadataPayloadBuilderFixtures",
+  },
+  {
     label: "Business intent grounding",
     modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
     exportName: "runBusinessIntentFixtures",
