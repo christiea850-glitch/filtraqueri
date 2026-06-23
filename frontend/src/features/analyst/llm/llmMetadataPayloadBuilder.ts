@@ -15,6 +15,7 @@ import type {
   AIDeterministicReportOpportunitySummary,
   AIMetadataContextPayload,
   AIMetadataPayloadCategorySummary,
+  AIMetadataPayloadSafetySummary,
   AIMode,
   AIRelationshipCandidateSummary,
   AIWorksheetTableSummary,
@@ -57,6 +58,9 @@ const summarizeColumn = (
     hasNumericStats: Boolean(column.numeric_stats),
     hasDateRange: Boolean(column.date_range),
     hasTextLengthStats: Boolean(column.text_length_stats),
+    sampleValuesIncluded: false,
+    topValuesIncluded: false,
+    rawValuesIncluded: false,
   },
   sensitivity: classifySensitiveColumn({ column, worksheetName, trustedTableName }),
 });
@@ -193,9 +197,14 @@ export const buildAIMetadataContextPayload = ({
       rawRowsIncluded: false,
       sampleRowsIncluded: false,
       promptTextIncluded: false,
+      topValuesIncluded: false,
+      sqlDraftsIncluded: false,
+      queryResultsIncluded: false,
+      providerResponsesIncluded: false,
+      tokenizationVaultIncluded: false,
       deterministicReportSource: "k10_report_intelligence",
       notes: [
-        "Metadata-only payload. Raw rows, sample values, prompt text, and SQL drafts are excluded.",
+        "Metadata-only payload. Raw rows, preview rows, sample values, top values, prompt text, SQL drafts, query results, provider responses, secrets, token vault contents, and raw sensitive values are excluded.",
       ],
     },
     sqlDialect: {
@@ -262,6 +271,13 @@ export const summarizeAIMetadataPayloadCategories = (
     rawRowsIncluded: false,
     sampleRowsIncluded: false,
     promptTextIncluded: false,
+    sampleValuesIncluded: false,
+    topValuesIncluded: false,
+    sqlDraftsIncluded: false,
+    queryResultsIncluded: false,
+    providerResponsesIncluded: false,
+    tokenizationVaultIncluded: false,
+    blockedCategoriesExcluded: true,
     datasetIncluded: Boolean(payload.dataset),
     worksheetCount: payload.worksheets.length,
     columnCount: payload.worksheets.reduce((sum, worksheet) => sum + worksheet.columns.length, 0),
@@ -278,3 +294,127 @@ export const summarizeAIMetadataPayloadCategories = (
     },
   };
 };
+
+
+const UNSAFE_METADATA_PAYLOAD_FIELD_NAMES = new Set([
+  "rows",
+  "rawRows",
+  "preview",
+  "previewRows",
+  "sample",
+  "samples",
+  "sampleRows",
+  "sample_values",
+  "sampleValues",
+  "top_values",
+  "topValues",
+  "prompt",
+  "promptText",
+  "rawPromptText",
+  "sql",
+  "sqlDraft",
+  "sqlDrafts",
+  "queryResult",
+  "queryResults",
+  "providerResponse",
+  "providerResponses",
+  "apiKey",
+  "secret",
+  "secrets",
+  "tokenVault",
+  "tokenizationVault",
+  "rawValue",
+  "rawValues",
+  "freeTextValue",
+]);
+
+const ALLOWED_METADATA_ONLY_CATEGORIES = [
+  "dataset_metadata",
+  "worksheet_metadata",
+  "column_metadata",
+  "relationship_metadata",
+  "data_profile_summary_without_values",
+  "deterministic_report_summaries",
+  "sensitivity_metadata",
+  "safe_aggregate_summaries_value_free_threshold_safe",
+];
+
+const EXCLUDED_METADATA_ONLY_CATEGORIES = [
+  "raw_rows",
+  "preview_rows",
+  "sample_values",
+  "top_values",
+  "raw_prompt_text",
+  "sql_drafts",
+  "query_results",
+  "provider_responses",
+  "api_keys_or_secrets",
+  "tokenization_vault",
+  "raw_free_text_cell_values",
+  "raw_restricted_or_sensitive_values",
+];
+
+export const stripUnsafeMetadataPayloadFields = <T>(input: T): T => {
+  if (Array.isArray(input)) return input.map((item) => stripUnsafeMetadataPayloadFields(item)) as T;
+  if (!input || typeof input !== "object") return input;
+  return Object.fromEntries(
+    Object.entries(input as Record<string, unknown>)
+      .filter(([key]) => !UNSAFE_METADATA_PAYLOAD_FIELD_NAMES.has(key))
+      .map(([key, value]) => [key, stripUnsafeMetadataPayloadFields(value)]),
+  ) as T;
+};
+
+export const sanitizeMetadataOnlyColumnProfile = (
+  profile: Partial<Record<string, unknown>> | null | undefined,
+): AIColumnSummary["profile"] => ({
+  uniqueCount: typeof profile?.uniqueCount === "number" ? profile.uniqueCount : 0,
+  hasNumericStats: Boolean(profile?.hasNumericStats),
+  hasDateRange: Boolean(profile?.hasDateRange),
+  hasTextLengthStats: Boolean(profile?.hasTextLengthStats),
+  sampleValuesIncluded: false,
+  topValuesIncluded: false,
+  rawValuesIncluded: false,
+});
+
+export const summarizeMetadataOnlyPayloadSafety = (
+  payload: AIMetadataContextPayload,
+): AIMetadataPayloadSafetySummary => ({
+  ...summarizeAIMetadataPayloadCategories(payload),
+  rawRowsIncluded: false,
+  previewRowsIncluded: false,
+  sampleValuesIncluded: false,
+  topValuesIncluded: false,
+  promptTextIncluded: false,
+  sqlDraftsIncluded: false,
+  queryResultsIncluded: false,
+  providerResponsesIncluded: false,
+  apiSecretsIncluded: false,
+  tokenizationVaultIncluded: false,
+  rawFreeTextValuesIncluded: false,
+  rawSensitiveValuesIncluded: false,
+  blockedCategories: [],
+  allowedCategories: [...ALLOWED_METADATA_ONLY_CATEGORIES],
+  excludedCategories: [...EXCLUDED_METADATA_ONLY_CATEGORIES],
+  providerReady: true,
+  notes: ["Metadata-only payload categories are value-free and exclude blocked raw-data categories."],
+});
+
+export const containsBlockedPayloadCategory = (summary: AIMetadataPayloadSafetySummary): boolean =>
+  summary.rawRowsIncluded ||
+  summary.previewRowsIncluded ||
+  summary.sampleValuesIncluded ||
+  summary.topValuesIncluded ||
+  summary.promptTextIncluded ||
+  summary.sqlDraftsIncluded ||
+  summary.queryResultsIncluded ||
+  summary.providerResponsesIncluded ||
+  summary.apiSecretsIncluded ||
+  summary.tokenizationVaultIncluded ||
+  summary.rawFreeTextValuesIncluded ||
+  summary.rawSensitiveValuesIncluded ||
+  summary.blockedCategories.length > 0;
+
+export const assertMetadataOnlyPayloadCategories = (payload: AIMetadataContextPayload): boolean =>
+  !containsBlockedPayloadCategory(summarizeMetadataOnlyPayloadSafety(payload));
+
+export const createMetadataOnlyPayloadAuditSummary = summarizeMetadataOnlyPayloadSafety;

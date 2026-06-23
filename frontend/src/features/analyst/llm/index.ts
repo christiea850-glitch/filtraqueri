@@ -10,6 +10,7 @@ export type {
   AIDeterministicReportOpportunitySummary,
   AIMetadataContextPayload,
   AIMetadataPayloadCategorySummary,
+  AIMetadataPayloadSafetySummary,
   AIMode,
   AIPayloadProvenance,
   AIRedactionPolicyLabel,
@@ -50,8 +51,14 @@ export {
   validateAIGovernedSuggestion,
 } from "./llmSuggestionValidator";
 export {
+  assertMetadataOnlyPayloadCategories,
   buildAIMetadataContextPayload,
+  containsBlockedPayloadCategory,
+  createMetadataOnlyPayloadAuditSummary,
+  sanitizeMetadataOnlyColumnProfile,
+  stripUnsafeMetadataPayloadFields,
   summarizeAIMetadataPayloadCategories,
+  summarizeMetadataOnlyPayloadSafety,
   type BuildAIMetadataContextPayloadInput,
 } from "./llmMetadataPayloadBuilder";
 export type {
