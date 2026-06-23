@@ -127,6 +127,11 @@ const fixtures = [
     exportName: "runLlmConsentDisclosureFixtures",
   },
   {
+    label: "LLM deployment policy",
+    modulePath: "/src/features/analyst/llm/__tests__/llmDeploymentPolicy.test.ts",
+    exportName: "runLlmDeploymentPolicyFixtures",
+  },
+  {
     label: "Business intent grounding",
     modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
     exportName: "runBusinessIntentFixtures",
