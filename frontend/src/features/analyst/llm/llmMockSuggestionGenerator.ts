@@ -305,7 +305,7 @@ export const createMockAISuggestionCandidatesFromMetadata = (
   payload: AIMetadataContextPayload,
 ): MockAIMetadataSuggestionCandidate[] => {
   const deterministic = payload.deterministicReports
-    .filter((report) => !report.sqlDraftIncluded)
+    .filter((report) => !report.draftSqlIncluded)
     .slice(0, 4)
     .map(candidateFromDeterministicReport);
   const metadataText = normalizeText([
