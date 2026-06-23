@@ -102,6 +102,11 @@ const fixtures = [
     exportName: "runSqlRelationshipConfirmationFixtures",
   },
   {
+    label: "LLM privacy modes",
+    modulePath: "/src/features/analyst/llm/__tests__/llmPrivacyModes.test.ts",
+    exportName: "runLlmPrivacyModeFixtures",
+  },
+  {
     label: "Business intent grounding",
     modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
     exportName: "runBusinessIntentFixtures",

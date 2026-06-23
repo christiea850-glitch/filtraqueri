@@ -115,3 +115,28 @@ export {
   checkAIProviderBoundary,
   summarizeAIProviderBoundary,
 } from "./llmProviderBoundary";
+export type {
+  AIPrivacyAuditSummary,
+  AIPrivacyConsentScope,
+  AIPrivacyDecision,
+  AIPrivacyLevel,
+  AIPrivacyMode,
+  AIPrivacyNoExecutionInvariants,
+  AIPrivacyPayloadCategory,
+  AIPrivacyProviderCategory,
+  ShadowPayloadManifest,
+} from "./llmPrivacyModes";
+export {
+  AI_PRIVACY_METADATA_ONLY_ALLOWED_CATEGORIES,
+  AI_PRIVACY_NO_EXECUTION_INVARIANTS,
+  AI_PRIVACY_RAW_DATA_PROHIBITED_CATEGORIES,
+  AI_PRIVACY_SHADOW_DATA_REQUIRES_CONSENT_CATEGORIES,
+  AI_PRIVACY_TOKENIZED_PRIVATE_CATEGORIES,
+  DEFAULT_AI_PRIVACY_MODE,
+  assertNoExecutionInvariants,
+  createDefaultAIPrivacyDecision,
+  createRefusedAIPrivacyDecision,
+  isCategoryAllowedForMetadataOnly,
+  isRawDataCategory,
+  requiresPrivacyConsent,
+} from "./llmPrivacyModes";
