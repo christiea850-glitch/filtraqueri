@@ -189,3 +189,26 @@ export {
   hasShadowPlanBlockingViolations,
   isLlmShadowPlanAdvisoryOnly,
 } from "./llmShadowPlanValidator";
+
+export type {
+  AIConsentDisclosureAction,
+  AIConsentDisclosureAuditSummary,
+  AIConsentDisclosureLevelCopy,
+  AIConsentDisclosureModeSummary,
+  AIConsentDisclosurePayloadSummary,
+  AIConsentDisclosureRiskCode,
+  AIConsentDisclosureStatus,
+  AIModeChipViewModel,
+  AIManualControlDisclosure,
+  AIProviderBoundaryDisclosure,
+} from "./llmConsentDisclosure";
+export {
+  AI_CONSENT_DISCLOSURE_LEVEL_COPY,
+  AI_MANUAL_CONTROL_DISCLOSURE,
+  createAIConsentPayloadDisclosureSummary,
+  createAIModeChipViewModel,
+  getAIConsentDisclosureForPrivacyMode,
+  isAIConsentBlocked,
+  isAIConsentGranted,
+  requiresAIConsentDisclosure,
+} from "./llmConsentDisclosure";
