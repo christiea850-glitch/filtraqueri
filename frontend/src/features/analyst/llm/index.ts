@@ -212,3 +212,22 @@ export {
   isAIConsentGranted,
   requiresAIConsentDisclosure,
 } from "./llmConsentDisclosure";
+export type {
+  AIAdminPolicyRequirement,
+  AIDeploymentPolicyDecision,
+  AIDeploymentType,
+  AIPrivacyLevelAllowance,
+  AIProviderEligibilityRequirement,
+} from "./llmDeploymentPolicy";
+export {
+  AI_DEPLOYMENT_NO_EXECUTION_INVARIANTS,
+  AI_DEPLOYMENT_POLICY_MATRIX,
+  AI_DEPLOYMENT_TYPES,
+  DEFAULT_AI_DEPLOYMENT_TYPE,
+  assertAIDeploymentNoExecutionInvariants,
+  createAIDeploymentPolicyDecision,
+  getAIPrivacyAllowanceForDeployment,
+  isAIPrivacyModeAllowedForDeployment,
+  requiresAIAdminPolicy,
+  requiresAILegalComplianceReview,
+} from "./llmDeploymentPolicy";
