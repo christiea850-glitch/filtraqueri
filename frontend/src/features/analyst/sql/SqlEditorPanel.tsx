@@ -800,6 +800,21 @@ function SqlEditorPanel({
   const relationshipReviewActionShownInRecommendedAnalysis =
     Boolean(askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction) &&
     showRelationshipReviewAction;
+  const compactRelationshipBlock = askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction
+    ? {
+        title: askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.title,
+        copy: askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.copy,
+        requiredRelationships:
+          askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.requiredRelationships,
+      }
+    : askFiltraQueriSuggestions.blockedPlan?.missingRelationships.length
+      ? {
+          title: "Review worksheet connections before inserting SQL",
+          copy:
+            "FiltraQueri understands the analysis, but worksheet connections need review before SQL can be inserted.",
+          requiredRelationships: askFiltraQueriSuggestions.blockedPlan.missingRelationships,
+        }
+      : null;
   const insertRecommendedAnalysisCard = (
     card: NonNullable<typeof askFiltraQueriSuggestions.recommendedAnalysis.primary>,
   ) => {
@@ -1100,7 +1115,26 @@ function SqlEditorPanel({
               </div>
             </div>
           )}
-          {askFiltraQueriSuggestions.recommendedAnalysis.primary && (
+          {compactRelationshipBlock && (
+            <div className="sql-recommended-analysis" aria-label="Relationship review required">
+              <div className="sql-adaptive-fit-relationship-action">
+                <div>
+                  <strong>{compactRelationshipBlock.title}</strong>
+                  <span>{compactRelationshipBlock.copy}</span>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() =>
+                    onReviewRelationships?.(compactRelationshipBlock.requiredRelationships)
+                  }
+                >
+                  {RELATIONSHIP_REVIEW_ACTION_LABEL}
+                </button>
+              </div>
+            </div>
+          )}
+          {!compactRelationshipBlock && askFiltraQueriSuggestions.recommendedAnalysis.primary && (
             <div className="sql-recommended-analysis" aria-label="Recommended analysis">
               <div className="sql-helper-section-label">
                 <span>{askFiltraQueriSuggestions.recommendedAnalysis.title}</span>
@@ -1129,7 +1163,7 @@ function SqlEditorPanel({
               )}
               {askFiltraQueriSuggestions.adaptedTemplateEvidence.length > 0 && (
                 <div className="sql-recommended-analysis-alternatives" aria-label="Adapted template evidence">
-                  {askFiltraQueriSuggestions.adaptedTemplateEvidence.map((evidence) => {
+                  {askFiltraQueriSuggestions.adaptedTemplateEvidence.slice(0, 1).map((evidence) => {
                     const insertState = createSqlAskAdaptedTemplateInsertModel(evidence, {
                       activeSqlDraft: editor.value,
                       insertedAskRecommendationId,
@@ -1145,9 +1179,6 @@ function SqlEditorPanel({
                           <span>{evidence.statusLabel}</span>
                           <span>{evidence.previewOnlyCopy}</span>
                         </div>
-                        {evidence.expectedOutputColumns.length > 0 && (
-                          <p>Expected output: {evidence.expectedOutputColumns.join(", ")}</p>
-                        )}
                         <button
                           type="button"
                           className="secondary-button"
@@ -1184,11 +1215,7 @@ function SqlEditorPanel({
                     <p>{card.description}</p>
                     <div className="sql-adaptive-fit-meta">
                       <span>{card.statusLabel}</span>
-                      <span>{card.isPrimary ? "Primary recommendation" : "Alternative"}</span>
                     </div>
-                    {card.expectedOutput.length > 0 && (
-                      <p>Expected output: {card.expectedOutput.join(", ")}</p>
-                    )}
                     {card.requiredRelationships.length > 0 && (
                       <p>Review worksheet connections before inserting SQL.</p>
                     )}
@@ -1217,60 +1244,10 @@ function SqlEditorPanel({
                   </article>
                 );
               })}
-              {askFiltraQueriSuggestions.recommendedAnalysis.alternatives.length > 0 && (
-                <div className="sql-recommended-analysis-alternatives" aria-label="Alternative analysis options">
-                  {askFiltraQueriSuggestions.recommendedAnalysis.alternatives.map((card) => (
-                    <article className="sql-recommended-analysis-card" key={card.id}>
-                      <div className="sql-template-recommendation-title-row">
-                        <strong>{card.title}</strong>
-                        <span className={`sql-grounding-badge ${card.insertState === "blocked_relationships" ? "needs_review" : "supported"}`}>
-                          {card.fitLabel}
-                        </span>
-                      </div>
-                      <p>{card.description}</p>
-                      <div className="sql-adaptive-fit-meta">
-                        <span>{card.statusLabel}</span>
-                        <span>Alternative</span>
-                      </div>
-                      {card.expectedOutput.length > 0 && (
-                        <p>Expected output: {card.expectedOutput.join(", ")}</p>
-                      )}
-                      {card.requiredRelationships.length > 0 && (
-                        <p>Review worksheet connections before inserting SQL.</p>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              )}
-              {askFiltraQueriSuggestions.recommendedAnalysis.hiddenAlternatives.length > 0 && (
-                <details className="sql-more-analysis-options">
-                  <summary>
-                    More analysis options ({askFiltraQueriSuggestions.recommendedAnalysis.hiddenAlternatives.length})
-                  </summary>
-                  <div className="sql-more-analysis-options-list">
-                    {askFiltraQueriSuggestions.recommendedAnalysis.hiddenAlternatives.map((card) => (
-                      <article className="sql-recommended-analysis-card" key={card.id}>
-                        <div className="sql-template-recommendation-title-row">
-                          <strong>{card.title}</strong>
-                          <span className={`sql-grounding-badge ${card.insertState === "blocked_relationships" ? "needs_review" : "supported"}`}>
-                            {card.fitLabel}
-                          </span>
-                        </div>
-                        <p>{card.description}</p>
-                        {card.expectedOutput.length > 0 && (
-                          <p>Expected output: {card.expectedOutput.join(", ")}</p>
-                        )}
-                        {card.requiredRelationships.length > 0 && (
-                          <p>Review worksheet connections before inserting SQL.</p>
-                        )}
-                      </article>
-                    ))}
-                  </div>
-                </details>
-              )}
             </div>
           )}
-          {!askFiltraQueriSuggestions.recommendedAnalysis.primary &&
+          {!compactRelationshipBlock &&
+          !askFiltraQueriSuggestions.recommendedAnalysis.primary &&
           (askFiltraQueriSuggestions.blockedPlan || askFiltraQueriSuggestions.recommendations.length > 0) ? (
             <div className="sql-template-recommendation-list" aria-label="Recommended templates">
               <div className="sql-helper-section-label">
