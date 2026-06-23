@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "fixtures:sql": "node scripts/run-sql-fixtures.mjs",
     "governance:audit": "node scripts/audit-governance-boundaries.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
