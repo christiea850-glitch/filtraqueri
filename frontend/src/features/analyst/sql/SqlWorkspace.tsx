@@ -917,19 +917,12 @@ function SqlWorkspace({
       <div className="analyst-page-banner" aria-label="Analyst workspace introduction">
         <p className="section-label">Analyst workspace</p>
         <h2>Inspect SQL</h2>
-        <p>
-          Write, review, and run SQL safely from one focused workspace. Templates and Reports
-          for ready-made starting points - Run Query always stays manual.
-        </p>
+        <p>Write, review, and run SQL safely. Run Query stays manual.</p>
       </div>
 
       <header className="analyst-page-head" aria-label="Inspect SQL section heading">
-        <p className="section-label">Analyst - Inspect SQL</p>
-        <h2>Write and run SQL</h2>
-        <p>
-          The editor below targets the active worksheet. Browse Templates and Browse Reports for
-          ready-made starting points - they insert back here.
-        </p>
+        <p className="section-label">SQL workspace</p>
+        <p>The editor targets the active worksheet. Templates and Reports insert back here.</p>
       </header>
 
       <div className="sqlw-main">
