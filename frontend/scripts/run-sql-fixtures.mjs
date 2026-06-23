@@ -122,6 +122,11 @@ const fixtures = [
     exportName: "runLlmShadowPlanValidatorFixtures",
   },
   {
+    label: "LLM consent disclosure",
+    modulePath: "/src/features/analyst/llm/__tests__/llmConsentDisclosure.test.ts",
+    exportName: "runLlmConsentDisclosureFixtures",
+  },
+  {
     label: "Business intent grounding",
     modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
     exportName: "runBusinessIntentFixtures",
