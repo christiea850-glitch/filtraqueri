@@ -3706,6 +3706,61 @@
   padding: 0;
 }
 
+.sql-command-readiness {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, 100%);
+  color: #1e3a8a;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.sql-command-readiness-chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 5px 9px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 11.5px;
+  font-weight: 850;
+}
+
+.sql-command-readiness.has-warning {
+  align-items: flex-start;
+  color: #92400e;
+}
+
+.sql-command-readiness.has-warning .sql-command-readiness-chip {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.sql-command-readiness-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 160px;
+  max-width: 360px;
+  color: #92400e;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.sql-command-readiness-summary span {
+  overflow-wrap: anywhere;
+}
+
+.sql-command-readiness-summary ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 16px;
+}
+
 /* Give Monaco real height by trimming external gaps and growing the main
  * column to fill the available viewport. The schema rail now lines up
  * exactly with the editor block on the right. */

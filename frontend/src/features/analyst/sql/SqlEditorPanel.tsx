@@ -537,6 +537,13 @@ function SqlEditorPanel({
   ]
     .filter(Boolean)
     .join(" · ");
+  const readinessStatusLabel = !editor.value.trim()
+    ? "Write SQL first"
+    : readinessReport?.status === "ready"
+      ? "Ready to run"
+      : readinessReport?.status === "warning"
+        ? "Review before running"
+        : "Readiness note";
 
   const closeSourcePopover = (returnFocus = true) => {
     setIsSourcePopoverOpen(false);
@@ -1548,6 +1555,7 @@ function SqlEditorPanel({
               <span className="sql-dialect-selector-label">{SQL_DIALECT_SELECTOR_LABEL}</span>
               <select
                 value={dialectContext.selectedDialect}
+                title={SQL_DIALECT_EXECUTION_HELPER_TEXT}
                 onChange={(event) =>
                   dialectContext.onDialectChange(event.target.value as SqlDialectContext["selectedDialect"])
                 }
@@ -1559,7 +1567,6 @@ function SqlEditorPanel({
                   </option>
                 ))}
               </select>
-              <small>{SQL_DIALECT_EXECUTION_HELPER_TEXT}</small>
             </label>
             {draftConversionPreview && (
               <div
@@ -1580,6 +1587,33 @@ function SqlEditorPanel({
               </div>
             )}
           </div>
+          {readinessReport && (
+            <div
+              className={[
+                "sql-command-readiness",
+                readinessReport.status === "warning" ? "has-warning" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              role="status"
+              aria-live="polite"
+              title={readinessReport.summary}
+            >
+              <span className="sql-command-readiness-chip">{readinessStatusLabel}</span>
+              {readinessReport.status === "warning" && (
+                <div className="sql-command-readiness-summary">
+                  <span>{readinessReport.summary}</span>
+                  {readinessReport.issues.length > 0 && (
+                    <ul>
+                      {readinessReport.issues.slice(0, 2).map((issue) => (
+                        <li key={issue.id}>{issue.message}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
             Run query
           </button>
@@ -1610,38 +1644,6 @@ function SqlEditorPanel({
           aria-live="polite"
         >
           {dialectExecutionAdvisory}
-        </div>
-      )}
-
-      {readinessReport && (
-        <div
-          className={[
-            "sql-readiness-guard",
-            readinessReport.status === "warning" ? "has-warning" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          role="status"
-          aria-live="polite"
-        >
-          <div className="sql-readiness-guard-head">
-            <span>SQL readiness check</span>
-            <strong>
-              {readinessReport.status === "ready"
-                ? "Ready"
-                : readinessReport.status === "warning"
-                  ? "Review before running"
-                  : "Review note"}
-            </strong>
-          </div>
-          <p>{readinessReport.summary}</p>
-          {readinessReport.issues.length > 0 && (
-            <ul>
-              {readinessReport.issues.slice(0, 4).map((issue) => (
-                <li key={issue.id}>{issue.message}</li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
 
