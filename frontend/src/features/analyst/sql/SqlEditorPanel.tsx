@@ -1661,28 +1661,20 @@ function SqlEditorPanel({
       )}
 
       {planningDetailsAvailable && effectiveBusinessSqlRenderPreview && (
-        <section className="business-sql-preview-panel" aria-label="Planning status">
-          <div className="business-sql-preview-head">
-            <div>
-              <span>Planning status</span>
-              <strong>{planningStatusLabel}</strong>
-            </div>
-            <div className="business-sql-preview-badges" aria-label="Planning status metadata">
-              <em>
-                {effectiveBusinessSqlRenderPreview.status === "ready"
-                  ? "Ready"
-                  : effectiveBusinessSqlRenderPreview.status === "blocked"
-                    ? "Needs review"
-                    : "Review"}
-              </em>
-            </div>
+        <section className="business-sql-planning-status-row" aria-label="Planning status">
+          <div>
+            <strong>Planning details available</strong>
+            <span>{planningStatusLabel}</span>
           </div>
-          <p>
-            {effectiveBusinessSqlRenderPreview.status === "ready"
-              ? "FiltraQueri prepared SQL preview details for review."
-              : businessSqlPreviewVisibility.advancedDetailsCopy ||
-                "FiltraQueri has planning details ready for review."}
-          </p>
+          <div className="business-sql-preview-badges" aria-label="Planning status metadata">
+            <em>
+              {effectiveBusinessSqlRenderPreview.status === "ready"
+                ? "Ready"
+                : effectiveBusinessSqlRenderPreview.status === "blocked"
+                  ? "Needs review"
+                  : "Review"}
+            </em>
+          </div>
           <button
             type="button"
             className="secondary-button"
