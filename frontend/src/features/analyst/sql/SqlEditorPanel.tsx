@@ -1621,24 +1621,41 @@ function SqlEditorPanel({
               )}
             </div>
           )}
-          <button type="button" className="primary-button" onClick={editor.onRun} disabled={!canRunQuery}>
+          <button
+            type="button"
+            className="primary-button sql-command-action is-run-query"
+            onClick={editor.onRun}
+            disabled={!canRunQuery}
+          >
             Run query
           </button>
           <button
             type="button"
-            className="secondary-button"
+            className="secondary-button sql-command-action is-result-preview"
             onClick={onOpenResultPreview}
             disabled={!canOpenResultPreview}
           >
             Result Preview
           </button>
-          <button type="button" className="secondary-button" onClick={editor.onSaveDraft}>
+          <button
+            type="button"
+            className="secondary-button sql-command-action is-save-query"
+            onClick={editor.onSaveDraft}
+          >
             Save Query
           </button>
-          <button type="button" className="secondary-button" onClick={onOpenSavedDrafts}>
+          <button
+            type="button"
+            className="secondary-button sql-command-action is-saved-drafts"
+            onClick={onOpenSavedDrafts}
+          >
             Saved Drafts
           </button>
-          <button type="button" className="text-button" onClick={editor.onClear}>
+          <button
+            type="button"
+            className="text-button sql-command-action is-clear-query"
+            onClick={editor.onClear}
+          >
             Clear
           </button>
         </div>

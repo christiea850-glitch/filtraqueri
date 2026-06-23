@@ -1326,6 +1326,7 @@
 
 .sql-scope-recommendation-pill-list {
   display: inline-flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 5px;
   min-width: 0;
@@ -1355,6 +1356,13 @@
   font-style: normal;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.sql-scope-recommendation-compact em {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sql-scope-recommendation-actions {
@@ -2705,7 +2713,8 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .sql-source-popover {
@@ -3792,15 +3801,44 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  justify-content: flex-end;
   margin: 0;
   padding: 0;
+}
+
+.sql-command-bar .sql-dialect-control {
+  order: 10;
+}
+
+.sql-command-bar .sql-command-readiness {
+  order: 20;
+}
+
+.sql-command-action.is-run-query {
+  order: 30;
+}
+
+.sql-command-action.is-result-preview {
+  order: 40;
+}
+
+.sql-command-action.is-save-query {
+  order: 50;
+}
+
+.sql-command-action.is-saved-drafts {
+  order: 60;
+}
+
+.sql-command-action.is-clear-query {
+  order: 70;
 }
 
 .sql-command-readiness {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  max-width: min(520px, 100%);
+  max-width: min(420px, 100%);
   color: #1e3a8a;
   font-size: 12px;
   line-height: 1.35;
@@ -3833,8 +3871,8 @@
 .sql-command-readiness-summary {
   display: grid;
   gap: 3px;
-  min-width: 160px;
-  max-width: 360px;
+  min-width: 140px;
+  max-width: 280px;
   color: #92400e;
   font-size: 11.5px;
   line-height: 1.35;
@@ -3892,6 +3930,43 @@
   margin-bottom: 8px;
 }
 
+@media (max-width: 900px) {
+  .sql-source-scope-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sql-source-scope-items,
+  .sql-source-scope-actions {
+    width: 100%;
+  }
+
+  .sql-source-scope-actions {
+    justify-content: flex-start;
+  }
+
+  .sql-command-bar {
+    align-items: stretch;
+  }
+
+  .sql-command-bar .sql-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .sql-command-readiness {
+    max-width: min(360px, 100%);
+  }
+
+  .sql-command-readiness-summary {
+    max-width: 240px;
+  }
+
+  .business-sql-planning-status-row {
+    align-items: flex-start;
+  }
+}
+
 /* Mobile / narrow viewports: command bar wraps cleanly */
 @media (max-width: 760px) {
   .sql-command-bar {
@@ -3918,14 +3993,76 @@
     align-items: stretch;
   }
 
-  .sql-ask-bar .primary-button,
-  .business-sql-planning-status-row .secondary-button {
-    justify-self: flex-start;
+  .sql-ask-bar .primary-button {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .sql-scope-recommendation-compact {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sql-scope-recommendation-pill-list {
+    width: 100%;
+  }
+
+  .sql-scope-recommendation-pill {
+    max-width: min(220px, 100%);
+  }
+
+  .sql-source-scope-pill {
+    max-width: 100%;
+  }
+
+  .sql-source-scope-actions > button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+
+  .sql-command-bar .sql-dialect-control,
+  .sql-command-bar .sql-command-readiness {
+    flex: 1 1 100%;
+  }
+
+  .sql-command-bar .sql-command-readiness {
+    max-width: 100%;
+  }
+
+  .sql-command-readiness.has-warning {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .sql-command-readiness-summary {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .sql-command-action.is-run-query,
+  .sql-command-action.is-result-preview,
+  .sql-command-action.is-save-query,
+  .sql-command-action.is-saved-drafts {
+    flex: 1 1 140px;
+  }
+
+  .sql-command-action.is-clear-query {
+    flex: 0 1 auto;
   }
 
   .business-sql-planning-status-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .business-sql-planning-status-row > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .business-sql-planning-status-row .secondary-button {
+    width: 100%;
   }
 
   .sql-query-explanation-grid {
