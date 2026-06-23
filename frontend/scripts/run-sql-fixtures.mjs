@@ -27,6 +27,56 @@ const fixtures = [
     exportName: "runSqlTemplateRecommenderFixtures",
   },
   {
+    label: "Template runtime badges",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlTemplateRuntimeBadges.test.ts",
+    exportName: "runSqlTemplateRuntimeBadgeFixtures",
+  },
+  {
+    label: "Report runtime badges",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlReportRuntimeBadges.test.ts",
+    exportName: "runSqlReportRuntimeBadgeFixtures",
+  },
+  {
+    label: "Candidate grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlCandidateGrounding.test.ts",
+    exportName: "runSqlCandidateGroundingFixtures",
+  },
+  {
+    label: "Source line adapter",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlSourceLineAdapter.test.ts",
+    exportName: "runSqlSourceLineAdapterFixtures",
+  },
+  {
+    label: "Worksheet scope adapter",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlWorksheetScopeAdapter.test.ts",
+    exportName: "runSqlWorksheetScopeAdapterFixtures",
+  },
+  {
+    label: "Resolve SQL tab source context",
+    modulePath: "/src/features/analyst/sql/__tests__/resolveSqlTabSourceContext.test.ts",
+    exportName: "runResolveSqlTabSourceContextFixtures",
+  },
+  {
+    label: "Static SQL syntax diagnostics",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlStaticSyntaxDiagnostics.test.ts",
+    exportName: "runSqlStaticSyntaxDiagnosticFixtures",
+  },
+  {
+    label: "SQL error formatter",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlErrorFormatter.test.ts",
+    exportName: "runSqlErrorFormatterFixtures",
+  },
+  {
+    label: "Dialect execution guidance",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlDialectExecutionGuidance.test.ts",
+    exportName: "runDialectExecutionGuidanceFixtures",
+  },
+  {
+    label: "Dialect draft conversion",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlDialectDraftConversion.test.ts",
+    exportName: "runDialectDraftConversionFixtures",
+  },
+  {
     label: "Result labeling",
     modulePath: "/src/features/analyst/sql/__tests__/resultLabeling.test.ts",
     exportName: "runResultLabelingFixtures",
@@ -40,6 +90,56 @@ const fixtures = [
     label: "SQL result provenance",
     modulePath: "/src/features/analyst/sql/__tests__/sqlResultProvenance.test.ts",
     exportName: "runSqlResultProvenanceFixtures",
+  },
+  {
+    label: "SQL workspace preview result",
+    modulePath: "/src/features/analyst/sql/__tests__/useSqlWorkspacePreviewResult.test.ts",
+    exportName: "runSqlWorkspacePreviewFixtures",
+  },
+  {
+    label: "Business intent grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/businessIntentGrounding.test.ts",
+    exportName: "runBusinessIntentFixtures",
+  },
+  {
+    label: "Semantic hint registry",
+    modulePath: "/src/features/analyst/sql/__tests__/semanticHintRegistry.test.ts",
+    exportName: "runSemanticHintRegistryFixtures",
+  },
+  {
+    label: "Business SQL query plan",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlan.test.ts",
+    exportName: "runBusinessSqlQueryPlanFixtures",
+  },
+  {
+    label: "Business SQL query planner",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
+    exportName: "runBusinessSqlQueryPlannerFixtures",
+  },
+  {
+    label: "Business SQL render readiness",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderReadiness.test.ts",
+    exportName: "runBusinessSqlRenderReadinessFixtures",
+  },
+  {
+    label: "Business SQL renderer",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderer.test.ts",
+    exportName: "runBusinessSqlRendererFixtures",
+  },
+  {
+    label: "Business SQL render preview",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderPreview.test.ts",
+    exportName: "runBusinessSqlRenderPreviewFixtures",
+  },
+  {
+    label: "Business SQL render preview UI adapter",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderPreviewUiAdapter.test.ts",
+    exportName: "runBusinessSqlRenderPreviewUiAdapterFixtures",
+  },
+  {
+    label: "Business SQL join path resolver",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlJoinPathResolver.test.ts",
+    exportName: "runBusinessSqlJoinPathResolverFixtures",
   },
 ];
 
