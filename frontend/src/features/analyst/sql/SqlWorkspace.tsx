@@ -36,7 +36,7 @@ type SqlWorkspaceProps = {
   onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
 };
 
-type BottomTab = "guidance" | "relationships";
+type BottomTab = "guidance";
 type FocusedSqlView =
   | "editor"
   | "result"
@@ -48,10 +48,9 @@ type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts" | "context";
 
 const bottomTabLabels: Record<BottomTab, string> = {
   guidance: "SQL diagnostics",
-  relationships: "Worksheet relationships",
 };
 
-const bottomTabOrder: BottomTab[] = ["guidance", "relationships"];
+const bottomTabOrder: BottomTab[] = ["guidance"];
 
 const formatDraftTimestamp = (value: string) => {
   const date = new Date(value);
@@ -472,6 +471,39 @@ function SqlWorkspaceDetailPlaceholder({
   );
 }
 
+function SqlRelationshipReviewPage({
+  model,
+  onBack,
+}: {
+  model: SqlRelationshipReviewModel;
+  onBack: () => void;
+}) {
+  return (
+    <section className="sql-detail-placeholder-page" aria-label="Review worksheet connections">
+      <div className="sql-result-page-header">
+        <button type="button" className="secondary-button" onClick={onBack}>
+          â† Back to SQL workspace
+        </button>
+        <div>
+          <p className="section-label">Analyst SQL</p>
+          <h2>Review worksheet connections</h2>
+          <p>FiltraQueri found worksheets that may need to connect before SQL can be prepared safely.</p>
+          <p>Review only. Nothing here inserts SQL, runs a query, or changes worksheet connections.</p>
+        </div>
+      </div>
+      {model.pairs.length > 0 ? (
+        <SqlRelationshipReviewPanel model={model} />
+      ) : (
+        <div className="empty-state compact-empty">
+          <p className="section-label">Details</p>
+          <h2>Review worksheet connections</h2>
+          <p>No worksheets need connection review for this question.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SqlRelationshipReviewPanel({
   model,
 }: {
@@ -691,9 +723,9 @@ function SqlWorkspace({
     setFocusedView("editor");
   };
   const openRelationshipReview = (requiredRelationships: string[]) => {
-    setFocusedView("editor");
     setRelationshipReviewRequirements(requiredRelationships);
-    setBottomTab("relationships");
+    setBottomTab(null);
+    setFocusedView("relationship-review");
   };
 
   useEffect(() => {
@@ -813,9 +845,8 @@ function SqlWorkspace({
   if (focusedView === "relationship-review") {
     return (
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
-        <SqlWorkspaceDetailPlaceholder
-          title="Review worksheet connections"
-          emptyStateCopy="No worksheets need connection review for this question."
+        <SqlRelationshipReviewPage
+          model={relationshipReviewModel}
           onBack={() => setFocusedView("editor")}
         />
       </section>
@@ -969,9 +1000,6 @@ function SqlWorkspace({
                     dialectContext={{ selectedDialectProfile }}
                     validation={sqlAnalysis.validation}
                   />
-                )}
-                {bottomTab === "relationships" && (
-                  <SqlRelationshipReviewPanel model={relationshipReviewModel} />
                 )}
               </div>
             </section>
