@@ -161,3 +161,31 @@ export {
   requiresRareValueSuppression,
   resolveShadowValuePolicyForSensitivity,
 } from "./llmShadowDataPolicy";
+
+export type {
+  LlmShadowPlan,
+  LlmShadowPlanAssumption,
+  LlmShadowPlanConfidence,
+  LlmShadowPlanEntity,
+  LlmShadowPlanFilter,
+  LlmShadowPlanGrouping,
+  LlmShadowPlanIntent,
+  LlmShadowPlanMetric,
+  LlmShadowPlanRelationshipNeed,
+  LlmShadowPlanValidationResult,
+  LlmShadowPlanValidationStatus,
+  ShadowPlanAuditSummary,
+  ShadowPlanNoExecutionInvariants,
+  ShadowPlanPrivacyViolation,
+  ShadowPlanRelationshipViolation,
+  ShadowPlanSchemaReference,
+  ShadowPlanUnsupportedReason,
+} from "./llmShadowPlanValidator";
+export {
+  SHADOW_PLAN_NO_EXECUTION_INVARIANTS,
+  assertShadowPlanNoExecutionInvariants,
+  createBlockedLlmShadowPlanValidationResult,
+  createEmptyLlmShadowPlanValidationResult,
+  hasShadowPlanBlockingViolations,
+  isLlmShadowPlanAdvisoryOnly,
+} from "./llmShadowPlanValidator";
