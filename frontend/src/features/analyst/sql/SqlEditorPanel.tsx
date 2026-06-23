@@ -829,6 +829,18 @@ function SqlEditorPanel({
           requiredRelationships: askFiltraQueriSuggestions.blockedPlan.missingRelationships,
         }
       : null;
+  const compactRelevantWorksheets = askFiltraQueriSuggestions.scopeRecommendations.slice(0, 3);
+  const compactRelevantWorksheetHintColumns = Array.from(
+    new Set(
+      compactRelevantWorksheets.flatMap((recommendation) =>
+        recommendation.matchedColumns,
+      ),
+    ),
+  ).slice(0, 3);
+  const compactRelevantWorksheetCountLabel =
+    askFiltraQueriSuggestions.scopeRecommendations.length === 1
+      ? "1 worksheet"
+      : `${askFiltraQueriSuggestions.scopeRecommendations.length} worksheets`;
   const insertRecommendedAnalysisCard = (
     card: NonNullable<typeof askFiltraQueriSuggestions.recommendedAnalysis.primary>,
   ) => {
@@ -1105,27 +1117,22 @@ function SqlEditorPanel({
           </div>
           {askFiltraQueriSuggestions.scopeRecommendations.length > 0 && (
             <div className="sql-scope-recommendation-list" aria-label="Relevant worksheets">
-              <div className="sql-helper-section-label">
-                <span>Relevant worksheets</span>
-                <small>{askFiltraQueriSuggestions.scopeRecommendations.length}</small>
-              </div>
-              <div className="sql-scope-recommendation-grid">
-                {askFiltraQueriSuggestions.scopeRecommendations.slice(0, 3).map((recommendation) => (
-                  <article className="sql-scope-recommendation-card" key={recommendation.worksheetId}>
-                    <div>
-                      <strong>{recommendation.worksheetName}</strong>
-                      <span>{recommendation.tableName}</span>
-                    </div>
-                    <div className="sql-scope-recommendation-meta">
-                      <em>{recommendation.confidence}</em>
-                      <span>{recommendation.rowCount.toLocaleString()} rows</span>
-                      <span>{recommendation.columnCount.toLocaleString()} columns</span>
-                    </div>
-                    {recommendation.matchedColumns.length > 0 && (
-                      <p>Columns: {recommendation.matchedColumns.join(", ")}</p>
-                    )}
-                  </article>
-                ))}
+              <div className="sql-scope-recommendation-compact">
+                <span className="sql-scope-recommendation-compact-label">Worksheets:</span>
+                <div className="sql-scope-recommendation-pill-list">
+                  {compactRelevantWorksheets.map((recommendation) => (
+                    <span
+                      className="sql-scope-recommendation-pill"
+                      key={recommendation.worksheetId}
+                    >
+                      {recommendation.worksheetName}
+                    </span>
+                  ))}
+                </div>
+                <small>{compactRelevantWorksheetCountLabel}</small>
+                {compactRelevantWorksheetHintColumns.length > 0 && (
+                  <em>Includes: {compactRelevantWorksheetHintColumns.join(", ")}</em>
+                )}
               </div>
             </div>
           )}
