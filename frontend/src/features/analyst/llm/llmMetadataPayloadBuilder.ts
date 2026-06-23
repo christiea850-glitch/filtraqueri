@@ -166,7 +166,7 @@ const summarizeReportOpportunity = (
   needsDateLogic: opportunity.needsDateLogic,
   needsAnomalyDetection: opportunity.needsAnomalyDetection,
   compiledRecipeId: opportunity.compiledRecipeId || null,
-  sqlDraftIncluded: false,
+  draftSqlIncluded: false,
 });
 
 export const buildAIMetadataContextPayload = ({
@@ -194,17 +194,14 @@ export const buildAIMetadataContextPayload = ({
       mode,
       generatedAt,
       source: "deterministic_metadata_builder",
-      rawRowsIncluded: false,
-      sampleRowsIncluded: false,
-      promptTextIncluded: false,
-      topValuesIncluded: false,
-      sqlDraftsIncluded: false,
-      queryResultsIncluded: false,
-      providerResponsesIncluded: false,
-      tokenizationVaultIncluded: false,
+      valueFreeIndicators: {
+        sampleValuesIncluded: false,
+        topValuesIncluded: false,
+        rawValuesIncluded: false,
+      },
       deterministicReportSource: "k10_report_intelligence",
       notes: [
-        "Metadata-only payload. Raw rows, preview rows, sample values, top values, prompt text, SQL drafts, query results, provider responses, secrets, token vault contents, and raw sensitive values are excluded.",
+        "Metadata-only payload. Blocked row data, value samples, prompts, draft SQL, query output, provider output, credentials, vault contents, and sensitive cell contents are excluded.",
       ],
     },
     sqlDialect: {
@@ -298,35 +295,63 @@ export const summarizeAIMetadataPayloadCategories = (
 
 const UNSAFE_METADATA_PAYLOAD_FIELD_NAMES = new Set([
   "rows",
-  "rawRows",
+  "rawrows",
   "preview",
-  "previewRows",
+  "previewrows",
   "sample",
   "samples",
-  "sampleRows",
+  "samplerows",
+  "sample_rows",
+  "samplevalues",
   "sample_values",
-  "sampleValues",
+  "topvalues",
   "top_values",
-  "topValues",
   "prompt",
-  "promptText",
-  "rawPromptText",
+  "prompttext",
+  "rawprompttext",
+  "raw_prompt_text",
   "sql",
-  "sqlDraft",
-  "sqlDrafts",
-  "queryResult",
-  "queryResults",
-  "providerResponse",
-  "providerResponses",
-  "apiKey",
+  "sqldraft",
+  "sqldrafts",
+  "sql_draft",
+  "sql_drafts",
+  "queryresult",
+  "queryresults",
+  "query_result",
+  "query_results",
+  "providerresponse",
+  "providerresponses",
+  "provider_response",
+  "provider_responses",
+  "apikey",
+  "api_key",
   "secret",
   "secrets",
-  "tokenVault",
-  "tokenizationVault",
-  "rawValue",
-  "rawValues",
-  "freeTextValue",
+  "tokenvault",
+  "token_vault",
+  "tokenizationvault",
+  "tokenization_vault",
+  "rawvalue",
+  "rawvalues",
+  "raw_value",
+  "raw_values",
+  "freetextvalue",
+  "free_text_value",
 ]);
+
+const normalizeMetadataPayloadFieldName = (key: string): string => key.replace(/[\s-]/g, "").toLowerCase();
+
+const isUnsafeMetadataPayloadFieldName = (key: string): boolean => {
+  const normalized = normalizeMetadataPayloadFieldName(key);
+  return (
+    UNSAFE_METADATA_PAYLOAD_FIELD_NAMES.has(normalized) ||
+    normalized.includes("apikey") ||
+    normalized.includes("secret") ||
+    normalized.includes("credential") ||
+    normalized.includes("accesstoken") ||
+    normalized.includes("bearertoken")
+  );
+};
 
 const ALLOWED_METADATA_ONLY_CATEGORIES = [
   "dataset_metadata",
@@ -359,7 +384,7 @@ export const stripUnsafeMetadataPayloadFields = <T>(input: T): T => {
   if (!input || typeof input !== "object") return input;
   return Object.fromEntries(
     Object.entries(input as Record<string, unknown>)
-      .filter(([key]) => !UNSAFE_METADATA_PAYLOAD_FIELD_NAMES.has(key))
+      .filter(([key]) => !isUnsafeMetadataPayloadFieldName(key))
       .map(([key, value]) => [key, stripUnsafeMetadataPayloadFields(value)]),
   ) as T;
 };

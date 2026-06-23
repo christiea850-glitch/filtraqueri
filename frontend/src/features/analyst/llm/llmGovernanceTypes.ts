@@ -13,14 +13,11 @@ export type AIPayloadProvenance = {
   mode: AIMode;
   generatedAt: string;
   source: "deterministic_metadata_builder";
-  rawRowsIncluded: false;
-  sampleRowsIncluded: false;
-  promptTextIncluded: false;
-  topValuesIncluded: false;
-  sqlDraftsIncluded: false;
-  queryResultsIncluded: false;
-  providerResponsesIncluded: false;
-  tokenizationVaultIncluded: false;
+  valueFreeIndicators: {
+    sampleValuesIncluded: false;
+    topValuesIncluded: false;
+    rawValuesIncluded: false;
+  };
   deterministicReportSource: "k10_report_intelligence";
   notes: string[];
 };
@@ -169,7 +166,7 @@ export type AIDeterministicReportOpportunitySummary = {
   needsDateLogic: boolean;
   needsAnomalyDetection: boolean;
   compiledRecipeId: string | null;
-  sqlDraftIncluded: false;
+  draftSqlIncluded: false;
 };
 
 export type AIDatasetWorkbookSummary = {
