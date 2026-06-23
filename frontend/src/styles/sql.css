@@ -2596,6 +2596,67 @@
   outline-offset: 2px;
 }
 
+.sql-source-scope-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+}
+
+.sql-source-scope-items {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sql-source-scope-pill {
+  display: inline-flex;
+  align-items: center;
+  max-width: 340px;
+  min-width: 0;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sql-source-scope-pill strong {
+  flex: 0 0 auto;
+  color: #334155;
+  font-weight: 850;
+}
+
+.sql-source-scope-pill.is-warning {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.sql-source-scope-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
 .sql-source-popover {
   position: absolute;
   z-index: 20;
@@ -2609,6 +2670,11 @@
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+}
+
+.sql-command-bar .sql-source-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 .sql-source-popover-head {

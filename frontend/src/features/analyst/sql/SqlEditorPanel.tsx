@@ -530,6 +530,13 @@ function SqlEditorPanel({
       sqlTabs.selectedScopeSelections,
     ],
   );
+  const scopeSummaryLabel = appliedScopeSummary || "Workbook default";
+  const sourceSummaryLabel = [
+    activeSourceLabel || activeSourceTableLabel || "Active source",
+    activeSourceKindLabel || "Original",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const closeSourcePopover = (returnFocus = true) => {
     setIsSourcePopoverOpen(false);
@@ -1348,12 +1355,31 @@ function SqlEditorPanel({
         </section>
       )}
 
-      <div className="sql-tab-task-scope" aria-label="This tab's task scope">
-        <div className="sql-tab-task-scope-head">
-          <div>
-            <span>This tab's task scope</span>
-            <strong>{sqlTabs.activeTabTitle || "Active SQL tab"}</strong>
-          </div>
+      <div className="sql-source-scope-strip" aria-label="Worksheet source and scope">
+        <div className="sql-source-scope-items" aria-label="Active worksheet context">
+          <span className="sql-source-scope-pill">
+            <strong>Scope:</strong> {scopeSummaryLabel}
+          </span>
+          <span className="sql-source-scope-pill">
+            <strong>Source:</strong> {sourceSummaryLabel}
+          </span>
+          {selectedTemplateLabel && (
+            <span className="sql-source-scope-pill">
+              <strong>Template:</strong> {selectedTemplateLabel}
+            </span>
+          )}
+          {hasUnappliedSelection && (
+            <span className="sql-source-scope-pill is-warning">
+              {selectedScopeCount} selected, not applied
+            </span>
+          )}
+          {sourceMismatchWarning && (
+            <span className="sql-source-scope-pill is-warning">
+              {sourceMismatchWarning}
+            </span>
+          )}
+        </div>
+        <div className="sql-source-scope-actions">
           {worksheetScope.options.length > 0 && (
             <button
               ref={scopeTriggerRef}
@@ -1366,26 +1392,25 @@ function SqlEditorPanel({
                 isScopePopoverOpen ? closeScopePopover(false) : openScopePopover()
               }
             >
-              Manage worksheet scope
+              Manage scope
+            </button>
+          )}
+          {onOpenSqlSourceTab && sourceLine.options.length > 0 && (
+            <button
+              ref={sourceTriggerRef}
+              type="button"
+              className="sql-source-line-button"
+              aria-label="Change source for this tab"
+              aria-expanded={isSourcePopoverOpen}
+              aria-controls="sql-source-popover"
+              onClick={() =>
+                isSourcePopoverOpen ? closeSourcePopover(false) : openSourcePopover()
+              }
+            >
+              Change source
             </button>
           )}
         </div>
-        <p>
-          {appliedScopeSummary
-            ? `This tab uses: ${appliedScopeSummary}`
-            : sourceLine.emptyScopeCopy}
-        </p>
-        <div className="sql-tab-task-scope-meta" aria-label="Active tab scope status">
-          <span>{sourceLine.scopeChipLabel}</span>
-          {hasUnappliedSelection && (
-            <span>{selectedScopeCount} selected, not applied</span>
-          )}
-          {selectedTemplateLabel && <span>Template: {selectedTemplateLabel}</span>}
-        </div>
-        <small>
-          Each SQL tab keeps its own worksheets, template, and SQL draft. You do not need to
-          remove worksheets from another tab.
-        </small>
         {isScopePopoverOpen && (
           <div
             id="sql-worksheet-scope-popover"
@@ -1457,24 +1482,6 @@ function SqlEditorPanel({
       </div>
 
       <div className="sql-editor-toolbar sql-command-bar">
-        <div className="sql-command-bar-lead">
-          <div className="sql-source-line">
-            <span>{sourceLine.text}</span>
-            {onOpenSqlSourceTab && sourceLine.options.length > 0 && (
-              <button
-                ref={sourceTriggerRef}
-                type="button"
-                className="sql-source-line-button"
-                aria-label="Change source for this tab"
-                aria-expanded={isSourcePopoverOpen}
-                aria-controls="sql-source-popover"
-                onClick={() =>
-                  isSourcePopoverOpen ? closeSourcePopover(false) : openSourcePopover()
-                }
-              >
-                Change source
-              </button>
-            )}
             {isSourcePopoverOpen && (
               <div
                 id="sql-source-popover"
@@ -1535,8 +1542,6 @@ function SqlEditorPanel({
                 </div>
               </div>
             )}
-          </div>
-        </div>
         <div className="sql-actions">
           <div className="sql-dialect-control">
             <label className="sql-dialect-selector">
@@ -1597,17 +1602,6 @@ function SqlEditorPanel({
           </button>
         </div>
       </div>
-
-      {sourceMismatchWarning && (
-        <div
-          className="sql-source-mismatch-warning"
-          role="status"
-          aria-live="polite"
-        >
-          <strong>Tab source differs from executable source.</strong>
-          <span>{sourceMismatchWarning}</span>
-        </div>
-      )}
 
       {dialectExecutionAdvisory && (
         <div
