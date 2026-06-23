@@ -640,7 +640,7 @@ function SqlWorkspace({
   const activeSourceLabel = dataset ? activeTabSourceContext.sourceLabel : null;
   // Separate workbook badge label for the command bar - mirrors the routing
   // mockup's "Property Management Company.xlsx" pill next to the violet
-  // "Active Â· {worksheet}" pill.
+  // "Active {worksheet}" pill.
   const workbookLabel = dataset?.original_filename || null;
   const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
   const selectedTabScopeSummary = formatSqlTabScopeSummary(

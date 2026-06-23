@@ -1067,7 +1067,7 @@ function SqlEditorPanel({
               askFiltraQueriForPreview();
             }
           }}
-          placeholder="Describe the analysis you want, like “Count leases by status”"
+          placeholder="Describe the analysis you want, like Count leases by status"
           aria-label="Ask FiltraQueri"
         />
         <button
