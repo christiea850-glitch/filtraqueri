@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
@@ -98,6 +98,17 @@ type SqlEditorPanelProps = {
   businessSqlRenderPreview?: BusinessSqlRenderPreview;
   dataset?: DatasetMetadata | null;
   onReviewRelationships?: (requiredRelationships: string[]) => void;
+  planningDetailMode?: boolean;
+  onOpenPlanningDetails?: () => void;
+  onBackFromPlanningDetails?: () => void;
+  businessSqlPreviewFeedback: BusinessSqlPreviewFeedback;
+  onBusinessSqlPreviewFeedbackChange: (feedback: BusinessSqlPreviewFeedback) => void;
+  businessSqlCandidatePreview: BusinessSqlRenderPreview | null;
+  onBusinessSqlCandidatePreviewChange: (preview: BusinessSqlRenderPreview | null) => void;
+  hasBusinessSqlPreviewAttempt: boolean;
+  onHasBusinessSqlPreviewAttemptChange: (hasAttempt: boolean) => void;
+  insertedAskRecommendationId: string | null;
+  onInsertedAskRecommendationIdChange: (recommendationId: string | null) => void;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -109,7 +120,7 @@ const statusLabels: Record<SqlExecutionStatus, string> = {
   error: "Query failed",
 };
 
-type BusinessSqlPreviewFeedback = "idle" | "copied" | "copy_failed" | "inserted";
+export type BusinessSqlPreviewFeedback = "idle" | "copied" | "copy_failed" | "inserted";
 
 const renderAdaptiveProposalValues = (values: readonly string[], fallback: string) =>
   values.length > 0 ? values.slice(0, 6).join(", ") : fallback;
@@ -333,6 +344,17 @@ function SqlEditorPanel({
   businessSqlRenderPreview,
   dataset,
   onReviewRelationships,
+  planningDetailMode = false,
+  onOpenPlanningDetails,
+  onBackFromPlanningDetails,
+  businessSqlPreviewFeedback,
+  onBusinessSqlPreviewFeedbackChange,
+  businessSqlCandidatePreview,
+  onBusinessSqlCandidatePreviewChange,
+  hasBusinessSqlPreviewAttempt,
+  onHasBusinessSqlPreviewAttemptChange,
+  insertedAskRecommendationId,
+  onInsertedAskRecommendationIdChange,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -343,12 +365,6 @@ function SqlEditorPanel({
   const draftConversionPreview = dialectContext.draftConversionPreview?.canConvert
     ? dialectContext.draftConversionPreview
     : null;
-  const [businessSqlPreviewFeedback, setBusinessSqlPreviewFeedback] =
-    useState<BusinessSqlPreviewFeedback>("idle");
-  const [businessSqlCandidatePreview, setBusinessSqlCandidatePreview] =
-    useState<BusinessSqlRenderPreview | null>(null);
-  const [hasBusinessSqlPreviewAttempt, setHasBusinessSqlPreviewAttempt] = useState(false);
-  const [insertedAskRecommendationId, setInsertedAskRecommendationId] = useState<string | null>(null);
   const [isSourcePopoverOpen, setIsSourcePopoverOpen] = useState(false);
   const [pendingSourceOptionId, setPendingSourceOptionId] = useState<string | null>(null);
   const [isScopePopoverOpen, setIsScopePopoverOpen] = useState(false);
@@ -529,11 +545,15 @@ function SqlEditorPanel({
   };
 
   useEffect(() => {
-    setBusinessSqlPreviewFeedback("idle");
-  }, [effectiveBusinessSqlRenderPreview?.planId, effectiveBusinessSqlRenderPreview?.sql]);
+    onBusinessSqlPreviewFeedbackChange("idle");
+  }, [
+    effectiveBusinessSqlRenderPreview?.planId,
+    effectiveBusinessSqlRenderPreview?.sql,
+    onBusinessSqlPreviewFeedbackChange,
+  ]);
 
   useEffect(() => {
-    setBusinessSqlCandidatePreview(null);
+    onBusinessSqlCandidatePreviewChange(null);
   }, [
     businessSqlRenderPreview?.planId,
     businessSqlRenderPreview?.sql,
@@ -541,29 +561,30 @@ function SqlEditorPanel({
     dialectContext.selectedDialect,
     sqlTabs.taskPrompt,
     editor.value,
+    onBusinessSqlCandidatePreviewChange,
   ]);
 
   useEffect(() => {
     if (!sqlTabs.taskPrompt.trim()) {
-      setHasBusinessSqlPreviewAttempt(false);
+      onHasBusinessSqlPreviewAttemptChange(false);
     }
-  }, [sqlTabs.taskPrompt]);
+  }, [onHasBusinessSqlPreviewAttemptChange, sqlTabs.taskPrompt]);
 
   useEffect(() => {
     if (!editor.value.trim()) {
-      setInsertedAskRecommendationId(null);
+      onInsertedAskRecommendationIdChange(null);
     }
-  }, [editor.value]);
+  }, [editor.value, onInsertedAskRecommendationIdChange]);
 
   useEffect(() => {
     if (businessSqlPreviewFeedback === "idle") return undefined;
 
     const feedbackTimeout = window.setTimeout(() => {
-      setBusinessSqlPreviewFeedback("idle");
+      onBusinessSqlPreviewFeedbackChange("idle");
     }, 1600);
 
     return () => window.clearTimeout(feedbackTimeout);
-  }, [businessSqlPreviewFeedback]);
+  }, [businessSqlPreviewFeedback, onBusinessSqlPreviewFeedbackChange]);
 
   useEffect(() => {
     if (!isSourcePopoverOpen) return undefined;
@@ -622,9 +643,9 @@ function SqlEditorPanel({
 
     try {
       await navigator.clipboard.writeText(businessSqlPreviewCopyState.sql);
-      setBusinessSqlPreviewFeedback("copied");
+      onBusinessSqlPreviewFeedbackChange("copied");
     } catch {
-      setBusinessSqlPreviewFeedback("copy_failed");
+      onBusinessSqlPreviewFeedbackChange("copy_failed");
     }
   };
 
@@ -639,7 +660,7 @@ function SqlEditorPanel({
     if (!insertResult.inserted) return;
 
     editor.onChange(insertResult.activeSqlDraft);
-    setBusinessSqlPreviewFeedback("inserted");
+    onBusinessSqlPreviewFeedbackChange("inserted");
   };
   const businessSqlInsertButtonLabel =
     businessSqlPreviewFeedback === "inserted"
@@ -667,7 +688,7 @@ function SqlEditorPanel({
 
     if (!handoff.preview) return;
 
-    setBusinessSqlCandidatePreview(handoff.preview);
+    onBusinessSqlCandidatePreviewChange(handoff.preview);
   };
   const openSourcePopover = () => {
     setIsScopePopoverOpen(false);
@@ -715,7 +736,7 @@ function SqlEditorPanel({
   };
   const askFiltraQueriForPreview = () => {
     if (!askFiltraQueri.canSubmit) return;
-    setHasBusinessSqlPreviewAttempt(true);
+    onHasBusinessSqlPreviewAttemptChange(true);
   };
   const insertAnalyticalStrategy = (
     strategy: typeof askFiltraQueriSuggestions.analyticalStrategies[number],
@@ -732,7 +753,7 @@ function SqlEditorPanel({
       label: strategy.title,
       createdFrom: "template",
     });
-    setInsertedAskRecommendationId(recommendationId);
+    onInsertedAskRecommendationIdChange(recommendationId);
   };
 
   const insertAskRecommendation = (
@@ -749,7 +770,7 @@ function SqlEditorPanel({
       label: recommendation.title,
       createdFrom: recommendation.kind,
     });
-    setInsertedAskRecommendationId(recommendation.id);
+    onInsertedAskRecommendationIdChange(recommendation.id);
   };
   const insertAdaptedTemplateEvidence = (
     evidence: typeof askFiltraQueriSuggestions.adaptedTemplateEvidence[number],
@@ -765,7 +786,7 @@ function SqlEditorPanel({
       label: evidence.title,
       createdFrom: "template",
     });
-    setInsertedAskRecommendationId(evidence.id);
+    onInsertedAskRecommendationIdChange(evidence.id);
   };
   const relationshipReviewRelationships =
     askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction?.requiredRelationships ||
@@ -797,7 +818,11 @@ function SqlEditorPanel({
       if (recommendation) insertAskRecommendation(recommendation);
     }
   };
-  const businessSqlPreviewPanel = effectiveBusinessSqlRenderPreview ? (
+  const renderBusinessSqlPreviewPanel = ({
+    includePreviewActions,
+  }: {
+    includePreviewActions: boolean;
+  }) => effectiveBusinessSqlRenderPreview ? (
     <section
       className={[
         "business-sql-preview-panel",
@@ -875,39 +900,43 @@ function SqlEditorPanel({
         </div>
       )}
 
-      <div className="business-sql-preview-actions" aria-label="Preview actions">
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={copyBusinessSqlPreview}
-          disabled={!businessSqlPreviewCopyState?.canCopySql}
-          title={businessSqlPreviewCopyState?.disabledReason || "Copy preview SQL"}
-        >
-          {businessSqlPreviewFeedback === "copied" ? "Copied" : "Copy SQL"}
-        </button>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={insertBusinessSqlPreview}
-          disabled={!businessSqlPreviewInsertState?.canManuallyInsertSqlPreview}
-          title={businessSqlPreviewInsertState?.disabledReason || "Insert preview SQL into the empty editor"}
-        >
-          {businessSqlInsertButtonLabel}
-        </button>
-        <button type="button" className="secondary-button" disabled>
-          Run preview disabled
-        </button>
-      </div>
-      <p className="business-sql-preview-action-note">{businessSqlPreviewActionHelper}</p>
-      {businessSqlPreviewFeedback === "copy_failed" && (
-        <p className="business-sql-preview-feedback" role="status">
-          Copy failed. Select the preview SQL and copy it manually.
-        </p>
-      )}
-      {businessSqlPreviewFeedback === "inserted" && (
-        <p className="business-sql-preview-feedback" role="status">
-          Inserted into editor. Review the SQL before running it manually.
-        </p>
+      {includePreviewActions && (
+        <>
+          <div className="business-sql-preview-actions" aria-label="Preview actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={copyBusinessSqlPreview}
+              disabled={!businessSqlPreviewCopyState?.canCopySql}
+              title={businessSqlPreviewCopyState?.disabledReason || "Copy preview SQL"}
+            >
+              {businessSqlPreviewFeedback === "copied" ? "Copied" : "Copy SQL"}
+            </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={insertBusinessSqlPreview}
+              disabled={!businessSqlPreviewInsertState?.canManuallyInsertSqlPreview}
+              title={businessSqlPreviewInsertState?.disabledReason || "Insert preview SQL into the empty editor"}
+            >
+              {businessSqlInsertButtonLabel}
+            </button>
+            <button type="button" className="secondary-button" disabled>
+              Run preview disabled
+            </button>
+          </div>
+          <p className="business-sql-preview-action-note">{businessSqlPreviewActionHelper}</p>
+          {businessSqlPreviewFeedback === "copy_failed" && (
+            <p className="business-sql-preview-feedback" role="status">
+              Copy failed. Select the preview SQL and copy it manually.
+            </p>
+          )}
+          {businessSqlPreviewFeedback === "inserted" && (
+            <p className="business-sql-preview-feedback" role="status">
+              Inserted into editor. Review the SQL before running it manually.
+            </p>
+          )}
+        </>
       )}
       <BusinessSqlAdaptiveProposalSection
         consentDisclosure={businessSqlAdaptiveProposalDisclosure}
@@ -917,6 +946,48 @@ function SqlEditorPanel({
       />
     </section>
   ) : null;
+  const businessSqlPreviewPanel = renderBusinessSqlPreviewPanel({
+    includePreviewActions: !planningDetailMode,
+  });
+  const planningDetailsAvailable =
+    Boolean(effectiveBusinessSqlRenderPreview) &&
+    (businessSqlPreviewVisibility.shouldShowDefaultPreviewPanel ||
+      businessSqlPreviewVisibility.shouldShowAdvancedPlanningDetails);
+  const planningStatusLabel =
+    effectiveBusinessSqlRenderPreview?.status === "ready"
+      ? "Preview ready"
+      : effectiveBusinessSqlRenderPreview?.status === "blocked"
+        ? "Needs review"
+        : "Planning details";
+
+  if (planningDetailMode) {
+    return (
+      <section className="sql-detail-placeholder-page" aria-label="Planning details">
+        <div className="sql-result-page-header">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onBackFromPlanningDetails}
+          >
+            {"\u2190 Back to SQL workspace"}
+          </button>
+          <div>
+            <p className="section-label">Analyst SQL</p>
+            <h2>Planning details</h2>
+            <p>Review how FiltraQueri interpreted the question before preparing SQL.</p>
+            <p>Read-only view. Nothing here runs SQL or changes the SQL editor.</p>
+          </div>
+        </div>
+        {businessSqlPreviewPanel || (
+          <div className="empty-state compact-empty">
+            <p className="section-label">Details</p>
+            <h2>Planning details</h2>
+            <p>No planning details yet. Ask FiltraQueri a question to generate a plan.</p>
+          </div>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="sql-editor-panel" aria-label="SQL editor">
@@ -1609,14 +1680,37 @@ function SqlEditorPanel({
         </p>
       )}
 
-      {businessSqlPreviewVisibility.shouldShowDefaultPreviewPanel && businessSqlPreviewPanel}
-
-      {businessSqlPreviewVisibility.shouldShowAdvancedPlanningDetails && businessSqlPreviewPanel && (
-        <details className="business-sql-advanced-details">
-          <summary>{businessSqlPreviewVisibility.advancedDetailsLabel}</summary>
-          <p>{businessSqlPreviewVisibility.advancedDetailsCopy}</p>
-          {businessSqlPreviewPanel}
-        </details>
+      {planningDetailsAvailable && effectiveBusinessSqlRenderPreview && (
+        <section className="business-sql-preview-panel" aria-label="Planning status">
+          <div className="business-sql-preview-head">
+            <div>
+              <span>Planning status</span>
+              <strong>{planningStatusLabel}</strong>
+            </div>
+            <div className="business-sql-preview-badges" aria-label="Planning status metadata">
+              <em>
+                {effectiveBusinessSqlRenderPreview.status === "ready"
+                  ? "Ready"
+                  : effectiveBusinessSqlRenderPreview.status === "blocked"
+                    ? "Needs review"
+                    : "Review"}
+              </em>
+            </div>
+          </div>
+          <p>
+            {effectiveBusinessSqlRenderPreview.status === "ready"
+              ? "FiltraQueri prepared SQL preview details for review."
+              : businessSqlPreviewVisibility.advancedDetailsCopy ||
+                "FiltraQueri has planning details ready for review."}
+          </p>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onOpenPlanningDetails}
+          >
+            View planning details
+          </button>
+        </section>
       )}
 
       <SqlEditorHost

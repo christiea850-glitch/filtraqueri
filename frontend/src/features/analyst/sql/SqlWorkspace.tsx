@@ -10,8 +10,12 @@ import DataTable, {
 } from "../../../components/common/DataTable";
 import WorkbookContextPanel from "../../../components/workbook/WorkbookContextPanel";
 import type { SqlAssistantMode } from "./SqlAssistantPanel";
-import SqlEditorPanel, { SqlGuidancePanel } from "./SqlEditorPanel";
+import SqlEditorPanel, {
+  SqlGuidancePanel,
+  type BusinessSqlPreviewFeedback,
+} from "./SqlEditorPanel";
 import SqlSchemaPanel from "./SqlSchemaPanel";
+import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 import { frameResultValue, labelResultColumns } from "./resultLabeling";
@@ -441,7 +445,7 @@ function DraftDetailPage({
   );
 }
 
-function SqlWorkspaceDetailPlaceholder({
+export function SqlWorkspaceDetailPlaceholder({
   title,
   emptyStateCopy,
   onBack,
@@ -454,7 +458,7 @@ function SqlWorkspaceDetailPlaceholder({
     <section className="sql-detail-placeholder-page" aria-label={title}>
       <div className="sql-result-page-header">
         <button type="button" className="secondary-button" onClick={onBack}>
-          ← Back to SQL workspace
+          {"\u2190 Back to SQL workspace"}
         </button>
         <div>
           <p className="section-label">Analyst SQL</p>
@@ -482,7 +486,7 @@ function SqlRelationshipReviewPage({
     <section className="sql-detail-placeholder-page" aria-label="Review worksheet connections">
       <div className="sql-result-page-header">
         <button type="button" className="secondary-button" onClick={onBack}>
-          â† Back to SQL workspace
+          {"\u2190 Back to SQL workspace"}
         </button>
         <div>
           <p className="section-label">Analyst SQL</p>
@@ -546,7 +550,7 @@ function SqlRelationshipReviewPanel({
             <article className="sql-relationship-review-card" key={pair.id}>
               <div className="sql-relationship-review-card-head">
                 <strong>
-                  {friendlyWorksheetLabel(pair.fromWorksheet)} ↔ {friendlyWorksheetLabel(pair.toWorksheet)}
+                  {friendlyWorksheetLabel(pair.fromWorksheet)} {"\u2194"} {friendlyWorksheetLabel(pair.toWorksheet)}
                 </strong>
                 <span className={`sql-grounding-badge ${pair.status === "accepted" ? "supported" : "needs_review"}`}>
                   {pair.statusLabel}
@@ -596,6 +600,12 @@ function SqlWorkspace({
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
   const [relationshipReviewRequirements, setRelationshipReviewRequirements] = useState<string[]>([]);
+  const [businessSqlPreviewFeedback, setBusinessSqlPreviewFeedback] =
+    useState<BusinessSqlPreviewFeedback>("idle");
+  const [businessSqlCandidatePreview, setBusinessSqlCandidatePreview] =
+    useState<BusinessSqlRenderPreview | null>(null);
+  const [hasBusinessSqlPreviewAttempt, setHasBusinessSqlPreviewAttempt] = useState(false);
+  const [insertedAskRecommendationId, setInsertedAskRecommendationId] = useState<string | null>(null);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
   const {
@@ -623,14 +633,14 @@ function SqlWorkspace({
     activeTabSourceContext,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
-  // Option C — Drive the command-bar source label from the active SQL tab's
+  // Option C - Drive the command-bar source label from the active SQL tab's
   // resolved context instead of falling back to the global active worksheet.
   // The schema rail (right) and command bar (top) now both reflect the
   // *tab's* source, not the global dataset's.
   const activeSourceLabel = dataset ? activeTabSourceContext.sourceLabel : null;
-  // Separate workbook badge label for the command bar — mirrors the routing
+  // Separate workbook badge label for the command bar - mirrors the routing
   // mockup's "Property Management Company.xlsx" pill next to the violet
-  // "Active · {worksheet}" pill.
+  // "Active Â· {worksheet}" pill.
   const workbookLabel = dataset?.original_filename || null;
   const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
   const selectedTabScopeSummary = formatSqlTabScopeSummary(
@@ -833,10 +843,54 @@ function SqlWorkspace({
   if (focusedView === "planning-details") {
     return (
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
-        <SqlWorkspaceDetailPlaceholder
-          title="Planning details"
-          emptyStateCopy="No planning details yet. Ask FiltraQueri a question to generate a plan."
-          onBack={() => setFocusedView("editor")}
+        <SqlEditorPanel
+          dataset={dataset}
+          editor={editor}
+          executionStatus={editorStatus}
+          characterCount={characterCount}
+          canRunQuery={Boolean(dataset)}
+          canOpenResultPreview={canOpenResultPreview}
+          onOpenResultPreview={() => setFocusedView("result")}
+          onOpenSavedDrafts={() => setFocusedView("drafts")}
+          sqlTabs={sqlTabs}
+          dialectContext={{
+            selectedDialect,
+            selectedDialectProfile,
+            dialectOptions,
+            draftConversionPreview,
+            onDialectChange: setSelectedDialect,
+            onApplyDraftConversion: applyDraftConversion,
+          }}
+          workbookLabel={workbookLabel}
+          activeSourceLabel={activeSourceLabel}
+          activeSourceTableLabel={activeTabSourceContext.tableName || sqlTabs.activeTabSourceBadge}
+          activeSourceKindLabel={
+            activeTabSourceContext.sourceType === "cleaned_working_copy"
+              ? "Cleaned"
+              : "Original"
+          }
+          selectedScopeSummary={selectedTabScopeSummary}
+          appliedScopeSummary={appliedTabScopeSummary}
+          selectedScopeCount={sqlTabs.selectedScopeSelections.length}
+          appliedScopeCount={sqlTabs.appliedScopeSelections.length}
+          selectedTemplateLabel={sqlTabs.selectedTemplateLabel}
+          onInsertSql={insertSql}
+          onOpenSqlSourceTab={openSqlSourceTab}
+          sourceMismatchWarning={activeTabSourceContext.mismatchWarning}
+          readinessReport={readinessReport}
+          errorInsight={previewResult.errorInsight}
+          businessSqlRenderPreview={businessSqlRenderPreview}
+          onReviewRelationships={openRelationshipReview}
+          planningDetailMode
+          onBackFromPlanningDetails={() => setFocusedView("editor")}
+          businessSqlPreviewFeedback={businessSqlPreviewFeedback}
+          onBusinessSqlPreviewFeedbackChange={setBusinessSqlPreviewFeedback}
+          businessSqlCandidatePreview={businessSqlCandidatePreview}
+          onBusinessSqlCandidatePreviewChange={setBusinessSqlCandidatePreview}
+          hasBusinessSqlPreviewAttempt={hasBusinessSqlPreviewAttempt}
+          onHasBusinessSqlPreviewAttemptChange={setHasBusinessSqlPreviewAttempt}
+          insertedAskRecommendationId={insertedAskRecommendationId}
+          onInsertedAskRecommendationIdChange={setInsertedAskRecommendationId}
         />
       </section>
     );
@@ -865,16 +919,16 @@ function SqlWorkspace({
         <h2>Inspect SQL</h2>
         <p>
           Write, review, and run SQL safely from one focused workspace. Templates and Reports
-          for ready-made starting points — Run Query always stays manual.
+          for ready-made starting points - Run Query always stays manual.
         </p>
       </div>
 
       <header className="analyst-page-head" aria-label="Inspect SQL section heading">
-        <p className="section-label">Analyst · Inspect SQL</p>
+        <p className="section-label">Analyst - Inspect SQL</p>
         <h2>Write and run SQL</h2>
         <p>
           The editor below targets the active worksheet. Browse Templates and Browse Reports for
-          ready-made starting points — they insert back here.
+          ready-made starting points - they insert back here.
         </p>
       </header>
 
@@ -964,6 +1018,15 @@ function SqlWorkspace({
           errorInsight={previewResult.errorInsight}
           businessSqlRenderPreview={businessSqlRenderPreview}
           onReviewRelationships={openRelationshipReview}
+          onOpenPlanningDetails={() => setFocusedView("planning-details")}
+          businessSqlPreviewFeedback={businessSqlPreviewFeedback}
+          onBusinessSqlPreviewFeedbackChange={setBusinessSqlPreviewFeedback}
+          businessSqlCandidatePreview={businessSqlCandidatePreview}
+          onBusinessSqlCandidatePreviewChange={setBusinessSqlCandidatePreview}
+          hasBusinessSqlPreviewAttempt={hasBusinessSqlPreviewAttempt}
+          onHasBusinessSqlPreviewAttemptChange={setHasBusinessSqlPreviewAttempt}
+          insertedAskRecommendationId={insertedAskRecommendationId}
+          onInsertedAskRecommendationIdChange={setInsertedAskRecommendationId}
         />
 
         {bottomTab && (
