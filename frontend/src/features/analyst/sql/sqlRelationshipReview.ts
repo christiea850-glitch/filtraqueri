@@ -11,7 +11,7 @@ export const RELATIONSHIP_REVIEW_PANEL_TITLE = "Review worksheet connections";
 export const RELATIONSHIP_REVIEW_PANEL_DESCRIPTION =
   "FiltraQueri found the worksheets needed for this question. Review how they connect before preparing SQL.";
 export const RELATIONSHIP_REVIEW_SQL_SAFETY_COPY =
-  "Nothing has been inserted, and no worksheet connections have been changed.";
+  "Confirming a connection only marks it for this workbook review. It does not generate SQL, insert SQL, run a query, or save anything permanently.";
 
 export type SqlRelationshipReviewStatus =
   | "missing"
@@ -30,6 +30,17 @@ export type SqlRelationshipReviewPair = {
     fromColumn: string;
     toColumn: string;
     source: "relationship_candidate" | "accepted_relationship";
+  } | null;
+  suggestion: {
+    candidateId: string;
+    fromWorksheetId: string;
+    fromWorksheetLabel: string;
+    fromColumns: string[];
+    toWorksheetId: string;
+    toWorksheetLabel: string;
+    toColumns: string[];
+    cardinality: "one_to_one" | "one_to_many" | "many_to_one" | "unknown";
+    confidence: number;
   } | null;
 };
 
@@ -136,6 +147,18 @@ const orientCandidateColumns = (
   };
 };
 
+const relationshipTypeToCardinality = (
+  relationshipType: WorksheetRelationshipCandidate["relationshipType"],
+): "one_to_one" | "one_to_many" | "many_to_one" | "unknown" => {
+  if (relationshipType === "one_to_one_candidate") return "one_to_one";
+  if (relationshipType === "one_to_many_candidate") return "one_to_many";
+  if (relationshipType === "many_to_one_candidate") return "many_to_one";
+  return "unknown";
+};
+
+const columnNamesForWorksheet = (worksheet: WorksheetMetadata | null): string[] =>
+  worksheet?.schema.map((column) => column.name) || [];
+
 const statusLabelFor = (
   status: SqlRelationshipReviewStatus,
 ): SqlRelationshipReviewPair["statusLabel"] => {
@@ -191,6 +214,20 @@ export const createSqlRelationshipReviewModel = ({
           ? orientAcceptedColumns(accepted, pair.fromTable)
           : candidate
             ? orientCandidateColumns(candidate, pair.fromTable)
+            : null,
+        suggestion:
+          candidate && fromWorksheet && toWorksheet
+            ? {
+                candidateId: candidate.relationshipId,
+                fromWorksheetId: fromWorksheet.worksheetId,
+                fromWorksheetLabel: worksheetLabel(fromWorksheet),
+                fromColumns: columnNamesForWorksheet(fromWorksheet),
+                toWorksheetId: toWorksheet.worksheetId,
+                toWorksheetLabel: worksheetLabel(toWorksheet),
+                toColumns: columnNamesForWorksheet(toWorksheet),
+                cardinality: relationshipTypeToCardinality(candidate.relationshipType),
+                confidence: candidate.confidence,
+              }
             : null,
       };
     });

@@ -17,6 +17,15 @@ import SqlEditorPanel, {
 import SqlSchemaPanel from "./SqlSchemaPanel";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
+import {
+  addSqlConfirmedRelationship,
+  createEmptySqlRelationshipConfirmationState,
+  createSqlConfirmedRelationshipFromSuggestion,
+  findSqlConfirmedRelationshipForEndpoints,
+  rejectSqlRelationshipSuggestion,
+  removeSqlConfirmedRelationship,
+  type SqlRelationshipConfirmationState,
+} from "./sqlRelationshipConfirmation";
 import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
 import { frameResultValue, labelResultColumns } from "./resultLabeling";
 import { createResultNarration } from "./resultNarration";
@@ -477,9 +486,17 @@ export function SqlWorkspaceDetailPlaceholder({
 
 function SqlRelationshipReviewPage({
   model,
+  confirmationState,
+  onConfirmRelationship,
+  onRejectRelationship,
+  onRemoveConfirmation,
   onBack,
 }: {
   model: SqlRelationshipReviewModel;
+  confirmationState: SqlRelationshipConfirmationState;
+  onConfirmRelationship: (pair: SqlRelationshipReviewModel["pairs"][number]) => void;
+  onRejectRelationship: (pair: SqlRelationshipReviewModel["pairs"][number]) => void;
+  onRemoveConfirmation: (pair: SqlRelationshipReviewModel["pairs"][number]) => void;
   onBack: () => void;
 }) {
   return (
@@ -492,11 +509,17 @@ function SqlRelationshipReviewPage({
           <p className="section-label">Analyst SQL</p>
           <h2>Review worksheet connections</h2>
           <p>FiltraQueri found worksheets that may need to connect before SQL can be prepared safely.</p>
-          <p>Review only. Nothing here inserts SQL, runs a query, or changes worksheet connections.</p>
+          <p>Review only. Nothing here inserts SQL, runs a query, or saves worksheet connections.</p>
         </div>
       </div>
       {model.pairs.length > 0 ? (
-        <SqlRelationshipReviewPanel model={model} />
+        <SqlRelationshipReviewPanel
+          model={model}
+          confirmationState={confirmationState}
+          onConfirmRelationship={onConfirmRelationship}
+          onRejectRelationship={onRejectRelationship}
+          onRemoveConfirmation={onRemoveConfirmation}
+        />
       ) : (
         <div className="empty-state compact-empty">
           <p className="section-label">Details</p>
@@ -510,8 +533,16 @@ function SqlRelationshipReviewPage({
 
 function SqlRelationshipReviewPanel({
   model,
+  confirmationState,
+  onConfirmRelationship,
+  onRejectRelationship,
+  onRemoveConfirmation,
 }: {
   model: SqlRelationshipReviewModel;
+  confirmationState: SqlRelationshipConfirmationState;
+  onConfirmRelationship: (pair: SqlRelationshipReviewModel["pairs"][number]) => void;
+  onRejectRelationship: (pair: SqlRelationshipReviewModel["pairs"][number]) => void;
+  onRemoveConfirmation: (pair: SqlRelationshipReviewModel["pairs"][number]) => void;
 }) {
   const friendlyWorksheetLabel = (value: string): string => {
     const label = value.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
@@ -546,14 +577,51 @@ function SqlRelationshipReviewPanel({
 
       {model.pairs.length > 0 ? (
         <div className="sql-relationship-review-list" aria-label="Required relationship pairs">
-          {model.pairs.map((pair) => (
-            <article className="sql-relationship-review-card" key={pair.id}>
+          {model.pairs.map((pair) => {
+            const confirmedRelationship = pair.suggestion && pair.suggestedColumns
+              ? findSqlConfirmedRelationshipForEndpoints(
+                  confirmationState,
+                  {
+                    worksheetId: pair.suggestion.fromWorksheetId,
+                    tableName: pair.fromTable,
+                    column: pair.suggestedColumns.fromColumn,
+                  },
+                  {
+                    worksheetId: pair.suggestion.toWorksheetId,
+                    tableName: pair.toTable,
+                    column: pair.suggestedColumns.toColumn,
+                  },
+                )
+              : null;
+            const rejectedSuggestion = pair.suggestion && pair.suggestedColumns
+              ? confirmationState.rejectedSuggestions.find(
+                  (relationship) =>
+                    relationship.fromWorksheetId === pair.suggestion?.fromWorksheetId &&
+                    relationship.fromTableName === pair.fromTable &&
+                    relationship.fromColumn === pair.suggestedColumns?.fromColumn &&
+                    relationship.toWorksheetId === pair.suggestion?.toWorksheetId &&
+                    relationship.toTableName === pair.toTable &&
+                    relationship.toColumn === pair.suggestedColumns?.toColumn,
+                )
+              : null;
+            const isConfirmed = Boolean(confirmedRelationship) || pair.status === "accepted";
+            const isRejected = Boolean(rejectedSuggestion) && !confirmedRelationship;
+
+            return (
+              <article
+                className={`sql-relationship-review-card ${isRejected ? "is-rejected" : ""}`}
+                key={pair.id}
+              >
               <div className="sql-relationship-review-card-head">
                 <strong>
                   {friendlyWorksheetLabel(pair.fromWorksheet)} {"\u2194"} {friendlyWorksheetLabel(pair.toWorksheet)}
                 </strong>
-                <span className={`sql-grounding-badge ${pair.status === "accepted" ? "supported" : "needs_review"}`}>
-                  {pair.statusLabel}
+                <span
+                  className={`sql-grounding-badge ${
+                    isConfirmed ? "supported" : isRejected ? "blocked" : "needs_review"
+                  }`}
+                >
+                  {isConfirmed ? "Confirmed" : isRejected ? "Rejected" : pair.statusLabel}
                 </span>
               </div>
               <dl>
@@ -571,8 +639,44 @@ function SqlRelationshipReviewPanel({
                   ? `Suggested match: ${pair.suggestedColumns.fromColumn} connects both worksheets`
                   : "FiltraQueri could not find a clear matching column yet."}
               </p>
-            </article>
-          ))}
+              {pair.suggestion && pair.suggestedColumns && pair.status !== "accepted" && (
+                <div className="sql-relationship-review-actions">
+                  {confirmedRelationship ? (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => onRemoveConfirmation(pair)}
+                    >
+                      Remove confirmation
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="primary-button"
+                        onClick={() => onConfirmRelationship(pair)}
+                      >
+                        Confirm connection
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => onRejectRelationship(pair)}
+                      >
+                        Reject suggestion
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {isRejected && (
+                <p className="sql-relationship-review-note">
+                  This worksheet connection suggestion is marked rejected for this review only.
+                </p>
+              )}
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="business-sql-preview-empty">
@@ -600,6 +704,8 @@ function SqlWorkspace({
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
   const [bottomTab, setBottomTab] = useState<BottomTab | null>(null);
   const [relationshipReviewRequirements, setRelationshipReviewRequirements] = useState<string[]>([]);
+  const [relationshipConfirmationState, setRelationshipConfirmationState] =
+    useState<SqlRelationshipConfirmationState>(() => createEmptySqlRelationshipConfirmationState());
   const [businessSqlPreviewFeedback, setBusinessSqlPreviewFeedback] =
     useState<BusinessSqlPreviewFeedback>("idle");
   const [businessSqlCandidatePreview, setBusinessSqlCandidatePreview] =
@@ -683,6 +789,64 @@ function SqlWorkspace({
       }),
     [dataset, relationshipReviewRequirements],
   );
+  useEffect(() => {
+    setRelationshipConfirmationState(createEmptySqlRelationshipConfirmationState());
+  }, [dataset?.dataset_id, dataset?.workbook_metadata?.workbookId]);
+
+  const createRelationshipFromReviewPair = (
+    pair: SqlRelationshipReviewModel["pairs"][number],
+    status: "confirmed" | "rejected",
+  ) => {
+    if (!pair.suggestion || !pair.suggestedColumns) return null;
+
+    return createSqlConfirmedRelationshipFromSuggestion({
+      from: {
+        worksheetId: pair.suggestion.fromWorksheetId,
+        worksheetLabel: pair.suggestion.fromWorksheetLabel,
+        tableName: pair.fromTable,
+        column: pair.suggestedColumns.fromColumn,
+      },
+      fromColumns: pair.suggestion.fromColumns,
+      to: {
+        worksheetId: pair.suggestion.toWorksheetId,
+        worksheetLabel: pair.suggestion.toWorksheetLabel,
+        tableName: pair.toTable,
+        column: pair.suggestedColumns.toColumn,
+      },
+      toColumns: pair.suggestion.toColumns,
+      scope: "workbook",
+      source: "inferred_then_confirmed",
+      status,
+      confirmedAt: status === "confirmed" ? new Date().toISOString() : undefined,
+      rejectedAt: status === "rejected" ? new Date().toISOString() : undefined,
+      cardinality: pair.suggestion.cardinality,
+      confidence: pair.suggestion.confidence,
+      acceptedFromCandidateId: pair.suggestion.candidateId,
+      workbookId: dataset?.workbook_metadata?.workbookId || null,
+      datasetId: dataset?.dataset_id || null,
+    });
+  };
+
+  const confirmRelationship = (pair: SqlRelationshipReviewModel["pairs"][number]) => {
+    const relationship = createRelationshipFromReviewPair(pair, "confirmed");
+    if (!relationship) return;
+    setRelationshipConfirmationState((state) => addSqlConfirmedRelationship(state, relationship));
+  };
+
+  const rejectRelationship = (pair: SqlRelationshipReviewModel["pairs"][number]) => {
+    const relationship = createRelationshipFromReviewPair(pair, "rejected");
+    if (!relationship) return;
+    setRelationshipConfirmationState((state) => rejectSqlRelationshipSuggestion(state, relationship));
+  };
+
+  const removeRelationshipConfirmation = (pair: SqlRelationshipReviewModel["pairs"][number]) => {
+    const relationship = createRelationshipFromReviewPair(pair, "confirmed");
+    if (!relationship) return;
+    setRelationshipConfirmationState((state) =>
+      removeSqlConfirmedRelationship(state, relationship.relationshipId),
+    );
+  };
+
   const toggleBottomTab = (tab: BottomTab) => {
     setBottomTab((current) => (current === tab ? null : tab));
   };
@@ -901,6 +1065,10 @@ function SqlWorkspace({
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
         <SqlRelationshipReviewPage
           model={relationshipReviewModel}
+          confirmationState={relationshipConfirmationState}
+          onConfirmRelationship={confirmRelationship}
+          onRejectRelationship={rejectRelationship}
+          onRemoveConfirmation={removeRelationshipConfirmation}
           onBack={() => setFocusedView("editor")}
         />
       </section>
