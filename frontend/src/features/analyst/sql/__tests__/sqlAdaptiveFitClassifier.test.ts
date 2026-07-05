@@ -114,6 +114,7 @@ const relationshipReviewPair = (
   status: "missing",
   statusLabel: "Needs review",
   suggestedColumns: null,
+  suggestion: null,
   ...override,
 });
 

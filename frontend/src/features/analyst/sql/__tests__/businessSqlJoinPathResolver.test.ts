@@ -6,7 +6,11 @@
  */
 
 import type { AcceptedRelationshipContract } from "../../../workbook";
-import { resolveBusinessSqlJoinPath } from "../businessSqlJoinPathResolver";
+import {
+  resolveBusinessSqlJoinPath,
+  resolveBusinessSqlJoinPaths,
+  type BusinessSqlRelationshipMetadata,
+} from "../businessSqlJoinPathResolver";
 import { planBusinessSqlQueryRequest } from "../businessSqlQueryPlanner";
 import {
   summarizeBusinessSqlQueryPlan,
@@ -67,7 +71,24 @@ const ordersPerCustomerBasePlan = planBusinessSqlQueryRequest({
   prompt: "Count orders per customer",
 });
 
-const fixtures: JoinPathResolverFixture[] = [
+const resolutionFixture = (
+  name: string,
+  resolution: ReturnType<typeof resolveBusinessSqlJoinPaths>,
+  assertResolution: (resolution: ReturnType<typeof resolveBusinessSqlJoinPaths>) => string[],
+): JoinPathResolverFixture => ({
+  name,
+  plan: ordersPerCustomerBasePlan,
+  assert: () => assertResolution(resolution),
+});
+
+const metadata = (
+  id: string,
+  fromEntity: string,
+  toEntity: string,
+  status: BusinessSqlRelationshipMetadata["status"],
+): BusinessSqlRelationshipMetadata => ({ id, fromEntity, toEntity, status });
+
+export const BUSINESS_SQL_JOIN_PATH_RESOLVER_FIXTURES: JoinPathResolverFixture[] = [
   {
     name: "accepted relationships resolve leased units per property",
     plan: planBusinessSqlQueryRequest({
@@ -102,6 +123,50 @@ const fixtures: JoinPathResolverFixture[] = [
     },
   },
   {
+    name: "accepted relationship resolves orders per customer",
+    plan: planBusinessSqlQueryRequest({
+      prompt: "Count orders per customer",
+      acceptedRelationshipContracts: [
+        relationshipContract(
+          "contract:customers-orders",
+          "customers",
+          "customer_id",
+          "orders",
+          "customer_id",
+        ),
+      ],
+    }),
+    assert: (plan) => {
+      const failures: string[] = [];
+      if (plan.joinPath.status !== "resolved") failures.push("Expected resolved join path.");
+      if (plan.joinPath.edges[0]?.relationship !== "customer has orders") {
+        failures.push("Expected the planner relationship label to be retained.");
+      }
+      return failures;
+    },
+  },
+  {
+    name: "ready relationship resolves tickets per account",
+    plan: planBusinessSqlQueryRequest({
+      prompt: "Count tickets per account",
+      readyRelationshipContracts: [
+        relationshipContract(
+          "contract:accounts-tickets",
+          "accounts",
+          "account_id",
+          "tickets",
+          "account_id",
+        ),
+      ],
+    }),
+    assert: (plan) => {
+      const failures: string[] = [];
+      if (plan.support !== "supported") failures.push("Expected supported plan.");
+      if (!plan.joinPath.edges[0]?.verified) failures.push("Expected verified join edge.");
+      return failures;
+    },
+  },
+  {
     name: "unknown relationship keeps required join in review",
     plan: resolveBusinessSqlJoinPath({ plan: ordersPerCustomerBasePlan }),
     assert: (plan) => {
@@ -130,33 +195,51 @@ const fixtures: JoinPathResolverFixture[] = [
     },
   },
   {
-    name: "broken accepted contract does not verify a join",
-    plan: resolveBusinessSqlJoinPath({
-      plan: ordersPerCustomerBasePlan,
-      acceptedRelationshipContracts: [
-        relationshipContract(
-          "contract:customers-orders-broken",
-          "customers",
-          "customer_id",
-          "orders",
-          "customer_id",
-          { validationState: "broken" },
-        ),
-      ],
-    }),
-    assert: (plan) => {
+    name: "rejected relationship blocks when no eligible alternative exists",
+    plan: ordersPerCustomerBasePlan,
+    assert: () => {
       const failures: string[] = [];
-      if (plan.support !== "needs_review") failures.push("Expected needs_review support.");
-      if (plan.joinPath.edges.some((edge) => edge.verified)) {
-        failures.push("Broken contract must not verify join edges.");
+      const resolution = resolveBusinessSqlJoinPaths({
+        requirements: ordersPerCustomerBasePlan.joinPath.requirements,
+        relationships: [metadata("relationship:rejected", "customers", "orders", "rejected")],
+      });
+      if (resolution.status !== "blocked") failures.push("Expected blocked resolution.");
+      if (resolution.blocked[0]?.reason !== "rejected_relationship") {
+        failures.push("Expected rejected relationship reason.");
       }
       return failures;
     },
   },
+  resolutionFixture(
+    "multiple eligible candidates use stable relationship ID ordering",
+    resolveBusinessSqlJoinPaths({
+      requirements: ordersPerCustomerBasePlan.joinPath.requirements,
+      relationships: [
+        metadata("relationship:z", "customers", "orders", "accepted"),
+        metadata("relationship:a", "customers", "orders", "ready"),
+      ],
+    }),
+    (resolution) =>
+      resolution.relationshipIds[0] === "relationship:a"
+        ? []
+        : ["Expected lexically first stable relationship ID."],
+  ),
+  resolutionFixture(
+    "no join requirement returns ready no-op resolution",
+    resolveBusinessSqlJoinPaths({ requirements: [] }),
+    (resolution) => {
+      const failures: string[] = [];
+      if (resolution.status !== "ready") failures.push("Expected ready resolution.");
+      if (resolution.resolved.length || resolution.unresolved.length || resolution.blocked.length) {
+        failures.push("Expected empty no-op resolution metadata.");
+      }
+      return failures;
+    },
+  ),
 ];
 
 export function runBusinessSqlJoinPathResolverFixtures(): JoinPathResolverFixtureReport {
-  const results = fixtures.map((fixture) => {
+  const results = BUSINESS_SQL_JOIN_PATH_RESOLVER_FIXTURES.map((fixture) => {
     const failureReasons = fixture.assert(fixture.plan);
     return {
       name: fixture.name,

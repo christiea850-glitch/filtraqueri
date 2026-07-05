@@ -13,6 +13,59 @@ export type BusinessSqlMissingRelationship = {
   reason?: string;
 };
 
+export type BusinessSqlRelationshipStatus =
+  | "accepted"
+  | "ready"
+  | "verified"
+  | "unknown"
+  | "missing"
+  | "rejected"
+  | "invalid";
+
+export type BusinessSqlRelationshipMetadata = {
+  id: string;
+  fromEntity: string;
+  toEntity: string;
+  fromTable?: string;
+  fromField?: string;
+  toTable?: string;
+  toField?: string;
+  status: BusinessSqlRelationshipStatus;
+};
+
+export type BusinessSqlJoinResolutionReason =
+  | "accepted_relationship"
+  | "ready_relationship"
+  | "verified_relationship"
+  | "unknown_relationship"
+  | "missing_relationship"
+  | "rejected_relationship"
+  | "invalid_relationship";
+
+export type BusinessSqlJoinRequirementResolution = {
+  requirement: BusinessSqlJoinRequirement;
+  status: "resolved" | "needs_review" | "blocked";
+  reason: BusinessSqlJoinResolutionReason;
+  relationshipId?: string;
+  edge?: BusinessSqlJoinEdge;
+};
+
+export type BusinessSqlJoinPathResolution = {
+  status: "ready" | "needs_review" | "blocked";
+  support: "supported" | "needs_review" | "blocked";
+  resolved: BusinessSqlJoinRequirementResolution[];
+  unresolved: BusinessSqlJoinRequirementResolution[];
+  blocked: BusinessSqlJoinRequirementResolution[];
+  relationshipIds: string[];
+  assumptions: string[];
+  warnings: string[];
+};
+
+export type ResolveBusinessSqlJoinPathsInput = {
+  requirements: readonly BusinessSqlJoinRequirement[];
+  relationships?: readonly BusinessSqlRelationshipMetadata[];
+};
+
 export type ResolveBusinessSqlJoinPathInput = {
   plan: BusinessSqlQueryPlan;
   acceptedRelationshipContracts?: readonly AcceptedRelationshipContract[];
@@ -43,6 +96,111 @@ const pairMatches = (
 const relationshipKey = (fromEntity: string, toEntity: string): string =>
   [fromEntity.trim().toLowerCase(), toEntity.trim().toLowerCase()].sort().join("::");
 
+const ELIGIBLE_STATUSES: readonly BusinessSqlRelationshipStatus[] = [
+  "accepted",
+  "ready",
+  "verified",
+];
+
+const reasonForStatus = (
+  status: BusinessSqlRelationshipStatus,
+): BusinessSqlJoinResolutionReason => `${status}_relationship` as BusinessSqlJoinResolutionReason;
+
+const edgeFromMetadata = (
+  requirement: BusinessSqlJoinRequirement,
+  relationship: BusinessSqlRelationshipMetadata,
+): BusinessSqlJoinEdge => {
+  const reversed = sameName(relationship.fromEntity, requirement.toEntity);
+  return {
+    fromEntity: requirement.fromEntity,
+    fromTable: reversed ? relationship.toTable : relationship.fromTable,
+    fromField: reversed ? relationship.toField : relationship.fromField,
+    toEntity: requirement.toEntity,
+    toTable: reversed ? relationship.fromTable : relationship.toTable,
+    toField: reversed ? relationship.fromField : relationship.toField,
+    relationship: relationship.id,
+    verified: true,
+  };
+};
+
+/** Resolves join requirements only; it never produces SQL or runtime instructions. */
+export function resolveBusinessSqlJoinPaths({
+  requirements,
+  relationships = [],
+}: ResolveBusinessSqlJoinPathsInput): BusinessSqlJoinPathResolution {
+  const resolved: BusinessSqlJoinRequirementResolution[] = [];
+  const unresolved: BusinessSqlJoinRequirementResolution[] = [];
+  const blocked: BusinessSqlJoinRequirementResolution[] = [];
+
+  for (const requirement of requirements) {
+    const candidates = relationships
+      .filter((relationship) =>
+        pairMatches(
+          requirement.fromEntity,
+          requirement.toEntity,
+          relationship.fromEntity,
+          relationship.toEntity,
+        ),
+      )
+      .slice()
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const eligible = candidates.find((candidate) =>
+      ELIGIBLE_STATUSES.includes(candidate.status),
+    );
+
+    if (eligible) {
+      resolved.push({
+        requirement: { ...requirement, verified: true },
+        status: "resolved",
+        reason: reasonForStatus(eligible.status),
+        relationshipId: eligible.id,
+        edge: edgeFromMetadata(requirement, eligible),
+      });
+      continue;
+    }
+
+    const blocking = candidates.find((candidate) =>
+      ["missing", "rejected", "invalid"].includes(candidate.status),
+    );
+    if (blocking) {
+      blocked.push({
+        requirement: { ...requirement, verified: false },
+        status: "blocked",
+        reason: reasonForStatus(blocking.status),
+        relationshipId: blocking.id,
+      });
+      continue;
+    }
+
+    const unknown = candidates.find((candidate) => candidate.status === "unknown");
+    unresolved.push({
+      requirement: { ...requirement, verified: false },
+      status: "needs_review",
+      reason: "unknown_relationship",
+      relationshipId: unknown?.id,
+    });
+  }
+
+  const status = blocked.length > 0 ? "blocked" : unresolved.length > 0 ? "needs_review" : "ready";
+  return {
+    status,
+    support: status === "ready" ? "supported" : status,
+    resolved,
+    unresolved,
+    blocked,
+    relationshipIds: resolved.flatMap((item) => item.relationshipId ? [item.relationshipId] : []),
+    assumptions: [],
+    warnings: [
+      ...unresolved.map((item) =>
+        `Relationship ${item.requirement.fromEntity} -> ${item.requirement.toEntity} needs review.`,
+      ),
+      ...blocked.map((item) =>
+        `Relationship ${item.requirement.fromEntity} -> ${item.requirement.toEntity} is blocked.`,
+      ),
+    ],
+  };
+}
+
 const warningExists = (
   warnings: readonly BusinessSqlPlanWarning[],
   id: string,
@@ -62,7 +220,9 @@ const activeReadyContracts = (
     }
     byId.set(contract.contractId, contract);
   }
-  return Array.from(byId.values());
+  return Array.from(byId.values()).sort((left, right) =>
+    left.contractId.localeCompare(right.contractId),
+  );
 };
 
 const tableForEntity = (
