@@ -181,6 +181,11 @@ const fixtures = [
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanJoinResolution.test.ts",
     exportName: "runBusinessSqlQueryPlanJoinResolutionFixtures",
   },
+  {
+    label: "Business SQL plan readiness",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlPlanReadiness.test.ts",
+    exportName: "runBusinessSqlPlanReadinessFixtures",
+  },
 ];
 
 const asCount = (value) => {
