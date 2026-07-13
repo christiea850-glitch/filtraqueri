@@ -59,7 +59,7 @@ type FocusedSqlView =
   | "draft-detail"
   | "planning-details"
   | "relationship-review";
-type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts" | "context";
+type SqlWorkspaceCommandTarget = "editor" | "result" | "drafts" | "context" | "relationship-review";
 
 const bottomTabLabels: Record<BottomTab, string> = {
   guidance: "SQL diagnostics",
@@ -532,8 +532,8 @@ function SqlRelationshipReviewPage({
         <div>
           <p className="section-label">Analyst SQL</p>
           <h2>Review worksheet connections</h2>
-          <p>FiltraQueri found worksheets that may need to connect before SQL can be prepared safely.</p>
-          <p>Review only. Nothing here inserts SQL, runs a query, or saves worksheet connections.</p>
+          <p>{model.description}</p>
+          <p>{model.safetyCopy}</p>
         </div>
       </div>
       {model.pairs.length > 0 ? (
@@ -952,7 +952,10 @@ function SqlWorkspace({
 
   useEffect(() => {
     const handleSqlWorkspaceCommand = (event: Event) => {
-      const commandEvent = event as CustomEvent<{ target?: SqlWorkspaceCommandTarget }>;
+      const commandEvent = event as CustomEvent<{
+        target?: SqlWorkspaceCommandTarget;
+        requiredRelationships?: string[];
+      }>;
       const target = commandEvent.detail?.target;
 
       if (target === "drafts") {
@@ -968,6 +971,16 @@ function SqlWorkspace({
       if (target === "context") {
         setFocusedView("editor");
         setIsContextOpen(true);
+        return;
+      }
+
+      if (target === "relationship-review") {
+        const requiredRelationships = Array.isArray(commandEvent.detail?.requiredRelationships)
+          ? commandEvent.detail.requiredRelationships.filter(
+              (relationship): relationship is string => typeof relationship === "string",
+            )
+          : [];
+        openRelationshipReview(requiredRelationships);
         return;
       }
 

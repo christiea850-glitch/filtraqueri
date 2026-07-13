@@ -57,6 +57,16 @@ import {
   createAdaptiveProposalLlmConsentShellViewModel,
   type AdaptiveProposalLlmConsentShellViewModel,
 } from "./adaptiveProposalLlmConsentShellAdapter";
+import {
+  classifySqlBusinessQuestion,
+  createBlockedRelationshipAskPlan,
+} from "./sqlBusinessQuestionShape";
+import {
+  RELATIONSHIP_REVIEW_ACTION_LABEL,
+  RELATIONSHIP_REVIEW_PANEL_DESCRIPTION,
+  RELATIONSHIP_REVIEW_SQL_SAFETY_COPY,
+  RELATIONSHIP_REVIEW_STEP_TITLE,
+} from "./sqlRelationshipReview";
 
 type SqlAssistantPanelProps = {
   dataset: DatasetMetadata | null;
@@ -73,6 +83,8 @@ type SqlAssistantPanelProps = {
   onTaskPromptChange?: (prompt: string) => void;
   onSelectedScopeChange?: (selections: AnalysisScopeSelection[]) => void;
   onApplyScope?: () => void;
+  onReviewRelationships?: (requiredRelationships: string[]) => void;
+  relationshipReviewProgressSummary?: string | null;
   appliedScopeLabels?: string[];
   activeTabLabel?: string;
 };
@@ -1059,6 +1071,8 @@ function SqlAssistantPanel({
   taskPrompt = "",
   onSelectedScopeChange,
   onApplyScope,
+  onReviewRelationships,
+  relationshipReviewProgressSummary,
   appliedScopeLabels = [],
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
@@ -1149,6 +1163,21 @@ function SqlAssistantPanel({
         : null,
     [adaptiveProposalFallback.proposal, dataset, selectedDialect],
   );
+  const relationshipReviewPlan = useMemo(() => {
+    if (!hasRequestedRecommendation || trimmedTaskPrompt.length === 0 || !dataset) return null;
+
+    const questionShape = classifySqlBusinessQuestion({
+      prompt: trimmedTaskPrompt,
+      dataset,
+    });
+
+    return createBlockedRelationshipAskPlan({
+      dataset,
+      shape: questionShape,
+    });
+  }, [dataset, hasRequestedRecommendation, trimmedTaskPrompt]);
+  const relationshipReviewRequirements = relationshipReviewPlan?.missingRelationships || [];
+  const showRelationshipReviewStep = relationshipReviewRequirements.length > 0;
   const taskAssistRecommendations = useMemo(
     () =>
       recommendSqlTemplates({
@@ -1574,6 +1603,28 @@ function SqlAssistantPanel({
                 </p>
               )
             )
+        )}
+        {showRelationshipReviewStep && (
+          <div className="sql-recommended-analysis" aria-label={RELATIONSHIP_REVIEW_STEP_TITLE}>
+            <div className="sql-adaptive-fit-relationship-action">
+              <div>
+                <strong>{RELATIONSHIP_REVIEW_STEP_TITLE}</strong>
+                <span>{RELATIONSHIP_REVIEW_PANEL_DESCRIPTION}</span>
+                {relationshipReviewProgressSummary && (
+                  <small>{relationshipReviewProgressSummary}</small>
+                )}
+                <small>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</small>
+              </div>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => onReviewRelationships?.(relationshipReviewRequirements)}
+                disabled={!onReviewRelationships}
+              >
+                {RELATIONSHIP_REVIEW_ACTION_LABEL}
+              </button>
+            </div>
+          </div>
         )}
       </section>
 

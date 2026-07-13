@@ -9,7 +9,10 @@ import {
   type SqlAdaptiveInsertState,
 } from "./sqlAdaptiveFitClassifier";
 import { recommendAnalyticalStrategies, type SqlAnalyticalStrategy } from "./sqlAnalyticalStrategies";
-import { createSqlRelationshipReviewModel } from "./sqlRelationshipReview";
+import {
+  createSqlRelationshipReviewModel,
+  RELATIONSHIP_REVIEW_PANEL_DESCRIPTION,
+} from "./sqlRelationshipReview";
 import { createSqlReportRecipes } from "./sqlReportRecipes";
 import {
   adaptSingleTableTemplate,
@@ -51,10 +54,10 @@ export const ASK_RECOMMENDATION_ALREADY_INSERTED_COPY =
   "One suggestion is already inserted. Clear the editor or start a new tab before inserting another suggestion.";
 
 export const ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE =
-  "Review worksheet connections before inserting SQL.";
+  "Review worksheet connections before inserting SQL";
 
 export const ASK_RELATIONSHIP_BLOCK_COMPACT_COPY =
-  "FiltraQueri understands the analysis, but worksheet connections must be reviewed before SQL can be inserted.";
+  RELATIONSHIP_REVIEW_PANEL_DESCRIPTION;
 
 export const ASK_ADAPTED_TEMPLATE_BADGE = "Adapted template";
 export const ASK_ADAPTED_TEMPLATE_READY_STATUS = "Ready to insert";

@@ -8,10 +8,11 @@ import type {
 
 export const RELATIONSHIP_REVIEW_ACTION_LABEL = "Review worksheet connections";
 export const RELATIONSHIP_REVIEW_PANEL_TITLE = "Review worksheet connections";
+export const RELATIONSHIP_REVIEW_STEP_TITLE = "Step 3 - Review worksheet connections";
 export const RELATIONSHIP_REVIEW_PANEL_DESCRIPTION =
-  "FiltraQueri found the worksheets needed for this question. Review how they connect before preparing SQL.";
+  "This question uses more than one worksheet. FiltraQueri needs to know how the worksheets connect - which columns link rows across worksheets - before it can prepare SQL safely.";
 export const RELATIONSHIP_REVIEW_SQL_SAFETY_COPY =
-  "Confirming a connection only marks it for this workbook review. It does not generate SQL, insert SQL, run a query, or save anything permanently.";
+  "Confirming a connection is for this review only. It does not run SQL, insert SQL, or permanently change workbook metadata.";
 
 export type SqlRelationshipReviewStatus =
   | "missing"

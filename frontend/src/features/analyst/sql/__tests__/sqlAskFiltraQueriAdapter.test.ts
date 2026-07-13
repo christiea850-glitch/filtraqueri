@@ -837,7 +837,7 @@ const fixtures: Fixture[] = [
         ...(blockedSummary?.description === ASK_RELATIONSHIP_BLOCK_COMPACT_COPY
           ? []
           : [`Expected compact blocked summary copy, received ${blockedSummary?.description || "none"}.`]),
-        ...(ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE === "Review worksheet connections before inserting SQL."
+        ...(ASK_RELATIONSHIP_BLOCK_COMPACT_TITLE === "Review worksheet connections before inserting SQL"
           ? []
           : ["Expected compact relationship block title copy."]),
         ...(blockedSummary?.description.includes("tenants to units") ||
@@ -1507,7 +1507,7 @@ const fixtures: Fixture[] = [
           ? []
           : [`Expected relationship review panel title, received ${review.title}.`]),
         ...(review.description === RELATIONSHIP_REVIEW_PANEL_DESCRIPTION &&
-          review.description.includes("Review how they connect before preparing SQL")
+          review.description.includes("which columns link rows across worksheets")
           ? []
           : ["Expected relationship review panel description copy."]),
         ...(review.description.includes("cross-table SQL") ||

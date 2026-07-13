@@ -187,6 +187,17 @@ function SqlAssistantRoutePage({
     }, 80);
   };
 
+  const reviewWorksheetConnections = (requiredRelationships: string[]) => {
+    onAnalystViewChange?.("sqlWorkspace");
+    const detail = { target: "relationship-review", requiredRelationships };
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("filtraqueri:sql-workspace-command", { detail }));
+    }, 0);
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("filtraqueri:sql-workspace-command", { detail }));
+    }, 80);
+  };
+
   return (
     <section className="sql-assistant-route-page" aria-label={copy.title}>
       <div className="analyst-page-banner">
@@ -251,6 +262,7 @@ function SqlAssistantRoutePage({
         onTaskPromptChange={sqlTabs.onTaskPromptChange}
         onSelectedScopeChange={sqlTabs.onSelectedScopeChange}
         onApplyScope={sqlTabs.onApplyScope}
+        onReviewRelationships={reviewWorksheetConnections}
         appliedScopeLabels={appliedScopeLabels}
         activeTabLabel={activeSourceLabel}
       />

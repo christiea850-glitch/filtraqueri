@@ -41,7 +41,11 @@ import {
   createSqlAskFiltraQueriSuggestionModel,
   shouldSubmitSqlAskFiltraQueriKey,
 } from "./sqlAskFiltraQueriAdapter";
-import { RELATIONSHIP_REVIEW_ACTION_LABEL } from "./sqlRelationshipReview";
+import {
+  RELATIONSHIP_REVIEW_ACTION_LABEL,
+  RELATIONSHIP_REVIEW_PANEL_DESCRIPTION,
+  RELATIONSHIP_REVIEW_SQL_SAFETY_COPY,
+} from "./sqlRelationshipReview";
 import { createSqlSourceLineModel } from "./sqlSourceLineAdapter";
 import {
   createSqlWorksheetScopeModel,
@@ -826,8 +830,7 @@ function SqlEditorPanel({
     : askFiltraQueriSuggestions.blockedPlan?.missingRelationships.length
       ? {
           title: "Review worksheet connections before inserting SQL",
-          copy:
-            "FiltraQueri understands the analysis, but worksheet connections need review before SQL can be inserted.",
+          copy: RELATIONSHIP_REVIEW_PANEL_DESCRIPTION,
           requiredRelationships: askFiltraQueriSuggestions.blockedPlan.missingRelationships,
         }
       : null;
@@ -1147,6 +1150,7 @@ function SqlEditorPanel({
                   {relationshipReviewProgressSummary && (
                     <small>{relationshipReviewProgressSummary}</small>
                   )}
+                  <small>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</small>
                 </div>
                 <button
                   type="button"
@@ -1176,6 +1180,7 @@ function SqlEditorPanel({
                     {relationshipReviewProgressSummary && (
                       <small>{relationshipReviewProgressSummary}</small>
                     )}
+                    <small>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</small>
                   </div>
                   <button
                     type="button"
@@ -1246,7 +1251,10 @@ function SqlEditorPanel({
                       <span>{card.statusLabel}</span>
                     </div>
                     {card.requiredRelationships.length > 0 && (
-                      <p>Review worksheet connections before inserting SQL.</p>
+                      <p>
+                        Review worksheet connections before inserting SQL.{" "}
+                        {RELATIONSHIP_REVIEW_PANEL_DESCRIPTION}
+                      </p>
                     )}
                     {canInsert ? (
                       <button
@@ -1302,7 +1310,11 @@ function SqlEditorPanel({
                       Relevant worksheets:{" "}
                       {askFiltraQueriSuggestions.blockedPlan.relevantEntities.join(", ")}
                     </li>
-                    <li>Review worksheet connections before inserting SQL.</li>
+                    <li>
+                      Review worksheet connections before inserting SQL.{" "}
+                      {RELATIONSHIP_REVIEW_PANEL_DESCRIPTION}
+                    </li>
+                    <li>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</li>
                     <li>{askFiltraQueriSuggestions.blockedPlan.explanation}</li>
                   </ul>
                   {!relationshipReviewActionShownInRecommendedAnalysis && (
