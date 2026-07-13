@@ -1296,6 +1296,22 @@
   font: inherit;
 }
 
+.sql-template-current-task {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.sql-template-current-task.is-empty {
+  color: #64748b;
+}
+
 .sql-template-recommendation-list {
   display: grid;
   gap: 8px;

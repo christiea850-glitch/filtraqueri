@@ -37,7 +37,6 @@ import { generateSqlTaskDraft, type SqlTaskGenerationResult } from "./sqlTaskGen
 import {
   SQL_REPORT_INSERT_ACTION_LABEL,
   SQL_REPORT_MANUAL_RUN_COPY,
-  SQL_REPORT_TASK_PLACEHOLDER,
 } from "./sqlReportCopy";
 import {
   recommendSqlScope,
@@ -1057,10 +1056,8 @@ function SqlAssistantPanel({
   requestedMode,
   allowedModes,
   taskPrompt = "",
-  onTaskPromptChange,
   onSelectedScopeChange,
   appliedScopeLabels = [],
-  activeTabLabel = "active SQL tab",
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1395,10 +1392,10 @@ function SqlAssistantPanel({
       <section className="sql-template-recommender" aria-label="Find matching SQL template">
         <div className="sql-template-recommender-head">
           <div>
-            <strong>What do you want to do?</strong>
+            <strong>Current SQL task from Inspect SQL</strong>
             <span>
-              Start by finding the worksheets for {activeTabLabel}. After you apply a scope,
-              FiltraQueri can recommend matching templates or reports.
+              Browse Templates uses this active task to suggest worksheet scope and matching
+              templates. Edit the task in Inspect SQL.
             </span>
           </div>
           <em>
@@ -1410,17 +1407,17 @@ function SqlAssistantPanel({
           </em>
         </div>
         <div className="sql-template-recommender-row">
-          <input
-            type="text"
-            value={taskPrompt}
-            onChange={(event) => {
-              onTaskPromptChange?.(event.target.value);
-              setHasRequestedRecommendation(false);
-              setHasRequestedScopeRecommendation(false);
-            }}
-            placeholder={SQL_REPORT_TASK_PLACEHOLDER}
-            aria-label="Describe the SQL task for this tab"
-          />
+          <div
+            className={[
+              "sql-template-current-task",
+              taskPrompt.trim().length === 0 ? "is-empty" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label="Current Inspect SQL task"
+          >
+            {taskPrompt.trim() || "No Inspect SQL task yet. Start in Inspect SQL or use Search templates below."}
+          </div>
           <button
             type="button"
             className="primary-button"
@@ -1440,7 +1437,7 @@ function SqlAssistantPanel({
         </div>
         {taskPrompt.trim().length === 0 && (
           <p className="sql-template-recommender-empty">
-            {groundingEmptyCopy.noPrompt}
+            No Inspect SQL task yet. Start in Inspect SQL or use Search templates below.
           </p>
         )}
         {hasRequestedScopeRecommendation && taskPrompt.trim().length > 0 && (
