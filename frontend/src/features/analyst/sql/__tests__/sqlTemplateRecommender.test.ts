@@ -137,6 +137,35 @@ const dataset: DatasetMetadata = {
   workbook_metadata: workbookMetadata,
 };
 
+const tenantAccessWorksheets = [
+  worksheet("worksheet:units", "units", "units", ["unit_id", "unit_number", "property_id"]),
+  worksheet("worksheet:access_codes", "access_codes", "access_codes", ["access_code_id", "tenant_id", "code_status"]),
+  worksheet("worksheet:tenants", "tenants", "tenants", ["tenant_id", "unit_id", "tenant_status"]),
+  worksheet("worksheet:security_log", "security_log", "security_log", ["security_log_id", "access_code_id", "event_status"]),
+  worksheet("worksheet:properties", "properties", "properties", ["property_id", "state"]),
+];
+
+const tenantAccessWorkbookMetadata: WorkbookMetadata = {
+  ...workbookMetadata,
+  worksheetIds: tenantAccessWorksheets.map((sheet) => sheet.worksheetId),
+  activeWorksheetId: "worksheet:units",
+  worksheets: tenantAccessWorksheets,
+  tableMappings: tenantAccessWorksheets.map((sheet) => ({
+    sheetName: sheet.sheetName,
+    tableName: sheet.tableName,
+    originalIndex: sheet.originalIndex,
+  })),
+  acceptedRelationshipContracts: [],
+};
+
+const tenantAccessDataset: DatasetMetadata = {
+  ...dataset,
+  dataset_id: "dataset:tenant-access",
+  table_name: "units",
+  schema: tenantAccessWorksheets[0].schema,
+  workbook_metadata: tenantAccessWorkbookMetadata,
+};
+
 const baseRecipe = (overrides: Partial<SqlReportRecipe>): SqlReportRecipe => ({
   id: "category-summary",
   title: "Count units by property",
@@ -203,6 +232,31 @@ const needsReviewOpportunity: ReportOpportunity = {
   missingRequirements: [],
   sql: 'SELECT "tenant_id" FROM "leases";',
 };
+
+const statusSummaryOpportunity = (
+  tableName: string,
+  statusColumn: string,
+): ReportOpportunity => ({
+  id: `status-summary:${tableName}`,
+  title: `Status summary — ${tableName}`,
+  businessQuestion: `How many records sit in each ${statusColumn} value?`,
+  whyItMatters: "Summarizes record status for a single worksheet.",
+  domains: ["property"],
+  confidence: 0.9,
+  support: "can_generate_now",
+  method: "sql",
+  complexity: "simple",
+  needsJoins: false,
+  needsAggregation: true,
+  needsDateLogic: false,
+  needsAnomalyDetection: false,
+  requiredTables: [tableName],
+  optionalTables: [],
+  requiredColumns: [statusColumn],
+  optionalColumns: [],
+  missingRequirements: [],
+  sql: `SELECT "${statusColumn}" AS status, COUNT(*) AS record_count FROM "${tableName}" GROUP BY "${statusColumn}";`,
+});
 
 const placeholderTemplate: SqlAssistantTemplate = {
   id: "generic-join",
@@ -271,6 +325,19 @@ export function runSqlTemplateRecommenderFixtures(): RecommenderFixtureReport {
     opportunities: [needsReviewOpportunity],
   });
 
+  const tenantAccessRecommendations = recommendSqlTemplates({
+    taskPrompt: "How many tenants have access codes in each unit?",
+    dataset: tenantAccessDataset,
+    appliedScopeLabels: ["units", "access_codes", "tenants", "security_log", "properties"],
+    templates: [],
+    recipes: [],
+    opportunities: [
+      statusSummaryOpportunity("properties", "state"),
+      statusSummaryOpportunity("units", "unit_number"),
+      statusSummaryOpportunity("access_codes", "code_status"),
+    ],
+  });
+
   const shapeRecommendation = countPromptRecommendations[0];
 
   const bannedCountTitles = countPromptRecommendations.filter((recommendation) =>
@@ -311,6 +378,16 @@ export function runSqlTemplateRecommenderFixtures(): RecommenderFixtureReport {
           recommendation.warnings?.some((warning) => warning.includes("tenant_id")),
       ),
       `Expected needs_review tenant lookup with warning, got: ${needsReviewRecommendations.map((recommendation) => `${recommendation.id}:${recommendation.support}:${recommendation.warnings?.join("|") || ""}`).join(", ")}`,
+    ),
+    expect(
+      "multi-entity relationship prompt suppresses misleading single-table status summaries",
+      tenantAccessRecommendations.every(
+        (recommendation) =>
+          recommendation.title !== "Status summary — properties" &&
+          recommendation.title !== "Status summary — units" &&
+          recommendation.title !== "Status summary — access_codes",
+      ),
+      `Expected tenant/access-code/unit prompt to suppress status summaries, got: ${tenantAccessRecommendations.map((recommendation) => recommendation.title).join(", ")}`,
     ),
     expect(
       "recommendSqlTemplates return shape still includes legacy required fields",

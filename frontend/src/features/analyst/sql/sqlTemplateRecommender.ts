@@ -4,6 +4,7 @@ import type { SqlReportRecipe } from "./sqlReportRecipes";
 import type { SqlTemplateAdaptiveMetadata } from "./sqlTemplateAdaptiveMetadata";
 import type { SqlAssistantTemplate } from "./sqlTemplateLibrary";
 import { detectBusinessIntent, type BusinessIntent } from "./businessIntentGrounding";
+import { classifySqlBusinessQuestion } from "./sqlBusinessQuestionShape";
 import {
   groundCandidate,
   normalizeCandidates,
@@ -130,6 +131,9 @@ const buildCandidateText = (candidate: Candidate) =>
     candidate.tableText,
   ].join(" "));
 
+const matchesPromptToken = (label: string, promptTokens: readonly string[]) =>
+  promptTokens.some((token) => includesToken(label, token));
+
 const scoreCandidate = ({
   candidate,
   promptTokens,
@@ -159,8 +163,7 @@ const scoreCandidate = ({
   }
 
   const matchedScopeLabels = normalizedScopeLabels.filter((label) =>
-    promptTokens.some((token) => includesToken(label, token)) ||
-    candidateText.includes(label),
+    matchesPromptToken(label, promptTokens),
   );
   if (matchedScopeLabels.length > 0) {
     score += matchedScopeLabels.length * 10;
@@ -192,7 +195,10 @@ const scoreCandidate = ({
     score += 3;
   }
 
-  if (candidate.tableText && normalizedScopeLabels.some((label) => candidate.tableText.includes(label))) {
+  if (
+    candidate.tableText &&
+    normalizedScopeLabels.some((label) => candidate.tableText.includes(label) && matchesPromptToken(label, promptTokens))
+  ) {
     score += 8;
   }
 
@@ -436,6 +442,29 @@ const createGroundingReasons = (candidate: GroundedSqlCandidate): string[] => {
   return reasons;
 };
 
+const isSingleTableReportCandidateForRelationshipPrompt = (
+  candidate: GroundedSqlCandidate,
+  relationshipDependent: boolean,
+): boolean => {
+  if (!relationshipDependent) return false;
+  if (candidate.source === "template") return false;
+
+  const candidateText = normalizeText([candidate.title, candidate.description].join(" "));
+  const looksLikeGenericStatusSummary =
+    candidateText.includes("status summary") ||
+    (candidateText.includes("status") && candidateText.includes("summary")) ||
+    (candidateText.includes("records") && candidateText.includes("each") && candidateText.includes("value"));
+  if (!looksLikeGenericStatusSummary) return false;
+
+  const candidateTables = uniqueStrings([
+    ...candidate.requiredTables,
+    ...candidate.usedTables,
+  ]);
+  const requiredJoinCount = candidate.requiredJoins?.length || 0;
+
+  return candidateTables.length <= 1 && requiredJoinCount === 0;
+};
+
 export const recommendSqlTemplates = ({
   taskPrompt,
   dataset,
@@ -448,6 +477,7 @@ export const recommendSqlTemplates = ({
   if (promptTokens.length === 0) return [];
 
   const promptSoundsLikeReport = promptTokens.some((token) => reportIntentWords.has(token));
+  const questionShape = classifySqlBusinessQuestion({ prompt: taskPrompt, dataset });
   const worksheetLabels = getDatasetWorksheetLabels(dataset);
   const columnNames = getDatasetColumnNames(dataset);
   const groundingContext = buildGroundingContext({
@@ -463,6 +493,13 @@ export const recommendSqlTemplates = ({
 
   return normalizeCandidates({ templates, recipes, opportunities })
     .map((candidate) => groundCandidate(candidate, groundingContext))
+    .filter(
+      (candidate) =>
+        !isSingleTableReportCandidateForRelationshipPrompt(
+          candidate,
+          questionShape.relationshipDependent,
+        ),
+    )
     .filter(
       (candidate) =>
         Boolean(candidate.sql) &&
