@@ -41,6 +41,8 @@ export type CreateSqlWorksheetScopeModelInput = {
   activeSourceLabel?: string | null;
 };
 
+const MAX_SCOPE_SUMMARY_LABELS = 5;
+
 const normalize = (value: string) => value.trim().toLowerCase();
 
 const selectionMatchesWorksheet = (
@@ -51,6 +53,24 @@ const selectionMatchesWorksheet = (
 const worksheetLabel = (
   worksheet: NonNullable<DatasetMetadata["workbook_metadata"]>["worksheets"][number],
 ) => worksheet.displayName || worksheet.sheetName || worksheet.tableName;
+
+export const formatSqlWorksheetScopeSummary = (
+  dataset: DatasetMetadata | null,
+  selections: readonly AnalysisScopeSelection[],
+): string | null => {
+  if (selections.length === 0) return null;
+  const worksheets = dataset?.workbook_metadata?.worksheets || [];
+  const labels = selections.map((selection) => {
+    const worksheet = worksheets.find((current) => current.worksheetId === selection.worksheetId);
+    return worksheet?.displayName || worksheet?.sheetName || selection.tableName;
+  });
+  const visibleLabels = labels.slice(0, MAX_SCOPE_SUMMARY_LABELS);
+  const remainingCount = Math.max(0, labels.length - visibleLabels.length);
+
+  return remainingCount > 0
+    ? `${visibleLabels.join(", ")} +${remainingCount} more`
+    : visibleLabels.join(", ");
+};
 
 const createSelection = (
   dataset: DatasetMetadata | null,

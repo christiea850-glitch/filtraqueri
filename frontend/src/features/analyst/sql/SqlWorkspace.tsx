@@ -35,6 +35,7 @@ import {
   type SqlRelationshipReviewModel,
 } from "./sqlRelationshipReview";
 import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
+import { formatSqlWorksheetScopeSummary } from "./sqlWorksheetScopeAdapter";
 import useSqlWorkspace from "./useSqlWorkspace";
 
 type SqlWorkspaceProps = {
@@ -81,24 +82,6 @@ const formatDraftTimestamp = (value: string) => {
 const createSqlPreview = (sql: string) => {
   const normalized = sql.replace(/\s+/g, " ").trim();
   return normalized.length > 150 ? `${normalized.slice(0, 150)}...` : normalized;
-};
-
-const formatSqlTabScopeSummary = (
-  dataset: DatasetMetadata | null,
-  selections: AnalysisScopeSelection[],
-) => {
-  if (selections.length === 0) return null;
-  const worksheets = dataset?.workbook_metadata?.worksheets || [];
-  const labels = selections.map((selection) => {
-    const worksheet = worksheets.find((current) => current.worksheetId === selection.worksheetId);
-    return worksheet?.displayName || worksheet?.sheetName || selection.tableName;
-  });
-  const visibleLabels = labels.slice(0, 3);
-  const remainingCount = Math.max(0, labels.length - visibleLabels.length);
-
-  return remainingCount > 0
-    ? `${visibleLabels.join(", ")} +${remainingCount}`
-    : visibleLabels.join(", ");
 };
 
 const createRelationshipReviewProgressSummary = (
@@ -797,11 +780,11 @@ function SqlWorkspace({
   // "Active {worksheet}" pill.
   const workbookLabel = dataset?.original_filename || null;
   const activeDraft = savedDrafts.find((draft) => draft.id === activeDraftId) || null;
-  const selectedTabScopeSummary = formatSqlTabScopeSummary(
+  const selectedTabScopeSummary = formatSqlWorksheetScopeSummary(
     dataset,
     sqlTabs.selectedScopeSelections,
   );
-  const appliedTabScopeSummary = formatSqlTabScopeSummary(
+  const appliedTabScopeSummary = formatSqlWorksheetScopeSummary(
     dataset,
     sqlTabs.appliedScopeSelections,
   );

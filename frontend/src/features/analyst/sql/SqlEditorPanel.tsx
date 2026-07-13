@@ -841,8 +841,8 @@ function SqlEditorPanel({
   ).slice(0, 3);
   const compactRelevantWorksheetCountLabel =
     askFiltraQueriSuggestions.scopeRecommendations.length === 1
-      ? "1 worksheet"
-      : `${askFiltraQueriSuggestions.scopeRecommendations.length} worksheets`;
+      ? "1 suggested worksheet"
+      : `${askFiltraQueriSuggestions.scopeRecommendations.length} suggested worksheets`;
   const insertRecommendedAnalysisCard = (
     card: NonNullable<typeof askFiltraQueriSuggestions.recommendedAnalysis.primary>,
   ) => {
@@ -1120,7 +1120,7 @@ function SqlEditorPanel({
           {askFiltraQueriSuggestions.scopeRecommendations.length > 0 && (
             <div className="sql-scope-recommendation-list" aria-label="Relevant worksheets">
               <div className="sql-scope-recommendation-compact">
-                <span className="sql-scope-recommendation-compact-label">Worksheets:</span>
+                <span className="sql-scope-recommendation-compact-label">Top worksheet suggestions:</span>
                 <div className="sql-scope-recommendation-pill-list">
                   {compactRelevantWorksheets.map((recommendation) => (
                     <span

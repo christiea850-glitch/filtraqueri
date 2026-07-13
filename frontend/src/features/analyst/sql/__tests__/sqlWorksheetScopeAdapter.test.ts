@@ -14,6 +14,7 @@ import type {
 } from "../../../workbook";
 import {
   createSqlWorksheetScopeModel,
+  formatSqlWorksheetScopeSummary,
   hasSameSqlWorksheetScopeSelections,
   setSqlWorksheetScopeSourceType,
   toggleSqlWorksheetScopeSelection,
@@ -176,6 +177,13 @@ const leasesCleanSelection: AnalysisScopeSelection = {
   cleanedTableName: "leases_clean",
 };
 
+const scopeSelection = (name: string): AnalysisScopeSelection => ({
+  worksheetId: `worksheet:${name}`,
+  sourceType: "original",
+  tableName: name,
+  originalTableName: name,
+});
+
 const createModel = (
   selectedScopeSelections: AnalysisScopeSelection[] = [],
   appliedScopeSummary: string | null = null,
@@ -337,6 +345,46 @@ const fixtures: Fixture[] = [
           ? []
           : ["Expected applied scope label."]),
         ...expectNoBehaviorChange(appliedModel),
+      ];
+    },
+  },
+  {
+    name: "applied scope summary shows all five worksheet labels",
+    assert: () => {
+      const summary = formatSqlWorksheetScopeSummary(null, [
+        scopeSelection("units"),
+        scopeSelection("access_codes"),
+        scopeSelection("tenants"),
+        scopeSelection("security_log"),
+        scopeSelection("properties"),
+      ]);
+      return [
+        ...(summary === "units, access_codes, tenants, security_log, properties"
+          ? []
+          : [`Expected all five labels without truncation, received ${summary}.`]),
+        ...(summary?.includes("+") ? ["Five-item scope summary must not show overflow."] : []),
+      ];
+    },
+  },
+  {
+    name: "applied scope summary uses five labels plus overflow count",
+    assert: () => {
+      const summary = formatSqlWorksheetScopeSummary(null, [
+        scopeSelection("units"),
+        scopeSelection("access_codes"),
+        scopeSelection("tenants"),
+        scopeSelection("security_log"),
+        scopeSelection("properties"),
+        scopeSelection("leases"),
+        scopeSelection("payments"),
+      ]);
+      return [
+        ...(summary === "units, access_codes, tenants, security_log, properties +2 more"
+          ? []
+          : [`Expected five labels plus overflow, received ${summary}.`]),
+        ...(summary?.includes("leases") || summary?.includes("payments")
+          ? ["Overflow labels must not be shown after +N more."]
+          : []),
       ];
     },
   },
