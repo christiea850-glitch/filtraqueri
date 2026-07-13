@@ -186,6 +186,11 @@ const fixtures = [
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlPlanReadiness.test.ts",
     exportName: "runBusinessSqlPlanReadinessFixtures",
   },
+  {
+    label: "Business SQL renderability gate",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderabilityGate.test.ts",
+    exportName: "runBusinessSqlRenderabilityGateFixtures",
+  },
 ];
 
 const asCount = (value) => {
