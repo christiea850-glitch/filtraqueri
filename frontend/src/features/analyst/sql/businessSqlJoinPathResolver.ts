@@ -311,12 +311,67 @@ const unresolvedEdge = (
   verified: false,
 });
 
+const isBlockedBusinessSqlPlan = (plan: BusinessSqlQueryPlan): boolean =>
+  plan.status === "blocked" || plan.support === "blocked" || plan.kind === "blocked";
+
 export function resolveBusinessSqlJoinPath({
   plan,
   acceptedRelationshipContracts = [],
   readyRelationshipContracts = [],
   missingRelationships = [],
 }: ResolveBusinessSqlJoinPathInput): BusinessSqlQueryPlan {
+  if (isBlockedBusinessSqlPlan(plan)) {
+    const requirements = plan.joinPath.requirements.map((requirement) => ({
+      ...requirement,
+      verified: false,
+    }));
+    const edges = requirements.map((requirement) =>
+      unresolvedEdge(requirement, hintForRequirement(plan.joinPath, requirement)),
+    );
+    const joinEntities = uniqueStrings([
+      ...plan.joinPath.entities,
+      ...requirements.flatMap((requirement) => [
+        requirement.fromEntity,
+        requirement.toEntity,
+      ]),
+    ]);
+    const blockingWarning: BusinessSqlPlanWarning = {
+      id: "base-plan-already-blocked",
+      severity: "blocking",
+      message: "The base business SQL plan is already blocked; join resolution was not attempted.",
+    };
+
+    return {
+      ...plan,
+      status: "blocked",
+      support: "blocked",
+      joinPath: {
+        required: plan.joinPath.required,
+        status: plan.joinPath.required ? "missing" : plan.joinPath.status,
+        entities: joinEntities,
+        edges,
+        requirements,
+      },
+      warnings: warningExists(plan.warnings, blockingWarning.id)
+        ? plan.warnings
+        : [...plan.warnings, blockingWarning],
+      renderer: {
+        ...plan.renderer,
+        status: "blocked",
+        sql: undefined,
+        notes: uniqueStrings([
+          ...plan.renderer.notes,
+          "Join resolution was not attempted because the base plan is blocked.",
+        ]),
+      },
+      preview: {
+        ...plan.preview,
+        joinSummary: "Base plan is already blocked; join path was not resolved.",
+        rendererSummary: "SQL rendering is blocked.",
+      },
+    };
+  }
+
   if (!plan.joinPath.required || plan.joinPath.requirements.length === 0) {
     return plan;
   }

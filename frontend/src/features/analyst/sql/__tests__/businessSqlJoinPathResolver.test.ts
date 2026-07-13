@@ -71,6 +71,24 @@ const ordersPerCustomerBasePlan = planBusinessSqlQueryRequest({
   prompt: "Count orders per customer",
 });
 
+const alreadyBlockedOrdersPerCustomerPlan: BusinessSqlQueryPlan = {
+  ...ordersPerCustomerBasePlan,
+  status: "blocked",
+  support: "blocked",
+  renderer: {
+    ...ordersPerCustomerBasePlan.renderer,
+    status: "blocked",
+  },
+  warnings: [
+    ...ordersPerCustomerBasePlan.warnings,
+    {
+      id: "base-plan-blocked",
+      severity: "blocking",
+      message: "Planner blocked this request before join resolution.",
+    },
+  ],
+};
+
 const resolutionFixture = (
   name: string,
   resolution: ReturnType<typeof resolveBusinessSqlJoinPaths>,
@@ -191,6 +209,39 @@ export const BUSINESS_SQL_JOIN_PATH_RESOLVER_FIXTURES: JoinPathResolverFixture[]
       if (plan.status !== "blocked") failures.push("Expected blocked plan status.");
       if (plan.joinPath.status !== "missing") failures.push("Expected missing join path.");
       if (plan.renderer.status !== "blocked") failures.push("Expected blocked renderer.");
+      return failures;
+    },
+  },
+  {
+    name: "already-blocked plan cannot be upgraded by accepted relationships",
+    plan: resolveBusinessSqlJoinPath({
+      plan: alreadyBlockedOrdersPerCustomerPlan,
+      acceptedRelationshipContracts: [
+        relationshipContract(
+          "contract:customers-orders",
+          "customers",
+          "customer_id",
+          "orders",
+          "customer_id",
+        ),
+      ],
+    }),
+    assert: (plan) => {
+      const failures: string[] = [];
+      if (plan.status !== "blocked") failures.push("Expected blocked plan status.");
+      if (plan.support !== "blocked") failures.push("Expected blocked support.");
+      if (plan.joinPath.status === "resolved") failures.push("Blocked plan must not resolve joins.");
+      if (plan.joinPath.edges.some((edge) => edge.verified)) {
+        failures.push("Blocked plan must not contain verified join evidence.");
+      }
+      if (plan.joinPath.requirements.some((requirement) => requirement.verified)) {
+        failures.push("Blocked plan must not contain verified join requirements.");
+      }
+      if (!plan.warnings.some((warning) => warning.id === "base-plan-already-blocked")) {
+        failures.push("Expected base-plan blocked warning.");
+      }
+      if (plan.renderer.status !== "blocked") failures.push("Expected blocked renderer.");
+      if (plan.renderer.sql) failures.push("Blocked resolver must not attach SQL text.");
       return failures;
     },
   },
