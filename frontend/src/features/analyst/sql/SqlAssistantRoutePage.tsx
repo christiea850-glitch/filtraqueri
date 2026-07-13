@@ -250,6 +250,7 @@ function SqlAssistantRoutePage({
         taskPrompt={sqlTabs.taskPrompt}
         onTaskPromptChange={sqlTabs.onTaskPromptChange}
         onSelectedScopeChange={sqlTabs.onSelectedScopeChange}
+        onApplyScope={sqlTabs.onApplyScope}
         appliedScopeLabels={appliedScopeLabels}
         activeTabLabel={activeSourceLabel}
       />

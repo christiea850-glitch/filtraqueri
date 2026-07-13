@@ -72,6 +72,7 @@ type SqlAssistantPanelProps = {
   taskPrompt?: string;
   onTaskPromptChange?: (prompt: string) => void;
   onSelectedScopeChange?: (selections: AnalysisScopeSelection[]) => void;
+  onApplyScope?: () => void;
   appliedScopeLabels?: string[];
   activeTabLabel?: string;
 };
@@ -1057,6 +1058,7 @@ function SqlAssistantPanel({
   allowedModes,
   taskPrompt = "",
   onSelectedScopeChange,
+  onApplyScope,
   appliedScopeLabels = [],
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
@@ -1383,6 +1385,8 @@ function SqlAssistantPanel({
   const useSuggestedScope = () => {
     if (scopeRecommendations.length === 0) return;
     onSelectedScopeChange?.(scopeRecommendations.map((recommendation) => recommendation.selection));
+    onApplyScope?.();
+    setHasRequestedRecommendation(true);
   };
 
   const handleTaskKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1491,17 +1495,17 @@ function SqlAssistantPanel({
                 <div>
                   <strong>Suggested worksheets for this task</strong>
                   <span>
-                    Review these worksheets, then use them for this tab's scope. Nothing is
-                    applied until you confirm.
+                    Review these worksheets. Applying them updates this tab's scope and reveals
+                    matching templates. Nothing runs SQL.
                   </span>
                 </div>
                 <button
                   type="button"
                   className="secondary-button"
                   onClick={useSuggestedScope}
-                  disabled={!onSelectedScopeChange}
+                  disabled={!onSelectedScopeChange || !onApplyScope}
                 >
-                  Use suggested worksheets in this tab
+                  Apply these worksheets and continue
                 </button>
               </div>
               <div className="sql-scope-recommendation-grid">
