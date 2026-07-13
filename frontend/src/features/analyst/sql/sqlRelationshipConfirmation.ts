@@ -1,4 +1,5 @@
 import type { SchemaColumn } from "../../dataset/datasetTypes";
+import type { AcceptedRelationshipContract } from "../../workbook";
 
 export type SqlRelationshipConfirmationStatus =
   | "suggested"
@@ -163,6 +164,63 @@ export const createEmptySqlRelationshipConfirmationState =
     rejectedSuggestions: [],
     invalidatedRelationshipIds: {},
   });
+
+const relationshipTypeForCardinality = (
+  cardinality: SqlConfirmedWorksheetRelationship["cardinality"],
+): AcceptedRelationshipContract["relationshipType"] => {
+  if (cardinality === "one_to_one") return "one_to_one_candidate";
+  if (cardinality === "one_to_many") return "one_to_many_candidate";
+  if (cardinality === "many_to_one") return "many_to_one_candidate";
+  return "unknown_candidate";
+};
+
+const temporaryContractFromRelationship = (
+  relationship: SqlConfirmedWorksheetRelationship,
+): AcceptedRelationshipContract => ({
+  contractId: `temporary-review:${relationship.relationshipId}`,
+  sourceWorksheetId: relationship.fromWorksheetId,
+  sourceTableName: relationship.fromTableName,
+  sourceColumnName: relationship.fromColumn,
+  targetWorksheetId: relationship.toWorksheetId,
+  targetTableName: relationship.toTableName,
+  targetColumnName: relationship.toColumn,
+  relationshipType: relationshipTypeForCardinality(relationship.cardinality),
+  confidence: relationship.confidence ?? 1,
+  acceptedFromCandidateId:
+    relationship.acceptedFromCandidateId || relationship.relationshipId,
+  acceptedAt: relationship.confirmedAt || "",
+  acceptedBy: null,
+  status: "active",
+  validationState: "valid",
+  validationSummary: ["Session-scoped relationship confirmed for this review only."],
+  overlapRatio: 1,
+  sourceUniqueRatio: 1,
+  targetUniqueRatio: 1,
+  inferredTypeCompatible: true,
+  lastValidatedAt: relationship.confirmedAt || null,
+});
+
+export const createTemporaryReadyRelationshipContractsFromConfirmationState = (
+  state: SqlRelationshipConfirmationState,
+): AcceptedRelationshipContract[] => {
+  const byRelationshipId = new Map<string, SqlConfirmedWorksheetRelationship>();
+
+  for (const relationship of state.confirmedRelationships) {
+    if (
+      !isSqlConfirmedRelationshipActive(relationship) ||
+      !relationship.schemaBackedColumns ||
+      state.invalidatedRelationshipIds[relationship.relationshipId]
+    ) {
+      continue;
+    }
+
+    byRelationshipId.set(relationship.relationshipId, relationship);
+  }
+
+  return Array.from(byRelationshipId.values())
+    .sort((left, right) => left.relationshipId.localeCompare(right.relationshipId))
+    .map(temporaryContractFromRelationship);
+};
 
 const withoutRelationship = (
   relationships: readonly SqlConfirmedWorksheetRelationship[],

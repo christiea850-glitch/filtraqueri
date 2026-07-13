@@ -21,6 +21,7 @@ import {
   addSqlConfirmedRelationship,
   createEmptySqlRelationshipConfirmationState,
   createSqlConfirmedRelationshipFromSuggestion,
+  createTemporaryReadyRelationshipContractsFromConfirmationState,
   findSqlConfirmedRelationshipForEndpoints,
   rejectSqlRelationshipSuggestion,
   removeSqlConfirmedRelationship,
@@ -98,6 +99,46 @@ const formatSqlTabScopeSummary = (
   return remainingCount > 0
     ? `${visibleLabels.join(", ")} +${remainingCount}`
     : visibleLabels.join(", ");
+};
+
+const createRelationshipReviewProgressSummary = (
+  model: SqlRelationshipReviewModel,
+  confirmationState: SqlRelationshipConfirmationState,
+): string | null => {
+  if (model.pairs.length === 0) return null;
+
+  const confirmedCount = model.pairs.filter((pair) => {
+    if (pair.status === "accepted") return true;
+    if (!pair.suggestion || !pair.suggestedColumns) return false;
+
+    return Boolean(
+      findSqlConfirmedRelationshipForEndpoints(
+        confirmationState,
+        {
+          worksheetId: pair.suggestion.fromWorksheetId,
+          tableName: pair.fromTable,
+          column: pair.suggestedColumns.fromColumn,
+        },
+        {
+          worksheetId: pair.suggestion.toWorksheetId,
+          tableName: pair.toTable,
+          column: pair.suggestedColumns.toColumn,
+        },
+      ),
+    );
+  }).length;
+  const remainingCount = Math.max(0, model.pairs.length - confirmedCount);
+
+  if (confirmedCount === 0) return null;
+  if (remainingCount === 0) {
+    return `All ${model.pairs.length} worksheet connection${
+      model.pairs.length === 1 ? "" : "s"
+    } confirmed for this review.`;
+  }
+
+  return `${confirmedCount} of ${model.pairs.length} worksheet connection${
+    model.pairs.length === 1 ? "" : "s"
+  } confirmed; ${remainingCount} still need${remainingCount === 1 ? "s" : ""} review.`;
 };
 
 function SqlFocusedResultPreview({
@@ -606,6 +647,13 @@ function SqlRelationshipReviewPanel({
               : null;
             const isConfirmed = Boolean(confirmedRelationship) || pair.status === "accepted";
             const isRejected = Boolean(rejectedSuggestion) && !confirmedRelationship;
+            const statusCopy = confirmedRelationship
+              ? "Confirmed for this review only"
+              : isConfirmed
+                ? "Confirmed"
+                : isRejected
+                  ? "Rejected"
+                  : pair.statusLabel;
 
             return (
               <article
@@ -621,7 +669,7 @@ function SqlRelationshipReviewPanel({
                     isConfirmed ? "supported" : isRejected ? "blocked" : "needs_review"
                   }`}
                 >
-                  {isConfirmed ? "Confirmed" : isRejected ? "Rejected" : pair.statusLabel}
+                  {statusCopy}
                 </span>
               </div>
               <dl>
@@ -757,6 +805,13 @@ function SqlWorkspace({
     dataset,
     sqlTabs.appliedScopeSelections,
   );
+  const temporaryReadyRelationshipContracts = useMemo(
+    () =>
+      createTemporaryReadyRelationshipContractsFromConfirmationState(
+        relationshipConfirmationState,
+      ),
+    [relationshipConfirmationState],
+  );
   const businessSqlRenderPreview = useMemo(
     () =>
       createBusinessSqlRenderPreviewFromWorkspaceContext({
@@ -767,6 +822,7 @@ function SqlWorkspace({
         worksheets: dataset?.workbook_metadata?.worksheets || [],
         acceptedRelationshipContracts:
           dataset?.workbook_metadata?.acceptedRelationshipContracts || [],
+        readyRelationshipContracts: temporaryReadyRelationshipContracts,
         activeSqlDraft: editor.value,
         activeSqlDraftSource: sqlTabs.activeTabCreatedFrom || undefined,
       }).preview,
@@ -779,6 +835,7 @@ function SqlWorkspace({
       sqlTabs.activeTabCreatedFrom,
       sqlTabs.selectedScopeSelections,
       sqlTabs.taskPrompt,
+      temporaryReadyRelationshipContracts,
     ],
   );
   const relationshipReviewModel = useMemo(
@@ -788,6 +845,14 @@ function SqlWorkspace({
         requiredRelationships: relationshipReviewRequirements,
       }),
     [dataset, relationshipReviewRequirements],
+  );
+  const relationshipReviewProgressSummary = useMemo(
+    () =>
+      createRelationshipReviewProgressSummary(
+        relationshipReviewModel,
+        relationshipConfirmationState,
+      ),
+    [relationshipConfirmationState, relationshipReviewModel],
   );
   useEffect(() => {
     setRelationshipConfirmationState(createEmptySqlRelationshipConfirmationState());
@@ -1045,6 +1110,7 @@ function SqlWorkspace({
           errorInsight={previewResult.errorInsight}
           businessSqlRenderPreview={businessSqlRenderPreview}
           onReviewRelationships={openRelationshipReview}
+          relationshipReviewProgressSummary={relationshipReviewProgressSummary}
           planningDetailMode
           onBackFromPlanningDetails={() => setFocusedView("editor")}
           businessSqlPreviewFeedback={businessSqlPreviewFeedback}
@@ -1179,6 +1245,7 @@ function SqlWorkspace({
           errorInsight={previewResult.errorInsight}
           businessSqlRenderPreview={businessSqlRenderPreview}
           onReviewRelationships={openRelationshipReview}
+          relationshipReviewProgressSummary={relationshipReviewProgressSummary}
           onOpenPlanningDetails={() => setFocusedView("planning-details")}
           businessSqlPreviewFeedback={businessSqlPreviewFeedback}
           onBusinessSqlPreviewFeedbackChange={setBusinessSqlPreviewFeedback}

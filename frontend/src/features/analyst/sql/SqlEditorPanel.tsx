@@ -98,6 +98,7 @@ type SqlEditorPanelProps = {
   businessSqlRenderPreview?: BusinessSqlRenderPreview;
   dataset?: DatasetMetadata | null;
   onReviewRelationships?: (requiredRelationships: string[]) => void;
+  relationshipReviewProgressSummary?: string | null;
   planningDetailMode?: boolean;
   onOpenPlanningDetails?: () => void;
   onBackFromPlanningDetails?: () => void;
@@ -344,6 +345,7 @@ function SqlEditorPanel({
   businessSqlRenderPreview,
   dataset,
   onReviewRelationships,
+  relationshipReviewProgressSummary,
   planningDetailMode = false,
   onOpenPlanningDetails,
   onBackFromPlanningDetails,
@@ -1142,6 +1144,9 @@ function SqlEditorPanel({
                 <div>
                   <strong>{compactRelationshipBlock.title}</strong>
                   <span>{compactRelationshipBlock.copy}</span>
+                  {relationshipReviewProgressSummary && (
+                    <small>{relationshipReviewProgressSummary}</small>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -1168,6 +1173,9 @@ function SqlEditorPanel({
                   <div>
                     <strong>{askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.title}</strong>
                     <span>{askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.copy}</span>
+                    {relationshipReviewProgressSummary && (
+                      <small>{relationshipReviewProgressSummary}</small>
+                    )}
                   </div>
                   <button
                     type="button"

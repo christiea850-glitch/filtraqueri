@@ -7,6 +7,12 @@
 
 import type { AcceptedRelationshipContract } from "../../../workbook";
 import {
+  addSqlConfirmedRelationship,
+  createEmptySqlRelationshipConfirmationState,
+  createTemporaryReadyRelationshipContractsFromConfirmationState,
+  type SqlConfirmedWorksheetRelationship,
+} from "../sqlRelationshipConfirmation";
+import {
   applyBusinessSqlRenderPreviewManualInsert,
   createBusinessSqlRenderPreviewFromWorkspaceContext,
   getBusinessSqlRenderPreviewEmptyState,
@@ -61,6 +67,54 @@ const acceptedContract = (
   lastValidatedAt: "2026-01-01T00:00:00.000Z",
 });
 
+const confirmedRelationship = ({
+  fromTableName,
+  fromColumn,
+  toTableName,
+  toColumn,
+}: {
+  fromTableName: string;
+  fromColumn: string;
+  toTableName: string;
+  toColumn: string;
+}): SqlConfirmedWorksheetRelationship => ({
+  relationshipId: `sql-relationship:${[fromTableName, toTableName].sort().join("::")}`,
+  fromWorksheetId: `worksheet:${fromTableName}`,
+  fromWorksheetLabel: fromTableName,
+  fromTableName,
+  fromColumn,
+  toWorksheetId: `worksheet:${toTableName}`,
+  toWorksheetLabel: toTableName,
+  toTableName,
+  toColumn,
+  cardinality: "many_to_one",
+  confidence: 0.95,
+  status: "confirmed",
+  confirmedAt: "2026-01-01T00:00:00.000Z",
+  confirmedByUser: true,
+  scope: "workbook",
+  source: "inferred_then_confirmed",
+  acceptedFromCandidateId: `candidate:${fromTableName}-${toTableName}`,
+  workbookId: "workbook:property",
+  datasetId: "dataset:property",
+  schemaBackedColumns: true,
+  noSqlGeneratedOnConfirm: true,
+  noRunQueryOnConfirm: true,
+  noBackendCallOnConfirm: true,
+  userCanRemove: true,
+  invalidatedWhenWorksheetMissing: true,
+});
+
+const temporaryContractsFromConfirmedRelationships = (
+  relationships: readonly SqlConfirmedWorksheetRelationship[],
+): AcceptedRelationshipContract[] => {
+  const state = relationships.reduce(
+    (currentState, relationship) => addSqlConfirmedRelationship(currentState, relationship),
+    createEmptySqlRelationshipConfirmationState(),
+  );
+  return createTemporaryReadyRelationshipContractsFromConfirmationState(state);
+};
+
 const activeSqlDraft = 'SELECT * FROM "leases";';
 const reportSqlDraft = 'SELECT status, COUNT(*) AS lease_count FROM "leases" GROUP BY status;';
 const emptySqlDraft = "";
@@ -69,6 +123,25 @@ const separateDraftCopy =
 const noPreviewCopy = "Business SQL Preview has no generated preview for this task.";
 const fallbackDraftCopy =
   "Business SQL Preview has no generated preview for this task. You can still review the SQL currently in the editor and run it manually.";
+const propertyUnitRelationship = confirmedRelationship({
+  fromTableName: "properties",
+  fromColumn: "property_id",
+  toTableName: "units",
+  toColumn: "property_id",
+});
+const customerOrderRelationship = confirmedRelationship({
+  fromTableName: "customers",
+  fromColumn: "customer_id",
+  toTableName: "orders",
+  toColumn: "customer_id",
+});
+const oneTemporaryReadyContract = temporaryContractsFromConfirmedRelationships([
+  propertyUnitRelationship,
+]);
+const allTemporaryReadyContracts = temporaryContractsFromConfirmedRelationships([
+  customerOrderRelationship,
+]);
+const persistedAcceptedContracts: AcceptedRelationshipContract[] = [];
 
 const expectInsertRunDisabled = (
   result: BusinessSqlRenderPreviewWorkspaceResult,
@@ -327,6 +400,46 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...expectCopyDisabled(result),
       ...expectManualInsertDisabled(result),
       ...expectRunDisabledMessagePresent(result),
+      ...expectInsertRunDisabled(result),
+    ],
+  },
+  {
+    name: "one confirmed local relationship keeps multi-hop preview in review",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "How many units in each property are leased to current tenants?",
+      selectedGuidanceDialect: "duckdb",
+      readyRelationshipContracts: oneTemporaryReadyContract,
+      activeSqlDraft,
+    }),
+    assert: (result) => [
+      ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
+      ...(result.preview.sql === null ? [] : ["Expected no SQL until all relationships are resolved."]),
+      ...expectCopyDisabled(result),
+      ...expectManualInsertDisabled(result),
+      ...expectInsertRunDisabled(result),
+    ],
+  },
+  {
+    name: "all confirmed local relationships resolve through temporary ready contracts",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "How many orders per customer?",
+      selectedGuidanceDialect: "duckdb",
+      acceptedRelationshipContracts: persistedAcceptedContracts,
+      readyRelationshipContracts: allTemporaryReadyContracts,
+      activeSqlDraft: emptySqlDraft,
+    }),
+    assert: (result) => [
+      ...(persistedAcceptedContracts.length === 0
+        ? []
+        : ["Temporary contracts must not mutate persisted accepted relationships."]),
+      ...(allTemporaryReadyContracts.every((contract) =>
+        contract.contractId.startsWith("temporary-review:"),
+      )
+        ? []
+        : ["Expected session-scoped temporary contract ids."]),
+      ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
+      ...(result.preview.sql ? [] : ["Expected existing guarded preview SQL only after all relationships resolve."]),
+      ...expectManualInsertEnabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },

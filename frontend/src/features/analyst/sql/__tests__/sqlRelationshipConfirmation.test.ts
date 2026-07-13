@@ -12,6 +12,7 @@ import {
   createEmptySqlRelationshipConfirmationState,
   createSqlConfirmedRelationshipFromSuggestion,
   createSqlRelationshipId,
+  createTemporaryReadyRelationshipContractsFromConfirmationState,
   findSqlConfirmedRelationshipForEndpoints,
   invalidateSqlRelationshipConfirmations,
   isSqlConfirmedRelationshipActive,
@@ -316,6 +317,111 @@ const fixtures: Array<{
         ...(state.confirmedRelationships[0]?.confidence === 0.95
           ? []
           : ["Expected latest relationship to replace earlier duplicate."]),
+      ];
+    },
+  },
+  {
+    name: "confirmed local relationship converts to a temporary ready contract",
+    run: () => {
+      const relationship = confirmedRelationship();
+      const state = addSqlConfirmedRelationship(
+        createEmptySqlRelationshipConfirmationState(),
+        relationship,
+      );
+      const contracts = createTemporaryReadyRelationshipContractsFromConfirmationState(state);
+      return [
+        ...(contracts.length === 1 ? [] : ["Expected one temporary ready contract."]),
+        ...(contracts[0]?.contractId === `temporary-review:${relationship.relationshipId}`
+          ? []
+          : ["Expected temporary review contract id."]),
+        ...(contracts[0]?.sourceTableName === relationship.fromTableName &&
+          contracts[0]?.targetTableName === relationship.toTableName
+          ? []
+          : ["Expected relationship table endpoints to be preserved."]),
+        ...(contracts[0]?.status === "active" && contracts[0]?.validationState === "valid"
+          ? []
+          : ["Expected active valid temporary contract."]),
+        ...(contracts[0]?.validationSummary.includes(
+          "Session-scoped relationship confirmed for this review only.",
+        )
+          ? []
+          : ["Expected session-scoped validation summary."]),
+      ];
+    },
+  },
+  {
+    name: "rejected local relationship does not convert to temporary ready evidence",
+    run: () => {
+      const rejected = confirmedRelationship({
+        status: "rejected",
+        confirmedAt: undefined,
+        rejectedAt: "2026-01-04T00:00:00.000Z",
+      });
+      const state = rejectSqlRelationshipSuggestion(
+        createEmptySqlRelationshipConfirmationState(),
+        rejected,
+      );
+      const contracts = createTemporaryReadyRelationshipContractsFromConfirmationState(state);
+      return contracts.length === 0
+        ? []
+        : ["Expected rejected relationship to be excluded."];
+    },
+  },
+  {
+    name: "invalidated local relationship does not convert to temporary ready evidence",
+    run: () => {
+      const relationship = confirmedRelationship();
+      const state = addSqlConfirmedRelationship(
+        createEmptySqlRelationshipConfirmationState(),
+        relationship,
+      );
+      const invalidated = invalidateSqlRelationshipConfirmations(state, {
+        datasetId: "dataset:other",
+      });
+      const contracts = createTemporaryReadyRelationshipContractsFromConfirmationState(invalidated);
+      return contracts.length === 0
+        ? []
+        : ["Expected invalidated relationship to be excluded."];
+    },
+  },
+  {
+    name: "temporary ready contracts are deduped and sorted deterministically",
+    run: () => {
+      const later = confirmedRelationship({
+        relationshipId: "sql-relationship:z",
+        fromTableName: "z_units",
+        toTableName: "z_codes",
+      });
+      const earlierFirst = confirmedRelationship({
+        relationshipId: "sql-relationship:a",
+        fromTableName: "a_units",
+        toTableName: "a_codes",
+        confidence: 0.8,
+      });
+      const earlierSecond = confirmedRelationship({
+        relationshipId: "sql-relationship:a",
+        fromTableName: "a_units",
+        toTableName: "a_codes",
+        confidence: 0.95,
+      });
+      const state = addSqlConfirmedRelationship(
+        addSqlConfirmedRelationship(
+          addSqlConfirmedRelationship(createEmptySqlRelationshipConfirmationState(), later),
+          earlierFirst,
+        ),
+        earlierSecond,
+      );
+      const before = JSON.stringify(state);
+      const contracts = createTemporaryReadyRelationshipContractsFromConfirmationState(state);
+      return [
+        ...(JSON.stringify(state) === before ? [] : ["Adapter must not mutate state."]),
+        ...(contracts.map((contract) => contract.contractId).join("|") ===
+        "temporary-review:sql-relationship:a|temporary-review:sql-relationship:z"
+          ? []
+          : [`Expected deterministic sorted contracts, received ${contracts.map((contract) => contract.contractId).join("|")}.`]),
+        ...(contracts[0]?.confidence === 0.95
+          ? []
+          : ["Expected latest duplicate confirmation to win."]),
       ];
     },
   },
