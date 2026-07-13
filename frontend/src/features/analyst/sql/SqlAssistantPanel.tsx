@@ -1336,19 +1336,23 @@ function SqlAssistantPanel({
   const canSuggestWorksheets = trimmedTaskPrompt.length > 0 && hasWorkbookMetadata;
   const canFindMatchingTemplate =
     trimmedTaskPrompt.length > 0 && hasDataset && hasAppliedScope;
+  const noActiveDatasetMessage =
+    trimmedTaskPrompt.length > 0 && !hasDataset
+      ? "No dataset is currently open for this SQL workspace. Reopen a dataset to suggest worksheets or find grounded templates."
+      : null;
   const worksheetUnavailableMessage =
     trimmedTaskPrompt.length === 0
       ? null
-      : !hasDataset
-        ? "Open a dataset to suggest worksheets."
+      : noActiveDatasetMessage
+        ? "No dataset is currently open for this SQL workspace."
         : !hasWorkbookMetadata
           ? "Open a dataset with workbook metadata to suggest worksheets."
           : null;
   const templateUnavailableMessage =
     trimmedTaskPrompt.length === 0
       ? null
-      : !hasDataset
-        ? "Open a dataset to find grounded template matches."
+      : noActiveDatasetMessage
+        ? "No dataset is currently open for this SQL workspace."
         : !hasAppliedScope
           ? "Apply a worksheet scope before finding grounded template matches."
           : null;
@@ -1468,11 +1472,17 @@ function SqlAssistantPanel({
             No Inspect SQL task yet. Start in Inspect SQL or use Search templates below.
           </p>
         )}
-        {worksheetUnavailableMessage && (
-          <p className="sql-template-recommender-empty">{worksheetUnavailableMessage}</p>
-        )}
-        {templateUnavailableMessage && (
-          <p className="sql-template-recommender-empty">{templateUnavailableMessage}</p>
+        {noActiveDatasetMessage ? (
+          <p className="sql-template-recommender-empty">{noActiveDatasetMessage}</p>
+        ) : (
+          <>
+            {worksheetUnavailableMessage && (
+              <p className="sql-template-recommender-empty">{worksheetUnavailableMessage}</p>
+            )}
+            {templateUnavailableMessage && (
+              <p className="sql-template-recommender-empty">{templateUnavailableMessage}</p>
+            )}
+          </>
         )}
         {hasRequestedScopeRecommendation && trimmedTaskPrompt.length > 0 && !worksheetUnavailableMessage && (
           scopeRecommendations.length > 0 ? (

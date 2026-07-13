@@ -152,6 +152,11 @@ function SqlAssistantRoutePage({
   const appliedScopeLabels = getScopeWorksheetLabels(dataset, sqlTabs.appliedScopeSelections);
   const appliedScopeLabel =
     appliedScopeLabels.length > 0 ? appliedScopeLabels.join(", ") : null;
+  const scopeHelperContext = !dataset
+    ? "No dataset is currently open for this SQL workspace. Reopen a dataset to suggest worksheets or find grounded templates."
+    : appliedScopeLabel
+      ? `Current applied scope: ${appliedScopeLabel}.`
+      : "No worksheet scope is applied yet. Suggest worksheets can help choose scope before finding grounded template matches.";
   const openedFromSqlTask = sqlAssistantOrigin === "sql-context-task-assist";
   // Option C — Templates / Reports must render against the active SQL tab's
   // source (schema, table name), not the global dataset. SqlAssistantPanel
@@ -213,9 +218,7 @@ function SqlAssistantRoutePage({
         Templates use the active SQL tab's applied scope and insert into the active tab only.
         Reports follow the same active-tab context. To use different worksheets, switch tabs or
         update this tab's SQL Context.{" "}
-        {appliedScopeLabel
-          ? `Current applied scope: ${appliedScopeLabel}.`
-          : "No scope applied yet; using the active tab source."}{" "}
+        {scopeHelperContext}{" "}
         Selected scope is context only and does not run or activate anything.
       </p>
 
