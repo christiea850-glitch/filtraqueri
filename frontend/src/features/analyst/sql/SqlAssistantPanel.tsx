@@ -1066,15 +1066,20 @@ function SqlAssistantPanel({
   const [generatedDrafts, setGeneratedDrafts] = useState<SqlTaskGenerationResult[]>([]);
   const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
   const [activeRecipeFilter, setActiveRecipeFilter] = useState<SqlReportRecipeFilter>("All");
+  const scopeDataset = scopeRecommendationDataset ?? dataset;
+  const hasDataset = Boolean(dataset);
+  const hasWorkbookMetadata = Boolean(scopeDataset?.workbook_metadata);
+  const hasAppliedScope = appliedScopeLabels.length > 0;
+  const trimmedTaskPrompt = taskPrompt.trim();
   const [hasRequestedScopeRecommendation, setHasRequestedScopeRecommendation] = useState(false);
   const scopeRecommendations = useMemo(
     () =>
       recommendSqlScope({
         taskPrompt,
-        dataset: scopeRecommendationDataset ?? dataset,
+        dataset: scopeDataset,
         appliedScopeLabels,
       }),
-    [appliedScopeLabels, dataset, scopeRecommendationDataset, taskPrompt],
+    [appliedScopeLabels, scopeDataset, taskPrompt],
   );
   const templates = useMemo(
     () => createSqlAssistantTemplates(dataset, selectedDialect),
@@ -1328,6 +1333,27 @@ function SqlAssistantPanel({
         : activeRecipeFilter === "All"
           ? "No report recipes match this dataset yet."
           : `No ${activeRecipeFilter} recipes match this dataset. Try All or Supported.`;
+  const canSuggestWorksheets = trimmedTaskPrompt.length > 0 && hasWorkbookMetadata;
+  const canFindMatchingTemplate =
+    trimmedTaskPrompt.length > 0 && hasDataset && hasAppliedScope;
+  const worksheetUnavailableMessage =
+    trimmedTaskPrompt.length === 0
+      ? null
+      : !hasDataset
+        ? "Open a dataset to suggest worksheets."
+        : !hasWorkbookMetadata
+          ? "Open a dataset with workbook metadata to suggest worksheets."
+          : null;
+  const templateUnavailableMessage =
+    trimmedTaskPrompt.length === 0
+      ? null
+      : !hasDataset
+        ? "Open a dataset to find grounded template matches."
+        : !hasAppliedScope
+          ? "Apply a worksheet scope before finding grounded template matches."
+          : null;
+  const datasetContextLabel =
+    dataset?.original_filename || scopeDataset?.original_filename || "this dataset";
 
   const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") event.preventDefault();
@@ -1410,19 +1436,20 @@ function SqlAssistantPanel({
           <div
             className={[
               "sql-template-current-task",
-              taskPrompt.trim().length === 0 ? "is-empty" : "",
+              trimmedTaskPrompt.length === 0 ? "is-empty" : "",
             ]
               .filter(Boolean)
               .join(" ")}
             aria-label="Current Inspect SQL task"
           >
-            {taskPrompt.trim() || "No Inspect SQL task yet. Start in Inspect SQL or use Search templates below."}
+            {trimmedTaskPrompt || "No Inspect SQL task yet. Start in Inspect SQL or use Search templates below."}
           </div>
           <button
             type="button"
             className="primary-button"
             onClick={recommendScope}
-            disabled={taskPrompt.trim().length === 0}
+            disabled={!canSuggestWorksheets}
+            title={worksheetUnavailableMessage || undefined}
           >
             Suggest worksheets
           </button>
@@ -1430,17 +1457,24 @@ function SqlAssistantPanel({
             type="button"
             className="secondary-button"
             onClick={recommendTemplate}
-            disabled={taskPrompt.trim().length === 0}
+            disabled={!canFindMatchingTemplate}
+            title={templateUnavailableMessage || undefined}
           >
             Find matching template
           </button>
         </div>
-        {taskPrompt.trim().length === 0 && (
+        {trimmedTaskPrompt.length === 0 && (
           <p className="sql-template-recommender-empty">
             No Inspect SQL task yet. Start in Inspect SQL or use Search templates below.
           </p>
         )}
-        {hasRequestedScopeRecommendation && taskPrompt.trim().length > 0 && (
+        {worksheetUnavailableMessage && (
+          <p className="sql-template-recommender-empty">{worksheetUnavailableMessage}</p>
+        )}
+        {templateUnavailableMessage && (
+          <p className="sql-template-recommender-empty">{templateUnavailableMessage}</p>
+        )}
+        {hasRequestedScopeRecommendation && trimmedTaskPrompt.length > 0 && !worksheetUnavailableMessage && (
           scopeRecommendations.length > 0 ? (
             <div className="sql-scope-recommendation-list" aria-label="Recommended worksheets">
               <div className="sql-scope-recommendation-actions">
@@ -1471,17 +1505,12 @@ function SqlAssistantPanel({
             </div>
           ) : (
             <p className="sql-template-recommender-empty">
-              No strong worksheet match yet. You can select worksheets manually in SQL Context.
+              No worksheet match found for "{trimmedTaskPrompt}" in {datasetContextLabel}. You can select worksheets manually in SQL Context.
             </p>
           )
         )}
-        {hasRequestedRecommendation && (
-          appliedScopeLabels.length === 0 ? (
-            <p className="sql-template-recommender-empty">
-              {groundingEmptyCopy.noScope}
-            </p>
-          ) : (
-            recommendations.length > 0 ? (
+        {hasRequestedRecommendation && !templateUnavailableMessage && (
+          recommendations.length > 0 ? (
               <div className="sql-template-recommendation-list" aria-label="Recommended templates">
                 <div>
                   <div className="sql-helper-section-label">
@@ -1527,11 +1556,10 @@ function SqlAssistantPanel({
                 </div>
               ) : (
                 <p className="sql-template-recommender-empty">
-                  {groundingEmptyCopy.noSupportedMatches}
+                  No grounded template match found for "{trimmedTaskPrompt}" in {datasetContextLabel}. You can keep browsing templates with Search templates.
                 </p>
               )
             )
-          )
         )}
       </section>
 
