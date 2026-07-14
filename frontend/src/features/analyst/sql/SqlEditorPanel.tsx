@@ -1629,6 +1629,17 @@ function SqlEditorPanel({
         )}
       </div>
 
+      <SqlEditorHost
+        editor={editor}
+        errorInsight={errorInsight}
+        errorDock={errorInsight ? <SqlExecutionErrorDock insight={errorInsight} /> : null}
+      />
+
+      <div className="sql-editor-footer">
+        <span>{statusLabels[executionStatus]}</span>
+        <span>{characterCount.toLocaleString()} characters</span>
+      </div>
+
       <div className="sql-editor-toolbar sql-command-bar">
             {isSourcePopoverOpen && (
               <div
@@ -1835,17 +1846,6 @@ function SqlEditorPanel({
           </button>
         </section>
       )}
-
-      <SqlEditorHost
-        editor={editor}
-        errorInsight={errorInsight}
-        errorDock={errorInsight ? <SqlExecutionErrorDock insight={errorInsight} /> : null}
-      />
-
-      <div className="sql-editor-footer">
-        <span>{statusLabels[executionStatus]}</span>
-        <span>{characterCount.toLocaleString()} characters</span>
-      </div>
     </section>
   );
 }
