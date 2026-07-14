@@ -380,6 +380,22 @@ function SqlEditorPanel({
   const scopePopoverRef = useRef<HTMLDivElement | null>(null);
   const effectiveBusinessSqlRenderPreview =
     businessSqlCandidatePreview || businessSqlRenderPreview;
+  const businessSqlRendererPreviewUiModel =
+    effectiveBusinessSqlRenderPreview?.rendererPreviewUiModel || null;
+  const businessSqlPreviewDisplaySql = businessSqlRendererPreviewUiModel
+    ? businessSqlRendererPreviewUiModel.displayStatus === "rendered"
+      ? businessSqlRendererPreviewUiModel.sqlText
+      : null
+    : effectiveBusinessSqlRenderPreview?.sql || null;
+  const businessSqlRendererSafetyLabels = businessSqlRendererPreviewUiModel
+    ? [
+        businessSqlRendererPreviewUiModel.safetyLabels.previewOnly,
+        businessSqlRendererPreviewUiModel.safetyLabels.notInsertedAutomatically,
+        businessSqlRendererPreviewUiModel.safetyLabels.notExecuted,
+        businessSqlRendererPreviewUiModel.safetyLabels.runQueryManual,
+      ]
+    : [];
+  const businessSqlRendererPreviewIsDisplayOnly = Boolean(businessSqlRendererPreviewUiModel);
   const askFiltraQueri = useMemo(
     () => createSqlAskFiltraQueriModel(sqlTabs.taskPrompt),
     [sqlTabs.taskPrompt],
@@ -889,6 +905,13 @@ function SqlEditorPanel({
           )}
         </div>
       </div>
+      {businessSqlRendererSafetyLabels.length > 0 && (
+        <div className="business-sql-renderer-safety-labels" aria-label="Renderer preview safety">
+          {businessSqlRendererSafetyLabels.map((label) => (
+            <span key={label}>{label}</span>
+          ))}
+        </div>
+      )}
       <p>
         {effectiveBusinessSqlRenderPreview.status === "ready"
           ? effectiveBusinessSqlRenderPreview.body
@@ -896,9 +919,9 @@ function SqlEditorPanel({
             effectiveBusinessSqlRenderPreview.body}
       </p>
 
-      {effectiveBusinessSqlRenderPreview.sql ? (
+      {businessSqlPreviewDisplaySql ? (
         <pre className="business-sql-preview-code" aria-label="Read-only rendered SQL">
-          {effectiveBusinessSqlRenderPreview.sql}
+          {businessSqlPreviewDisplaySql}
         </pre>
       ) : (
         <div className="business-sql-preview-empty" aria-label="No rendered SQL">
@@ -906,6 +929,34 @@ function SqlEditorPanel({
             "Business SQL Preview has no generated preview for this task."}
         </div>
       )}
+
+      {businessSqlRendererPreviewUiModel &&
+        businessSqlRendererPreviewUiModel.displayStatus !== "rendered" &&
+        (businessSqlRendererPreviewUiModel.blockers.length > 0 ||
+          businessSqlRendererPreviewUiModel.warnings.length > 0) && (
+          <div className="business-sql-preview-review-notes">
+            {businessSqlRendererPreviewUiModel.blockers.length > 0 && (
+              <div>
+                <strong>Renderer blockers</strong>
+                <ul>
+                  {businessSqlRendererPreviewUiModel.blockers.slice(0, 4).map((blocker) => (
+                    <li key={blocker}>{blocker}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {businessSqlRendererPreviewUiModel.warnings.length > 0 && (
+              <div>
+                <strong>Renderer warnings</strong>
+                <ul>
+                  {businessSqlRendererPreviewUiModel.warnings.slice(0, 4).map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
       {effectiveBusinessSqlRenderPreview.status !== "ready" &&
         businessSqlPreviewVisibility.failureTitle && (
@@ -962,8 +1013,15 @@ function SqlEditorPanel({
               type="button"
               className="secondary-button"
               onClick={insertBusinessSqlPreview}
-              disabled={!businessSqlPreviewInsertState?.canManuallyInsertSqlPreview}
-              title={businessSqlPreviewInsertState?.disabledReason || "Insert preview SQL into the empty editor"}
+              disabled={
+                businessSqlRendererPreviewIsDisplayOnly ||
+                !businessSqlPreviewInsertState?.canManuallyInsertSqlPreview
+              }
+              title={
+                businessSqlRendererPreviewIsDisplayOnly
+                  ? "Renderer preview is read-only. It is not inserted automatically."
+                  : businessSqlPreviewInsertState?.disabledReason || "Insert preview SQL into the empty editor"
+              }
             >
               {businessSqlInsertButtonLabel}
             </button>
