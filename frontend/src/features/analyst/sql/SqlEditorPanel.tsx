@@ -388,6 +388,7 @@ function SqlEditorPanel({
   const [isSourcePopoverOpen, setIsSourcePopoverOpen] = useState(false);
   const [pendingSourceOptionId, setPendingSourceOptionId] = useState<string | null>(null);
   const [isScopePopoverOpen, setIsScopePopoverOpen] = useState(false);
+  const [isPlanningDisclosureOpen, setIsPlanningDisclosureOpen] = useState(false);
   const sourceTriggerRef = useRef<HTMLButtonElement | null>(null);
   const sourcePopoverRef = useRef<HTMLDivElement | null>(null);
   const scopeTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -1126,6 +1127,46 @@ function SqlEditorPanel({
       : effectiveBusinessSqlRenderPreview?.status === "blocked"
         ? "Needs review"
         : "Planning details";
+  const planningDisclosureAvailable =
+    Boolean(readinessReport) ||
+    Boolean(dialectExecutionAdvisory) ||
+    businessSqlPreviewVisibility.shouldShowIdleCopy ||
+    (planningDetailsAvailable && Boolean(effectiveBusinessSqlRenderPreview));
+  const shouldOpenPlanningDisclosure =
+    readinessReport?.status === "warning" ||
+    Boolean(compactRelationshipBlock) ||
+    effectiveBusinessSqlRenderPreview?.status === "blocked";
+  const readinessDetailsBlock = readinessReport ? (
+    <div
+      className={[
+        "sql-command-readiness",
+        readinessReport.status === "warning" ? "has-warning" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      role="status"
+      aria-live="polite"
+      title={readinessReport.summary}
+    >
+      <span className="sql-command-readiness-chip">{readinessStatusLabel}</span>
+      {readinessReport.status === "warning" && (
+        <div className="sql-command-readiness-summary">
+          <span>{readinessReport.summary}</span>
+          {readinessReport.issues.length > 0 && (
+            <ul>
+              {readinessReport.issues.slice(0, 2).map((issue) => (
+                <li key={issue.id}>{issue.message}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  useEffect(() => {
+    if (shouldOpenPlanningDisclosure) setIsPlanningDisclosureOpen(true);
+  }, [shouldOpenPlanningDisclosure]);
 
   if (planningDetailMode) {
     return (
@@ -1739,33 +1780,6 @@ function SqlEditorPanel({
               </div>
             )}
           </div>
-          {readinessReport && (
-            <div
-              className={[
-                "sql-command-readiness",
-                readinessReport.status === "warning" ? "has-warning" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              role="status"
-              aria-live="polite"
-              title={readinessReport.summary}
-            >
-              <span className="sql-command-readiness-chip">{readinessStatusLabel}</span>
-              {readinessReport.status === "warning" && (
-                <div className="sql-command-readiness-summary">
-                  <span>{readinessReport.summary}</span>
-                  {readinessReport.issues.length > 0 && (
-                    <ul>
-                      {readinessReport.issues.slice(0, 2).map((issue) => (
-                        <li key={issue.id}>{issue.message}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
           <button
             type="button"
             className="primary-button sql-command-action is-run-query"
@@ -1806,45 +1820,63 @@ function SqlEditorPanel({
         </div>
       </div>
 
-      {dialectExecutionAdvisory && (
-        <div
-          className="sql-dialect-execution-advisory"
-          role="status"
-          aria-live="polite"
+      {planningDisclosureAvailable && (
+        <details
+          className="sql-planning-details"
+          open={isPlanningDisclosureOpen}
+          onToggle={(event) => setIsPlanningDisclosureOpen(event.currentTarget.open)}
         >
-          {dialectExecutionAdvisory}
-        </div>
-      )}
+          <summary className="sql-planning-details-summary">
+            <span>Planning details</span>
+            <small>
+              Review generated preview status, readiness notes, worksheet relationship requirements, and planning metadata.
+            </small>
+          </summary>
+          <div className="sql-planning-details-body">
+            {readinessDetailsBlock}
 
-      {businessSqlPreviewVisibility.shouldShowIdleCopy && (
-        <p className="business-sql-preview-idle" role="status">
-          {BUSINESS_SQL_PREVIEW_IDLE_COPY}
-        </p>
-      )}
+            {dialectExecutionAdvisory && (
+              <div
+                className="sql-dialect-execution-advisory"
+                role="status"
+                aria-live="polite"
+              >
+                {dialectExecutionAdvisory}
+              </div>
+            )}
 
-      {planningDetailsAvailable && effectiveBusinessSqlRenderPreview && (
-        <section className="business-sql-planning-status-row" aria-label="Planning status">
-          <div>
-            <strong>Planning details available</strong>
-            <span>{planningStatusLabel}</span>
+            {businessSqlPreviewVisibility.shouldShowIdleCopy && (
+              <p className="business-sql-preview-idle" role="status">
+                {BUSINESS_SQL_PREVIEW_IDLE_COPY}
+              </p>
+            )}
+
+            {planningDetailsAvailable && effectiveBusinessSqlRenderPreview && (
+              <section className="business-sql-planning-status-row" aria-label="Planning status">
+                <div>
+                  <strong>Planning details available</strong>
+                  <span>{planningStatusLabel}</span>
+                </div>
+                <div className="business-sql-preview-badges" aria-label="Planning status metadata">
+                  <em>
+                    {effectiveBusinessSqlRenderPreview.status === "ready"
+                      ? "Ready"
+                      : effectiveBusinessSqlRenderPreview.status === "blocked"
+                        ? "Needs review"
+                        : "Review"}
+                  </em>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={onOpenPlanningDetails}
+                >
+                  View planning details
+                </button>
+              </section>
+            )}
           </div>
-          <div className="business-sql-preview-badges" aria-label="Planning status metadata">
-            <em>
-              {effectiveBusinessSqlRenderPreview.status === "ready"
-                ? "Ready"
-                : effectiveBusinessSqlRenderPreview.status === "blocked"
-                  ? "Needs review"
-                  : "Review"}
-            </em>
-          </div>
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={onOpenPlanningDetails}
-          >
-            View planning details
-          </button>
-        </section>
+        </details>
       )}
     </section>
   );
