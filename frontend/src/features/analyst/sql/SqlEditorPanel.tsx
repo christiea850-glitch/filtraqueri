@@ -27,6 +27,10 @@ import {
   getBusinessSqlRenderPreviewManualInsertState,
 } from "./businessSqlRenderPreviewUiAdapter";
 import {
+  applyBusinessSqlRendererPreviewManualInsert,
+  getBusinessSqlRendererPreviewManualInsertEligibility,
+} from "./businessSqlRendererPreviewManualInsertGate";
+import {
   getSqlDialectExecutionAdvisory,
   SQL_DIALECT_EXECUTION_HELPER_TEXT,
   SQL_DIALECT_SELECTOR_LABEL,
@@ -395,7 +399,6 @@ function SqlEditorPanel({
         businessSqlRendererPreviewUiModel.safetyLabels.runQueryManual,
       ]
     : [];
-  const businessSqlRendererPreviewIsDisplayOnly = Boolean(businessSqlRendererPreviewUiModel);
   const askFiltraQueri = useMemo(
     () => createSqlAskFiltraQueriModel(sqlTabs.taskPrompt),
     [sqlTabs.taskPrompt],
@@ -439,6 +442,17 @@ function SqlEditorPanel({
         ? getBusinessSqlRenderPreviewManualInsertState(effectiveBusinessSqlRenderPreview, editor.value)
         : null,
     [effectiveBusinessSqlRenderPreview, editor.value],
+  );
+  const businessSqlRendererPreviewInsertEligibility = useMemo(
+    () =>
+      businessSqlRendererPreviewUiModel
+        ? getBusinessSqlRendererPreviewManualInsertEligibility({
+            rendererPreviewUiModel: businessSqlRendererPreviewUiModel,
+            activeSqlDraft: editor.value,
+            priorInsertedFingerprint: insertedAskRecommendationId,
+          })
+        : null,
+    [businessSqlRendererPreviewUiModel, editor.value, insertedAskRecommendationId],
   );
   const businessSqlPreviewEmptyState = useMemo(
     () =>
@@ -688,6 +702,23 @@ function SqlEditorPanel({
   const insertBusinessSqlPreview = () => {
     if (!effectiveBusinessSqlRenderPreview) return;
 
+    if (businessSqlRendererPreviewUiModel) {
+      const insertResult = applyBusinessSqlRendererPreviewManualInsert({
+        rendererPreviewUiModel: businessSqlRendererPreviewUiModel,
+        activeSqlDraft: editor.value,
+        priorInsertedFingerprint: insertedAskRecommendationId,
+      });
+
+      if (!insertResult.inserted) return;
+
+      editor.onChange(insertResult.nextSqlDraft);
+      onInsertedAskRecommendationIdChange(
+        `business-sql-renderer-preview:${effectiveBusinessSqlRenderPreview.planId}`,
+      );
+      onBusinessSqlPreviewFeedbackChange("inserted");
+      return;
+    }
+
     const insertResult = applyBusinessSqlRenderPreviewManualInsert(
       effectiveBusinessSqlRenderPreview,
       editor.value,
@@ -698,16 +729,25 @@ function SqlEditorPanel({
     editor.onChange(insertResult.activeSqlDraft);
     onBusinessSqlPreviewFeedbackChange("inserted");
   };
+  const businessSqlCanInsertPreview = businessSqlRendererPreviewUiModel
+    ? Boolean(businessSqlRendererPreviewInsertEligibility?.eligible)
+    : Boolean(businessSqlPreviewInsertState?.canManuallyInsertSqlPreview);
+  const businessSqlPreviewInsertDisabledReason = businessSqlRendererPreviewUiModel
+    ? businessSqlRendererPreviewInsertEligibility?.reasonCode ===
+      "insert_only_from_rendered_duckdb_preview"
+      ? "SQL can be inserted only from a rendered DuckDB preview."
+      : businessSqlRendererPreviewInsertEligibility?.disabledReason
+    : businessSqlPreviewInsertState?.disabledReason;
   const businessSqlInsertButtonLabel =
     businessSqlPreviewFeedback === "inserted"
       ? "Inserted into editor"
-      : businessSqlPreviewInsertState?.disabledReason?.startsWith("Editor already has SQL")
+      : businessSqlPreviewInsertDisabledReason?.startsWith("Editor already has SQL")
         ? "Replace disabled for now"
         : "Insert into editor";
   const businessSqlPreviewActionHelper =
-    businessSqlPreviewInsertState?.canManuallyInsertSqlPreview
-      ? "Insert places this SQL in the editor only. Review it, then use the separate Run Query button when ready."
-      : businessSqlPreviewInsertState?.disabledReason ||
+    businessSqlCanInsertPreview
+      ? "Insert places this SQL in the editor only. Review it, then use Run Query manually when ready."
+      : businessSqlPreviewInsertDisabledReason ||
         "Preview actions become available only when SQL is ready.";
   const dialectStyleName = dialectContext.selectedDialectProfile.displayName;
   const previewSqlFromPlanCandidate = () => {
@@ -1013,14 +1053,10 @@ function SqlEditorPanel({
               type="button"
               className="secondary-button"
               onClick={insertBusinessSqlPreview}
-              disabled={
-                businessSqlRendererPreviewIsDisplayOnly ||
-                !businessSqlPreviewInsertState?.canManuallyInsertSqlPreview
-              }
+              disabled={!businessSqlCanInsertPreview}
               title={
-                businessSqlRendererPreviewIsDisplayOnly
-                  ? "Renderer preview is read-only. It is not inserted automatically."
-                  : businessSqlPreviewInsertState?.disabledReason || "Insert preview SQL into the empty editor"
+                businessSqlPreviewInsertDisabledReason ||
+                "Insert preview SQL into the empty editor"
               }
             >
               {businessSqlInsertButtonLabel}
