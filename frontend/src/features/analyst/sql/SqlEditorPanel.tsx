@@ -31,6 +31,10 @@ import {
   getBusinessSqlRendererPreviewManualInsertEligibility,
 } from "./businessSqlRendererPreviewManualInsertGate";
 import {
+  createBusinessSqlPreviewInsertProvenance,
+  type BusinessSqlPreviewInsertProvenance,
+} from "./businessSqlPreviewProvenance";
+import {
   getSqlDialectExecutionAdvisory,
   SQL_DIALECT_EXECUTION_HELPER_TEXT,
   SQL_DIALECT_SELECTOR_LABEL,
@@ -118,6 +122,10 @@ type SqlEditorPanelProps = {
   onHasBusinessSqlPreviewAttemptChange: (hasAttempt: boolean) => void;
   insertedAskRecommendationId: string | null;
   onInsertedAskRecommendationIdChange: (recommendationId: string | null) => void;
+  businessSqlPreviewInsertProvenance?: BusinessSqlPreviewInsertProvenance | null;
+  onBusinessSqlPreviewInsertProvenanceChange?: (
+    provenance: BusinessSqlPreviewInsertProvenance | null,
+  ) => void;
 };
 
 const statusLabels: Record<SqlExecutionStatus, string> = {
@@ -365,6 +373,8 @@ function SqlEditorPanel({
   onHasBusinessSqlPreviewAttemptChange,
   insertedAskRecommendationId,
   onInsertedAskRecommendationIdChange,
+  businessSqlPreviewInsertProvenance = null,
+  onBusinessSqlPreviewInsertProvenanceChange,
 }: SqlEditorPanelProps) {
   const hasUnappliedSelection =
     selectedScopeCount > 0 && selectedScopeSummary !== appliedScopeSummary;
@@ -714,6 +724,13 @@ function SqlEditorPanel({
       editor.onChange(insertResult.nextSqlDraft);
       onInsertedAskRecommendationIdChange(
         `business-sql-renderer-preview:${effectiveBusinessSqlRenderPreview.planId}`,
+      );
+      onBusinessSqlPreviewInsertProvenanceChange?.(
+        createBusinessSqlPreviewInsertProvenance({
+          activeTabId: sqlTabs.activeTabId,
+          planId: effectiveBusinessSqlRenderPreview.planId,
+          sqlText: insertResult.nextSqlDraft,
+        }),
       );
       onBusinessSqlPreviewFeedbackChange("inserted");
       return;
@@ -1066,6 +1083,16 @@ function SqlEditorPanel({
             </button>
           </div>
           <p className="business-sql-preview-action-note">{businessSqlPreviewActionHelper}</p>
+          {businessSqlPreviewInsertProvenance && (
+            <div
+              className="business-sql-preview-provenance"
+              aria-label="Business SQL preview insert provenance"
+            >
+              <span>{businessSqlPreviewInsertProvenance.bannerCopy}</span>
+              <em>{businessSqlPreviewInsertProvenance.copy}</em>
+              <small>{businessSqlPreviewInsertProvenance.helperCopy}</small>
+            </div>
+          )}
           {businessSqlPreviewFeedback === "copy_failed" && (
             <p className="business-sql-preview-feedback" role="status">
               Copy failed. Select the preview SQL and copy it manually.

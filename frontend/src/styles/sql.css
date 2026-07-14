@@ -3379,6 +3379,32 @@
   font-weight: 700;
 }
 
+.business-sql-preview-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.business-sql-preview-provenance em,
+.business-sql-preview-provenance small {
+  padding: 3px 7px;
+  border: 1px solid #86efac;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #166534;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
 .business-sql-preview-review-notes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

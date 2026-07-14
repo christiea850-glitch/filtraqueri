@@ -172,6 +172,11 @@ const fixtures = [
     exportName: "runBusinessSqlRendererPreviewManualInsertGateFixtures",
   },
   {
+    label: "Business SQL preview provenance",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlPreviewProvenance.test.ts",
+    exportName: "runBusinessSqlPreviewProvenanceFixtures",
+  },
+  {
     label: "Business SQL render preview",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderPreview.test.ts",
     exportName: "runBusinessSqlRenderPreviewFixtures",

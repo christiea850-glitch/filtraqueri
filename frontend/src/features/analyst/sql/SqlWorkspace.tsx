@@ -18,6 +18,10 @@ import SqlSchemaPanel from "./SqlSchemaPanel";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import { createBusinessSqlRenderPreviewFromWorkspaceContext } from "./businessSqlRenderPreviewUiAdapter";
 import {
+  shouldShowBusinessSqlPreviewInsertProvenance,
+  type BusinessSqlPreviewInsertProvenance,
+} from "./businessSqlPreviewProvenance";
+import {
   addSqlConfirmedRelationship,
   createEmptySqlRelationshipConfirmationState,
   createSqlConfirmedRelationshipFromSuggestion,
@@ -741,6 +745,8 @@ function SqlWorkspace({
     useState<BusinessSqlRenderPreview | null>(null);
   const [hasBusinessSqlPreviewAttempt, setHasBusinessSqlPreviewAttempt] = useState(false);
   const [insertedAskRecommendationId, setInsertedAskRecommendationId] = useState<string | null>(null);
+  const [businessSqlPreviewInsertProvenance, setBusinessSqlPreviewInsertProvenance] =
+    useState<BusinessSqlPreviewInsertProvenance | null>(null);
   const [contextHeight, setContextHeight] = useState(248);
   const [bottomHeight, setBottomHeight] = useState(220);
   const {
@@ -838,6 +844,32 @@ function SqlWorkspace({
   useEffect(() => {
     setRelationshipConfirmationState(createEmptySqlRelationshipConfirmationState());
   }, [dataset?.dataset_id, dataset?.workbook_metadata?.workbookId]);
+  useEffect(() => {
+    if (!businessSqlPreviewInsertProvenance) return;
+    if (
+      insertedAskRecommendationId &&
+      insertedAskRecommendationId !==
+        `business-sql-renderer-preview:${businessSqlPreviewInsertProvenance.planId}`
+    ) {
+      setBusinessSqlPreviewInsertProvenance(null);
+      return;
+    }
+    if (
+      shouldShowBusinessSqlPreviewInsertProvenance({
+        provenance: businessSqlPreviewInsertProvenance,
+        activeTabId: sqlTabs.activeTabId,
+        currentSqlDraft: editor.value,
+      })
+    ) {
+      return;
+    }
+    setBusinessSqlPreviewInsertProvenance(null);
+  }, [
+    businessSqlPreviewInsertProvenance,
+    editor.value,
+    insertedAskRecommendationId,
+    sqlTabs.activeTabId,
+  ]);
 
   const createRelationshipFromReviewPair = (
     pair: SqlRelationshipReviewModel["pairs"][number],
@@ -1115,6 +1147,8 @@ function SqlWorkspace({
           onHasBusinessSqlPreviewAttemptChange={setHasBusinessSqlPreviewAttempt}
           insertedAskRecommendationId={insertedAskRecommendationId}
           onInsertedAskRecommendationIdChange={setInsertedAskRecommendationId}
+          businessSqlPreviewInsertProvenance={businessSqlPreviewInsertProvenance}
+          onBusinessSqlPreviewInsertProvenanceChange={setBusinessSqlPreviewInsertProvenance}
         />
       </section>
     );
@@ -1249,6 +1283,8 @@ function SqlWorkspace({
           onHasBusinessSqlPreviewAttemptChange={setHasBusinessSqlPreviewAttempt}
           insertedAskRecommendationId={insertedAskRecommendationId}
           onInsertedAskRecommendationIdChange={setInsertedAskRecommendationId}
+          businessSqlPreviewInsertProvenance={businessSqlPreviewInsertProvenance}
+          onBusinessSqlPreviewInsertProvenanceChange={setBusinessSqlPreviewInsertProvenance}
         />
 
         {bottomTab && (
