@@ -3092,6 +3092,27 @@
   color: #92400e;
 }
 
+.sql-source-scope-chip-strip {
+  flex: 1 1 220px;
+  min-width: 160px;
+}
+
+.sql-source-scope-chip-strip .overflow-chip-strip-visible {
+  gap: 4px;
+}
+
+.sql-applied-scope-chip {
+  min-height: 23px;
+  max-width: 150px;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-color: #dbeafe;
+  background: #f8fbff;
+  color: #1e3a8a;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
 .sql-source-scope-actions {
   display: inline-flex;
   flex: 0 0 auto;

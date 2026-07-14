@@ -582,6 +582,28 @@ function SqlEditorPanel({
     ],
   );
   const scopeSummaryLabel = appliedScopeSummary || "Workbook default";
+  const appliedScopeChipItems = useMemo<OverflowChipItem[]>(
+    () => {
+      const worksheets = dataset?.workbook_metadata?.worksheets || [];
+      return sqlTabs.appliedScopeSelections.map((selection) => {
+        const worksheet = worksheets.find(
+          (current) => current.worksheetId === selection.worksheetId,
+        );
+        const label = worksheet?.displayName || worksheet?.sheetName || selection.tableName;
+        const sourceLabel =
+          selection.sourceType === "cleaned_working_copy"
+            ? "Cleaned working copy"
+            : "Original worksheet";
+        return {
+          key: `${selection.worksheetId}:${selection.sourceType}:${selection.tableName}`,
+          label,
+          tooltip: `${label} · ${sourceLabel} · ${selection.tableName}`,
+          className: "sql-applied-scope-chip",
+        };
+      });
+    },
+    [dataset?.workbook_metadata?.worksheets, sqlTabs.appliedScopeSelections],
+  );
   const sourceSummaryLabel = [
     activeSourceLabel || activeSourceTableLabel || "Active source",
     activeSourceKindLabel || "Original",
@@ -1585,6 +1607,14 @@ function SqlEditorPanel({
           <span className="sql-source-scope-pill">
             <strong>Scope:</strong> {scopeSummaryLabel}
           </span>
+          {appliedScopeChipItems.length > 0 && (
+            <OverflowChipStrip
+              items={appliedScopeChipItems}
+              visibleLimit={5}
+              ariaLabel={`Applied worksheet scope: ${scopeSummaryLabel}`}
+              className="sql-source-scope-chip-strip"
+            />
+          )}
           <span className="sql-source-scope-pill">
             <strong>Source:</strong> {sourceSummaryLabel}
           </span>
