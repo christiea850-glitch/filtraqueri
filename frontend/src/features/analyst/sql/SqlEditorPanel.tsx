@@ -393,6 +393,7 @@ function SqlEditorPanel({
   const sourcePopoverRef = useRef<HTMLDivElement | null>(null);
   const scopeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const scopePopoverRef = useRef<HTMLDivElement | null>(null);
+  const planningDisclosureRef = useRef<HTMLDetailsElement | null>(null);
   const effectiveBusinessSqlRenderPreview =
     businessSqlCandidatePreview || businessSqlRenderPreview;
   const businessSqlRendererPreviewUiModel =
@@ -591,6 +592,19 @@ function SqlEditorPanel({
       : readinessReport?.status === "warning"
         ? "Review before running"
         : "Readiness note";
+  const readinessChipStatus = readinessReport?.status as string | undefined;
+  const readinessChipTone =
+    readinessChipStatus === "ready"
+      ? "ready"
+      : readinessChipStatus === "blocked"
+        ? "blocked"
+        : "warning";
+  const readinessChipLabel =
+    readinessChipTone === "ready"
+      ? "Ready · DuckDB"
+      : readinessChipTone === "blocked"
+        ? "Blocked · DuckDB"
+        : "Review before running · DuckDB";
 
   const closeSourcePopover = (returnFocus = true) => {
     setIsSourcePopoverOpen(false);
@@ -827,6 +841,15 @@ function SqlEditorPanel({
   const applyWorksheetScope = () => {
     sqlTabs.onApplyScope();
     closeScopePopover();
+  };
+  const openPlanningDisclosure = () => {
+    setIsPlanningDisclosureOpen(true);
+    window.setTimeout(() => {
+      planningDisclosureRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+    }, 0);
   };
   const askFiltraQueriForPreview = () => {
     if (!askFiltraQueri.canSubmit) return;
@@ -1780,6 +1803,16 @@ function SqlEditorPanel({
               </div>
             )}
           </div>
+          {readinessReport && (
+            <button
+              type="button"
+              className={`sql-readiness-chip is-${readinessChipTone}`}
+              onClick={openPlanningDisclosure}
+              title="Open full readiness details"
+            >
+              {readinessChipLabel}
+            </button>
+          )}
           <button
             type="button"
             className="primary-button sql-command-action is-run-query"
@@ -1822,6 +1855,7 @@ function SqlEditorPanel({
 
       {planningDisclosureAvailable && (
         <details
+          ref={planningDisclosureRef}
           className="sql-planning-details"
           open={isPlanningDisclosureOpen}
           onToggle={(event) => setIsPlanningDisclosureOpen(event.currentTarget.open)}
