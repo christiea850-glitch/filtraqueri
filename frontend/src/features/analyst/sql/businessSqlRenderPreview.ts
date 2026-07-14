@@ -1,6 +1,10 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
 import { renderBusinessSqlQueryPlan } from "./businessSqlRenderer";
+import {
+  createBusinessSqlRendererPreviewUiModel,
+  type BusinessSqlRendererPreviewUiModel,
+} from "./businessSqlRendererPreviewUiAdapter";
 
 export type BusinessSqlRenderPreview = {
   status: "ready" | "needs_review" | "blocked";
@@ -12,6 +16,7 @@ export type BusinessSqlRenderPreview = {
   guidanceDialect?: SqlDialectId;
   reasons: string[];
   warnings: string[];
+  rendererPreviewUiModel?: BusinessSqlRendererPreviewUiModel;
   actions: {
     canCopySql: boolean;
     canInsertSql: boolean;
@@ -39,6 +44,7 @@ export function createBusinessSqlRenderPreview(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRenderPreview {
   const renderResult = renderBusinessSqlQueryPlan(plan);
+  const rendererPreviewUiModel = createBusinessSqlRendererPreviewUiModel(renderResult);
   const status: BusinessSqlRenderPreview["status"] =
     renderResult.status === "rendered"
       ? "ready"
@@ -57,6 +63,7 @@ export function createBusinessSqlRenderPreview(
     guidanceDialect: plan.renderer.selectedGuidanceDialect,
     reasons: [...renderResult.reasons],
     warnings: [...renderResult.warnings],
+    rendererPreviewUiModel,
     actions: {
       canCopySql: status === "ready" && Boolean(sql),
       canInsertSql: false,
@@ -76,5 +83,8 @@ export function summarizeBusinessSqlRenderPreview(
     `insert=${preview.actions.canInsertSql}`,
     `run=${preview.actions.canRunSql}`,
     `sql=${preview.sql ? "present" : "none"}`,
+    preview.rendererPreviewUiModel
+      ? `rendererPreview=${preview.rendererPreviewUiModel.displayStatus}`
+      : "rendererPreview=none",
   ].join("; ");
 }

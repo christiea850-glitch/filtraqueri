@@ -148,7 +148,88 @@ const expectInsertRunDisabled = (
 ): string[] => [
   ...(result.preview.actions.canInsertSql ? ["Insert must be disabled."] : []),
   ...(result.preview.actions.canRunSql ? ["Run must be disabled."] : []),
+  ...(result.preview.rendererPreviewUiModel?.actions.canInsertSql
+    ? ["Renderer preview insert must be disabled."]
+    : []),
+  ...(result.preview.rendererPreviewUiModel?.actions.canRunSql
+    ? ["Renderer preview Run Query must be disabled."]
+    : []),
 ];
+
+const expectRendererPreviewSafety = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] => {
+  const model = result.preview.rendererPreviewUiModel;
+  if (!model) return ["Expected renderer preview UI model."];
+
+  return [
+    ...(model.safetyLabels.previewOnly === "Preview only"
+      ? []
+      : ["Expected Preview only safety label."]),
+    ...(model.safetyLabels.notExecuted === "Not executed"
+      ? []
+      : ["Expected Not executed safety label."]),
+    ...(model.safetyLabels.notInsertedAutomatically === "Not inserted automatically"
+      ? []
+      : ["Expected Not inserted automatically safety label."]),
+    ...(model.safetyLabels.runQueryManual === "Run Query remains manual"
+      ? []
+      : ["Expected Run Query remains manual safety label."]),
+    ...(model.insertEligibility.eligible
+      ? ["Renderer preview insert eligibility must remain disabled."]
+      : []),
+    ...(model.actions.canRunSql ? ["Renderer preview Run Query must remain disabled."] : []),
+    ...(model.noSqlExecution &&
+      model.noDuckDbExecution &&
+      model.noEditorMutation &&
+      model.noBackendCall &&
+      model.noProviderCall &&
+      model.noNetworkCall &&
+      model.noPersistence
+      ? []
+      : ["Expected all renderer preview safety flags."]),
+  ];
+};
+
+const expectRendererPreviewSql = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+): string[] => {
+  const model = result.preview.rendererPreviewUiModel;
+  if (!model) return ["Expected renderer preview UI model."];
+
+  return [
+    ...(model.displayStatus === "rendered"
+      ? []
+      : [`Expected rendered renderer preview, got ${model.displayStatus}.`]),
+    ...(model.sqlText === result.preview.sql
+      ? []
+      : ["Renderer preview SQL text must match Business SQL preview SQL."]),
+    ...(model.actions.canPreviewSql ? [] : ["Renderer preview SQL should be previewable."]),
+    ...expectRendererPreviewSafety(result),
+  ];
+};
+
+const expectRendererPreviewNoSql = (
+  result: BusinessSqlRenderPreviewWorkspaceResult,
+  expectedStatus: NonNullable<
+    BusinessSqlRenderPreviewWorkspaceResult["preview"]["rendererPreviewUiModel"]
+  >["displayStatus"],
+): string[] => {
+  const model = result.preview.rendererPreviewUiModel;
+  if (!model) return ["Expected renderer preview UI model."];
+
+  return [
+    ...(model.displayStatus === expectedStatus
+      ? []
+      : [`Expected ${expectedStatus} renderer preview, got ${model.displayStatus}.`]),
+    ...(model.sqlText === null ? [] : ["Refused renderer preview must not expose SQL text."]),
+    ...(model.actions.canPreviewSql
+      ? ["Refused renderer preview must not be previewable."]
+      : []),
+    ...(model.actions.canCopySql ? ["Refused renderer preview copy must be disabled."] : []),
+    ...expectRendererPreviewSafety(result),
+  ];
+};
 
 const expectRunDisabledMessagePresent = (
   result: BusinessSqlRenderPreviewWorkspaceResult,
@@ -244,6 +325,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
 
       return [
         ...(result.preview.sql === null ? [] : ["Expected no generated business preview SQL."]),
+        ...expectRendererPreviewNoSql(result, "needs_review"),
         ...(emptyState.message === noPreviewCopy ? [] : ["Expected no-preview empty copy."]),
         ...(emptyState.hasSeparateEditorDraft
           ? ["Empty editor must not be described as a separate SQL draft."]
@@ -265,6 +347,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     assert: (result) => [
       ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
       ...(result.preview.sql ? [] : ["Expected display SQL."]),
+      ...expectRendererPreviewSql(result),
       ...(result.preview.actions.canCopySql ? [] : ["Expected copy eligibility for ready SQL."]),
       ...expectCopyEnabled(result),
       ...expectManualInsertEnabled(result),
@@ -288,6 +371,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       return [
         ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
         ...(result.preview.sql ? [] : ["Expected display SQL."]),
+        ...expectRendererPreviewSql(result),
         ...expectCopyEnabled(result),
         ...expectManualInsertDisabled(result),
         ...(insertState.disabledReason ===
@@ -317,6 +401,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       return [
         ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
         ...(result.preview.sql === null ? [] : ["Expected no SQL for needs_review preview."]),
+        ...expectRendererPreviewNoSql(result, "needs_review"),
         ...(result.preview.reasons.length > 0 ? [] : ["Expected needs_review reasons."]),
         ...(emptyState.message === separateDraftCopy
           ? []
@@ -351,6 +436,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
         ...(result.preview.sql === null
           ? []
           : ["Report/template draft must not be exposed as Business SQL Preview SQL."]),
+        ...expectRendererPreviewNoSql(result, "needs_review"),
         ...(emptyState.message === separateDraftCopy
           ? []
           : ["Expected separate editor draft clarification for report/template draft."]),
@@ -377,6 +463,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
 
       return [
         ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
+        ...expectRendererPreviewNoSql(result, "needs_review"),
         ...(emptyState.message === fallbackDraftCopy ? [] : ["Expected generic fallback copy."]),
         ...expectCopyDisabled(result),
         ...expectManualInsertDisabled(result),
@@ -396,6 +483,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     assert: (result) => [
       ...(result.preview.status === "blocked" ? [] : ["Expected blocked preview."]),
       ...(result.preview.sql === null ? [] : ["Expected no SQL for blocked preview."]),
+      ...expectRendererPreviewNoSql(result, "blocked"),
       ...(result.preview.reasons.length > 0 ? [] : ["Expected blocking reason."]),
       ...expectCopyDisabled(result),
       ...expectManualInsertDisabled(result),
@@ -414,6 +502,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     assert: (result) => [
       ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
       ...(result.preview.sql === null ? [] : ["Expected no SQL until all relationships are resolved."]),
+      ...expectRendererPreviewNoSql(result, "needs_review"),
       ...expectCopyDisabled(result),
       ...expectManualInsertDisabled(result),
       ...expectInsertRunDisabled(result),
@@ -439,6 +528,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
         : ["Expected session-scoped temporary contract ids."]),
       ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
       ...(result.preview.sql ? [] : ["Expected existing guarded preview SQL only after all relationships resolve."]),
+      ...expectRendererPreviewSql(result),
       ...expectManualInsertEnabled(result),
       ...expectInsertRunDisabled(result),
     ],
@@ -487,8 +577,45 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
           ? ["Core preview canInsertSql must remain false."]
           : []),
         ...(result.preview.actions.canRunSql ? ["Run must remain disabled."] : []),
+        ...expectRendererPreviewSafety(result),
         ...expectRunDisabledMessagePresent(result),
       ];
+    },
+  },
+  {
+    name: "unsupported renderer preview metadata exposes no SQL and insert disabled",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "Show me something interesting about the workbook",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft: emptySqlDraft,
+    }),
+    assert: (result) => [
+      ...(result.preview.status === "needs_review" ? [] : ["Expected needs_review preview."]),
+      ...(result.preview.sql === null ? [] : ["Unsupported preview must not expose SQL."]),
+      ...expectRendererPreviewNoSql(result, "needs_review"),
+      ...expectCopyDisabled(result),
+      ...expectManualInsertDisabled(result),
+      ...expectInsertRunDisabled(result),
+    ],
+  },
+  {
+    name: "same input produces the same renderer preview metadata",
+    result: createBusinessSqlRenderPreviewFromWorkspaceContext({
+      taskPrompt: "Count leases by status",
+      selectedGuidanceDialect: "duckdb",
+      activeSqlDraft: emptySqlDraft,
+    }),
+    assert: (result) => {
+      const second = createBusinessSqlRenderPreviewFromWorkspaceContext({
+        taskPrompt: "Count leases by status",
+        selectedGuidanceDialect: "duckdb",
+        activeSqlDraft: emptySqlDraft,
+      });
+
+      return JSON.stringify(result.preview.rendererPreviewUiModel) ===
+        JSON.stringify(second.preview.rendererPreviewUiModel)
+        ? []
+        : ["Expected deterministic renderer preview metadata."];
     },
   },
   {
@@ -506,6 +633,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       ...(result.preview.rendererTarget === "duckdb" ? [] : ["Expected DuckDB target."]),
       ...(result.preview.guidanceDialect === "oracle" ? [] : ["Expected Oracle guidance metadata."]),
       ...(result.preview.sql?.includes('"orders"') ? [] : ["Expected DuckDB SQL display."]),
+      ...expectRendererPreviewSql(result),
       ...expectCopyEnabled(result),
       ...expectManualInsertDisabled(result),
       ...expectRunDisabledMessagePresent(result),
