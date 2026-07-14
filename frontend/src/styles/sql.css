@@ -1512,6 +1512,169 @@
   padding-left: 16px;
 }
 
+.sql-adaptive-proposal-card {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.sql-adaptive-proposal-main,
+.sql-adaptive-proposal-sections {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sql-adaptive-proposal-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sql-adaptive-proposal-summary,
+.sql-adaptive-proposal-intro,
+.sql-adaptive-proposal-section p,
+.adaptive-proposal-llm-consent-shell p {
+  margin: 0;
+  color: #475569;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.sql-adaptive-proposal-summary {
+  color: #334155;
+  font-weight: 700;
+}
+
+.sql-adaptive-proposal-sections {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.sql-adaptive-proposal-section {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.sql-adaptive-proposal-section.is-text {
+  grid-column: 1 / -1;
+}
+
+.sql-adaptive-proposal-section h5 {
+  margin: 0;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.sql-adaptive-proposal-section ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 16px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sql-adaptive-proposal-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sql-adaptive-proposal-chip-list span {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.adaptive-proposal-llm-consent-shell {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.adaptive-proposal-llm-consent-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.adaptive-proposal-llm-consent-shell details {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.adaptive-proposal-llm-consent-shell summary {
+  padding: 8px 10px;
+  color: #334155;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.adaptive-proposal-llm-consent-shell details p {
+  padding: 0 10px 8px;
+}
+
+.adaptive-proposal-llm-consent-shell dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0 10px 8px;
+}
+
+.adaptive-proposal-llm-consent-shell dl > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.adaptive-proposal-llm-consent-shell dt {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.adaptive-proposal-llm-consent-shell dd {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .sql-template-recommender-empty {
   margin: 0;
   padding: 8px 10px;

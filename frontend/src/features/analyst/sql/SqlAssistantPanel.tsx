@@ -534,9 +534,6 @@ function SqlTemplateRecommendationCard({
   );
 }
 
-const renderProposalValues = (values: readonly string[], fallback: string) =>
-  values.length > 0 ? values.slice(0, 6).join(", ") : fallback;
-
 const adaptivePlanningSafetyCopy = "Planning only · SQL not generated · Insert disabled · Run disabled";
 
 const scopeFallbackDisclosure =
@@ -549,40 +546,78 @@ const isScopeFallbackOnly = (proposal: AdaptiveReportProposal): boolean =>
 const adaptiveProposalRows = (proposal: AdaptiveReportProposal) =>
   [
     {
+      label: "Proposal sketch",
+      values: [proposal.proposalNarrative],
+      variant: "text",
+    },
+    {
       label: "Entities",
       values: proposal.entities.map((entity) => entity.label),
+      variant: "chips",
     },
     {
-      label: "Metrics",
+      label: "Metric",
       values: proposal.metrics.map((metric) => metric.label),
+      variant: "chips",
     },
     {
-      label: "Groupings",
+      label: "Grouping",
       values: proposal.groupings.map((grouping) => grouping.label),
+      variant: "chips",
     },
     {
       label: "Filters",
       values: proposal.filters.map((filter) => filter.label),
+      variant: "chips",
     },
     {
       label: "Join needs",
       values: proposal.joinNeeds
         .filter((join) => join.status !== "not_required")
         .map((join) => `${join.leftEntity} to ${join.rightEntity}: ${join.status.replace("_", " ")}`),
+      variant: "list",
     },
     {
       label: "Assumptions",
       values: proposal.assumptions.map((item) => item.detail),
+      variant: "list",
     },
     {
       label: "Warnings",
       values: proposal.warnings.map((warning) => warning.message),
+      variant: "list",
     },
     {
       label: "Missing requirements",
       values: proposal.missingRequirements.map((requirement) => requirement.message),
+      variant: "list",
     },
   ].filter((row) => row.values.length > 0);
+
+type AdaptiveProposalRow = ReturnType<typeof adaptiveProposalRows>[number];
+
+function AdaptiveProposalSection({ row }: { row: AdaptiveProposalRow }) {
+  return (
+    <section className={`sql-adaptive-proposal-section is-${row.variant}`}>
+      <h5>{row.label}</h5>
+      {row.variant === "chips" ? (
+        <div className="sql-adaptive-proposal-chip-list">
+          {row.values.slice(0, 8).map((value) => (
+            <span key={value}>{value}</span>
+          ))}
+        </div>
+      ) : row.variant === "text" ? (
+        <p>{row.values[0]}</p>
+      ) : (
+        <ul>
+          {row.values.slice(0, 6).map((value) => (
+            <li key={value}>{value}</li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 function AdaptiveReportProposalCard({
   introCopy = "No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.",
@@ -598,9 +633,10 @@ function AdaptiveReportProposalCard({
 
   return (
     <article className="sql-template-recommendation-card sql-adaptive-proposal-card">
-      <div>
-        <div className="sql-template-recommendation-title-row">
-          <strong>{proposal.title}</strong>
+      <div className="sql-adaptive-proposal-main">
+        <div className="sql-adaptive-proposal-header">
+          <strong>Adaptive report proposal</strong>
+          <span className="sql-grounding-badge">Read-only</span>
           <span className={`sql-grounding-badge ${proposal.support}`}>
             {proposal.support === "supported"
               ? "Proposal"
@@ -609,19 +645,20 @@ function AdaptiveReportProposalCard({
                 : "Unsupported"}
           </span>
         </div>
-        <span>{introCopy}</span>
-        <span>{proposal.proposalNarrative}</span>
-        {isScopeFallbackOnly(proposal) && <span>{scopeFallbackDisclosure}</span>}
+        <p className="sql-adaptive-proposal-summary">
+          FiltraQueri can outline this analysis, but worksheet relationships must be reviewed before SQL can be prepared.
+        </p>
+        <p className="sql-adaptive-proposal-intro">{introCopy}</p>
+        {isScopeFallbackOnly(proposal) && (
+          <p className="sql-adaptive-proposal-intro">{scopeFallbackDisclosure}</p>
+        )}
       </div>
       {adaptiveProposalRows(proposal).length > 0 && (
-        <dl>
+        <div className="sql-adaptive-proposal-sections">
           {adaptiveProposalRows(proposal).map((row) => (
-            <div key={row.label}>
-              <dt>{row.label}</dt>
-              <dd>{renderProposalValues(row.values, "")}</dd>
-            </div>
+            <AdaptiveProposalSection key={row.label} row={row} />
           ))}
-        </dl>
+        </div>
       )}
       {consentShell && <AdaptiveProposalLlmConsentShell model={consentShell} />}
       <div className="sql-assistant-card-foot">

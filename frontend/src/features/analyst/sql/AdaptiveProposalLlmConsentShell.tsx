@@ -13,12 +13,10 @@ function AdaptiveProposalLlmConsentShell({
 
   return (
     <section className="adaptive-proposal-llm-consent-shell" aria-label="Metadata-only AI refinement consent preview">
-      <div className="sql-template-recommendation-title-row">
+      <div className="adaptive-proposal-llm-consent-head">
         <span className={`sql-grounding-badge ${model.status}`}>{model.chipLabel}</span>
       </div>
-      <p>{model.safetyLine}</p>
-      <p>{model.nonSqlWarning}</p>
-      {model.status === "provider_disabled" && <p>{model.providerDisabledCopy}</p>}
+      <p>{model.disabledHelper}</p>
       {model.status === "validation_rejected" && (
         <p>AI response rejected. Original planning outline unchanged.</p>
       )}
@@ -33,7 +31,10 @@ function AdaptiveProposalLlmConsentShell({
         </ul>
       )}
       <details>
-        <summary>What would be sent?</summary>
+        <summary>Metadata-only AI refinement details</summary>
+        <p>{model.safetyLine}</p>
+        <p>{model.nonSqlWarning}</p>
+        {model.status === "provider_disabled" && <p>{model.providerDisabledCopy}</p>}
         <dl>
           <div>
             <dt>Tables</dt>
@@ -67,7 +68,7 @@ function AdaptiveProposalLlmConsentShell({
         <p>{model.payloadExclusions}</p>
       </details>
       <div className="sql-assistant-card-foot">
-        <small>{model.disabledHelper}</small>
+        <small>No provider call, SQL generation, insertion, or execution is available here.</small>
         <button type="button" className="secondary-button" disabled>
           {model.ctaLabel}
         </button>
@@ -77,4 +78,3 @@ function AdaptiveProposalLlmConsentShell({
 }
 
 export default AdaptiveProposalLlmConsentShell;
-
