@@ -1,4 +1,7 @@
 import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
+import OverflowChipStrip, {
+  type OverflowChipItem,
+} from "../../../components/common/OverflowChipStrip";
 import {
   WORKBOOK_HEADER_WARNING_COPY,
   getStructuralColumnNotice,
@@ -25,6 +28,8 @@ const getSchemaTypeGroup = (inferredType: string | null | undefined): string => 
   if (inferredType === "categorical") return "categorical";
   return "text";
 };
+
+const COLUMN_OVERFLOW_THRESHOLD = 15;
 
 /**
  * K8A-Fix-2: the right-rail "Worksheet tables" picker that previously lived in
@@ -58,6 +63,17 @@ function SqlSchemaPanel({
     typeof columnCountOverride === "number" ? columnCountOverride : railSchema.length;
   const headerLabel = activeSourceLabel ? `Columns · ${activeSourceLabel}` : "Columns";
 
+  const schemaColumnOverflowItems: OverflowChipItem<SchemaColumn>[] = railSchema.map((column) => {
+    const typeGroup = getSchemaTypeGroup(column.inferred_type);
+    return {
+      key: column.name,
+      label: column.name,
+      tooltip: column.name,
+      className: `schema-pill sql-schema-chip is-type-${typeGroup}`,
+      data: column,
+    };
+  });
+
   return (
     <aside className="sql-context-panel" aria-label="SQL schema intelligence">
       <button
@@ -85,21 +101,42 @@ function SqlSchemaPanel({
           </div>
           <div className="schema-list sql-schema-list" aria-label="SQL available columns">
             {dataset && railSchema.length > 0 ? (
-              railSchema.map((column) => {
-                const typeGroup = getSchemaTypeGroup(column.inferred_type);
-                return (
-                  <button
-                    type="button"
-                    className={`schema-pill sql-schema-chip is-type-${typeGroup}`}
-                    key={column.name}
-                    onClick={() => onInsertSql(`"${column.name.replace(/"/g, '""')}"`)}
-                  >
-                    <span aria-hidden="true" className="sql-schema-chip-dot" />
-                    {column.name}
-                    <small>{column.inferred_type}</small>
-                  </button>
-                );
-              })
+              railSchema.length > COLUMN_OVERFLOW_THRESHOLD ? (
+                <OverflowChipStrip
+                  items={schemaColumnOverflowItems}
+                  visibleLimit={COLUMN_OVERFLOW_THRESHOLD}
+                  ariaLabel="SQL available columns"
+                  className="sql-schema-overflow-chip-strip"
+                  enableSearch
+                  searchPlaceholder="Search columns…"
+                  onChipClick={(item) =>
+                    item.data && onInsertSql(`"${item.data.name.replace(/"/g, '""')}"`)
+                  }
+                  renderChip={(item) => (
+                    <>
+                      <span aria-hidden="true" className="sql-schema-chip-dot" />
+                      {item.label}
+                      <small>{item.data?.inferred_type}</small>
+                    </>
+                  )}
+                />
+              ) : (
+                railSchema.map((column) => {
+                  const typeGroup = getSchemaTypeGroup(column.inferred_type);
+                  return (
+                    <button
+                      type="button"
+                      className={`schema-pill sql-schema-chip is-type-${typeGroup}`}
+                      key={column.name}
+                      onClick={() => onInsertSql(`"${column.name.replace(/"/g, '""')}"`)}
+                    >
+                      <span aria-hidden="true" className="sql-schema-chip-dot" />
+                      {column.name}
+                      <small>{column.inferred_type}</small>
+                    </button>
+                  );
+                })
+              )
             ) : dataset ? (
               <p className="sql-helper-empty">No columns available for this source.</p>
             ) : (

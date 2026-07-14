@@ -4856,6 +4856,15 @@
   gap: 5px;
 }
 
+.sql-schema-overflow-chip-strip {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.sql-schema-overflow-chip-strip .overflow-chip-strip-visible {
+  gap: 5px;
+}
+
 .sql-schema-chip {
   display: inline-flex;
   align-items: center;
