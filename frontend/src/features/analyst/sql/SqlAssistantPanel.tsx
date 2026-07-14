@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import OverflowChipStrip, {
+  type OverflowChipItem,
+} from "../../../components/common/OverflowChipStrip";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import type { AnalysisScopeSelection } from "../../workbook";
 import {
@@ -1119,6 +1122,16 @@ function SqlAssistantPanel({
   const [generatedDrafts, setGeneratedDrafts] = useState<SqlTaskGenerationResult[]>([]);
   const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
   const [activeRecipeFilter, setActiveRecipeFilter] = useState<SqlReportRecipeFilter>("All");
+  const recipeFilterItems = useMemo<OverflowChipItem<SqlReportRecipeFilter>[]>(
+    () =>
+      recipeFilters.map((filter) => ({
+        key: filter,
+        label: filter,
+        isActive: activeRecipeFilter === filter,
+        data: filter,
+      })),
+    [activeRecipeFilter],
+  );
   const scopeDataset = scopeRecommendationDataset ?? dataset;
   const hasDataset = Boolean(dataset);
   const hasWorkbookMetadata = Boolean(scopeDataset?.workbook_metadata);
@@ -1837,19 +1850,14 @@ function SqlAssistantPanel({
             <p className="sql-assistant-recipe-note">
               Recipes combine patterns like grouping, ranking, thresholds, CASE checks, and joins into report-style SQL drafts. Insert only. Run Query remains manual. Blocked recipes show exactly what the active dataset is missing.
             </p>
-            <div className="sql-assistant-category-tabs" aria-label="Report recipe filters">
-              {recipeFilters.map((filter) => (
-                <button
-                  type="button"
-                  key={filter}
-                  className={activeRecipeFilter === filter ? "is-active" : ""}
-                  aria-pressed={activeRecipeFilter === filter}
-                  onClick={() => setActiveRecipeFilter(filter)}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
+            <OverflowChipStrip
+              items={recipeFilterItems}
+              visibleLimit={8}
+              ariaLabel="Report recipe filters"
+              enableSearch
+              searchPlaceholder="Search filters..."
+              onChipClick={(item) => setActiveRecipeFilter(item.data || "All")}
+            />
           </div>
 
           <div className="sql-assistant-generated-list" aria-label="Report recipe drafts">
