@@ -1473,9 +1473,9 @@ const fixtures: Fixture[] = [
         ...(model.guidanceTitle === "Review worksheet connections before inserting SQL"
           ? []
           : [`Expected relationship guidance, received ${model.guidanceTitle}.`]),
-        ...(model.guidanceCopy.includes("tenants") && model.guidanceCopy.includes("access_codes")
+        ...(model.guidanceCopy === RELATIONSHIP_REVIEW_PANEL_DESCRIPTION
           ? []
-          : [`Expected relevant entity guidance, received ${model.guidanceCopy}.`]),
+          : [`Expected relationship review guidance copy, received ${model.guidanceCopy}.`]),
         ...expectNoBehaviorChange(model),
       ];
     },
@@ -1507,7 +1507,7 @@ const fixtures: Fixture[] = [
           ? []
           : [`Expected relationship review panel title, received ${review.title}.`]),
         ...(review.description === RELATIONSHIP_REVIEW_PANEL_DESCRIPTION &&
-          review.description.includes("which columns link rows across worksheets")
+          review.description.includes("before it can prepare SQL safely")
           ? []
           : ["Expected relationship review panel description copy."]),
         ...(review.description.includes("cross-table SQL") ||

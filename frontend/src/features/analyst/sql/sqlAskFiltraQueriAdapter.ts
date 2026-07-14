@@ -317,11 +317,6 @@ const uniqueRecommendations = (
 const uniqueStrings = (values: readonly string[]): string[] =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
-const formatRelationshipGaps = (shape: SqlBusinessQuestionShape): string =>
-  shape.relationshipGaps
-    .map((gap) => `${gap.fromTable} to ${gap.toTable}`)
-    .join(", ");
-
 const createGuidanceForQuestionShape = ({
   hasTemplate,
   neededTables,
@@ -332,12 +327,9 @@ const createGuidanceForQuestionShape = ({
   shape: SqlBusinessQuestionShape | null;
 }) => {
   if (shape?.preferredOutputShape === "blocked_relationship_plan") {
-    const relationshipGaps = formatRelationshipGaps(shape);
     return {
       guidanceTitle: "Review worksheet connections before inserting SQL",
-      guidanceCopy: relationshipGaps
-        ? `This question needs related worksheets (${shape.mentionedEntities.map((entity) => entity.label).join(", ")}). Review the worksheet connections before inserting SQL.`
-        : "This question needs related worksheets. Review the worksheet connections before inserting SQL.",
+      guidanceCopy: RELATIONSHIP_REVIEW_PANEL_DESCRIPTION,
     };
   }
 

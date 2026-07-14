@@ -582,15 +582,13 @@ function SqlRelationshipReviewPanel({
       <div className="business-sql-preview-head">
         <div>
           <span>Review only</span>
-          <strong>{model.title}</strong>
+          <strong>Connections to review</strong>
         </div>
         <div className="business-sql-preview-badges" aria-label="Relationship review safety">
           <em>Review only</em>
           <em>Nothing has been inserted</em>
         </div>
       </div>
-      <p>{model.description}</p>
-      <p>{model.safetyCopy}</p>
 
       {model.relevantWorksheets.length > 0 && (
         <div className="sql-relationship-review-worksheets" aria-label="Relevant worksheets">

@@ -1239,8 +1239,6 @@ function SqlEditorPanel({
             <div className="sql-recommended-analysis" aria-label="Relationship review required">
               <div className="sql-adaptive-fit-relationship-action">
                 <div>
-                  <strong>{compactRelationshipBlock.title}</strong>
-                  <span>{compactRelationshipBlock.copy}</span>
                   {relationshipReviewProgressSummary && (
                     <small>{relationshipReviewProgressSummary}</small>
                   )}
@@ -1270,7 +1268,6 @@ function SqlEditorPanel({
                 <div className="sql-adaptive-fit-relationship-action">
                   <div>
                     <strong>{askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.title}</strong>
-                    <span>{askFiltraQueriSuggestions.recommendedAnalysis.relationshipAction.copy}</span>
                     {relationshipReviewProgressSummary && (
                       <small>{relationshipReviewProgressSummary}</small>
                     )}
@@ -1345,10 +1342,7 @@ function SqlEditorPanel({
                       <span>{card.statusLabel}</span>
                     </div>
                     {card.requiredRelationships.length > 0 && (
-                      <p>
-                        Review worksheet connections before inserting SQL.{" "}
-                        {RELATIONSHIP_REVIEW_PANEL_DESCRIPTION}
-                      </p>
+                      <p>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</p>
                     )}
                     {canInsert ? (
                       <button
@@ -1404,10 +1398,9 @@ function SqlEditorPanel({
                       Relevant worksheets:{" "}
                       {askFiltraQueriSuggestions.blockedPlan.relevantEntities.join(", ")}
                     </li>
-                    <li>
-                      Review worksheet connections before inserting SQL.{" "}
-                      {RELATIONSHIP_REVIEW_PANEL_DESCRIPTION}
-                    </li>
+                    {relationshipReviewProgressSummary && (
+                      <li>{relationshipReviewProgressSummary}</li>
+                    )}
                     <li>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</li>
                     <li>{askFiltraQueriSuggestions.blockedPlan.explanation}</li>
                   </ul>
