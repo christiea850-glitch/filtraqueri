@@ -1646,6 +1646,24 @@
   padding: 0 10px 8px;
 }
 
+.adaptive-proposal-llm-consent-shell .adaptive-proposal-llm-audit-fingerprint {
+  margin: 0 10px 8px;
+  border-style: dashed;
+  background: #f8fafc;
+}
+
+.adaptive-proposal-llm-consent-shell .adaptive-proposal-llm-audit-fingerprint summary {
+  font-size: 11.5px;
+}
+
+.adaptive-proposal-llm-consent-shell .adaptive-proposal-llm-audit-fingerprint p {
+  overflow-wrap: anywhere;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .adaptive-proposal-llm-consent-shell dl {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

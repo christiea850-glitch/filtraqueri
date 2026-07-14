@@ -53,10 +53,6 @@ function AdaptiveProposalLlmConsentShell({
             <dd>{formatCount(model.payloadSummary.restrictedOrExcludedColumnCount)}</dd>
           </div>
           <div>
-            <dt>Payload fingerprint</dt>
-            <dd>{model.payloadSummary.payloadFingerprint || "Unavailable"}</dd>
-          </div>
-          <div>
             <dt>Provider mode</dt>
             <dd>{model.payloadSummary.providerMode}</dd>
           </div>
@@ -65,6 +61,10 @@ function AdaptiveProposalLlmConsentShell({
             <dd>{model.payloadSummary.consentStatus}</dd>
           </div>
         </dl>
+        <details className="adaptive-proposal-llm-audit-fingerprint">
+          <summary>Developer/audit payload fingerprint</summary>
+          <p>{model.payloadSummary.payloadFingerprint || "Unavailable"}</p>
+        </details>
         <p>{model.payloadExclusions}</p>
       </details>
       <div className="sql-assistant-card-foot">
