@@ -138,6 +138,15 @@ const expectAdapterSafetyLiterals = (model: BusinessSqlRendererPreviewUiModel): 
   ...(model.noDuckDbExecution === true ? [] : ["Adapter noDuckDbExecution must remain true."]),
 ];
 
+const expectManualInsertDoesNotEnableExecution = (
+  model: BusinessSqlRendererPreviewUiModel,
+): string[] => [
+  ...(model.actions.canRunSql === false ? [] : ["Manual insert must not enable Run Query metadata."]),
+  ...(model.noSqlExecution === true ? [] : ["Manual insert gate must preserve noSqlExecution metadata."]),
+  ...(model.noDuckDbExecution === true ? [] : ["Manual insert gate must preserve noDuckDbExecution metadata."]),
+  ...(model.noEditorMutation === true ? [] : ["Manual insert gate must preserve adapter noEditorMutation metadata."]),
+];
+
 export const BUSINESS_SQL_RENDERER_PREVIEW_MANUAL_INSERT_GATE_FIXTURES: ManualInsertGateFixture[] = [
   {
     name: "rendered DuckDB preview and empty editor is eligible",
@@ -217,6 +226,35 @@ export const BUSINESS_SQL_RENDERER_PREVIEW_MANUAL_INSERT_GATE_FIXTURES: ManualIn
         ...(result.feedback === "Inserted into editor. Review the SQL before running it manually."
           ? []
           : ["Expected review-before-running feedback copy."]),
+        ...(result.disabledReason === null ? [] : ["Eligible insert must not include disabled reason."]),
+        ...(result.reasonCode === "eligible" ? [] : ["Eligible insert must keep eligible reason code."]),
+        ...expectManualInsertDoesNotEnableExecution(renderedModel),
+      ];
+    },
+  },
+  {
+    name: "manual apply returns SQL draft only through gate result",
+    assert: () => {
+      const originalDraft = "";
+      const result = applyBusinessSqlRendererPreviewManualInsert({
+        rendererPreviewUiModel: renderedModel,
+        activeSqlDraft: originalDraft,
+      });
+      const secondEligibility = getBusinessSqlRendererPreviewManualInsertEligibility({
+        rendererPreviewUiModel: renderedModel,
+        activeSqlDraft: result.nextSqlDraft,
+      });
+
+      return [
+        ...(result.inserted ? [] : ["Expected manual gate result to report inserted true."]),
+        ...(result.nextSqlDraft === renderedModel.sqlText
+          ? []
+          : ["Manual gate must return preview SQL only as nextSqlDraft."]),
+        ...(originalDraft === "" ? [] : ["Fixture draft should remain the empty input value."]),
+        ...(secondEligibility.reasonCode === "editor_already_has_sql"
+          ? []
+          : ["Returned SQL draft must make the next eligibility check non-empty-editor blocked."]),
+        ...expectAdapterSafetyLiterals(renderedModel),
       ];
     },
   },

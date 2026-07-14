@@ -1510,6 +1510,13 @@ const fixtures: Fixture[] = [
           review.description.includes("before it can prepare SQL safely")
           ? []
           : ["Expected relationship review panel description copy."]),
+        ...(review.description.includes("which columns link rows across worksheets")
+          ? ["Relationship review description should use the concise non-duplicated copy."]
+          : []),
+        ...(review.safetyCopy ===
+          "Confirming a connection is for this review only. It does not run SQL, insert SQL, or permanently change workbook metadata."
+          ? []
+          : ["Expected one explicit relationship review safety copy."]),
         ...(review.description.includes("cross-table SQL") ||
           review.safetyCopy.includes("No SQL generated") ||
           review.safetyCopy.includes("accepted relationship metadata")
