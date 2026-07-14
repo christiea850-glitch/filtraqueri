@@ -1327,14 +1327,20 @@ function SqlEditorPanel({
             </div>
           )}
           {compactRelationshipBlock && (
-            <div className="sql-recommended-analysis" aria-label="Relationship review required">
-              <div className="sql-adaptive-fit-relationship-action">
-                <div>
-                  {relationshipReviewProgressSummary && (
-                    <small>{relationshipReviewProgressSummary}</small>
-                  )}
-                  <small>{RELATIONSHIP_REVIEW_SQL_SAFETY_COPY}</small>
-                </div>
+            <aside className="sql-relationship-review-compact" aria-label="Relationship review required">
+              <div>
+                <strong className="sql-relationship-review-compact-title">
+                  Review worksheet connections before preparing SQL
+                </strong>
+                <p>
+                  This question uses more than one worksheet. Confirm the worksheet connections before FiltraQueri prepares SQL safely.
+                </p>
+                {relationshipReviewProgressSummary && (
+                  <small>{relationshipReviewProgressSummary}</small>
+                )}
+                <small>Review-scoped only. Workbook metadata is unchanged.</small>
+              </div>
+              <div className="sql-relationship-review-compact-actions">
                 <button
                   type="button"
                   className="secondary-button"
@@ -1345,7 +1351,7 @@ function SqlEditorPanel({
                   {RELATIONSHIP_REVIEW_ACTION_LABEL}
                 </button>
               </div>
-            </div>
+            </aside>
           )}
           {!compactRelationshipBlock && askFiltraQueriSuggestions.recommendedAnalysis.primary && (
             <div className="sql-recommended-analysis" aria-label="Recommended analysis">

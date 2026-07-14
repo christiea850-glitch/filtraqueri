@@ -3926,6 +3926,49 @@
   line-height: 1.4;
 }
 
+.sql-relationship-review-compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #475569;
+}
+
+.sql-relationship-review-compact > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sql-relationship-review-compact-title {
+  color: #78350f;
+  font-size: 12.5px;
+  font-weight: 850;
+}
+
+.sql-relationship-review-compact p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.sql-relationship-review-compact small {
+  color: #92400e;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.sql-relationship-review-compact-actions {
+  flex: 0 0 auto;
+}
+
 .sql-more-analysis-options {
   display: grid;
   gap: 8px;
