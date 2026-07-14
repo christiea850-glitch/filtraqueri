@@ -162,6 +162,11 @@ const fixtures = [
     exportName: "runBusinessSqlRendererFixtures",
   },
   {
+    label: "Business SQL renderer preview UI adapter",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRendererPreviewUiAdapter.test.ts",
+    exportName: "runBusinessSqlRendererPreviewUiAdapterFixtures",
+  },
+  {
     label: "Business SQL render preview",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderPreview.test.ts",
     exportName: "runBusinessSqlRenderPreviewFixtures",
