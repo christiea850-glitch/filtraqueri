@@ -1,31 +1,31 @@
 /**
- * T-13F - deterministic DuckDB SQL renderer fixtures.
+ * T-13H - guarded Business SQL renderer contract fixtures.
  *
  * Pure fixture runner only. No editor insertion, Run Query calls, backend/API
- * calls, provider calls, or query execution.
+ * calls, provider calls, network calls, persistence, or query execution.
  */
 
-import type { AcceptedRelationshipContract } from "../../../workbook";
 import {
-  createBlockedBusinessSqlQueryPlan,
-  summarizeBusinessSqlQueryPlan,
-  type BusinessSqlQueryPlan,
-} from "../businessSqlQueryPlan";
-import { planBusinessSqlQueryRequest } from "../businessSqlQueryPlanner";
+  evaluateBusinessSqlRenderability,
+  type BusinessSqlRenderabilityGate,
+} from "../businessSqlRenderabilityGate";
+import type { BusinessSqlRelationshipMetadata } from "../businessSqlJoinPathResolver";
 import {
-  applyBusinessSqlRenderedSql,
-  canRenderBusinessSqlQueryPlan,
-  renderBusinessSqlQueryPlan,
+  planBusinessSqlQueryRequestWithJoinResolution,
+  type BusinessSqlQueryPlanJoinResolution,
+} from "../businessSqlQueryPlanJoinResolution";
+import {
+  renderBusinessSqlFromRenderability,
   type BusinessSqlRenderResult,
 } from "../businessSqlRenderer";
 
 type RendererFixture = {
   name: string;
-  plan: BusinessSqlQueryPlan;
+  integrated: BusinessSqlQueryPlanJoinResolution;
+  renderability?: BusinessSqlRenderabilityGate;
   assert: (
-    plan: BusinessSqlQueryPlan,
     result: BusinessSqlRenderResult,
-    applied: BusinessSqlQueryPlan,
+    integrated: BusinessSqlQueryPlanJoinResolution,
   ) => string[];
 };
 
@@ -43,225 +43,255 @@ export type RendererFixtureReport = {
   failed: RendererFixtureResult[];
 };
 
-const acceptedContract = (
-  sourceTableName: string,
-  sourceColumnName: string,
-  targetTableName: string,
-  targetColumnName: string,
-): AcceptedRelationshipContract => ({
-  contractId: `contract:${sourceTableName}-${targetTableName}`,
-  sourceWorksheetId: `worksheet:${sourceTableName}`,
-  sourceTableName,
-  sourceColumnName,
-  targetWorksheetId: `worksheet:${targetTableName}`,
-  targetTableName,
-  targetColumnName,
-  relationshipType: "many_to_one_candidate",
-  confidence: 0.95,
-  acceptedFromCandidateId: `candidate:${sourceTableName}-${targetTableName}`,
-  acceptedAt: "2026-01-01T00:00:00.000Z",
-  acceptedBy: null,
-  status: "active",
-  validationState: "valid",
-  validationSummary: [],
-  overlapRatio: 1,
-  sourceUniqueRatio: 0.5,
-  targetUniqueRatio: 1,
-  inferredTypeCompatible: true,
-  lastValidatedAt: "2026-01-01T00:00:00.000Z",
-});
+const relationship = (
+  id: string,
+  fromEntity: string,
+  toEntity: string,
+  status: BusinessSqlRelationshipMetadata["status"] = "accepted",
+): BusinessSqlRelationshipMetadata => ({ id, fromEntity, toEntity, status });
 
-const ordersPerCustomerPlan = planBusinessSqlQueryRequest({
-  prompt: "orders per customer",
-  acceptedRelationshipContracts: [
-    acceptedContract("customers", "customer_id", "orders", "customer_id"),
+const integratedFor = (
+  prompt: string,
+  relationships: readonly BusinessSqlRelationshipMetadata[] = [],
+): BusinessSqlQueryPlanJoinResolution =>
+  planBusinessSqlQueryRequestWithJoinResolution({ prompt, relationships });
+
+const renderabilityFor = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+): BusinessSqlRenderabilityGate =>
+  evaluateBusinessSqlRenderability({ integrated });
+
+const renderInput = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+  renderability = renderabilityFor(integrated),
+) => renderBusinessSqlFromRenderability({ integrated, renderability });
+
+const leasesByStatus = integratedFor("Count leases by status");
+const leasedUnitsPerProperty = integratedFor(
+  "How many units in each property are leased to current tenants?",
+  [
+    relationship("relationship:properties-units", "properties", "units", "accepted"),
+    relationship("relationship:units-leases", "units", "leases", "ready"),
   ],
-});
-
-const ticketsPerAccountPlan = planBusinessSqlQueryRequest({
-  prompt: "tickets per account",
-  acceptedRelationshipContracts: [
-    acceptedContract("accounts", "account_id", "tickets", "account_id"),
-  ],
-});
-
-const unresolvedLeasedUnitsPlan = planBusinessSqlQueryRequest({
-  prompt: "How many units in each property are leased to current tenants?",
-});
-
-const resolvedLeasedUnitsPlan = planBusinessSqlQueryRequest({
-  prompt: "How many units in each property are leased to current tenants?",
-  acceptedRelationshipContracts: [
-    acceptedContract("properties", "property_id", "units", "property_id"),
-    acceptedContract("units", "unit_id", "leases", "unit_id"),
-  ],
-});
-
-const missingRelationshipPlan = planBusinessSqlQueryRequest({
-  prompt: "orders per customer",
-  missingRelationships: [{ fromEntity: "customers", toEntity: "orders" }],
-});
-
-const unsupportedPromptPlan = planBusinessSqlQueryRequest({
-  prompt: "Show me something interesting about the workbook",
-});
-
-const oracleGuidancePlan = planBusinessSqlQueryRequest({
-  prompt: "Count leases by status",
-  selectedGuidanceDialect: "oracle",
-});
-
-const expectRendered = (result: BusinessSqlRenderResult): string[] => {
-  if (result.status === "rendered" && result.sql) return [];
-  return [`Expected rendered SQL but got ${result.status}.`];
+);
+const ordersPerCustomer = integratedFor("Count orders per customer", [
+  relationship("relationship:customers-orders", "customers", "orders", "ready"),
+]);
+const ticketsPerAccount = integratedFor("Count tickets per account", [
+  relationship("relationship:accounts-tickets", "accounts", "tickets", "verified"),
+]);
+const needsReviewPlan = integratedFor("Count orders per customer", [
+  relationship("relationship:customers-orders", "customers", "orders", "unknown"),
+]);
+const blockedPlan = integratedFor("Count orders per customer", [
+  relationship("relationship:customers-orders", "customers", "orders", "missing"),
+]);
+const unsupportedReadyPlan: BusinessSqlQueryPlanJoinResolution = {
+  ...leasesByStatus,
+  plan: {
+    ...leasesByStatus.plan,
+    id: "business-sql-plan:unsupported-render-shape",
+    kind: "count_distinct_entity",
+  },
 };
+const nonDuckDbPlan: BusinessSqlQueryPlanJoinResolution = {
+  ...leasesByStatus,
+  plan: {
+    ...leasesByStatus.plan,
+    renderer: {
+      ...leasesByStatus.plan.renderer,
+      targetDialect: "oracle",
+    },
+  },
+};
+const forgedUnresolvedJoinPlan: BusinessSqlQueryPlanJoinResolution = {
+  ...needsReviewPlan,
+  readiness: "ready",
+  support: "supported",
+};
+const forgedRenderableGate: BusinessSqlRenderabilityGate = {
+  ...renderabilityFor(needsReviewPlan),
+  status: "renderable",
+  renderable: true,
+  readinessStatus: "ready",
+  support: "supported",
+  reasonCodes: [],
+  blockingReasons: [],
+  reviewReasons: [],
+};
+const deterministicFirst = renderInput(ordersPerCustomer);
+const deterministicSecond = renderInput(ordersPerCustomer);
+
+const expectRendered = (
+  result: BusinessSqlRenderResult,
+  fragments: readonly string[],
+): string[] => [
+  ...(result.rendered && result.status === "rendered" && result.sql
+    ? []
+    : [`Expected rendered SQL but got ${result.status}.`]),
+  ...(result.reasonCode === "rendered" ? [] : [`Expected rendered reason code, got ${result.reasonCode}.`]),
+  ...(result.executionPayload === null ? [] : ["Renderer must not expose an execution payload."]),
+  ...(result.inserted === false ? [] : ["Renderer must not insert SQL."]),
+  ...(result.ranQuery === false ? [] : ["Renderer must not run SQL."]),
+  ...(fragments.every((fragment) => result.sql?.includes(fragment))
+    ? []
+    : [`Expected SQL fragments: ${fragments.join(" | ")}`]),
+];
 
 const expectRefused = (
   result: BusinessSqlRenderResult,
-  expectedStatus: "needs_review" | "blocked",
-): string[] => {
-  if (result.status === expectedStatus && result.sql === null) return [];
-  return [`Expected ${expectedStatus} without SQL but got ${result.status}.`];
+  reasonCode: BusinessSqlRenderResult["reasonCode"],
+): string[] => [
+  ...(!result.rendered && result.sql === null
+    ? []
+    : ["Refused render attempt must return rendered=false and sql=null."]),
+  ...(result.reasonCode === reasonCode
+    ? []
+    : [`Expected reason ${reasonCode}, got ${result.reasonCode}.`]),
+  ...(result.executionPayload === null ? [] : ["Refusal must not expose an execution payload."]),
+  ...(result.inserted === false ? [] : ["Refusal must not insert SQL."]),
+  ...(result.ranQuery === false ? [] : ["Refusal must not run SQL."]),
+];
+
+const assertSelectOnly = (sql: string | null): string[] => {
+  if (!sql) return ["Expected SQL text."];
+  const normalized = sql.trim();
+  return [
+    ...(/^SELECT\b/.test(normalized) ? [] : ["Rendered SQL must start with SELECT."]),
+    ...(/\b(INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE|CREATE|MERGE|CALL|COPY|PRAGMA|ATTACH|DETACH)\b/i.test(normalized)
+      ? ["Rendered SQL must not contain mutating or runtime-control statements."]
+      : []),
+    ...(/--|\/\*/.test(normalized) ? ["Rendered SQL must not contain comments."] : []),
+    ...(normalized.slice(0, -1).includes(";")
+      ? ["Rendered SQL must not contain multiple statements."]
+      : []),
+  ];
 };
 
-const containsAll = (value: string | null, fragments: readonly string[]): boolean =>
-  Boolean(value && fragments.every((fragment) => value.includes(fragment)));
+const assertNoPromptText = (
+  result: BusinessSqlRenderResult,
+  prompt: string,
+): string[] => {
+  const sql = result.sql || "";
+  return sql.toLowerCase().includes(prompt.toLowerCase())
+    ? ["Rendered SQL must not contain raw prompt text."]
+    : [];
+};
 
 export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
   {
-    name: "leases by status renders DuckDB SQL",
-    plan: planBusinessSqlQueryRequest({ prompt: "Count leases by status" }),
-    assert: (_plan, result, applied) => [
-      ...expectRendered(result),
-      ...(containsAll(result.sql, [
+    name: "leases by status renderable plan produces deterministic DuckDB SELECT",
+    integrated: leasesByStatus,
+    assert: (result, integrated) => [
+      ...expectRendered(result, [
         'SELECT',
-        '"leases"."lease_status"',
+        '"leases"."lease_status" AS "lease_status"',
         'COUNT(*) AS "count_leases"',
         'FROM "leases"',
         'GROUP BY "leases"."lease_status"',
         'ORDER BY "count_leases" DESC;',
-      ])
-        ? []
-        : ["Expected DuckDB grouped lease-status SQL."]),
-      ...(applied.renderer.status !== "rendered" ? ["Expected applied renderer status rendered."] : []),
-      ...(applied.renderer.sql !== result.sql ? ["Expected applied SQL to match render result."] : []),
+      ]),
+      ...assertNoPromptText(result, integrated.plan.prompt || ""),
     ],
   },
   {
-    name: "resolved orders per customer renders join SQL",
-    plan: ordersPerCustomerPlan,
-    assert: (_plan, result) => [
-      ...expectRendered(result),
-      ...(containsAll(result.sql, [
-        '"customers"."customer_id"',
+    name: "leased units per property with resolved joins renders deterministic DuckDB SELECT",
+    integrated: leasedUnitsPerProperty,
+    assert: (result, integrated) => [
+      ...expectRendered(result, [
+        '"properties"."property_id" AS "property"',
+        'COUNT(DISTINCT "units"."unit_id") AS "count_distinct_units"',
+        'FROM "properties"',
+        'JOIN "units" ON "properties"."property_id" = "units"."property_id"',
+        'JOIN "leases" ON "units"."unit_id" = "leases"."unit_id"',
+      ]),
+      ...assertNoPromptText(result, integrated.plan.prompt || ""),
+    ],
+  },
+  {
+    name: "orders per customer with resolved joins renders deterministic DuckDB SELECT",
+    integrated: ordersPerCustomer,
+    assert: (result, integrated) => [
+      ...expectRendered(result, [
+        '"customers"."customer_id" AS "customer"',
         'COUNT(*) AS "count_orders"',
         'FROM "customers"',
         'JOIN "orders" ON "customers"."customer_id" = "orders"."customer_id"',
-        'GROUP BY "customers"."customer_id"',
-      ])
-        ? []
-        : ["Expected customers to orders join SQL."]),
+      ]),
+      ...assertNoPromptText(result, integrated.plan.prompt || ""),
     ],
   },
   {
-    name: "resolved tickets per account renders join SQL",
-    plan: ticketsPerAccountPlan,
-    assert: (_plan, result) => [
-      ...expectRendered(result),
-      ...(containsAll(result.sql, [
-        '"accounts"."account_id"',
+    name: "tickets per account with resolved joins renders deterministic DuckDB SELECT",
+    integrated: ticketsPerAccount,
+    assert: (result, integrated) => [
+      ...expectRendered(result, [
+        '"accounts"."account_id" AS "account"',
         'COUNT(*) AS "count_tickets"',
         'FROM "accounts"',
         'JOIN "tickets" ON "accounts"."account_id" = "tickets"."account_id"',
-      ])
+      ]),
+      ...assertNoPromptText(result, integrated.plan.prompt || ""),
+    ],
+  },
+  {
+    name: "needs-review renderability refuses to render",
+    integrated: needsReviewPlan,
+    assert: (result) => expectRefused(result, "renderability_not_renderable"),
+  },
+  {
+    name: "blocked renderability refuses to render",
+    integrated: blockedPlan,
+    assert: (result) => expectRefused(result, "renderability_not_renderable"),
+  },
+  {
+    name: "unsupported ready shape refuses to render",
+    integrated: unsupportedReadyPlan,
+    assert: (result) => expectRefused(result, "unsupported_plan_shape"),
+  },
+  {
+    name: "non-DuckDB renderer target refuses to render",
+    integrated: nonDuckDbPlan,
+    assert: (result) => expectRefused(result, "renderer_target_not_duckdb"),
+  },
+  {
+    name: "unresolved join refuses even with forged renderable gate",
+    integrated: forgedUnresolvedJoinPlan,
+    renderability: forgedRenderableGate,
+    assert: (result) => expectRefused(result, "relationship_review_required"),
+  },
+  {
+    name: "rendered SQL is SELECT-only and contains no prompt text",
+    integrated: ordersPerCustomer,
+    assert: (result, integrated) => [
+      ...expectRendered(result, ["SELECT", 'FROM "customers"', 'JOIN "orders"']),
+      ...assertSelectOnly(result.sql),
+      ...assertNoPromptText(result, integrated.plan.prompt || ""),
+    ],
+  },
+  {
+    name: "same input produces the same SQL output",
+    integrated: ordersPerCustomer,
+    assert: () =>
+      deterministicFirst.sql === deterministicSecond.sql &&
+      deterministicFirst.summary === deterministicSecond.summary
         ? []
-        : ["Expected accounts to tickets join SQL."]),
-    ],
-  },
-  {
-    name: "unresolved leased units per property refuses rendering",
-    plan: unresolvedLeasedUnitsPlan,
-    assert: (_plan, result, applied) => [
-      ...expectRefused(result, "needs_review"),
-      ...(canRenderBusinessSqlQueryPlan(unresolvedLeasedUnitsPlan)
-        ? ["Unresolved leased units must not be renderable."]
-        : []),
-      ...(applied.renderer.sql ? ["Needs-review plan must not gain SQL text."] : []),
-    ],
-  },
-  {
-    name: "resolved leased units per property refuses unsafe current-lease filter",
-    plan: resolvedLeasedUnitsPlan,
-    assert: (_plan, result, applied) => [
-      ...expectRefused(result, "needs_review"),
-      ...(result.reasons.some((reason) => reason.includes("Active/current lease"))
-        ? []
-        : ["Expected active/current lease refusal reason."]),
-      ...(applied.renderer.sql ? ["Unsafe current-lease filter plan must not gain SQL text."] : []),
-    ],
-  },
-  {
-    name: "missing relationship blocked plan refuses rendering",
-    plan: missingRelationshipPlan,
-    assert: (_plan, result, applied) => [
-      ...expectRefused(result, "blocked"),
-      ...(applied.renderer.status !== "blocked" ? ["Expected blocked applied renderer."] : []),
-      ...(applied.renderer.sql ? ["Blocked plan must not gain SQL text."] : []),
-    ],
-  },
-  {
-    name: "unsupported prompt refuses rendering",
-    plan: unsupportedPromptPlan,
-    assert: (_plan, result, applied) => [
-      ...expectRefused(result, "needs_review"),
-      ...(applied.renderer.sql ? ["Unsupported prompt must not gain SQL text."] : []),
-    ],
-  },
-  {
-    name: "selected Oracle guidance still renders DuckDB-target SQL only",
-    plan: oracleGuidancePlan,
-    assert: (plan, result, applied) => [
-      ...expectRendered(result),
-      ...(plan.renderer.targetDialect !== "duckdb" ? ["Expected DuckDB renderer target."] : []),
-      ...(plan.renderer.selectedGuidanceDialect !== "oracle"
-        ? ["Expected Oracle guidance metadata."]
-        : []),
-      ...(containsAll(result.sql, ['FROM "leases"', 'ORDER BY "count_leases" DESC;'])
-        ? []
-        : ["Expected DuckDB SQL despite Oracle guidance metadata."]),
-      ...(applied.renderer.selectedGuidanceDialect !== "oracle"
-        ? ["Expected applied plan to preserve Oracle guidance metadata."]
-        : []),
-    ],
-  },
-  {
-    name: "rendered SQL never appears for needs_review or blocked plans",
-    plan: createBlockedBusinessSqlQueryPlan("Missing required join path between invoices and vendors."),
-    assert: (_plan, result, applied) => {
-      const needsReviewResult = renderBusinessSqlQueryPlan(unsupportedPromptPlan);
-      const needsReviewApplied = applyBusinessSqlRenderedSql(unsupportedPromptPlan);
-      const failures = [
-        ...expectRefused(result, "blocked"),
-        ...(applied.renderer.sql ? ["Blocked plan must not gain SQL text."] : []),
-      ];
-      if (needsReviewResult.sql || needsReviewApplied.renderer.sql) {
-        failures.push("Needs-review plan must not gain SQL text.");
-      }
-      return failures;
-    },
+        : ["Expected deterministic rendered SQL and summary."],
   },
 ];
 
 export function runBusinessSqlRendererFixtures(): RendererFixtureReport {
   const results = BUSINESS_SQL_RENDERER_FIXTURES.map((fixture) => {
-    const renderResult = renderBusinessSqlQueryPlan(fixture.plan);
-    const applied = applyBusinessSqlRenderedSql(fixture.plan);
-    const failureReasons = fixture.assert(fixture.plan, renderResult, applied);
+    const renderResult = renderBusinessSqlFromRenderability({
+      integrated: fixture.integrated,
+      renderability: fixture.renderability || renderabilityFor(fixture.integrated),
+    });
+    const failureReasons = fixture.assert(renderResult, fixture.integrated);
 
     return {
       name: fixture.name,
       ok: failureReasons.length === 0,
-      summary: summarizeBusinessSqlQueryPlan(applied),
+      summary: renderResult.summary,
       renderResult,
       failureReasons,
     };
