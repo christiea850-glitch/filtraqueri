@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import OverflowChipStrip, {
+  type OverflowChipItem,
+} from "../../../components/common/OverflowChipStrip";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import SqlEditorHost from "./SqlEditorHost";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
@@ -931,7 +934,16 @@ function SqlEditorPanel({
           requiredRelationships: askFiltraQueriSuggestions.blockedPlan.missingRelationships,
         }
       : null;
-  const compactRelevantWorksheets = askFiltraQueriSuggestions.scopeRecommendations.slice(0, 3);
+  const compactRelevantWorksheets = askFiltraQueriSuggestions.scopeRecommendations.slice(0, 5);
+  const relevantWorksheetSuggestionItems = useMemo<OverflowChipItem[]>(
+    () =>
+      askFiltraQueriSuggestions.scopeRecommendations.map((recommendation) => ({
+        key: recommendation.worksheetId,
+        label: recommendation.worksheetName,
+        className: "sql-scope-recommendation-pill",
+      })),
+    [askFiltraQueriSuggestions.scopeRecommendations],
+  );
   const compactRelevantWorksheetHintColumns = Array.from(
     new Set(
       compactRelevantWorksheets.flatMap((recommendation) =>
@@ -1309,16 +1321,11 @@ function SqlEditorPanel({
             <div className="sql-scope-recommendation-list" aria-label="Relevant worksheets">
               <div className="sql-scope-recommendation-compact">
                 <span className="sql-scope-recommendation-compact-label">Top worksheet suggestions:</span>
-                <div className="sql-scope-recommendation-pill-list">
-                  {compactRelevantWorksheets.map((recommendation) => (
-                    <span
-                      className="sql-scope-recommendation-pill"
-                      key={recommendation.worksheetId}
-                    >
-                      {recommendation.worksheetName}
-                    </span>
-                  ))}
-                </div>
+                <OverflowChipStrip
+                  items={relevantWorksheetSuggestionItems}
+                  visibleLimit={5}
+                  ariaLabel="Top worksheet suggestions"
+                />
                 <small>{compactRelevantWorksheetCountLabel}</small>
                 {compactRelevantWorksheetHintColumns.length > 0 && (
                   <em>Includes: {compactRelevantWorksheetHintColumns.join(", ")}</em>

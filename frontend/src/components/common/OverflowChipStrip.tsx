@@ -48,27 +48,38 @@ function OverflowChipStrip<T = unknown>({
     [hiddenItems, normalizedSearchQuery],
   );
 
-  const renderButton = (item: OverflowChipItem<T>, isInOverflow: boolean) => (
-    <button
-      type="button"
-      key={item.key}
-      className={[
-        "overflow-chip-strip-chip",
-        item.isActive ? "is-active" : "",
-        item.className || "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      title={item.tooltip}
-      aria-pressed={item.isActive || undefined}
-      onClick={() => {
-        onChipClick?.(item);
-        if (isInOverflow) setIsOverflowOpen(false);
-      }}
-    >
-      {renderChip ? renderChip(item, isInOverflow) : item.label}
-    </button>
-  );
+  const renderChipContent = (item: OverflowChipItem<T>, isInOverflow: boolean) =>
+    renderChip ? renderChip(item, isInOverflow) : item.label;
+
+  const chipClassName = (item: OverflowChipItem<T>) =>
+    [
+      "overflow-chip-strip-chip",
+      item.isActive ? "is-active" : "",
+      item.className || "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+  const renderButton = (item: OverflowChipItem<T>, isInOverflow: boolean) =>
+    onChipClick ? (
+      <button
+        type="button"
+        key={item.key}
+        className={chipClassName(item)}
+        title={item.tooltip}
+        aria-pressed={item.isActive || undefined}
+        onClick={() => {
+          onChipClick(item);
+          if (isInOverflow) setIsOverflowOpen(false);
+        }}
+      >
+        {renderChipContent(item, isInOverflow)}
+      </button>
+    ) : (
+      <span key={item.key} className={chipClassName(item)} title={item.tooltip}>
+        {renderChipContent(item, isInOverflow)}
+      </span>
+    );
 
   if (items.length === 0) {
     return emptyState ? (
