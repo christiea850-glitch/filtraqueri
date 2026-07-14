@@ -43,6 +43,15 @@ Confirm these remain untouched unless the phase explicitly approves them:
 - `App.tsx` routing and mode switching
 - backend route handlers
 
+## No Authentication Yet
+
+FiltraQueri currently has no login or authentication feature. Until an explicit authentication and persistence slice is approved:
+
+- Avoid implementing or describing features as account-owned, cloud-persistent, collaborative, or user-secured.
+- Treat saved drafts, query history, relationship confirmations, settings, and workspace state as local or session-scoped only.
+- Do not imply durable user identity, shared workspaces, team access, cloud sync, account recovery, or secured user storage in UI copy, docs, fixtures, or plans.
+- Keep T-13 renderer and manual-insert work unblocked, but preserve this boundary when adding provenance, saved-query behavior, or any future persistence copy.
+
 ## Hybrid And Allowlist Review
 
 - Hybrid allowlists stay narrow and path-specific.
