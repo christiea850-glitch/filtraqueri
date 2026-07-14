@@ -4,8 +4,10 @@ export type OverflowChipItem<T = unknown> = {
   key: string;
   label: string;
   tooltip?: string;
+  ariaLabel?: string;
   className?: string;
   isActive?: boolean;
+  disabled?: boolean;
   data?: T;
 };
 
@@ -13,6 +15,7 @@ export type OverflowChipStripProps<T = unknown> = {
   items: readonly OverflowChipItem<T>[];
   visibleLimit: number;
   ariaLabel: string;
+  className?: string;
   onChipClick?: (item: OverflowChipItem<T>) => void;
   renderChip?: (item: OverflowChipItem<T>, isInOverflow: boolean) => ReactNode;
   overflowLabel?: (remainingCount: number) => string;
@@ -25,6 +28,7 @@ function OverflowChipStrip<T = unknown>({
   items,
   visibleLimit,
   ariaLabel,
+  className,
   onChipClick,
   renderChip,
   overflowLabel,
@@ -66,9 +70,12 @@ function OverflowChipStrip<T = unknown>({
         type="button"
         key={item.key}
         className={chipClassName(item)}
+        disabled={item.disabled}
         title={item.tooltip}
+        aria-label={item.ariaLabel}
         aria-pressed={item.isActive || undefined}
         onClick={() => {
+          if (item.disabled) return;
           onChipClick(item);
           if (isInOverflow) setIsOverflowOpen(false);
         }}
@@ -90,7 +97,10 @@ function OverflowChipStrip<T = unknown>({
   }
 
   return (
-    <div className="overflow-chip-strip" aria-label={ariaLabel}>
+    <div
+      className={["overflow-chip-strip", className || ""].filter(Boolean).join(" ")}
+      aria-label={ariaLabel}
+    >
       <div className="overflow-chip-strip-visible">
         {visibleItems.map((item) => renderButton(item, false))}
         {hiddenItems.length > 0 && (

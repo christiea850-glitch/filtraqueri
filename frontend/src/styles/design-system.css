@@ -4301,6 +4301,10 @@ body {
   gap: 6px;
 }
 
+.app .dataset-preview-sheets.overflow-chip-strip {
+  display: block;
+}
+
 .app .dataset-preview-mode-switch {
   display: inline-flex;
   width: fit-content;
