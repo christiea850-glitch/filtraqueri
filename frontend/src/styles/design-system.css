@@ -9528,6 +9528,160 @@ body {
   line-height: 1.5;
 }
 
+/* UX-S2A-3-3: Top categories focused result */
+.app .top-categories-answer-card {
+  border-color: rgba(124, 58, 237, 0.22);
+}
+
+.app .top-categories-answer-card.has-categories {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 243, 255, 0.88));
+}
+
+.app .top-categories-answer-card.is-empty {
+  border-color: rgba(148, 163, 184, 0.32);
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.app .top-categories-summary-chips div:nth-child(3) {
+  border-color: rgba(249, 115, 22, 0.24);
+  background: rgba(255, 247, 237, 0.76);
+}
+
+.app .top-categories-column-list {
+  display: grid;
+  gap: 14px;
+}
+
+.app .top-categories-column-list > article {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 22px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.app .top-categories-column-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.app .top-categories-column-heading strong {
+  display: block;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 850;
+  word-break: break-word;
+}
+
+.app .top-categories-column-heading span {
+  display: inline-flex;
+  margin-top: 4px;
+  color: rgba(91, 33, 182, 0.74);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app .top-categories-column-heading small {
+  color: rgba(71, 85, 105, 0.72);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.app .top-categories-value-list {
+  display: grid;
+  gap: 10px;
+}
+
+.app .top-categories-value-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.55fr) minmax(180px, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.app .top-categories-value-row strong {
+  display: block;
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .top-categories-value-row small {
+  color: rgba(71, 85, 105, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app .top-categories-bar-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.95);
+}
+
+.app .top-categories-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7c3aed, #34d399);
+}
+
+.app .top-categories-value-row:nth-child(2n) .top-categories-bar-fill {
+  background: linear-gradient(90deg, #10b981, #60a5fa);
+}
+
+.app .top-categories-value-row.is-other .top-categories-bar-fill {
+  background: linear-gradient(90deg, #94a3b8, #cbd5e1);
+}
+
+.app .top-categories-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-color: rgba(148, 163, 184, 0.28);
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.app .top-categories-empty-state > span {
+  display: inline-flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: rgba(241, 245, 249, 0.98);
+  color: #64748b;
+  box-shadow: 0 14px 34px rgba(100, 116, 139, 0.13);
+}
+
+.app .top-categories-empty-state svg {
+  width: 22px;
+  height: 22px;
+}
+
+.app .top-categories-empty-state h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.app .top-categories-empty-state p:not(.section-label) {
+  margin: 6px 0 0;
+  color: rgba(71, 85, 105, 0.76);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 @media (max-width: 860px) {
   .app .missing-values-summary-chips,
   .app .summary-notable-grid {
@@ -9554,12 +9708,19 @@ body {
   .app .summary-worksheet-list > span,
   .app .missing-values-column-heading,
   .app .missing-values-worksheet-list article > div,
-  .app .missing-values-complete-state {
+  .app .missing-values-complete-state,
+  .app .top-categories-column-heading,
+  .app .top-categories-empty-state {
     flex-direction: column;
   }
 
+  .app .top-categories-value-row {
+    grid-template-columns: 1fr;
+  }
+
   .app .missing-values-column-heading small,
-  .app .missing-values-worksheet-list small {
+  .app .missing-values-worksheet-list small,
+  .app .top-categories-column-heading small {
     white-space: normal;
   }
 }

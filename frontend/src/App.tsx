@@ -12,6 +12,7 @@ import ResultsGrid from "./components/results/ResultsGrid";
 import ResultsInvestigationSurface from "./components/results/ResultsInvestigationSurface";
 import MissingValuesResultPage from "./components/results/MissingValuesResultPage";
 import SummaryResultPage from "./components/results/SummaryResultPage";
+import TopCategoriesResultPage from "./components/results/TopCategoriesResultPage";
 import UploadPanel from "./components/upload/UploadPanel";
 import QuestionWorkspacePanel from "./components/workspace/QuestionWorkspacePanel";
 import {
@@ -298,7 +299,10 @@ function App() {
   });
 
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
-  const isFocusedResultIntent = humanIntent === "summary" || humanIntent === "missing_values";
+  const isFocusedResultIntent =
+    humanIntent === "summary" ||
+    humanIntent === "missing_values" ||
+    humanIntent === "top_categories";
 
   // E-1: Explore Three-Room state machine (compose / refine / answer).
   // Infrastructure only — read-only state today, used for the future
@@ -942,6 +946,23 @@ function App() {
     if (humanIntent === "missing_values" && dataset) {
       return (
         <MissingValuesResultPage
+          dataset={dataset}
+          activeWorksheetName={
+            activeWorkbookWorksheet?.displayName ||
+            activeWorkbookWorksheet?.sheetName ||
+            dataset.table_name
+          }
+          onBackHome={() => updateDatasetSessionView("welcome")}
+          onContinueExplore={() => navigateHumanInsightAction("queryBuilder")}
+          onAskFollowup={() => navigateHumanInsightAction("queryBuilder")}
+          onSelectIntent={selectHumanIntent}
+        />
+      );
+    }
+
+    if (humanIntent === "top_categories" && dataset) {
+      return (
+        <TopCategoriesResultPage
           dataset={dataset}
           activeWorksheetName={
             activeWorkbookWorksheet?.displayName ||

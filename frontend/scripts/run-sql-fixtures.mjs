@@ -216,6 +216,11 @@ const fixtures = [
     modulePath: "/src/features/results/__tests__/computeMissingValuesSummary.test.ts",
     exportName: "runComputeMissingValuesSummaryFixtures",
   },
+  {
+    label: "Top categories result",
+    modulePath: "/src/features/results/__tests__/computeTopCategoriesSummary.test.ts",
+    exportName: "runComputeTopCategoriesSummaryFixtures",
+  },
 ];
 
 const asCount = (value) => {

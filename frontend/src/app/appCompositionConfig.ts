@@ -23,7 +23,7 @@ export const humanIntentGuidance: Record<HumanIntent, HumanIntentGuidance> = {
   },
   top_categories: {
     label: "Top categories",
-    route: "queryBuilder",
+    route: "results",
     nextStep: "Group a category.",
     detail: "Count the biggest groups.",
   },
