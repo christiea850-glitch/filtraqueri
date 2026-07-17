@@ -1118,6 +1118,7 @@ function App() {
         onFileChange={handleFileUpload}
         onContinue={() => updateDatasetSessionView(activeResultModel ? "results" : "dataset")}
         onRecentDatasetClick={activateRecentDataset}
+        onSuggestionSelect={selectHumanIntent}
       />
     ),
     dataset: () =>
