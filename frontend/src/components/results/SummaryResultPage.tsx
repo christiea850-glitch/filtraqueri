@@ -6,7 +6,8 @@ import { computeDatasetSummary } from "../../features/results/computeDatasetSumm
 type SummaryResultPageProps = {
   dataset: DatasetMetadata;
   activeWorksheetName?: string | null;
-  onBackHome: () => void;
+  backLabel: string;
+  onBack: () => void;
   onContinueExplore: () => void;
   onAskFollowup: () => void;
   onSelectIntent: (intent: HumanIntent) => void;
@@ -43,7 +44,8 @@ function SummaryIcon({ name }: { name: "back" | "search" | "explore" }) {
 export default function SummaryResultPage({
   dataset,
   activeWorksheetName,
-  onBackHome,
+  backLabel,
+  onBack,
   onContinueExplore,
   onAskFollowup,
   onSelectIntent,
@@ -64,9 +66,9 @@ export default function SummaryResultPage({
   return (
     <article className="summary-result-page" aria-label="Dataset summary">
       <header className="summary-result-hero">
-        <button type="button" className="summary-back-button" onClick={onBackHome}>
+        <button type="button" className="summary-back-button" onClick={onBack}>
           <SummaryIcon name="back" />
-          Back to Home
+          {backLabel}
         </button>
         <div>
           <p className="section-label">Insights · Summary</p>

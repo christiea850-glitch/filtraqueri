@@ -77,6 +77,62 @@ type CleanPrepareRestoreContext = {
   requestId: number;
 };
 
+type FocusedResultOrigin = {
+  view: ActiveView;
+  label: string;
+  humanIntent: HumanIntent | null;
+};
+
+type FocusedHumanIntent = Extract<
+  HumanIntent,
+  "summary" | "missing_values" | "top_categories" | "trends"
+>;
+
+const isFocusedHumanIntent = (intent: HumanIntent | null): intent is FocusedHumanIntent =>
+  intent === "summary" ||
+  intent === "missing_values" ||
+  intent === "top_categories" ||
+  intent === "trends";
+
+const getFocusedIntentLabel = (intent: FocusedHumanIntent) => {
+  if (intent === "summary") return "Summary";
+  if (intent === "missing_values") return "Missing values";
+  if (intent === "top_categories") return "Top categories";
+  if (intent === "trends") return "Trends";
+  return "Back";
+};
+
+const createFocusedResultOrigin = (
+  activeView: ActiveView,
+  humanIntent: HumanIntent | null,
+): FocusedResultOrigin => {
+  if (activeView === "welcome") {
+    return { view: "welcome", label: "Home", humanIntent: null };
+  }
+
+  if (activeView === "dataset") {
+    return { view: "dataset", label: "Data", humanIntent: null };
+  }
+
+  if (activeView === "queryBuilder") {
+    return { view: "queryBuilder", label: "Explore", humanIntent: null };
+  }
+
+  if (activeView === "results" && isFocusedHumanIntent(humanIntent)) {
+    return {
+      view: "results",
+      label: getFocusedIntentLabel(humanIntent),
+      humanIntent,
+    };
+  }
+
+  if (activeView === "results") {
+    return { view: "results", label: "Results", humanIntent: null };
+  }
+
+  return { view: activeView, label: "Back", humanIntent: null };
+};
+
 // S5-P3: App.tsx remains the current composition root. The S5 navigation
 // skeleton is intentionally inactive here; routing, mode switching, dataset
 // restore, SQL, results, export, and runtime wiring stay behaviorally unchanged.
@@ -123,6 +179,9 @@ function App() {
     view: ActiveView;
     tab: ResultTabKey;
   } | null>(null);
+  const [focusedResultBackStack, setFocusedResultBackStack] = useState<
+    FocusedResultOrigin[]
+  >([]);
   const {
     registry: executionRegistry,
     recordExecutionResult,
@@ -300,11 +359,7 @@ function App() {
   });
 
   const hasQueryResults = queriedResult.columns.length > 0 || hasRunQuery;
-  const isFocusedResultIntent =
-    humanIntent === "summary" ||
-    humanIntent === "missing_values" ||
-    humanIntent === "top_categories" ||
-    humanIntent === "trends";
+  const isFocusedResultIntent = isFocusedHumanIntent(humanIntent);
 
   // E-1: Explore Three-Room state machine (compose / refine / answer).
   // Infrastructure only — read-only state today, used for the future
@@ -345,6 +400,7 @@ function App() {
   useEffect(() => {
     if (!dataset) {
       resetExploreRoom();
+      setFocusedResultBackStack([]);
     }
   }, [dataset, resetExploreRoom]);
 
@@ -702,6 +758,10 @@ function App() {
 
   const selectHumanIntent = (intent: HumanIntent) => {
     const guidance = humanIntentGuidance[intent];
+    if (intent !== humanIntent || activeView !== "results") {
+      const origin = createFocusedResultOrigin(activeView, humanIntent);
+      setFocusedResultBackStack((currentStack) => [...currentStack, origin]);
+    }
     setHumanIntent(intent);
     setHumanInsightBackTarget(null);
     setWorkspaceMode("human");
@@ -714,6 +774,31 @@ function App() {
     if (guidance.route === "queryBuilder") setHumanAnalyzeStage("investigate");
     updateDatasetSessionView(guidance.route);
   };
+
+  const handleFocusedResultBack = useCallback(() => {
+    const origin = focusedResultBackStack[focusedResultBackStack.length - 1];
+    setFocusedResultBackStack((currentStack) => currentStack.slice(0, -1));
+
+    if (origin?.humanIntent) {
+      setHumanIntent(origin.humanIntent);
+      updateDatasetSessionView(humanIntentGuidance[origin.humanIntent].route);
+      return;
+    }
+
+    if (origin?.view) {
+      updateDatasetSessionView(origin.view);
+      return;
+    }
+
+    updateDatasetSessionView("welcome");
+  }, [focusedResultBackStack, updateDatasetSessionView]);
+
+  const currentFocusedBackOrigin =
+    focusedResultBackStack[focusedResultBackStack.length - 1];
+  const focusedResultBackLabel =
+    currentFocusedBackOrigin?.label && currentFocusedBackOrigin.label !== "Back"
+      ? `Back to ${currentFocusedBackOrigin.label}`
+      : "Back";
 
   const navigateHumanInsightAction = (view: ActiveView, tab?: ResultTabKey) => {
     if (view !== activeView) {
@@ -937,7 +1022,8 @@ function App() {
             activeWorkbookWorksheet?.sheetName ||
             dataset.table_name
           }
-          onBackHome={() => updateDatasetSessionView("welcome")}
+          backLabel={focusedResultBackLabel}
+          onBack={handleFocusedResultBack}
           onContinueExplore={() => navigateHumanInsightAction("queryBuilder")}
           onAskFollowup={() => navigateHumanInsightAction("queryBuilder")}
           onSelectIntent={selectHumanIntent}
@@ -954,7 +1040,8 @@ function App() {
             activeWorkbookWorksheet?.sheetName ||
             dataset.table_name
           }
-          onBackHome={() => updateDatasetSessionView("welcome")}
+          backLabel={focusedResultBackLabel}
+          onBack={handleFocusedResultBack}
           onContinueExplore={() => navigateHumanInsightAction("queryBuilder")}
           onAskFollowup={() => navigateHumanInsightAction("queryBuilder")}
           onSelectIntent={selectHumanIntent}
@@ -971,7 +1058,8 @@ function App() {
             activeWorkbookWorksheet?.sheetName ||
             dataset.table_name
           }
-          onBackHome={() => updateDatasetSessionView("welcome")}
+          backLabel={focusedResultBackLabel}
+          onBack={handleFocusedResultBack}
           onContinueExplore={() => navigateHumanInsightAction("queryBuilder")}
           onAskFollowup={() => navigateHumanInsightAction("queryBuilder")}
           onSelectIntent={selectHumanIntent}
@@ -988,7 +1076,8 @@ function App() {
             activeWorkbookWorksheet?.sheetName ||
             dataset.table_name
           }
-          onBackHome={() => updateDatasetSessionView("welcome")}
+          backLabel={focusedResultBackLabel}
+          onBack={handleFocusedResultBack}
           onContinueExplore={() => navigateHumanInsightAction("queryBuilder")}
           onAskFollowup={() => navigateHumanInsightAction("queryBuilder")}
           onSelectIntent={selectHumanIntent}

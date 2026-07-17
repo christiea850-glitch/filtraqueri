@@ -6,7 +6,8 @@ import { computeTopCategoriesSummary } from "../../features/results/computeTopCa
 type TopCategoriesResultPageProps = {
   dataset: DatasetMetadata;
   activeWorksheetName?: string | null;
-  onBackHome: () => void;
+  backLabel: string;
+  onBack: () => void;
   onContinueExplore: () => void;
   onAskFollowup: () => void;
   onSelectIntent: (intent: HumanIntent) => void;
@@ -61,7 +62,8 @@ const emptyTitle = (reason: ReturnType<typeof computeTopCategoriesSummary>["empt
 export default function TopCategoriesResultPage({
   dataset,
   activeWorksheetName,
-  onBackHome,
+  backLabel,
+  onBack,
   onContinueExplore,
   onAskFollowup,
   onSelectIntent,
@@ -80,9 +82,9 @@ export default function TopCategoriesResultPage({
   return (
     <article className="top-categories-result-page summary-result-page" aria-label="Top categories summary">
       <header className="summary-result-hero">
-        <button type="button" className="summary-back-button" onClick={onBackHome}>
+        <button type="button" className="summary-back-button" onClick={onBack}>
           <TopCategoriesIcon name="back" />
-          Back to Home
+          {backLabel}
         </button>
         <div>
           <p className="section-label">Insights · Top categories</p>

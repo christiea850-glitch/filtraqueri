@@ -6,7 +6,8 @@ import { computeMissingValuesSummary } from "../../features/results/computeMissi
 type MissingValuesResultPageProps = {
   dataset: DatasetMetadata;
   activeWorksheetName?: string | null;
-  onBackHome: () => void;
+  backLabel: string;
+  onBack: () => void;
   onContinueExplore: () => void;
   onAskFollowup: () => void;
   onSelectIntent: (intent: HumanIntent) => void;
@@ -54,7 +55,8 @@ function MissingValuesIcon({ name }: { name: "back" | "search" | "explore" | "co
 export default function MissingValuesResultPage({
   dataset,
   activeWorksheetName,
-  onBackHome,
+  backLabel,
+  onBack,
   onContinueExplore,
   onAskFollowup,
   onSelectIntent,
@@ -73,9 +75,9 @@ export default function MissingValuesResultPage({
   return (
     <article className="missing-values-result-page summary-result-page" aria-label="Missing values summary">
       <header className="summary-result-hero">
-        <button type="button" className="summary-back-button" onClick={onBackHome}>
+        <button type="button" className="summary-back-button" onClick={onBack}>
           <MissingValuesIcon name="back" />
-          Back to Home
+          {backLabel}
         </button>
         <div>
           <p className="section-label">Insights · Missing values</p>

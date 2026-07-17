@@ -6,7 +6,8 @@ import { computeTrendsSummary } from "../../features/results/computeTrendsSummar
 type TrendsResultPageProps = {
   dataset: DatasetMetadata;
   activeWorksheetName?: string | null;
-  onBackHome: () => void;
+  backLabel: string;
+  onBack: () => void;
   onContinueExplore: () => void;
   onAskFollowup: () => void;
   onSelectIntent: (intent: HumanIntent) => void;
@@ -54,7 +55,8 @@ function TrendsIcon({ name }: { name: "back" | "search" | "explore" | "calendar"
 export default function TrendsResultPage({
   dataset,
   activeWorksheetName,
-  onBackHome,
+  backLabel,
+  onBack,
   onContinueExplore,
   onAskFollowup,
   onSelectIntent,
@@ -73,9 +75,9 @@ export default function TrendsResultPage({
   return (
     <article className="trends-result-page summary-result-page" aria-label="Trends readiness summary">
       <header className="summary-result-hero">
-        <button type="button" className="summary-back-button" onClick={onBackHome}>
+        <button type="button" className="summary-back-button" onClick={onBack}>
           <TrendsIcon name="back" />
-          Back to Home
+          {backLabel}
         </button>
         <div>
           <p className="section-label">Insights · Trends</p>
