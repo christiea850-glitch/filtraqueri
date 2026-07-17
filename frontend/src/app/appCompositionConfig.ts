@@ -35,7 +35,7 @@ export const humanIntentGuidance: Record<HumanIntent, HumanIntentGuidance> = {
   },
   trends: {
     label: "Trend analysis",
-    route: "queryBuilder",
+    route: "results",
     nextStep: "Choose time and value.",
     detail: "Summarize change over time.",
   },

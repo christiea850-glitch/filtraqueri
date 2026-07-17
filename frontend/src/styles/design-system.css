@@ -9682,6 +9682,138 @@ body {
   line-height: 1.5;
 }
 
+/* UX-S2A-3-4: Trends focused readiness result */
+.app .trends-answer-card {
+  border-color: rgba(245, 158, 11, 0.28);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(255, 251, 235, 0.82));
+}
+
+.app .trends-answer-card.is-ready {
+  border-color: rgba(16, 185, 129, 0.26);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(236, 253, 245, 0.78));
+}
+
+.app .trends-readiness-chips div:nth-child(2) dd {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .trends-date-list {
+  display: grid;
+  gap: 10px;
+}
+
+.app .trends-date-list article {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.74);
+}
+
+.app .trends-date-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.app .trends-date-heading strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 850;
+  word-break: break-word;
+}
+
+.app .trends-date-heading span {
+  display: inline-flex;
+  margin-top: 4px;
+  color: rgba(5, 150, 105, 0.78);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app .trends-date-list article:has(.trends-date-heading span:last-child) {
+  border-color: rgba(226, 232, 240, 0.95);
+}
+
+.app .trends-date-heading small {
+  color: rgba(71, 85, 105, 0.72);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.app .trends-date-list p {
+  margin: 0;
+  color: rgba(71, 85, 105, 0.78);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.app .trends-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-color: rgba(245, 158, 11, 0.26);
+  background: rgba(255, 251, 235, 0.74);
+}
+
+.app .trends-empty-state > span {
+  display: inline-flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: rgba(254, 243, 199, 0.98);
+  color: #b45309;
+  box-shadow: 0 14px 34px rgba(245, 158, 11, 0.15);
+}
+
+.app .trends-empty-state svg {
+  width: 22px;
+  height: 22px;
+}
+
+.app .trends-empty-state h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.app .trends-empty-state p:not(.section-label) {
+  margin: 6px 0 0;
+  color: rgba(71, 85, 105, 0.76);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.app .trends-type-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app .trends-type-grid span {
+  display: inline-flex;
+  padding: 8px 11px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.84);
+  color: rgba(15, 23, 42, 0.74);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 @media (max-width: 860px) {
   .app .missing-values-summary-chips,
   .app .summary-notable-grid {
@@ -9710,7 +9842,9 @@ body {
   .app .missing-values-worksheet-list article > div,
   .app .missing-values-complete-state,
   .app .top-categories-column-heading,
-  .app .top-categories-empty-state {
+  .app .top-categories-empty-state,
+  .app .trends-date-heading,
+  .app .trends-empty-state {
     flex-direction: column;
   }
 
@@ -9720,7 +9854,8 @@ body {
 
   .app .missing-values-column-heading small,
   .app .missing-values-worksheet-list small,
-  .app .top-categories-column-heading small {
+  .app .top-categories-column-heading small,
+  .app .trends-date-heading small {
     white-space: normal;
   }
 }

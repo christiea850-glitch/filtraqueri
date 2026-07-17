@@ -221,6 +221,11 @@ const fixtures = [
     modulePath: "/src/features/results/__tests__/computeTopCategoriesSummary.test.ts",
     exportName: "runComputeTopCategoriesSummaryFixtures",
   },
+  {
+    label: "Trends result",
+    modulePath: "/src/features/results/__tests__/computeTrendsSummary.test.ts",
+    exportName: "runComputeTrendsSummaryFixtures",
+  },
 ];
 
 const asCount = (value) => {
