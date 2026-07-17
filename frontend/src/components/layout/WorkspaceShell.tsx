@@ -53,6 +53,7 @@ type WorkspaceShellProps = {
   analystViews: AnalystNavItem[];
   errorMessage: string;
   runtimeContext: WorkspaceRuntimeContext;
+  hideInvestigationChrome?: boolean;
   isRuntimePanelCollapsed: boolean;
   commandItems: CommandLauncherItem[];
   children: ReactNode;
@@ -234,6 +235,7 @@ function WorkspaceShell({
   analystViews,
   errorMessage,
   runtimeContext,
+  hideInvestigationChrome = false,
   isRuntimePanelCollapsed,
   commandItems,
   children,
@@ -272,11 +274,13 @@ function WorkspaceShell({
   // redundant there — and crowding it in caused the rail to clip off-screen.
   // Analyst therefore runs as a clean 3-column shell with no rail.
   const hasDestinationRail =
+    !hideInvestigationChrome &&
     !isSettingsView &&
     activeDestination.id !== "home" &&
     activeDestination.id !== "analyst" &&
     activeDestination.id !== "data";
   const hasWorkspaceContextStrip =
+    !hideInvestigationChrome &&
     !isSettingsView &&
     activeDestination.id !== "home" &&
     activeDestination.id !== "data";
@@ -681,7 +685,7 @@ function WorkspaceShell({
                 </span>
               </section>
 
-              {workspaceMode === "human" && activeDestination.id !== "settings" && (
+              {!hideInvestigationChrome && workspaceMode === "human" && activeDestination.id !== "settings" && (
                 <section className="investigation-status-strip" aria-label="Investigation progress">
                   {investigationJourneySteps.map((step) => (
                     <span

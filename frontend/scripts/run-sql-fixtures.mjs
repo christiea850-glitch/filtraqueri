@@ -206,6 +206,11 @@ const fixtures = [
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderabilityGate.test.ts",
     exportName: "runBusinessSqlRenderabilityGateFixtures",
   },
+  {
+    label: "Dataset summary result",
+    modulePath: "/src/features/results/__tests__/computeDatasetSummary.test.ts",
+    exportName: "runComputeDatasetSummaryFixtures",
+  },
 ];
 
 const asCount = (value) => {

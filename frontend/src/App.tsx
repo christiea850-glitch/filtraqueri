@@ -10,6 +10,7 @@ import VisualQueryBuilderPanel from "./components/query-builder/VisualQueryBuild
 import ResultTabs from "./components/results/ResultTabs";
 import ResultsGrid from "./components/results/ResultsGrid";
 import ResultsInvestigationSurface from "./components/results/ResultsInvestigationSurface";
+import SummaryResultPage from "./components/results/SummaryResultPage";
 import UploadPanel from "./components/upload/UploadPanel";
 import QuestionWorkspacePanel from "./components/workspace/QuestionWorkspacePanel";
 import {
@@ -919,6 +920,23 @@ function App() {
   const renderHumanIntentGuidance = () => {
     if (!humanIntent) return null;
 
+    if (humanIntent === "summary" && dataset) {
+      return (
+        <SummaryResultPage
+          dataset={dataset}
+          activeWorksheetName={
+            activeWorkbookWorksheet?.displayName ||
+            activeWorkbookWorksheet?.sheetName ||
+            dataset.table_name
+          }
+          onBackHome={() => updateDatasetSessionView("welcome")}
+          onContinueExplore={() => navigateHumanInsightAction("queryBuilder")}
+          onAskFollowup={() => navigateHumanInsightAction("queryBuilder")}
+          onSelectIntent={selectHumanIntent}
+        />
+      );
+    }
+
     const guidance = humanIntentGuidance[humanIntent];
     const insight = createHumanInsight(humanIntent);
 
@@ -975,6 +993,7 @@ function App() {
   );
 
   const renderResultsInvestigationSurface = () => {
+    if (humanIntent === "summary") return null;
     if (!activeResultModel) return null;
 
     return (
@@ -996,6 +1015,7 @@ function App() {
   };
 
   const renderActiveResultPanel = () => {
+    if (humanIntent === "summary") return null;
     if (!activeResultModel) return null;
 
     return (
@@ -1309,9 +1329,11 @@ function App() {
         <>
           {renderHumanInsightBackButton()}
           {renderHumanIntentGuidance()}
-          <section className="results-workspace" aria-label="Data exploration workspace">
-            {renderActiveResultPanel()}
-          </section>
+          {humanIntent !== "summary" && (
+            <section className="results-workspace" aria-label="Data exploration workspace">
+              {renderActiveResultPanel()}
+            </section>
+          )}
         </>
       ) : null,
     history: () =>
@@ -1624,6 +1646,7 @@ function App() {
       analystViews={analystNavItems}
       errorMessage={errorMessage}
       runtimeContext={workspaceRuntimeContext}
+      hideInvestigationChrome={humanIntent === "summary"}
       isRuntimePanelCollapsed={runtimePersistence.isRuntimePanelCollapsed}
       commandItems={commandItems}
       onOpenFile={() => {

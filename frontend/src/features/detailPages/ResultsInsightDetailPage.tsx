@@ -16,7 +16,7 @@ function ResultsInsightDetailPage({
   sourceContext,
   resultFactLabel,
   filterSortLabel,
-  preservedContextLabel = "preserve:results-insight-detail",
+  preservedContextLabel = "Results context",
   backTargetLabel = "Results",
   onBack,
 }: ResultsInsightDetailPageProps) {
@@ -60,7 +60,7 @@ function ResultsInsightDetailPage({
       </div>
 
       <p className="status-message">
-        {preservedContextLabel}: Back behavior preserves the current dataset, session, mode, filters, pagination,
+        {preservedContextLabel} is preserved when you return to the current dataset, filters, pagination,
         export state, result context, and expanded panels.
       </p>
     </FocusedWorkspaceShell>

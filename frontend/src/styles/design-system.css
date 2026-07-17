@@ -9033,3 +9033,333 @@ body {
   font-weight: 500;
   line-height: 1.2;
 }
+
+/* UX-S2A-3-1: Summary result page */
+.app .summary-result-page {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  width: min(100%, 1120px);
+  margin: 0 auto;
+}
+
+.app .summary-result-page::before {
+  content: "";
+  position: absolute;
+  inset: -56px auto auto 8%;
+  width: min(520px, 70vw);
+  height: 260px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.16), rgba(124, 58, 237, 0));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app .summary-result-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app .summary-result-hero {
+  display: grid;
+  gap: 16px;
+  padding: 4px 2px 8px;
+}
+
+.app .summary-back-button {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  background: transparent;
+  color: rgba(91, 33, 182, 0.9);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app .summary-back-button svg,
+.app .summary-action-row svg,
+.app .summary-followup-row svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.app .summary-result-hero .section-label {
+  color: rgba(109, 40, 217, 0.9);
+  letter-spacing: 0.16em;
+}
+
+.app .summary-result-hero h2 {
+  margin: 0;
+  max-width: 820px;
+  color: #111827;
+  font-size: clamp(34px, 5vw, 54px);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+
+.app .summary-answer-card,
+.app .summary-card,
+.app .summary-followup-card {
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 65px rgba(15, 23, 42, 0.08);
+}
+
+.app .summary-answer-card {
+  display: grid;
+  gap: 20px;
+  padding: 26px;
+}
+
+.app .summary-answer-card > p:not(.section-label) {
+  margin: 0;
+  max-width: 850px;
+  color: rgba(15, 23, 42, 0.82);
+  font-size: 18px;
+  line-height: 1.65;
+}
+
+.app .summary-card,
+.app .summary-followup-card {
+  padding: 22px;
+}
+
+.app .summary-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.app .summary-section-heading h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.app .summary-section-heading > span {
+  color: rgba(71, 85, 105, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app .summary-type-bar {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.75);
+}
+
+.app .summary-type-segment.is-text,
+.app .summary-type-dot.is-text {
+  background: #64748b;
+}
+
+.app .summary-type-segment.is-numeric,
+.app .summary-type-dot.is-numeric {
+  background: #7c3aed;
+}
+
+.app .summary-type-segment.is-date,
+.app .summary-type-dot.is-date {
+  background: #f59e0b;
+}
+
+.app .summary-type-segment.is-categorical,
+.app .summary-type-dot.is-categorical {
+  background: #10b981;
+}
+
+.app .summary-type-segment.is-identifier,
+.app .summary-type-dot.is-identifier {
+  background: #f97316;
+}
+
+.app .summary-type-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-top: 14px;
+}
+
+.app .summary-type-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.app .summary-type-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.app .summary-notable-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.app .summary-notable-grid article {
+  padding: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.app .summary-notable-grid span {
+  color: rgba(109, 40, 217, 0.78);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app .summary-notable-grid strong {
+  display: block;
+  margin-top: 7px;
+  color: #0f172a;
+  font-size: 17px;
+  word-break: break-word;
+}
+
+.app .summary-notable-grid p {
+  margin: 6px 0 0;
+  color: rgba(71, 85, 105, 0.8);
+  font-size: 13px;
+}
+
+.app .summary-worksheet-list {
+  display: grid;
+  gap: 8px;
+}
+
+.app .summary-worksheet-list > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.75);
+}
+
+.app .summary-worksheet-list > span.is-active {
+  border-color: rgba(124, 58, 237, 0.24);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.app .summary-worksheet-list strong,
+.app .summary-worksheet-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .summary-worksheet-list strong {
+  color: #0f172a;
+}
+
+.app .summary-worksheet-list small {
+  color: rgba(71, 85, 105, 0.72);
+}
+
+.app .summary-followup-card {
+  display: grid;
+  gap: 14px;
+}
+
+.app .summary-followup-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 8px 10px 8px 18px;
+  border: 1px solid rgba(221, 214, 254, 0.96);
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(109, 40, 217, 0.12);
+}
+
+.app .summary-followup-row svg {
+  color: #7c3aed;
+}
+
+.app .summary-followup-row input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  color: #111827;
+  font: inherit;
+  background: transparent;
+}
+
+.app .summary-followup-row .primary-button {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.28);
+}
+
+.app .summary-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app .summary-action-row .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.app .summary-intent-chip {
+  border: 1px solid rgba(221, 214, 254, 0.95);
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: rgba(245, 243, 255, 0.88);
+  color: #5b21b6;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.app .summary-intent-chip:hover {
+  border-color: rgba(124, 58, 237, 0.42);
+  background: rgba(237, 233, 254, 0.95);
+}
+
+@media (max-width: 860px) {
+  .app .summary-notable-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app .summary-followup-row {
+    border-radius: 24px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .app .summary-followup-row .primary-button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .app .summary-notable-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .app .summary-section-heading,
+  .app .summary-worksheet-list > span {
+    flex-direction: column;
+  }
+}
