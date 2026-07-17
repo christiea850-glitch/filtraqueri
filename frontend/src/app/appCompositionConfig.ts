@@ -17,7 +17,7 @@ export const humanIntentGuidance: Record<HumanIntent, HumanIntentGuidance> = {
   },
   missing_values: {
     label: "Missing values",
-    route: "queryBuilder",
+    route: "results",
     nextStep: "Choose columns.",
     detail: "Check columns with empty values.",
   },
@@ -52,4 +52,3 @@ export const humanIntentGuidance: Record<HumanIntent, HumanIntentGuidance> = {
     detail: "Prepare grouped chart data.",
   },
 };
-

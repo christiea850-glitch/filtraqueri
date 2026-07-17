@@ -211,6 +211,11 @@ const fixtures = [
     modulePath: "/src/features/results/__tests__/computeDatasetSummary.test.ts",
     exportName: "runComputeDatasetSummaryFixtures",
   },
+  {
+    label: "Missing values result",
+    modulePath: "/src/features/results/__tests__/computeMissingValuesSummary.test.ts",
+    exportName: "runComputeMissingValuesSummaryFixtures",
+  },
 ];
 
 const asCount = (value) => {

@@ -9338,7 +9338,198 @@ body {
   background: rgba(237, 233, 254, 0.95);
 }
 
+/* UX-S2A-3-2: Missing values focused result */
+.app .missing-values-active-scope {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(221, 214, 254, 0.9);
+  border-radius: 999px;
+  background: rgba(245, 243, 255, 0.82);
+  color: rgba(91, 33, 182, 0.86);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.app .missing-values-answer-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.app .missing-values-answer-card.is-complete {
+  border-color: rgba(16, 185, 129, 0.32);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(236, 253, 245, 0.9));
+}
+
+.app .missing-values-answer-card.has-missing-values {
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.app .missing-values-success-icon {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  background: rgba(209, 250, 229, 0.95);
+  color: #059669;
+  box-shadow: 0 14px 34px rgba(16, 185, 129, 0.18);
+}
+
+.app .missing-values-success-icon svg,
+.app .missing-values-complete-state svg {
+  width: 22px;
+  height: 22px;
+}
+
+.app .missing-values-summary-chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.app .missing-values-summary-chips div {
+  padding: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.84);
+}
+
+.app .missing-values-summary-chips dt {
+  color: rgba(71, 85, 105, 0.74);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app .missing-values-summary-chips dd {
+  margin: 5px 0 0;
+  color: #0f172a;
+  font-size: 19px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.app .missing-values-column-list,
+.app .missing-values-worksheet-list {
+  display: grid;
+  gap: 10px;
+}
+
+.app .missing-values-column-list article,
+.app .missing-values-worksheet-list article {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.app .missing-values-column-heading,
+.app .missing-values-worksheet-list article > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.app .missing-values-column-heading strong,
+.app .missing-values-worksheet-list strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+  word-break: break-word;
+}
+
+.app .missing-values-column-heading span {
+  display: inline-flex;
+  margin-top: 4px;
+  color: rgba(71, 85, 105, 0.72);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app .missing-values-column-heading small,
+.app .missing-values-worksheet-list small {
+  color: rgba(71, 85, 105, 0.72);
+  font-size: 12px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.app .missing-values-bar-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.95);
+}
+
+.app .missing-values-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.app .missing-values-column-list article.is-numeric .missing-values-bar-fill {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+}
+
+.app .missing-values-column-list article.is-date .missing-values-bar-fill {
+  background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.app .missing-values-column-list article.is-text .missing-values-bar-fill {
+  background: linear-gradient(90deg, #64748b, #94a3b8);
+}
+
+.app .missing-values-complete-state {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-color: rgba(16, 185, 129, 0.28);
+  background: rgba(236, 253, 245, 0.78);
+}
+
+.app .missing-values-complete-state > span {
+  display: inline-flex;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: rgba(209, 250, 229, 0.98);
+  color: #059669;
+  box-shadow: 0 14px 34px rgba(16, 185, 129, 0.16);
+}
+
+.app .missing-values-complete-state h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.app .missing-values-complete-state p:not(.section-label) {
+  margin: 6px 0 0;
+  color: rgba(71, 85, 105, 0.76);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 @media (max-width: 860px) {
+  .app .missing-values-summary-chips,
   .app .summary-notable-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -9354,12 +9545,21 @@ body {
 }
 
 @media (max-width: 620px) {
+  .app .missing-values-summary-chips,
   .app .summary-notable-grid {
     grid-template-columns: 1fr;
   }
 
   .app .summary-section-heading,
-  .app .summary-worksheet-list > span {
+  .app .summary-worksheet-list > span,
+  .app .missing-values-column-heading,
+  .app .missing-values-worksheet-list article > div,
+  .app .missing-values-complete-state {
     flex-direction: column;
+  }
+
+  .app .missing-values-column-heading small,
+  .app .missing-values-worksheet-list small {
+    white-space: normal;
   }
 }
