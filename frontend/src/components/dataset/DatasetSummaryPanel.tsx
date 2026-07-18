@@ -740,6 +740,10 @@ function DatasetPreviewPage({
     : selectedWorksheet
       ? selectedWorksheet.rowCount
       : dataset.row_count;
+  const previewSummary =
+    previewRows.length === previewRowTotal
+      ? `Showing all ${previewRowTotal.toLocaleString()} rows · ${previewColumns.length.toLocaleString()} columns`
+      : `Showing ${previewRows.length.toLocaleString()} of ${previewRowTotal.toLocaleString()} rows · ${previewColumns.length.toLocaleString()} columns`;
 
   const selectPreviewWorksheet = (worksheetId: string) => {
     if (previewMode === "analysis") {
@@ -819,9 +823,9 @@ function DatasetPreviewPage({
   return (
     <FocusedWorkspaceShell
       className="dataset-preview-page"
-      eyebrow="Preview dataset"
-      title={previewLabel}
-      summary={`${previewRowTotal.toLocaleString()} rows / ${previewColumns.length.toLocaleString()} columns / showing a sample`}
+      eyebrow="PREVIEW"
+      title={`Previewing ${previewLabel}`}
+      summary={previewSummary}
       backLabel="Back to Data"
       onBack={onBack}
       actions={
@@ -856,15 +860,22 @@ function DatasetPreviewPage({
             className={previewMode === "analysis" ? "is-active" : ""}
             onClick={() => selectPreviewMode("analysis")}
           >
-            Analysis table
+            Clean preview
           </button>
           <button
             type="button"
             className={previewMode === "original" ? "is-active" : ""}
             onClick={() => selectPreviewMode("original")}
           >
-            Original workbook
+            Original workbook layout
           </button>
+          <span
+            className="dataset-preview-mode-help"
+            title="Clean preview shows the normalized data FiltraQueri uses for analysis. Original workbook layout shows the raw XLSX as uploaded."
+            aria-label="Clean preview shows the normalized data FiltraQueri uses for analysis. Original workbook layout shows the raw XLSX as uploaded."
+          >
+            ?
+          </span>
         </div>
       )}
 
@@ -876,9 +887,6 @@ function DatasetPreviewPage({
         const activeSourceIsCleaned =
           activeAnalysisSource?.type === "cleaned_working_copy" &&
           activeAnalysisSource?.worksheetId === activeWorksheetId;
-        const activeSourceLabel = activeSourceIsCleaned
-          ? "cleaned working copy"
-          : "original";
         const isPreviewingActive =
           selectedWorksheet?.worksheetId === activeWorksheetId;
         const canPromoteSelected =
@@ -889,50 +897,48 @@ function DatasetPreviewPage({
         const selectedWorksheetName =
           selectedWorksheet?.displayName || selectedWorksheet?.sheetName || "this worksheet";
         return (
-          <div className="dataset-active-source-strip" aria-live="polite">
-            <div className="dataset-active-source-info">
-              <span className="dataset-active-source-label">Active analysis source</span>
-              <strong className="dataset-active-source-name">{activeWorksheetName}</strong>
-              <span
-                className={`dataset-active-source-badge is-${
-                  activeSourceIsCleaned ? "cleaned" : "original"
-                }`}
-              >
-                {activeSourceLabel}
+          <div
+            className={`dataset-active-source-compact ${
+              isPreviewingActive ? "is-active-source" : "is-previewing-other"
+            }`}
+            aria-live="polite"
+          >
+            {isPreviewingActive ? (
+              <span className="dataset-active-source-chip">
+                <span aria-hidden="true" />
+                {activeSourceIsCleaned ? "Active source · cleaned working copy" : "Active source"}
               </span>
-              <span className="dataset-active-source-help">
-                Analyst, Query Builder, and Report Recipes use this worksheet.
-              </span>
-            </div>
-            <div className="dataset-active-source-action">
-              {isPreviewingActive ? (
-                <span className="dataset-active-source-confirm">
-                  ✓ You are previewing the active analysis source
+            ) : (
+              <>
+                <span className="dataset-active-source-current">
+                  Currently active: <strong>{activeWorksheetName}</strong>
                 </span>
-              ) : selectedWorksheet ? (
-                <button
-                  type="button"
-                  className="primary-button dataset-active-source-cta"
-                  onClick={() => onWorksheetSelect(selectedWorksheet.worksheetId)}
-                  disabled={!canPromoteSelected}
-                  title={
-                    canPromoteSelected
-                      ? `Make ${selectedWorksheetName} the active analysis source`
-                      : "This worksheet is not ready for analysis yet"
-                  }
-                >
-                  {isSwitchingWorksheet
-                    ? "Switching…"
-                    : `Use ${selectedWorksheetName} for analysis`}
-                </button>
-              ) : null}
-            </div>
+                {selectedWorksheet ? (
+                  <button
+                    type="button"
+                    className="primary-button dataset-active-source-cta"
+                    onClick={() => onWorksheetSelect(selectedWorksheet.worksheetId)}
+                    disabled={!canPromoteSelected}
+                    title={
+                      canPromoteSelected
+                        ? `Make ${selectedWorksheetName} the active analysis source`
+                        : "This worksheet is not ready for analysis yet"
+                    }
+                  >
+                    {isSwitchingWorksheet
+                      ? "Switching…"
+                      : `Use ${selectedWorksheetName} for analysis`}
+                  </button>
+                ) : null}
+              </>
+            )}
           </div>
         );
       })()}
 
       {hasWorkbook && (
-        <WorksheetSwitcher
+        <div className="dataset-preview-sheets-compact">
+          <WorksheetSwitcher
           variant="dataPreview"
           ariaLabel="Worksheets"
           className="dataset-preview-sheets"
@@ -981,30 +987,8 @@ function DatasetPreviewPage({
                 : undefined,
             };
           })}
-          onSelect={selectPreviewWorksheet}
-        />
-      )}
-
-      {/*
-        M-2: Continue in Analyst handoff strip. Compact one-line helper sits
-        between the worksheet switcher and the preview table. The button
-        only appears when the handler is wired (the App-level
-        handleContinueInAnalyst is passed through DatasetSummaryPanel).
-        Nothing here generates SQL, runs a query, or contacts a backend.
-      */}
-      {onContinueInAnalyst && (
-        <div className="dataset-preview-handoff" aria-label="Continue this worksheet in Analyst">
-          <p className="dataset-preview-handoff-copy">
-            Use this worksheet in Analyst to build reports, templates, or SQL.{" "}
-            <strong>Nothing runs until you click Run Query.</strong>
-          </p>
-          <button
-            type="button"
-            className="text-button dataset-preview-handoff-link"
-            onClick={onContinueInAnalyst}
-          >
-            Continue in Analyst &rarr;
-          </button>
+            onSelect={selectPreviewWorksheet}
+          />
         </div>
       )}
 

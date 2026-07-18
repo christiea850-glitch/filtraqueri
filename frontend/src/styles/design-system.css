@@ -4927,13 +4927,37 @@ body {
   display: block;
 }
 
+.app .dataset-preview-sheets-compact {
+  max-height: 46px;
+  padding: 2px 0 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.app .dataset-preview-sheets-compact .dataset-preview-sheets {
+  flex-wrap: nowrap;
+  width: max-content;
+  min-width: 100%;
+}
+
+.app .dataset-preview-sheets-compact .overflow-chip-strip-visible {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  width: max-content;
+  min-width: 100%;
+}
+
 .app .dataset-preview-mode-switch {
   display: inline-flex;
+  align-items: center;
+  gap: 2px;
   width: fit-content;
   padding: 3px;
-  border: 1px solid #dbe3ea;
+  border: 1px solid var(--brand-violet-soft);
   border-radius: 999px;
-  background: #f8fafc;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
 }
 
 .app .dataset-preview-mode-switch button {
@@ -4942,7 +4966,7 @@ body {
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: var(--brand-slate);
   font: inherit;
   font-size: 11px;
   font-weight: 700;
@@ -4950,9 +4974,23 @@ body {
 }
 
 .app .dataset-preview-mode-switch button.is-active {
-  background: #ffffff;
-  color: #0f6575;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  background: var(--brand-violet-soft);
+  color: var(--brand-violet);
+  box-shadow: var(--elevation-1);
+}
+
+.app .dataset-preview-mode-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--brand-slate);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: help;
 }
 
 .app .dataset-preview-analysis-source {
@@ -4969,86 +5007,51 @@ body {
   color: #64748b;
 }
 
-.app .dataset-active-source-strip {
+.app .dataset-active-source-compact {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: 8px 12px;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  margin: 0 0 10px 0;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  background: #f8fafc;
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
 }
 
-.app .dataset-active-source-info {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+.app .dataset-active-source-compact.is-active-source {
+  border-color: rgba(16, 185, 129, 0.22);
+  background: var(--brand-mint-soft);
 }
 
-.app .dataset-active-source-label {
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.app .dataset-active-source-compact.is-previewing-other {
+  border-color: rgba(245, 158, 11, 0.26);
+  background: var(--brand-amber-soft);
 }
 
-.app .dataset-active-source-name {
-  color: #0f172a;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.app .dataset-active-source-badge {
+.app .dataset-active-source-chip,
+.app .dataset-active-source-current {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  line-height: 1.1;
-}
-
-.app .dataset-active-source-badge.is-original {
-  background: #e0e7ff;
-  border-color: #c7d2fe;
-  color: #3730a3;
-}
-
-.app .dataset-active-source-badge.is-cleaned {
-  background: #d1fae5;
-  border-color: #6ee7b7;
-  color: #065f46;
-}
-
-.app .dataset-active-source-help {
-  width: 100%;
-  margin: 0;
-  color: #475569;
+  gap: 7px;
+  color: var(--brand-slate);
   font-size: 12px;
+  font-weight: 700;
 }
 
-.app .dataset-active-source-action {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.app .dataset-active-source-chip span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--brand-mint);
+  box-shadow: 0 0 0 4px var(--brand-mint-soft);
 }
 
-.app .dataset-active-source-cta {
-  white-space: nowrap;
-}
-
-.app .dataset-active-source-confirm {
-  color: #047857;
-  font-size: 12.5px;
-  font-weight: 600;
+.app .dataset-active-source-current strong {
+  color: #172033;
 }
 
 .app .dataset-preview-sheet {
