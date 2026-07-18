@@ -4331,8 +4331,98 @@ body {
 .app .data-profile-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.app .data-primary-actions,
+.app .data-danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.app .data-danger-actions {
+  margin-left: auto;
+  padding-left: 12px;
+  border-left: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.app .data-refresh-link {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.app .data-warning-card,
+.app .data-column-profile-card,
+.app .data-workbook-browser-card {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--fq-radius-card, 22px);
+  background: var(--fq-surface-card, #ffffff);
+  box-shadow: var(--fq-shadow-card, 0 18px 45px rgba(15, 23, 42, 0.08));
+}
+
+.app .data-warning-card {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: linear-gradient(135deg, rgba(255, 251, 235, 0.92), #ffffff);
+}
+
+.app .data-warning-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.app .data-column-profile-list {
+  display: grid;
+  gap: 8px;
+}
+
+.app .data-column-profile-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.8fr) minmax(92px, 0.7fr) minmax(96px, 0.7fr) minmax(96px, 0.7fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.app .data-column-profile-row strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app .data-column-profile-row span,
+.app .data-column-profile-row small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.app .data-workbook-sheets {
+  margin: 0;
+}
+
+.app .data-actions-row {
+  margin-top: 16px;
 }
 
 .app .human-understanding-panel {

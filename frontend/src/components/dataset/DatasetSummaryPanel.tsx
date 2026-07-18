@@ -18,7 +18,6 @@ import {
   type OriginalWorkbookCellStyle,
   type OriginalWorkbookLayout,
 } from "../../services/api";
-import ColumnDistributionCard from "./ColumnDistributionCard";
 import DataTable, { type DataTableColumn, type DataTableRow } from "../common/DataTable";
 import WorksheetSwitcher, { type WorksheetSwitcherOption } from "../common/WorksheetSwitcher";
 import MissingValuesOverview from "./MissingValuesOverview";
@@ -35,7 +34,6 @@ import {
 } from "../../features/navigation";
 import {
   createSchemaDisplayProfiles,
-  getBusinessRoleLabel,
 } from "../../features/dataIntelligence/structuralPresentation";
 import {
   WORKBOOK_HEADER_WARNING_COPY,
@@ -51,9 +49,7 @@ import {
   type WorkbookEntityRole,
   type WorkbookRelationshipIntelligence,
 } from "../../features/workbookIntelligence";
-import DrillInDetailPanel from "../layout/DrillInDetailPanel";
 import FocusedWorkspaceShell from "../layout/FocusedWorkspaceShell";
-import WorkspaceTabs from "../layout/WorkspaceTabs";
 import {
   ContextRail,
   ContextRailHeader,
@@ -61,9 +57,7 @@ import {
   EvidenceRows,
   InlineDisclosure,
   InvestigationThread,
-  InvestigationThreadStage,
   MetadataFooter,
-  OperationalTag,
   OperationalWorkspaceLayout,
   WorkspaceHeader,
 } from "../workspace";
@@ -117,12 +111,7 @@ type DatasetSummaryPanelProps = {
   onCleanPrepareRestoreConsumed?: () => void;
 };
 
-type DataDrillInView = "overview" | "columns" | "worksheets" | "dataIntelligence" | "businessSemantics";
 type DataWorkflowMenu = "details";
-type DataFocusedWorkflow =
-  | "dataIntelligence"
-  | "businessSemantics"
-  | "kpiIntelligence";
 type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
 type DataWorkspaceCommandTarget =
   | "overview"
@@ -136,14 +125,6 @@ type DataWorkspaceCommandTarget =
   | "semantics";
 
 const datasetIntelligenceDetailRouteId: ControlledHashDetailRouteId = "detail:dataset-intelligence";
-
-type HumanSignalTone =
-  | "info"
-  | "warning"
-  | "opportunity"
-  | "ready"
-  | "attention"
-  | "connected";
 
 type HumanSignalIcon =
   | "trend"
@@ -286,61 +267,6 @@ export function DatasetSessionPanel({
   );
 }
 
-type WorksheetSelectorProps = {
-  worksheets: WorksheetMetadata[];
-  activeWorksheetId: string | null;
-  isSwitchingWorksheet: boolean;
-  onWorksheetSelect: (worksheetId: string) => void;
-};
-
-function WorksheetSelector({
-  worksheets,
-  activeWorksheetId,
-  isSwitchingWorksheet,
-  onWorksheetSelect,
-}: WorksheetSelectorProps) {
-  if (worksheets.length === 0) return null;
-
-  return (
-    <div className="worksheet-selector" aria-label="Workbook sources">
-      <div className="worksheet-selector-header">
-        <div>
-          <p className="section-label">Sources</p>
-          <h4>Available sources</h4>
-        </div>
-        <span className="dataset-count-pill">{worksheets.length}</span>
-      </div>
-      <div className="worksheet-list">
-        {worksheets.map((worksheet) => {
-          const isActive = worksheet.worksheetId === activeWorksheetId;
-          const isReady = worksheet.status === "ready";
-          const label = worksheet.displayName || worksheet.sheetName;
-
-          return (
-            <button
-              type="button"
-              className={`worksheet-item${isActive ? " active" : ""}`}
-              key={worksheet.worksheetId}
-              disabled={!isReady || isActive || isSwitchingWorksheet}
-              onClick={() => onWorksheetSelect(worksheet.worksheetId)}
-              aria-current={isActive ? "true" : undefined}
-              title={label}
-            >
-              <span className="worksheet-name">{label}</span>
-              <span className={`worksheet-status ${worksheet.status}`}>{worksheet.status}</span>
-              <span className="worksheet-metrics">
-                {worksheet.rowCount.toLocaleString()} rows
-                <span aria-hidden="true">/</span>
-                {worksheet.columnCount.toLocaleString()} columns
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 const workbookRoleLabels: Record<WorkbookEntityRole, string> = {
   customers: "Customers",
   orders: "Orders",
@@ -353,20 +279,6 @@ const workbookRoleLabels: Record<WorkbookEntityRole, string> = {
   payments: "Payments",
   regions: "Regions",
   unknown: "Worksheet",
-};
-
-const workbookRoleActivityLabels: Record<WorkbookEntityRole, string> = {
-  customers: "customer fields",
-  orders: "order fields",
-  invoices: "invoice fields",
-  products: "product fields",
-  employees: "employee fields",
-  managers: "manager fields",
-  transactions: "transaction fields",
-  inventory: "inventory fields",
-  payments: "payment fields",
-  regions: "regional fields",
-  unknown: "dataset fields",
 };
 
 const toBusinessConnectionGuidance = (connection: {
@@ -523,18 +435,6 @@ function WorkbookRelationshipSummaryPanel({
       </div>
     </section>
   );
-}
-
-function formatRelativeTime(value: string): string {
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return "recently";
-  const minutes = Math.round((Date.now() - timestamp) / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 function CountUp({ value }: { value: number }) {
@@ -1341,9 +1241,7 @@ function DatasetSummaryPanel({
   cleanPrepareRestoreContext,
   onCleanPrepareRestoreConsumed,
 }: DatasetSummaryPanelProps) {
-  const [activeDrillInView, setActiveDrillInView] = useState<DataDrillInView>("overview");
   const [activeWorkflowMenu, setActiveWorkflowMenu] = useState<DataWorkflowMenu | null>(null);
-  const [activeFocusedWorkflow, setActiveFocusedWorkflow] = useState<DataFocusedWorkflow | null>(null);
   const [activeOperationalWorkspace, setActiveOperationalWorkspace] =
     useState<FocusedOperationalWorkspace | null>(null);
   const [isDatasetIntelligenceDetailOpen, setIsDatasetIntelligenceDetailOpen] = useState(false);
@@ -1358,8 +1256,6 @@ function DatasetSummaryPanel({
     worksheetId: string;
     scrollY: number;
   } | null>(null);
-  const [selectedEvidenceTitle, setSelectedEvidenceTitle] = useState<string | null>(null);
-  const [expandedColumnName, setExpandedColumnName] = useState<string | null>(null);
   const dataOverviewRef = useRef<HTMLElement | null>(null);
   const missingValuesRef = useRef<HTMLDivElement | null>(null);
   const detectedColumnsRef = useRef<HTMLElement | null>(null);
@@ -1379,112 +1275,80 @@ function DatasetSummaryPanel({
   const detectedColumns = Array.isArray(dataset?.schema) ? dataset.schema : [];
   const displayColumnProfiles = createSchemaDisplayProfiles(detectedColumns);
   const detectedNumericFields = dataProfile?.possibleMetrics || [];
-  const detectedCategoryFields = dataProfile?.possibleDimensions || [];
   const detectedDateFields = dataProfile?.dateTimeFields || [];
   const semanticHints = displayColumnProfiles.filter((profile) => profile.role).slice(0, 5);
   const businessEntityHints = displayColumnProfiles
     .filter((profile) => profile.role === "customer" || profile.role === "description" || profile.role === "identifier")
     .slice(0, 3);
-  const datasetPurposeLabel =
-    semanticHints.some((profile) => profile.role === "customer") &&
-    (dataProfile?.possibleMetrics.length || 0) > 0
-      ? "This dataset includes entity fields and measurable values."
-      : (dataProfile?.possibleMetrics.length || 0) > 0 && (dataProfile?.dateTimeFields.length || 0) > 0
-        ? "This dataset includes measurable values over time."
-        : (dataProfile?.possibleMetrics.length || 0) > 0
-          ? "This dataset includes measurable values."
-          : "This dataset has structure available for investigation.";
-  const understandingSignals = [
-    businessEntityHints[0] ? `Entity field: ${businessEntityHints[0].displayName}` : null,
-    dataProfile?.possibleMetrics[0] ? `Possible metric: ${dataProfile.possibleMetrics[0].name}` : null,
-    dataProfile?.dateTimeFields[0] ? `Timeline signal: ${dataProfile.dateTimeFields[0].name}` : "Timeline signal needs review",
-    dataProfile?.possibleDimensions[0] ? `Possible segment: ${dataProfile.possibleDimensions[0].name}` : null,
-  ].filter(Boolean) as string[];
-  const workbookActivityLabels = Array.from(
-    new Set(
-      (workbookRelationshipIntelligence?.entityRoles || [])
-        .filter((role) => role.role !== "unknown")
-        .map((role) => workbookRoleActivityLabels[role.role]),
-    ),
-  ).slice(0, 4);
-  const businessActivityLabels = Array.from(
+  const missingValueColumns = detectedColumns.filter((column) => (column.null_count || 0) > 0);
+  const activeWorksheetLabel =
+    activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table";
+  const worksheetCountLabel =
+    workbookWorksheets.length > 0
+      ? `${workbookWorksheets.length.toLocaleString()} worksheet${
+          workbookWorksheets.length === 1 ? "" : "s"
+        }`
+      : "Single table";
+  const workbookWarningMessages = Array.from(
     new Set([
-      ...(dataProfile?.possibleMetrics.length ? ["measurable fields"] : []),
-      ...(dataProfile?.dateTimeFields.length ? ["date/time fields"] : []),
-      ...(businessEntityHints.length ? ["entity fields"] : []),
-      ...(dataProfile?.possibleDimensions.length ? ["comparison fields"] : []),
-      ...workbookActivityLabels,
+      ...(structuralColumnNotice ? [structuralColumnNotice] : []),
+      ...(!structuralColumnNotice && showHeaderWarning ? [WORKBOOK_HEADER_WARNING_COPY] : []),
+      ...(dataset?.workbook_metadata?.normalization?.warnings || []),
+      ...workbookWorksheets.flatMap((worksheet) => worksheet.normalization?.warnings || []),
+      ...workbookWorksheets
+        .map((worksheet) => worksheet.normalization?.headerDetectionWarning)
+        .filter(Boolean),
+      ...workbookWorksheets
+        .map((worksheet) => worksheet.normalization?.structuralColumnDetectionWarning)
+        .filter(Boolean),
     ]),
-  ).slice(0, 6);
-  const businessNarrative =
-    businessActivityLabels.length > 0
-      ? `Start with ${businessActivityLabels.slice(0, 3).join(", ")}. These cues describe the dataset structure.`
-      : "A first read is being prepared so you can choose a useful question sooner.";
-  const businessSignals = [
-    dataProfile?.possibleMetrics.length
+  );
+  const structuralProfileCards = [
+    {
+      title: "Column profile",
+      detail: `${detectedColumns.length.toLocaleString()} columns across ${Object.keys(
+        schemaTypeSummary,
+      ).length.toLocaleString()} inferred field type${
+        Object.keys(schemaTypeSummary).length === 1 ? "" : "s"
+      }.`,
+      tone: "info" as const,
+      icon: "info" as HumanSignalIcon,
+    },
+    detectedDateFields.length > 0
       ? {
-          title: "Measurable field",
-          detail: `${detectedNumericFields[0].name} may support measurement or ranking.`,
-          tone: "opportunity" as HumanSignalTone,
-          icon: "opportunity" as HumanSignalIcon,
-        }
-      : null,
-    dataProfile?.dateTimeFields.length
-      ? {
-          title: "Timeline ready",
-          detail: `${detectedDateFields[0].name} can order records over time.`,
-          tone: "ready" as HumanSignalTone,
+          title: "Date fields",
+          detail: `${detectedDateFields[0].name} is detected as a date field.`,
+          tone: "ready" as const,
           icon: "timeline" as HumanSignalIcon,
         }
       : {
-          title: "Timeline unclear",
-          detail: "Time-based review may need a clearer date field.",
-          tone: "attention" as HumanSignalTone,
+          title: "No date column detected",
+          detail: "Trends analysis needs at least one date field.",
+          tone: "attention" as const,
           icon: "warning" as HumanSignalIcon,
         },
-    businessEntityHints.length
+    missingValueColumns.length > 0
       ? {
-          title: "Entity signal",
-          detail: `${businessEntityHints[0].displayName} may show who or what the activity concerns.`,
-          tone: "info" as HumanSignalTone,
-          icon: "entity" as HumanSignalIcon,
+          title: "Missing values",
+          detail: `${missingValueColumns.length.toLocaleString()} column${
+            missingValueColumns.length === 1 ? "" : "s"
+          } contain blank values in the available profile.`,
+          tone: "attention" as const,
+          icon: "warning" as HumanSignalIcon,
         }
-      : null,
-    (workbookRelationshipIntelligence?.joinSuggestions.length || 0) > 0
-      ? {
-          title: "Connected sources",
-          detail: "Multiple sheets may describe related records.",
-          tone: "connected" as HumanSignalTone,
+      : {
+          title: "Missing values",
+          detail: "No blank-value columns are reported in the available profile.",
+          tone: "ready" as const,
           icon: "connected" as HumanSignalIcon,
-        }
-      : null,
-    dataProfile?.possibleDimensions.length
-      ? {
-          title: "Comparison field",
-          detail: `${detectedCategoryFields[0].name} may support grouping or comparison.`,
-          tone: "opportunity" as HumanSignalTone,
-          icon: "comparison" as HumanSignalIcon,
-        }
-      : null,
-  ].filter(Boolean) as Array<{
-    title: string;
-    detail: string;
-    tone: HumanSignalTone;
-    icon: HumanSignalIcon;
-  }>;
-  const selectedEvidence =
-    businessSignals.find((signal) => signal.title === selectedEvidenceTitle) ||
-    businessSignals[0] ||
-    null;
-  const closeDrillIn = () => {
-    setActiveDrillInView("overview");
-    setActiveFocusedWorkflow(null);
-  };
-  const dataTabs = [
-    { id: "overview", label: "Overview" },
-    { id: "columns", label: "Fields" },
-    { id: "worksheets", label: "Sources" },
-  ] satisfies Array<{ id: DataDrillInView; label: string }>;
+        },
+    {
+      title: "Sources",
+      detail: `${worksheetCountLabel}. Active source: ${activeWorksheetLabel}.`,
+      tone: "connected" as const,
+      icon: "connected" as HumanSignalIcon,
+    },
+  ];
   const datasetIntelligencePreview = createDatasetIntelligencePreviewViewModel({
     sourceDescriptorVersion: "dataset-summary-panel-v1",
     generatedAt: "deterministic-dataset-preview",
@@ -1547,7 +1411,7 @@ function DatasetSummaryPanel({
     expandedPanelState: {
       expandedPanelIds: isDatasetIntelligenceDetailOpen
         ? ["dataset-intelligence-detail"]
-        : [`dataset-drill-in:${activeDrillInView}`],
+        : ["dataset-profile"],
       collapsedPanelIds: [],
     },
     selectedItem: {
@@ -1563,14 +1427,11 @@ function DatasetSummaryPanel({
   const openOperationalWorkspace = (workspace: FocusedOperationalWorkspace) => {
     setIsDatasetPreviewOpen(false);
     setIsDatasetIntelligenceDetailOpen(false);
-    setActiveFocusedWorkflow(null);
     setActiveWorkflowMenu(null);
     setActiveOperationalWorkspace(workspace);
-    setActiveDrillInView("overview");
   };
   const closeOperationalWorkspace = () => {
     setActiveOperationalWorkspace(null);
-    setActiveDrillInView("overview");
   };
   const focusDataTarget = (target: "overview" | "missingValues" | "columns") => {
     window.setTimeout(() => {
@@ -1639,7 +1500,6 @@ function DatasetSummaryPanel({
               }
             : null,
         );
-        setActiveFocusedWorkflow(null);
         setIsDatasetPreviewOpen(true);
         return;
       }
@@ -1648,8 +1508,6 @@ function DatasetSummaryPanel({
         setIsDatasetPreviewOpen(false);
         setIsDatasetIntelligenceDetailOpen(false);
         setActiveOperationalWorkspace(null);
-        setActiveFocusedWorkflow(null);
-        setActiveDrillInView(target === "columns" ? "columns" : "overview");
         focusDataTarget(target);
         return;
       }
@@ -1661,7 +1519,6 @@ function DatasetSummaryPanel({
 
       if (target === "intelligenceDetail") {
         setIsDatasetPreviewOpen(false);
-        setActiveFocusedWorkflow(null);
         setIsDatasetIntelligenceDetailOpen(true);
         return;
       }
@@ -1670,8 +1527,6 @@ function DatasetSummaryPanel({
         setIsDatasetPreviewOpen(false);
         setIsDatasetIntelligenceDetailOpen(false);
         setActiveOperationalWorkspace(null);
-        setActiveFocusedWorkflow(null);
-        setActiveDrillInView("overview");
       }
     };
 
@@ -1739,22 +1594,22 @@ function DatasetSummaryPanel({
       activeOperationalWorkspace === "connections"
         ? "Connected sources"
         : activeOperationalWorkspace === "entities"
-          ? "Possible segments"
+          ? "Category and identifier fields"
           : activeOperationalWorkspace === "kpis"
-            ? "Possible measures"
+            ? "Numeric fields"
             : "Date/time fields";
     const workspaceSummary =
       activeOperationalWorkspace === "connections"
         ? "Review source relationships and related worksheet fields."
         : activeOperationalWorkspace === "entities"
-          ? "Review entity and segment fields detected in the dataset."
+          ? "Review categorical, identifier, and comparison fields detected in the dataset."
           : activeOperationalWorkspace === "kpis"
-            ? "Review measurable fields detected in the dataset."
-            : "Review timeline fields and date signals found in the dataset.";
+            ? "Review numeric fields detected in the dataset."
+            : "Review date and time fields found in the dataset.";
 
     return (
       <FocusedWorkspaceShell
-        eyebrow="Data detail"
+        eyebrow="Data profile"
         title={workspaceTitle}
         summary={workspaceSummary}
         onBack={closeOperationalWorkspace}
@@ -1762,14 +1617,14 @@ function DatasetSummaryPanel({
         <div className="focused-operational-workspace">
           <InvestigationThread>
             <WorkspaceHeader
-              eyebrow="Dataset detail"
+              eyebrow="Dataset profile"
               title={workspaceTitle}
               meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
             />
             <EvidenceRows>
               <div className="thread-section-heading">
-                <p className="section-label">Available signals</p>
-                <strong>Detected fields and source context.</strong>
+                <p className="section-label">Available fields</p>
+                <strong>Detected columns and source context.</strong>
               </div>
               {activeOperationalWorkspace === "connections" &&
                 (workbookRelationshipIntelligence?.joinSuggestions.slice(0, 5).map((connection) => (
@@ -1798,15 +1653,15 @@ function DatasetSummaryPanel({
                         tone="info"
                         icon={<HumanSignalIcon name="entity" />}
                         title={label}
-                        description="Potential entity, segment, or comparison field."
+                        description="Categorical, identifier, or comparison field."
                       />
                     ))
                 ) : (
                   <EvidenceRow
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
-                    title="Segment signal needs review"
-                    description="No strong entity or segment field is available yet."
+                    title="No category field detected"
+                    description="No clear categorical or identifier field is available in the current profile."
                   />
                 ))}
               {activeOperationalWorkspace === "kpis" &&
@@ -1820,15 +1675,15 @@ function DatasetSummaryPanel({
                         tone="opportunity"
                         icon={<HumanSignalIcon name="opportunity" />}
                         title={label}
-                        description="Possible measurable field for dataset review."
+                        description="Numeric field available in the current profile."
                       />
                     ))
                 ) : (
                   <EvidenceRow
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
-                    title="Metric signal needs review"
-                    description="A stronger measurable field is needed for measure review."
+                    title="No numeric field detected"
+                    description="No numeric field is available in the current profile."
                   />
                 ))}
               {activeOperationalWorkspace === "trends" &&
@@ -1839,15 +1694,15 @@ function DatasetSummaryPanel({
                       tone="ready"
                       icon={<HumanSignalIcon name="timeline" />}
                       title={field.name}
-                      description="Timeline candidate for reviewing change over time."
+                      description="Date or time field available in the current profile."
                     />
                   ))
                 ) : (
                   <EvidenceRow
                     tone="attention"
                     icon={<HumanSignalIcon name="warning" />}
-                    title="Timeline signal needs review"
-                    description="Time review needs a clearer date or time field."
+                    title="No date field detected"
+                    description="A date or time field is needed for time-based inspection."
                   />
                 ))}
             </EvidenceRows>
@@ -1855,8 +1710,8 @@ function DatasetSummaryPanel({
           <ContextRail>
             <ContextRailHeader
               eyebrow="Context"
-              title="Data detail"
-              description="This focused surface keeps detailed dataset review out of the main Data page."
+              title="Profile context"
+              description="This view uses existing workbook and column metadata."
             />
             <InlineDisclosure summary="Advanced context" className="context-disclosure">
               <p>
@@ -1871,7 +1726,6 @@ function DatasetSummaryPanel({
 
   return (
     <div className="human-dataset-workspace">
-      {!activeFocusedWorkflow && (
       <section
         ref={dataOverviewRef}
         className="dataset-hub-panel"
@@ -1881,18 +1735,21 @@ function DatasetSummaryPanel({
         <div className="data-page-head">
           <div>
             <p className="section-label">Data</p>
-            <h2>Data</h2>
-            <p>Understand what this data may represent and where it may be useful.</p>
+            <h2>{dataset ? dataset.original_filename : "Data"}</h2>
+            <p>
+              {dataset
+                ? `Structure and columns for ${dataset.original_filename}.`
+                : "Choose a dataset to inspect workbook structure and columns."}
+            </p>
           </div>
           {dataset && (
             <div className="data-page-head-actions">
-              <span className="data-updated">Last updated: {formatRelativeTime(dataset.uploaded_at)}</span>
               <button
                 type="button"
-                className="secondary-button"
+                className="text-button data-refresh-link"
                 onClick={() => window.location.reload()}
               >
-                Refresh
+                Refresh data
               </button>
             </div>
           )}
@@ -1903,40 +1760,10 @@ function DatasetSummaryPanel({
             <OperationalWorkspaceLayout>
               <InvestigationThread>
                 <WorkspaceHeader
-                  eyebrow="Dataset"
-                  title={<span title={dataset.original_filename}>{dataset.original_filename}</span>}
-                  meta={activeWorksheet?.displayName || activeWorksheet?.sheetName || "Dataset table"}
+                  eyebrow="Dataset profile"
+                  title="Structure and sources"
+                  meta={`Active worksheet: ${activeWorksheetLabel}`}
                 />
-
-                <InvestigationThreadStage ariaLabel="Understand" className="is-understand">
-                  <p className="section-label">Understand</p>
-                  <h3>{datasetPurposeLabel}</h3>
-                  <p>Early read of the structure behind the data.</p>
-                  <div className="evidence-chip-row" aria-label="Initial detected signals">
-                    {understandingSignals.map((signal) => (
-                      <OperationalTag key={signal}>{signal}</OperationalTag>
-                    ))}
-                  </div>
-                </InvestigationThreadStage>
-
-                <EvidenceRows>
-                  <div className="thread-section-heading">
-                    <p className="section-label">Detected signals</p>
-                    <strong>{businessNarrative}</strong>
-                  </div>
-                  {businessSignals.slice(0, 3).map((signal, index) => (
-                    <EvidenceRow
-                      key={signal.title}
-                      tone={signal.tone}
-                      selected={selectedEvidence?.title === signal.title}
-                      primary={index === 0}
-                      icon={<HumanSignalIcon name={signal.icon} />}
-                      title={signal.title}
-                      description={signal.detail}
-                      onClick={() => setSelectedEvidenceTitle(signal.title)}
-                    />
-                  ))}
-                </EvidenceRows>
 
                 <MetadataFooter>
                   <span>
@@ -1949,16 +1776,35 @@ function DatasetSummaryPanel({
                   </span>
                   <span>
                     Sources
-                    <strong><CountUp value={workbookWorksheets.length} /></strong>
+                    <strong>
+                      <CountUp value={workbookWorksheets.length || 1} />
+                    </strong>
                   </span>
                   <span>
-                    Field mix
+                    Field types
                     <strong><CountUp value={Object.keys(schemaTypeSummary).length} /></strong>
                   </span>
                 </MetadataFooter>
+
+                <EvidenceRows>
+                  <div className="thread-section-heading">
+                    <p className="section-label">Structure checks</p>
+                    <strong>Metadata available for inspection before analysis.</strong>
+                  </div>
+                  {structuralProfileCards.map((signal, index) => (
+                    <EvidenceRow
+                      key={signal.title}
+                      tone={signal.tone}
+                      primary={index === 0}
+                      icon={<HumanSignalIcon name={signal.icon} />}
+                      title={signal.title}
+                      description={signal.detail}
+                    />
+                  ))}
+                </EvidenceRows>
               </InvestigationThread>
 
-              {activeDrillInView === "overview" && workbookRelationshipIntelligence && (
+              {workbookRelationshipIntelligence && (
                 <ContextRail>
                   <InlineDisclosure summary="Connected source detail" className="context-disclosure">
                     <WorkbookRelationshipSummaryPanel intelligence={workbookRelationshipIntelligence} />
@@ -1966,57 +1812,109 @@ function DatasetSummaryPanel({
                 </ContextRail>
               )}
             </OperationalWorkspaceLayout>
-            {structuralColumnNotice ? (
-              <p className="workbook-header-warning">{structuralColumnNotice}</p>
-            ) : showHeaderWarning ? (
-              <p className="workbook-header-warning">{WORKBOOK_HEADER_WARNING_COPY}</p>
-            ) : null}
+            {workbookWarningMessages.length > 0 && (
+              <section className="data-warning-card" aria-label="Workbook warnings">
+                <div className="worksheet-selector-header">
+                  <div>
+                    <p className="section-label">Warnings</p>
+                    <h4>Review before analysis</h4>
+                  </div>
+                  <span className="dataset-count-pill">
+                    {workbookWarningMessages.length.toLocaleString()}
+                  </span>
+                </div>
+                <ul>
+                  {workbookWarningMessages.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <div ref={missingValuesRef} tabIndex={-1}>
               <MissingValuesOverview
                 schema={Array.isArray(dataset.schema) ? dataset.schema : []}
                 rowCount={dataset.row_count}
               />
             </div>
-            <div className="data-tabs-row">
-              <WorkspaceTabs
-                items={dataTabs}
-                activeItem={activeDrillInView}
-                label="Data views"
-                onChange={(view) => {
-                  setActiveFocusedWorkflow(null);
-                  setActiveDrillInView(view);
-                }}
-              />
+            <section
+              ref={detectedColumnsRef}
+              className="data-column-profile-card"
+              aria-label="Column profile"
+              tabIndex={-1}
+            >
+              <div className="worksheet-selector-header">
+                <div>
+                  <p className="section-label">Column profile</p>
+                  <h4>Fields in this dataset</h4>
+                </div>
+                <span className="dataset-count-pill">{detectedColumns.length.toLocaleString()}</span>
+              </div>
+              <div className="data-column-profile-list">
+                {detectedColumns.map((column) => (
+                  <div key={column.name} className="data-column-profile-row">
+                    <strong title={column.name}>{column.name}</strong>
+                    <span>{column.inferred_type || "unknown"}</span>
+                    <small>
+                      {(column.null_count || 0) > 0
+                        ? `${column.null_count.toLocaleString()} missing`
+                        : "no missing"}
+                    </small>
+                    <small>{column.unique_count.toLocaleString()} unique</small>
+                  </div>
+                ))}
+              </div>
+            </section>
+            {dataset.workbook_metadata && workbookWorksheets.length > 1 && (
+              <section className="data-workbook-browser-card" aria-label="Workbook browser">
+                <div className="worksheet-selector-header">
+                  <div>
+                    <p className="section-label">Workbook sources</p>
+                    <h4>Worksheets in this workbook</h4>
+                  </div>
+                  <span className="dataset-count-pill">{workbookWorksheets.length.toLocaleString()}</span>
+                </div>
+                <WorksheetSwitcher
+                  variant="dataPreview"
+                  ariaLabel="Workbook worksheets"
+                  className="dataset-preview-sheets data-workbook-sheets"
+                  optionClassName="dataset-preview-sheet data-workbook-sheet"
+                  activeClassName="active"
+                  labelClassName="dataset-preview-sheet-label"
+                  badgeClassName="dataset-preview-sheet-badge"
+                  options={workbookWorksheets.map<WorksheetSwitcherOption>((worksheet) => {
+                    const label = worksheet.displayName || worksheet.sheetName;
+                    return {
+                      id: worksheet.worksheetId,
+                      label,
+                      isActive: worksheet.worksheetId === activeWorksheet?.worksheetId,
+                      disabled:
+                        worksheet.status !== "ready" ||
+                        worksheet.worksheetId === activeWorksheet?.worksheetId ||
+                        isSwitchingWorksheet,
+                      title: label,
+                      ariaLabel: `${label}, ${worksheet.rowCount.toLocaleString()} rows, ${worksheet.columnCount.toLocaleString()} columns`,
+                      badge: {
+                        label: worksheet.status,
+                        status: worksheet.status,
+                        ariaHidden: true,
+                      },
+                    };
+                  })}
+                  onSelect={onWorksheetSelect}
+                />
+              </section>
+            )}
+            <div className="data-tabs-row data-actions-row">
               <div className="data-profile-actions">
-                <button
-                  type="button"
-                  className="secondary-button data-action-btn"
-                  onClick={() => {
-                    setPreviewOrigin(null);
-                    setRequestedPreviewWorksheetId(null);
-                    setIsDatasetPreviewOpen(true);
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  Preview dataset
-                </button>
-                {onAnalysisSourceSelect && (
+                <div className="data-primary-actions">
                   <button
                     type="button"
-                    className="secondary-button data-action-btn data-clean-prepare-toggle"
-                    onClick={() => setIsCleanPreparePageOpen(true)}
-                    title="Review missing values, field types, and cleanup suggestions before analysis."
+                    className="secondary-button data-action-btn"
+                    onClick={() => {
+                      setPreviewOrigin(null);
+                      setRequestedPreviewWorksheetId(null);
+                      setIsDatasetPreviewOpen(true);
+                    }}
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -2027,30 +1925,54 @@ function DatasetSummaryPanel({
                       strokeLinejoin="round"
                       aria-hidden="true"
                     >
-                      <path d="M3 6h18M3 12h18M3 18h12" />
-                      <path d="m17 17 2 2 4-4" />
+                      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
                     </svg>
-                    Clean & Prepare
+                    Preview dataset
                   </button>
-                )}
-                <button
-                  type="button"
-                  className="text-button danger-text-button data-action-btn"
-                  onClick={() => onDeleteDataset(dataset.dataset_id)}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                  {onAnalysisSourceSelect && (
+                    <button
+                      type="button"
+                      className="secondary-button data-action-btn data-clean-prepare-toggle"
+                      onClick={() => setIsCleanPreparePageOpen(true)}
+                      title="Review missing values, field types, and cleanup suggestions before analysis."
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M3 6h18M3 12h18M3 18h12" />
+                        <path d="m17 17 2 2 4-4" />
+                      </svg>
+                      Clean & Prepare
+                    </button>
+                  )}
+                </div>
+                <div className="data-danger-actions">
+                  <button
+                    type="button"
+                    className="text-button danger-text-button data-action-btn"
+                    onClick={() => onDeleteDataset(dataset.dataset_id)}
                   >
-                    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-                  </svg>
-                  Delete dataset
-                </button>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                    </svg>
+                    Delete dataset
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2063,90 +1985,6 @@ function DatasetSummaryPanel({
           </div>
         )}
       </section>
-      )}
-
-      {dataset && activeDrillInView === "columns" && (
-        <DrillInDetailPanel
-          eyebrow="Data detail"
-          title="Detected columns"
-          summary="Column details are shown here so the main Data page stays compact."
-          onBack={closeDrillIn}
-        >
-          <section
-            ref={detectedColumnsRef}
-            className="detected-columns-section"
-            aria-label="Detected columns"
-            tabIndex={-1}
-          >
-            <div className="worksheet-selector-header">
-              <div>
-                <p className="section-label">Detected columns</p>
-                <h4>Column profile</h4>
-              </div>
-              <span className="dataset-count-pill">{detectedColumns.length.toLocaleString()}</span>
-            </div>
-            <div className="detected-column-list">
-              {detectedColumns.map((column) => {
-                const displayProfile =
-                  displayColumnProfiles.find((profile) => profile.sourceName === column.name) ||
-                  null;
-                const isExpanded = expandedColumnName === column.name;
-                const handleToggle = () =>
-                  setExpandedColumnName((current) => (current === column.name ? null : column.name));
-
-                return (
-                  <div
-                    key={column.name}
-                    className={`detected-column-item${isExpanded ? " is-expanded" : ""}`}
-                  >
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={isExpanded}
-                      onClick={handleToggle}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          handleToggle();
-                        }
-                      }}
-                      title={displayProfile?.displayName !== column.name ? column.name : undefined}
-                    >
-                      <strong>{displayProfile?.displayName || column.name}</strong>
-                      <small>
-                        {displayProfile?.role
-                          ? getBusinessRoleLabel(displayProfile.role)
-                          : column.inferred_type || "unknown"}
-                      </small>
-                      {displayProfile && displayProfile.displayName !== column.name && (
-                        <em>Source: {column.name}</em>
-                      )}
-                    </span>
-                    {isExpanded && <ColumnDistributionCard column={column} />}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </DrillInDetailPanel>
-      )}
-
-      {dataset && activeDrillInView === "worksheets" && (
-        <DrillInDetailPanel
-          eyebrow="Data detail"
-          title="Available sources"
-          summary="Switch worksheets without leaving the Data tab."
-          onBack={closeDrillIn}
-        >
-          <WorksheetSelector
-            worksheets={workbookWorksheets}
-            activeWorksheetId={activeWorksheet?.worksheetId || null}
-            isSwitchingWorksheet={isSwitchingWorksheet}
-            onWorksheetSelect={onWorksheetSelect}
-          />
-        </DrillInDetailPanel>
-      )}
-
     </div>
   );
 }
