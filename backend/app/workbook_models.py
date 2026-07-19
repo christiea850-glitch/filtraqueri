@@ -29,6 +29,7 @@ class WorksheetTemplateStructureEvidence(BaseModel):
         "serial_only_placeholder_rows",
         "side_note_region_candidate",
         "repeated_missing_pattern",
+        "automatic_blank_row",
         "clean_table_counter_signal",
     ]
     row_index: int | None = Field(default=None, ge=0)

@@ -170,6 +170,16 @@ export type CleaningRecipePreview = {
     placeholder_rows: number;
     side_note_columns: number;
   };
+  excluded_details?: {
+    layout_rows?: {
+      count: number;
+      row_indexes: number[];
+      reasons: {
+        row_index: number;
+        reason: string;
+      }[];
+    };
+  };
   preview_row_limit: number;
   message: string;
 };

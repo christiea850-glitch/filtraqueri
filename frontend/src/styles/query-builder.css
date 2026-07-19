@@ -643,6 +643,33 @@
   justify-content: space-between;
 }
 
+.clean-prepare-structural-card-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.clean-prepare-clear-decision-button {
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.clean-prepare-clear-decision-button:hover,
+.clean-prepare-clear-decision-button:focus-visible {
+  border-color: var(--brand-violet);
+  color: var(--brand-violet);
+  outline: none;
+}
+
 .clean-prepare-structural-evidence {
   color: var(--brand-slate);
   font-size: 12px;
@@ -779,6 +806,43 @@
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   background: var(--surface);
+}
+
+.clean-prepare-structural-plan-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clean-prepare-reset-decisions-button {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.clean-prepare-reset-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.clean-prepare-reset-confirm p {
+  margin: 0;
+  color: var(--brand-slate);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.clean-prepare-reset-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .clean-prepare-structural-plan strong {

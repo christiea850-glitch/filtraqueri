@@ -101,6 +101,16 @@ def _empty_excluded_counts() -> dict[str, int]:
     }
 
 
+def _empty_excluded_details() -> dict[str, Any]:
+    return {
+        "layout_rows": {
+            "count": 0,
+            "row_indexes": [],
+            "reasons": [],
+        }
+    }
+
+
 def _empty_preview(
     *,
     worksheet: dict[str, Any],
@@ -123,6 +133,7 @@ def _empty_preview(
         },
         "recipe": [],
         "excluded": _empty_excluded_counts(),
+        "excluded_details": _empty_excluded_details(),
         "preview_row_limit": row_limit,
         "message": "This worksheet is empty, so there is no cleaning recipe to preview.",
     }
@@ -220,6 +231,7 @@ def compute_cleaning_recipe_plan(
     current_section_date: str | None = None
     current_section_label: str | None = None
     excluded = _empty_excluded_counts()
+    layout_row_reasons: dict[int, str] = {}
     excluded["side_note_columns"] = len(side_note_columns)
     counted_layout_rows: set[int] = set()
     counted_placeholder_rows: set[int] = set()
@@ -244,6 +256,7 @@ def compute_cleaning_recipe_plan(
             continue
         if not populated_values:
             counted_layout_rows.add(original_row_index)
+            layout_row_reasons[original_row_index] = "automatic_blank_row"
             continue
 
         business_values = row[:business_width]
@@ -265,12 +278,15 @@ def compute_cleaning_recipe_plan(
             continue
         if has_only_header_shaped_serial:
             counted_layout_rows.add(original_row_index)
+            layout_row_reasons[original_row_index] = "automatic_header_shaped_serial"
             continue
         if original_row_index in sparse_layout_set and not has_business_value_after_serial:
             counted_layout_rows.add(original_row_index)
+            layout_row_reasons[original_row_index] = "sparse_layout_gap"
             continue
         if not any(not is_blank_cell(value) for value in business_values):
             counted_layout_rows.add(original_row_index)
+            layout_row_reasons[original_row_index] = "automatic_blank_business_values"
             continue
 
         values = {
@@ -294,6 +310,20 @@ def compute_cleaning_recipe_plan(
     excluded["date_title_rows"] = len(date_title_rows)
     excluded["layout_rows"] = len(counted_layout_rows)
     excluded["placeholder_rows"] = len(counted_placeholder_rows)
+    sorted_layout_rows = sorted(counted_layout_rows)
+    excluded_details = {
+        "layout_rows": {
+            "count": len(sorted_layout_rows),
+            "row_indexes": sorted_layout_rows,
+            "reasons": [
+                {
+                    "row_index": row_index,
+                    "reason": layout_row_reasons.get(row_index, "automatic_blank_row"),
+                }
+                for row_index in sorted_layout_rows
+            ],
+        }
+    }
 
     recipe: list[dict[str, Any]] = []
     if repeated_header_rows:
@@ -367,6 +397,7 @@ def compute_cleaning_recipe_plan(
         "row_provenance": row_provenance,
         "recipe": recipe,
         "excluded": excluded,
+        "excluded_details": excluded_details,
         "has_section_context": has_section_context,
     }
 
@@ -385,6 +416,7 @@ def _empty_plan(*, worksheet: dict[str, Any]) -> dict[str, Any]:
         "row_provenance": [],
         "recipe": [],
         "excluded": _empty_excluded_counts(),
+        "excluded_details": _empty_excluded_details(),
         "has_section_context": False,
     }
 
@@ -424,6 +456,7 @@ def build_cleaning_recipe_preview(
         },
         "recipe": plan["recipe"],
         "excluded": plan["excluded"],
+        "excluded_details": plan.get("excluded_details", _empty_excluded_details()),
         "preview_row_limit": clamped_row_limit,
         "message": "Preview only - no changes have been applied.",
     }

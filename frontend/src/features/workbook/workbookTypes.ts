@@ -46,6 +46,7 @@ export type WorksheetTemplateStructureEvidenceType =
   | "serial_only_placeholder_rows"
   | "side_note_region_candidate"
   | "repeated_missing_pattern"
+  | "automatic_blank_row"
   | "clean_table_counter_signal";
 
 export type WorksheetTemplateStructureEvidence = {
