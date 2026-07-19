@@ -168,6 +168,118 @@ const enabledTransformationKinds = new Set<TransformationStepKind>([
   "fill_missing_false",
 ]);
 
+const configurableTransformationKinds = new Set<TransformationStepKind>([
+  "fill_missing_custom",
+  "cap_outliers_percentile",
+  "ordinal_encode",
+  "days_since",
+]);
+
+type ConfigurableTransformationKind =
+  | "fill_missing_custom"
+  | "cap_outliers_percentile"
+  | "ordinal_encode"
+  | "days_since";
+
+type DraftTransformationConfig = {
+  customValue: string;
+  lowerPercentile: string;
+  upperPercentile: string;
+  orderText: string;
+  anchorDate: string;
+};
+
+type TransformationStepParametersInput = NonNullable<
+  Parameters<typeof createTransformationStep>[0]["parameters"]
+>;
+
+const createTransformationConfigKey = (
+  columnName: string,
+  kind: TransformationStepKind,
+): string => `${columnName}:${kind}`;
+
+const createDefaultTransformationConfig = (
+  kind: TransformationStepKind,
+): DraftTransformationConfig => ({
+  customValue: "",
+  lowerPercentile: kind === "cap_outliers_percentile" ? "5" : "",
+  upperPercentile: kind === "cap_outliers_percentile" ? "95" : "",
+  orderText: "",
+  anchorDate: "",
+});
+
+const isConfigurableTransformationKind = (
+  kind: TransformationStepKind,
+): kind is ConfigurableTransformationKind => configurableTransformationKinds.has(kind);
+
+const parseOrdinalOrder = (orderText: string): string[] =>
+  orderText
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+const validateTransformationConfig = (
+  kind: ConfigurableTransformationKind,
+  config: DraftTransformationConfig,
+): string | null => {
+  if (kind === "fill_missing_custom") {
+    return config.customValue.trim()
+      ? null
+      : "Enter a replacement value before adding this step.";
+  }
+
+  if (kind === "cap_outliers_percentile") {
+    const lowerValue = config.lowerPercentile.trim();
+    const upperValue = config.upperPercentile.trim();
+    if (!lowerValue || !upperValue) return "Enter both lower and upper percentile values.";
+    const lowerPercentile = Number(lowerValue);
+    const upperPercentile = Number(upperValue);
+    if (!Number.isFinite(lowerPercentile) || !Number.isFinite(upperPercentile)) {
+      return "Lower and upper percentile must be numbers between 0 and 100.";
+    }
+    if (
+      lowerPercentile < 0 ||
+      lowerPercentile > 100 ||
+      upperPercentile < 0 ||
+      upperPercentile > 100
+    ) {
+      return "Percentile bounds must stay between 0 and 100.";
+    }
+    if (lowerPercentile >= upperPercentile) {
+      return "Lower percentile must be smaller than upper percentile.";
+    }
+    return null;
+  }
+
+  if (kind === "ordinal_encode") {
+    return parseOrdinalOrder(config.orderText).length >= 2
+      ? null
+      : "Provide at least two comma-separated category values in order.";
+  }
+
+  return config.anchorDate.trim() ? null : "Choose an anchor date before adding this step.";
+};
+
+const createConfiguredTransformationParameters = (
+  kind: ConfigurableTransformationKind,
+  config: DraftTransformationConfig,
+): TransformationStepParametersInput => {
+  if (kind === "fill_missing_custom") {
+    return { kind, customValue: config.customValue.trim() };
+  }
+  if (kind === "cap_outliers_percentile") {
+    return {
+      kind,
+      lowerPercentile: Number(config.lowerPercentile),
+      upperPercentile: Number(config.upperPercentile),
+    };
+  }
+  if (kind === "ordinal_encode") {
+    return { kind, order: parseOrdinalOrder(config.orderText) };
+  }
+  return { kind, anchorDate: config.anchorDate.trim() };
+};
+
 const transformationKindCopy: Record<
   Exclude<TransformationStepKind, "sql_select_transform">,
   { label: string; description: string }
@@ -1267,6 +1379,9 @@ function DataCleanPreparePage({
       seed: transformationPipelineSeed,
     }),
   );
+  const [transformationConfigs, setTransformationConfigs] = useState<
+    Record<string, DraftTransformationConfig>
+  >({});
   const visibleDraftPipeline =
     draftPipeline.worksheetId === transformationWorksheetId &&
     draftPipeline.sourceTableName === transformationSourceTableName &&
@@ -1286,9 +1401,29 @@ function DataCleanPreparePage({
           kind !== "sql_select_transform",
       )
     : [];
+  const updateTransformationConfig = useCallback(
+    (
+      columnName: string,
+      kind: ConfigurableTransformationKind,
+      patch: Partial<DraftTransformationConfig>,
+    ) => {
+      const configKey = createTransformationConfigKey(columnName, kind);
+      setTransformationConfigs((currentConfigs) => ({
+        ...currentConfigs,
+        [configKey]: {
+          ...createDefaultTransformationConfig(kind),
+          ...currentConfigs[configKey],
+          ...patch,
+        },
+      }));
+    },
+    [],
+  );
   const addTransformationStep = useCallback(
-    (kind: TransformationStepKind) => {
-      if (!selectedColumn || !enabledTransformationKinds.has(kind)) return;
+    (kind: TransformationStepKind, parameters?: TransformationStepParametersInput) => {
+      if (!selectedColumn) return;
+      if (!enabledTransformationKinds.has(kind) && !isConfigurableTransformationKind(kind)) return;
+      if (isConfigurableTransformationKind(kind) && !parameters) return;
       setDraftPipeline((currentPipeline) => {
         const pipeline =
           currentPipeline.worksheetId === transformationWorksheetId &&
@@ -1306,6 +1441,7 @@ function DataCleanPreparePage({
           sequenceIndex: pipeline.steps.length,
           kind,
           targetColumn: selectedColumn,
+          parameters,
         });
         return createEmptyTransformationPipeline({
           worksheetId: pipeline.worksheetId,
@@ -1324,6 +1460,24 @@ function DataCleanPreparePage({
       transformationSourceType,
       transformationWorksheetId,
     ],
+  );
+  const addConfiguredTransformationStep = useCallback(
+    (kind: ConfigurableTransformationKind) => {
+      if (!selectedColumn) return;
+      const configKey = createTransformationConfigKey(selectedColumn.name, kind);
+      const config = {
+        ...createDefaultTransformationConfig(kind),
+        ...transformationConfigs[configKey],
+      };
+      if (validateTransformationConfig(kind, config)) return;
+      addTransformationStep(kind, createConfiguredTransformationParameters(kind, config));
+      setTransformationConfigs((currentConfigs) => {
+        const nextConfigs = { ...currentConfigs };
+        delete nextConfigs[configKey];
+        return nextConfigs;
+      });
+    },
+    [addTransformationStep, selectedColumn, transformationConfigs],
   );
   const isMultiWorksheetWorkbook = Boolean(workbook && worksheetCount > 1);
   const missingCellsSubtitle = isMultiWorksheetWorkbook
@@ -1528,13 +1682,123 @@ function DataCleanPreparePage({
                   <div className="prepare-transformations-options">
                     {supportedTransformationKinds.map((kind) => {
                       const copy = transformationKindCopy[kind];
+                      const isConfigurable = isConfigurableTransformationKind(kind);
+                      const configKey = createTransformationConfigKey(selectedColumn.name, kind);
+                      const config = isConfigurable
+                        ? {
+                            ...createDefaultTransformationConfig(kind),
+                            ...transformationConfigs[configKey],
+                          }
+                        : null;
+                      const validationMessage =
+                        isConfigurable && config ? validateTransformationConfig(kind, config) : null;
                       const isEnabled = enabledTransformationKinds.has(kind);
                       return (
-                        <article className="prepare-transformations-option-card" key={kind}>
+                        <article
+                          className={`prepare-transformations-option-card${
+                            isConfigurable ? " is-configurable" : ""
+                          }`}
+                          key={kind}
+                        >
                           <div>
                             <h4>{copy.label}</h4>
                             <p>{copy.description}</p>
                           </div>
+                          {isConfigurable && config && (
+                            <div className="prepare-transformations-config-area">
+                              {kind === "fill_missing_custom" && (
+                                <label>
+                                  <span>Replacement value</span>
+                                  <input
+                                    type="text"
+                                    value={config.customValue}
+                                    placeholder="e.g. Unknown, 0, N/A"
+                                    onChange={(event) =>
+                                      updateTransformationConfig(selectedColumn.name, kind, {
+                                        customValue: event.target.value,
+                                      })
+                                    }
+                                  />
+                                </label>
+                              )}
+                              {kind === "cap_outliers_percentile" && (
+                                <div className="prepare-transformations-config-grid">
+                                  <label>
+                                    <span>Lower percentile</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.1"
+                                      value={config.lowerPercentile}
+                                      onChange={(event) =>
+                                        updateTransformationConfig(selectedColumn.name, kind, {
+                                          lowerPercentile: event.target.value,
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                  <label>
+                                    <span>Upper percentile</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      step="0.1"
+                                      value={config.upperPercentile}
+                                      onChange={(event) =>
+                                        updateTransformationConfig(selectedColumn.name, kind, {
+                                          upperPercentile: event.target.value,
+                                        })
+                                      }
+                                    />
+                                  </label>
+                                </div>
+                              )}
+                              {kind === "ordinal_encode" && (
+                                <label>
+                                  <span>Category order</span>
+                                  <textarea
+                                    value={config.orderText}
+                                    placeholder="Low, Medium, High"
+                                    rows={3}
+                                    onChange={(event) =>
+                                      updateTransformationConfig(selectedColumn.name, kind, {
+                                        orderText: event.target.value,
+                                      })
+                                    }
+                                  />
+                                </label>
+                              )}
+                              {kind === "days_since" && (
+                                <label>
+                                  <span>Anchor date</span>
+                                  <input
+                                    type="date"
+                                    value={config.anchorDate}
+                                    onChange={(event) =>
+                                      updateTransformationConfig(selectedColumn.name, kind, {
+                                        anchorDate: event.target.value,
+                                      })
+                                    }
+                                  />
+                                </label>
+                              )}
+                              {validationMessage && (
+                                <p className="prepare-transformations-validation-error">
+                                  {validationMessage}
+                                </p>
+                              )}
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                onClick={() => addConfiguredTransformationStep(kind)}
+                                disabled={Boolean(validationMessage)}
+                              >
+                                Add configured step
+                              </button>
+                            </div>
+                          )}
                           <button
                             type="button"
                             className={isEnabled ? "secondary-button" : "secondary-button prepare-transformations-disabled-action"}

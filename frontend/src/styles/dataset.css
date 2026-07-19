@@ -4084,6 +4084,69 @@
   border-radius: 8px;
 }
 
+.prepare-transformations-option-card.is-configurable {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.prepare-transformations-option-card.is-configurable > .prepare-transformations-disabled-action {
+  display: none;
+}
+
+.prepare-transformations-config-area {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.prepare-transformations-config-area label {
+  display: grid;
+  gap: 6px;
+  color: var(--brand-slate);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.prepare-transformations-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.prepare-transformations-config-area input,
+.prepare-transformations-config-area textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.prepare-transformations-config-area input {
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.prepare-transformations-config-area textarea {
+  min-height: 74px;
+  padding: 9px 10px;
+  resize: vertical;
+}
+
+.prepare-transformations-validation-error {
+  margin: 0;
+  color: var(--brand-coral);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.prepare-transformations-config-area button {
+  justify-self: start;
+}
+
 .prepare-transformations-disabled-action,
 .prepare-transformations-disabled-action:disabled,
 .prepare-transformations-draft-actions button:disabled {
@@ -4164,7 +4227,8 @@
 @media (max-width: 760px) {
   .prepare-transformations-layout,
   .prepare-transformations-column-row,
-  .prepare-transformations-option-card {
+  .prepare-transformations-option-card,
+  .prepare-transformations-config-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
