@@ -15,6 +15,11 @@ export type PrepareBackHandlers = {
   goToDecide: () => void;
 };
 
+export type PrepareApplyGateReadiness = {
+  canContinueToApply: boolean;
+  blockingMessage: string | null;
+};
+
 const prepareBackLabels: Record<PrepareBackDestination, string> = {
   data: "Back to Data",
   review: "Back to Review",
@@ -69,4 +74,49 @@ export const invokePrepareBackTransition = (
     return;
   }
   handlers.onBackToData();
+};
+
+export const isStructuralApplyNavigationBlocked = (
+  activePrepareTab: PrepareTab,
+  readiness: PrepareApplyGateReadiness | null,
+): boolean => activePrepareTab === "structural" && readiness?.canContinueToApply !== true;
+
+export const getStructuralApplyNavigationBlockMessage = (
+  activePrepareTab: PrepareTab,
+  step: CleanPrepareStep,
+  readiness: PrepareApplyGateReadiness | null,
+): string | null => {
+  if (step !== "decide" || !isStructuralApplyNavigationBlocked(activePrepareTab, readiness)) {
+    return null;
+  }
+  return (
+    readiness?.blockingMessage ||
+    "Resolve or explicitly defer every recommendation before continuing."
+  );
+};
+
+export const normalizeBlockedApplyStep = (
+  activePrepareTab: PrepareTab,
+  step: CleanPrepareStep,
+  readiness: PrepareApplyGateReadiness | null,
+): CleanPrepareStep => {
+  if (
+    activePrepareTab === "structural" &&
+    step === "apply" &&
+    readiness &&
+    !readiness.canContinueToApply
+  ) {
+    return "decide";
+  }
+  return step;
+};
+
+export const invokeStructuralApplyNavigation = (
+  activePrepareTab: PrepareTab,
+  readiness: PrepareApplyGateReadiness | null,
+  goToApply: () => void,
+): boolean => {
+  if (isStructuralApplyNavigationBlocked(activePrepareTab, readiness)) return false;
+  goToApply();
+  return true;
 };

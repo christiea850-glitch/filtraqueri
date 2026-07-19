@@ -72,6 +72,7 @@ type CleanPrepareReviewPanelProps = {
   // render the review section directly. No execution change.
   embedded?: boolean;
   activeStep?: CleanPrepareStep;
+  onStructuralDecisionReadinessChange?: (readiness: StructuralDecisionReadiness) => void;
 };
 
 type PreparationPriority = "low" | "medium" | "high";
@@ -142,6 +143,15 @@ export type SuggestedFixDecisionProgress = {
   deferred: number;
 };
 
+export type StructuralDecisionReadiness = {
+  totalCount: number;
+  resolvedCount: number;
+  unresolvedCount: number;
+  deferredCount: number;
+  canContinueToApply: boolean;
+  blockingMessage: string | null;
+};
+
 export const getSuggestedFixDecision = (
   fixId: string,
   decisions: Record<string, SuggestedFixDecision>,
@@ -159,6 +169,44 @@ export const getSuggestedFixDecisionProgress = (
       return { ...progress, resolved: progress.resolved + 1 };
     },
     { total: fixes.length, resolved: 0, unresolved: 0, deferred: 0 },
+  );
+
+export const getStructuralDecisionReadiness = (
+  fixes: SuggestedFix[],
+  decisions: Record<string, SuggestedFixDecision>,
+): StructuralDecisionReadiness => {
+  const progress = getSuggestedFixDecisionProgress(fixes, decisions);
+  const canContinueToApply = progress.unresolved === 0;
+  const blockingMessage = canContinueToApply
+    ? null
+    : `${progress.unresolved.toLocaleString()} recommendation${
+        progress.unresolved === 1 ? "" : "s"
+      } still need a decision. Resolve or explicitly defer ${
+        progress.unresolved === 1 ? "it" : "them"
+      } before continuing.`;
+
+  return {
+    totalCount: progress.total,
+    resolvedCount: progress.resolved,
+    unresolvedCount: progress.unresolved,
+    deferredCount: progress.deferred,
+    canContinueToApply,
+    blockingMessage,
+  };
+};
+
+export const areStructuralDecisionReadinessEqual = (
+  left: StructuralDecisionReadiness | null,
+  right: StructuralDecisionReadiness,
+): boolean =>
+  Boolean(
+    left &&
+      left.totalCount === right.totalCount &&
+      left.resolvedCount === right.resolvedCount &&
+      left.unresolvedCount === right.unresolvedCount &&
+      left.deferredCount === right.deferredCount &&
+      left.canContinueToApply === right.canContinueToApply &&
+      left.blockingMessage === right.blockingMessage,
   );
 
 export const getSuggestedFixCleaningPlan = (
@@ -486,6 +534,7 @@ export function CleanPrepareReviewPanel({
   onContinueInAnalyst,
   embedded = false,
   activeStep = "review",
+  onStructuralDecisionReadinessChange,
 }: CleanPrepareReviewPanelProps) {
   const reviewRef = useRef<HTMLDivElement | null>(null);
   // When embedded, the review is the whole reason the dedicated page exists,
@@ -520,10 +569,17 @@ export function CleanPrepareReviewPanel({
     () => getSuggestedFixDecisionProgress(review.suggestedFixes, fixDecisionDrafts),
     [fixDecisionDrafts, review.suggestedFixes],
   );
+  const structuralDecisionReadiness = useMemo(
+    () => getStructuralDecisionReadiness(review.suggestedFixes, fixDecisionDrafts),
+    [fixDecisionDrafts, review.suggestedFixes],
+  );
   const suggestedFixCleaningPlan = useMemo(
     () => getSuggestedFixCleaningPlan(review.suggestedFixes, fixDecisionDrafts),
     [fixDecisionDrafts, review.suggestedFixes],
   );
+  useEffect(() => {
+    onStructuralDecisionReadinessChange?.(structuralDecisionReadiness);
+  }, [onStructuralDecisionReadinessChange, structuralDecisionReadiness]);
   const issueGroups = useMemo(
     () =>
       Array.from(

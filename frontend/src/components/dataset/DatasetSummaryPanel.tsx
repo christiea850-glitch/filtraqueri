@@ -14,8 +14,12 @@ import {
   useCleanPrepareStep,
 } from "../../features/cleanPrepare/useCleanPrepareStep";
 import {
+  getStructuralApplyNavigationBlockMessage,
   getPrepareBackTransition,
+  isStructuralApplyNavigationBlocked,
+  invokeStructuralApplyNavigation,
   invokePrepareBackTransition,
+  normalizeBlockedApplyStep,
   type PrepareTab,
 } from "../../features/cleanPrepare/prepareBackNavigation";
 import {
@@ -83,7 +87,11 @@ import {
   WorkspaceHeader,
 } from "../workspace";
 import WorkbookContextPanel from "../workbook/WorkbookContextPanel";
-import { CleanPrepareReviewPanel } from "../workspace/CleanPrepareReviewPanel";
+import {
+  areStructuralDecisionReadinessEqual,
+  CleanPrepareReviewPanel,
+  type StructuralDecisionReadiness,
+} from "../workspace/CleanPrepareReviewPanel";
 
 export type HumanIntent =
   | "summary"
@@ -1604,6 +1612,8 @@ function DataCleanPreparePage({
 }) {
   const { step, goToReview, goToDecide, goToApply } = useCleanPrepareStep();
   const [activePrepareTab, setActivePrepareTab] = useState<PrepareTab>("structural");
+  const [structuralDecisionReadiness, setStructuralDecisionReadiness] =
+    useState<StructuralDecisionReadiness | null>(null);
   // Deterministic page-header summary. The detailed signal counts and per-
   // worksheet issue breakdown surface inside the embedded
   // CleanPrepareReviewPanel below — the page chrome stays compact with just
@@ -1735,6 +1745,20 @@ function DataCleanPreparePage({
     setTransformationPreviewResult(null);
     setTransformationPreviewStatus("idle");
   }, []);
+  const handleStructuralDecisionReadinessChange = useCallback(
+    (nextReadiness: StructuralDecisionReadiness) => {
+      setStructuralDecisionReadiness((currentReadiness) => {
+        if (areStructuralDecisionReadinessEqual(currentReadiness, nextReadiness)) {
+          return currentReadiness;
+        }
+        return nextReadiness;
+      });
+    },
+    [],
+  );
+  useEffect(() => {
+    setStructuralDecisionReadiness(null);
+  }, [dataset.dataset_id]);
   useEffect(() => {
     clearTransformationPreview();
   }, [
@@ -1923,6 +1947,16 @@ function DataCleanPreparePage({
   };
   const activeStepIndex = cleanPrepareSteps.indexOf(step);
   const prepareBackTransition = getPrepareBackTransition(activePrepareTab, step);
+  const structuralApplyBlocked = isStructuralApplyNavigationBlocked(
+    activePrepareTab,
+    structuralDecisionReadiness,
+  );
+  const structuralApplyBlockMessage = getStructuralApplyNavigationBlockMessage(
+    activePrepareTab,
+    step,
+    structuralDecisionReadiness,
+  );
+  const structuralApplyBlockMessageId = "prepare-structural-apply-block-message";
   const handlePrepareBack = useCallback(() => {
     invokePrepareBackTransition(prepareBackTransition, {
       goToDecide,
@@ -1930,6 +1964,17 @@ function DataCleanPreparePage({
       onBackToData: onBack,
     });
   }, [goToDecide, goToReview, onBack, prepareBackTransition]);
+  const handleGoToApply = useCallback(() => {
+    invokeStructuralApplyNavigation(activePrepareTab, structuralDecisionReadiness, goToApply);
+  }, [activePrepareTab, goToApply, structuralDecisionReadiness]);
+  useEffect(() => {
+    if (
+      normalizeBlockedApplyStep(activePrepareTab, step, structuralDecisionReadiness) === "decide" &&
+      step !== "decide"
+    ) {
+      goToDecide();
+    }
+  }, [activePrepareTab, goToDecide, step, structuralDecisionReadiness]);
 
   return (
     <FocusedWorkspaceShell
@@ -1991,7 +2036,8 @@ function DataCleanPreparePage({
                   ? goToReview
                   : stepItem === "decide"
                     ? goToDecide
-                    : goToApply;
+                    : handleGoToApply;
+              const isApplyStepBlocked = stepItem === "apply" && structuralApplyBlocked;
 
               return (
                 <button
@@ -1999,6 +2045,12 @@ function DataCleanPreparePage({
                   key={stepItem}
                   className={stateClass}
                   onClick={goToStep}
+                  disabled={isApplyStepBlocked}
+                  aria-describedby={
+                    isApplyStepBlocked && structuralApplyBlockMessage
+                      ? structuralApplyBlockMessageId
+                      : undefined
+                  }
                   aria-current={stepItem === step ? "step" : undefined}
                 >
                   <span className="data-clean-prepare-step-marker" aria-hidden="true">
@@ -2019,10 +2071,20 @@ function DataCleanPreparePage({
             onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
             onContinueInAnalyst={onContinueInAnalyst}
             activeStep={step}
+            onStructuralDecisionReadinessChange={handleStructuralDecisionReadinessChange}
             embedded
           />
 
           <div className="data-clean-prepare-step-actions" aria-label="Clean and prepare step navigation">
+            {structuralApplyBlockMessage && (
+              <p
+                id={structuralApplyBlockMessageId}
+                className="data-clean-prepare-step-block-message"
+                aria-live="polite"
+              >
+                {structuralApplyBlockMessage}
+              </p>
+            )}
             {step === "review" && (
               <>
                 <button type="button" className="secondary-button" onClick={onBack}>
@@ -2038,7 +2100,15 @@ function DataCleanPreparePage({
                 <button type="button" className="secondary-button" onClick={goToReview}>
                   Back: Review
                 </button>
-                <button type="button" className="primary-button" onClick={goToApply}>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={handleGoToApply}
+                  disabled={structuralApplyBlocked}
+                  aria-describedby={
+                    structuralApplyBlockMessage ? structuralApplyBlockMessageId : undefined
+                  }
+                >
                   Next: Apply
                 </button>
               </>

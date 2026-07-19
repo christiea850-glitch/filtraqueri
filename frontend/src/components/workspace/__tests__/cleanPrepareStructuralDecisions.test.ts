@@ -1,4 +1,6 @@
 import {
+  areStructuralDecisionReadinessEqual,
+  getStructuralDecisionReadiness,
   getSuggestedFixCleaningPlan,
   getSuggestedFixDecision,
   getSuggestedFixDecisionProgress,
@@ -163,11 +165,14 @@ export const runCleanPrepareStructuralDecisionFixtures =
         );
       }),
       fixture("next apply local gating model blocks unresolved", () => {
-        const progress = getSuggestedFixDecisionProgress(fixes, decisions({ sparse_layout_gap: "use_recommendation" }));
-        return expect(progress.unresolved > 0, "Unresolved count should be available for local navigation gating.");
+        const readiness = getStructuralDecisionReadiness(fixes, decisions({ sparse_layout_gap: "use_recommendation" }));
+        return [
+          ...expect(readiness.canContinueToApply === false, "Unresolved count should block Apply."),
+          ...expect(readiness.unresolvedCount === 2, "Two recommendations should still be unresolved."),
+        ];
       }),
       fixture("next apply local gating model allows resolved or deferred", () => {
-        const progress = getSuggestedFixDecisionProgress(
+        const readiness = getStructuralDecisionReadiness(
           fixes,
           decisions({
             sparse_layout_gap: "use_recommendation",
@@ -175,7 +180,101 @@ export const runCleanPrepareStructuralDecisionFixtures =
             "dataset:missing-values": "decide_later",
           }),
         );
-        return expect(progress.unresolved === 0, "No unresolved recommendations should allow navigation gating.");
+        return [
+          ...expect(readiness.canContinueToApply === true, "No unresolved recommendations should allow Apply."),
+          ...expect(readiness.deferredCount === 1, "Explicit deferral should remain counted."),
+        ];
+      }),
+      fixture("all unresolved decisions cannot continue to Apply", () => {
+        const readiness = getStructuralDecisionReadiness(fixes, decisions({}));
+        return [
+          ...expect(readiness.canContinueToApply === false, "Untouched recommendations should block Apply."),
+          ...expect(readiness.unresolvedCount === 3, "All three recommendations should be unresolved."),
+        ];
+      }),
+      fixture("accepted plus unresolved decisions cannot continue to Apply", () => {
+        const readiness = getStructuralDecisionReadiness(
+          fixes,
+          decisions({ sparse_layout_gap: "use_recommendation" }),
+        );
+        return expect(readiness.canContinueToApply === false, "Remaining unresolved decisions should block.");
+      }),
+      fixture("accepted plus keep-original plus unresolved cannot continue to Apply", () => {
+        const readiness = getStructuralDecisionReadiness(
+          fixes,
+          decisions({
+            sparse_layout_gap: "use_recommendation",
+            side_note_region_candidate: "keep_original",
+          }),
+        );
+        return expect(readiness.canContinueToApply === false, "One unresolved recommendation should block.");
+      }),
+      fixture("all accepted decisions can continue to Apply", () => {
+        const readiness = getStructuralDecisionReadiness(
+          fixes,
+          decisions({
+            sparse_layout_gap: "use_recommendation",
+            side_note_region_candidate: "use_recommendation",
+            "dataset:missing-values": "use_recommendation",
+          }),
+        );
+        return expect(readiness.canContinueToApply === true, "Accepted recommendations should count as handled.");
+      }),
+      fixture("all keep-original decisions can continue to Apply", () => {
+        const readiness = getStructuralDecisionReadiness(
+          fixes,
+          decisions({
+            sparse_layout_gap: "keep_original",
+            side_note_region_candidate: "keep_original",
+            "dataset:missing-values": "keep_original",
+          }),
+        );
+        return expect(readiness.canContinueToApply === true, "Keep-original decisions should count as handled.");
+      }),
+      fixture("all decide-later decisions can continue with deferred count equal total", () => {
+        const readiness = getStructuralDecisionReadiness(
+          fixes,
+          decisions({
+            sparse_layout_gap: "decide_later",
+            side_note_region_candidate: "decide_later",
+            "dataset:missing-values": "decide_later",
+          }),
+        );
+        return [
+          ...expect(readiness.canContinueToApply === true, "Explicit deferrals should allow Apply."),
+          ...expect(readiness.deferredCount === readiness.totalCount, "Deferred count should equal total."),
+        ];
+      }),
+      fixture("empty recommendation list can continue explicitly", () => {
+        const readiness = getStructuralDecisionReadiness([], decisions({}));
+        return [
+          ...expect(readiness.canContinueToApply === true, "No recommendations should not block Apply."),
+          ...expect(readiness.blockingMessage === null, "No recommendations should have no blocker."),
+        ];
+      }),
+      fixture("blocking message includes unresolved count", () => {
+        const readiness = getStructuralDecisionReadiness(fixes, decisions({ sparse_layout_gap: "keep_original" }));
+        return expect(
+          readiness.blockingMessage?.includes("2 recommendations") === true,
+          "Blocking message should include unresolved count.",
+        );
+      }),
+      fixture("parent readiness callback model updates only on meaningful changes", () => {
+        const first = getStructuralDecisionReadiness(fixes, decisions({}));
+        const duplicate = getStructuralDecisionReadiness(fixes, decisions({}));
+        const changed = getStructuralDecisionReadiness(
+          fixes,
+          decisions({ sparse_layout_gap: "use_recommendation" }),
+        );
+        let current = null as ReturnType<typeof getStructuralDecisionReadiness> | null;
+        let updateCount = 0;
+        [first, duplicate, changed].forEach((next) => {
+          if (!areStructuralDecisionReadinessEqual(current, next)) {
+            current = next;
+            updateCount += 1;
+          }
+        });
+        return expect(updateCount === 2, "Only meaningful readiness changes should update parent state.");
       }),
       fixture("direct action labels match recommendation", () => [
         ...expect(
@@ -196,6 +295,8 @@ export const runCleanPrepareStructuralDecisionFixtures =
           getSuggestedFixDecision.toString(),
           getSuggestedFixDecisionProgress.toString(),
           getSuggestedFixCleaningPlan.toString(),
+          getStructuralDecisionReadiness.toString(),
+          areStructuralDecisionReadinessEqual.toString(),
         ].join("\n");
         return [
           ...expect(!sourceMarkers.includes("localStorage"), "Structural helpers should not introduce storage."),
@@ -209,6 +310,8 @@ export const runCleanPrepareStructuralDecisionFixtures =
           getSuggestedFixCleaningPlan.toString(),
           getSuggestedFixRecommendationLabel.toString(),
           getSuggestedFixKeepOriginalLabel.toString(),
+          getStructuralDecisionReadiness.toString(),
+          areStructuralDecisionReadinessEqual.toString(),
         ].join("\n");
         const forbidden = [
           "fetch(",

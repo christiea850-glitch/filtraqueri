@@ -4,7 +4,11 @@ import {
   getPrepareBackHash,
   getPrepareBackLabel,
   getPrepareBackTransition,
+  getStructuralApplyNavigationBlockMessage,
+  invokeStructuralApplyNavigation,
   invokePrepareBackTransition,
+  isStructuralApplyNavigationBlocked,
+  normalizeBlockedApplyStep,
   type PrepareBackDestination,
   type PrepareTab,
 } from "../prepareBackNavigation";
@@ -96,6 +100,16 @@ const nonStructuralCases: Array<{
   { tab: "sql-cleaning", step: "apply" },
 ];
 
+const unresolvedReadiness = {
+  canContinueToApply: false,
+  blockingMessage: "2 recommendations still need a decision. Resolve or explicitly defer them before continuing.",
+};
+
+const readyReadiness = {
+  canContinueToApply: true,
+  blockingMessage: null,
+};
+
 export const runPrepareBackNavigationFixtures = (): PrepareBackNavigationFixtureReport => {
   const results = [
     fixture("structural review returns to Data", () => {
@@ -185,13 +199,90 @@ export const runPrepareBackNavigationFixtures = (): PrepareBackNavigationFixture
         ),
       ),
     ),
+    fixture("Next Apply is blocked when structural readiness is unresolved", () => [
+      ...expect(
+        isStructuralApplyNavigationBlocked("structural", unresolvedReadiness) === true,
+        "Unresolved structural readiness should block Apply.",
+      ),
+      ...expect(
+        getStructuralApplyNavigationBlockMessage("structural", "decide", unresolvedReadiness) ===
+          unresolvedReadiness.blockingMessage,
+        "Decide should expose the readiness blocking message.",
+      ),
+    ]),
+    fixture("Next Apply is available when structural readiness is ready", () => [
+      ...expect(
+        isStructuralApplyNavigationBlocked("structural", readyReadiness) === false,
+        "Handled structural readiness should allow Apply.",
+      ),
+      ...expect(
+        getStructuralApplyNavigationBlockMessage("structural", "decide", readyReadiness) === null,
+        "Ready structural navigation should not expose a blocker.",
+      ),
+    ]),
+    fixture("Next Apply does not invoke goToApply while blocked", () => {
+      let calls = 0;
+      const invoked = invokeStructuralApplyNavigation("structural", unresolvedReadiness, () => {
+        calls += 1;
+      });
+      return [
+        ...expect(invoked === false, "Blocked Apply navigation should report no invocation."),
+        ...expect(calls === 0, "Blocked Apply navigation should not call goToApply."),
+      ];
+    }),
+    fixture("Next Apply invokes goToApply once when ready", () => {
+      let calls = 0;
+      const invoked = invokeStructuralApplyNavigation("structural", readyReadiness, () => {
+        calls += 1;
+      });
+      return [
+        ...expect(invoked === true, "Ready Apply navigation should report invocation."),
+        ...expect(calls === 1, "Ready Apply navigation should call goToApply once."),
+      ];
+    }),
+    fixture("non-structural tabs do not use structural Apply gate", () =>
+      (["transformations", "sql-cleaning"] as PrepareTab[]).flatMap((tab) =>
+        expect(
+          isStructuralApplyNavigationBlocked(tab, unresolvedReadiness) === false,
+          `${tab} should not be gated by structural decisions.`,
+        ),
+      ),
+    ),
+    fixture("direct apply hash with unresolved decisions normalizes to Decide", () =>
+      expect(
+        normalizeBlockedApplyStep("structural", "apply", unresolvedReadiness) === "decide",
+        "Blocked direct #apply should normalize to Decide.",
+      ),
+    ),
+    fixture("direct apply hash remains Apply when decisions are ready", () =>
+      expect(
+        normalizeBlockedApplyStep("structural", "apply", readyReadiness) === "apply",
+        "Ready direct #apply should remain Apply.",
+      ),
+    ),
+    fixture("Apply back to Decide preserves readiness model", () =>
+      expect(
+        normalizeBlockedApplyStep("structural", "decide", readyReadiness) === "decide",
+        "Returning to Decide should not mutate readiness.",
+      ),
+    ),
+    fixture("Prepare Data tab switching preserves gate interpretation", () =>
+      expect(
+        normalizeBlockedApplyStep("transformations", "apply", unresolvedReadiness) === "apply",
+        "Switching away from Structural fixes should not rewrite local structural state.",
+      ),
+    ),
     fixture("back-navigation helper has no storage, SQL, network, or time side effects", () => {
       const source =
         `${getPrepareBackDestination}` +
         `${getPrepareBackLabel}` +
         `${getPrepareBackHash}` +
         `${getPrepareBackTransition}` +
-        `${invokePrepareBackTransition}`;
+        `${invokePrepareBackTransition}` +
+        `${isStructuralApplyNavigationBlocked}` +
+        `${getStructuralApplyNavigationBlockMessage}` +
+        `${normalizeBlockedApplyStep}` +
+        `${invokeStructuralApplyNavigation}`;
       const bannedTokens = [
         "fetch(",
         "XMLHttpRequest",
