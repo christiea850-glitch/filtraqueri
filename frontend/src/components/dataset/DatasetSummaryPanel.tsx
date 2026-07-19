@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import type { DatasetMetadata, DatasetSession } from "../../features/dataset/datasetTypes";
+import type { DatasetMetadata, DatasetSession, SchemaColumn } from "../../features/dataset/datasetTypes";
 import {
   cleanPrepareSteps,
   type CleanPrepareStep,
@@ -17,9 +17,9 @@ import {
   createEmptyTransformationPipeline,
   createTransformationStep,
   getSupportedTransformationsForColumn,
-  summarizeTransformationPipeline,
-  summarizeTransformationStep,
   type TransformationPipeline,
+  type TransformationStep,
+  type TransformationStepParameters,
   type TransformationStepKind,
 } from "../../features/dataPreparation/transformationPipeline";
 import {
@@ -193,6 +193,327 @@ type TransformationStepParametersInput = NonNullable<
   Parameters<typeof createTransformationStep>[0]["parameters"]
 >;
 
+type ColumnTransformationKind = Exclude<TransformationStepKind, "sql_select_transform">;
+type VisibleTransformationStep = TransformationStep & { kind: ColumnTransformationKind };
+
+type OutputBehavior =
+  | {
+      mode: "replace";
+      targetColumnName: string;
+    }
+  | {
+      mode: "new_column";
+      newColumnName: string;
+    }
+  | {
+      mode: "new_columns_per_category";
+      sourceColumnName: string;
+    };
+
+type TransformationIntentGroup = {
+  headingLabel: string;
+  kinds: ColumnTransformationKind[];
+};
+
+const transformationIntentGroups: Record<SchemaColumn["inferred_type"], TransformationIntentGroup[]> = {
+  numeric: [
+    {
+      headingLabel: "Fill missing values",
+      kinds: [
+        "fill_missing_mean",
+        "fill_missing_median",
+        "fill_missing_mode",
+        "fill_missing_zero",
+        "fill_missing_custom",
+      ],
+    },
+    {
+      headingLabel: "Cap outliers",
+      kinds: ["cap_outliers_percentile"],
+    },
+    {
+      headingLabel: "Transform values",
+      kinds: ["log_transform", "z_score_scale", "min_max_scale"],
+    },
+  ],
+  categorical: [
+    {
+      headingLabel: "Fill missing values",
+      kinds: ["fill_missing_mode", "fill_missing_unknown"],
+    },
+    {
+      headingLabel: "Encode categories",
+      kinds: ["one_hot_encode", "ordinal_encode", "frequency_encode"],
+    },
+  ],
+  text: [
+    {
+      headingLabel: "Fill missing values",
+      kinds: ["fill_missing_unknown"],
+    },
+    {
+      headingLabel: "Clean formatting",
+      kinds: ["trim_whitespace", "lowercase", "uppercase"],
+    },
+  ],
+  date: [
+    {
+      headingLabel: "Extract fields",
+      kinds: ["extract_year", "extract_month", "extract_quarter", "extract_day_of_week"],
+    },
+    {
+      headingLabel: "Compute derived values",
+      kinds: ["days_since"],
+    },
+  ],
+  boolean: [
+    {
+      headingLabel: "Fill missing values",
+      kinds: ["fill_missing_true", "fill_missing_false"],
+    },
+    {
+      headingLabel: "Convert type",
+      kinds: ["boolean_to_integer"],
+    },
+  ],
+};
+
+const formatConfiguredValue = (value: string | number | boolean): string =>
+  typeof value === "string" ? value : String(value);
+
+const formatOrdinal = (value: number): string => {
+  const absoluteValue = Math.abs(value);
+  const lastTwoDigits = absoluteValue % 100;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 13) return `${value}th`;
+  const lastDigit = absoluteValue % 10;
+  if (lastDigit === 1) return `${value}st`;
+  if (lastDigit === 2) return `${value}nd`;
+  if (lastDigit === 3) return `${value}rd`;
+  return `${value}th`;
+};
+
+const describeTransformationAction = (
+  kind: ColumnTransformationKind,
+  columnName: string,
+  parameters?: TransformationStepParameters,
+): {
+  title: string;
+  description: string;
+  outputBehavior: OutputBehavior;
+} => {
+  const replaceBehavior: OutputBehavior = { mode: "replace", targetColumnName: columnName };
+  switch (kind) {
+    case "fill_missing_mean":
+      return {
+        title: `Replace missing ${columnName} values with the mean`,
+        description: "Plans a numeric fill using the column average.",
+        outputBehavior: replaceBehavior,
+      };
+    case "fill_missing_median":
+      return {
+        title: `Replace missing ${columnName} values with the median`,
+        description: "Plans a numeric fill using the column midpoint.",
+        outputBehavior: replaceBehavior,
+      };
+    case "fill_missing_mode":
+      return {
+        title: `Replace missing ${columnName} values with the most common value`,
+        description: "Plans a fill using the most common value.",
+        outputBehavior: replaceBehavior,
+      };
+    case "fill_missing_zero":
+      return {
+        title: `Replace missing ${columnName} values with 0`,
+        description: "Plans a numeric fill with zero.",
+        outputBehavior: replaceBehavior,
+      };
+    case "fill_missing_custom": {
+      const customValue =
+        parameters?.kind === "fill_missing_custom" ? formatConfiguredValue(parameters.customValue) : "";
+      return {
+        title: customValue
+          ? `Replace missing ${columnName} values with ${customValue}`
+          : `Replace missing ${columnName} values with a custom value`,
+        description: "Needs a configured replacement value.",
+        outputBehavior: replaceBehavior,
+      };
+    }
+    case "fill_missing_unknown":
+      return {
+        title: `Replace missing ${columnName} values with "Unknown"`,
+        description: "Plans a text or category fill with Unknown.",
+        outputBehavior: replaceBehavior,
+      };
+    case "cap_outliers_percentile": {
+      const hasPercentiles = parameters?.kind === "cap_outliers_percentile";
+      return {
+        title: hasPercentiles
+          ? `Cap ${columnName} between the ${formatOrdinal(parameters.lowerPercentile)} and ${formatOrdinal(
+              parameters.upperPercentile,
+            )} percentile`
+          : `Cap ${columnName} between two percentiles`,
+        description: "Needs configured lower and upper percentile limits.",
+        outputBehavior: replaceBehavior,
+      };
+    }
+    case "log_transform":
+      return {
+        title: `Create a log-transformed ${columnName} column`,
+        description: "Plans a log-scaled derived column.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_log` },
+      };
+    case "z_score_scale":
+      return {
+        title: `Standardize ${columnName} using z-scores`,
+        description: "Plans a standardized numeric derived column.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_z` },
+      };
+    case "min_max_scale":
+      return {
+        title: `Scale ${columnName} between 0 and 1`,
+        description: "Plans a numeric derived column scaled between 0 and 1.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_scaled` },
+      };
+    case "one_hot_encode":
+      return {
+        title: `Create indicator columns for each ${columnName} category`,
+        description: "Plans one indicator column per category.",
+        outputBehavior: { mode: "new_columns_per_category", sourceColumnName: columnName },
+      };
+    case "ordinal_encode":
+      return {
+        title: `Encode ${columnName} using a fixed category order`,
+        description: "Needs a configured category order.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_ordinal` },
+      };
+    case "frequency_encode":
+      return {
+        title: `Create a frequency-encoded ${columnName} column`,
+        description: "Plans category values as frequency signals.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_frequency` },
+      };
+    case "trim_whitespace":
+      return {
+        title: `Trim whitespace from ${columnName}`,
+        description: "Plans leading and trailing whitespace cleanup.",
+        outputBehavior: replaceBehavior,
+      };
+    case "lowercase":
+      return {
+        title: `Convert ${columnName} to lowercase`,
+        description: "Plans lowercase text cleanup.",
+        outputBehavior: replaceBehavior,
+      };
+    case "uppercase":
+      return {
+        title: `Convert ${columnName} to uppercase`,
+        description: "Plans uppercase text cleanup.",
+        outputBehavior: replaceBehavior,
+      };
+    case "extract_year":
+      return {
+        title: `Extract the year from ${columnName} into a new column`,
+        description: "Plans a derived year column from date values.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_year` },
+      };
+    case "extract_month":
+      return {
+        title: `Extract the month from ${columnName} into a new column`,
+        description: "Plans a derived month column from date values.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_month` },
+      };
+    case "extract_quarter":
+      return {
+        title: `Extract the quarter from ${columnName} into a new column`,
+        description: "Plans a derived quarter column from date values.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_quarter` },
+      };
+    case "extract_day_of_week":
+      return {
+        title: `Extract the day of week from ${columnName} into a new column`,
+        description: "Plans a derived day-of-week column from date values.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_day_of_week` },
+      };
+    case "days_since": {
+      const anchorDate = parameters?.kind === "days_since" ? parameters.anchorDate : "";
+      return {
+        title: anchorDate
+          ? `Compute days between ${columnName} and ${anchorDate}`
+          : `Compute days between ${columnName} and an anchor date`,
+        description: "Needs a configured anchor date.",
+        outputBehavior: { mode: "new_column", newColumnName: `${columnName}_days_since` },
+      };
+    }
+    case "boolean_to_integer":
+      return {
+        title: `Convert ${columnName} true/false values to 1/0`,
+        description: "Plans true and false values as numeric indicators.",
+        outputBehavior: replaceBehavior,
+      };
+    case "fill_missing_true":
+      return {
+        title: `Replace missing ${columnName} values with true`,
+        description: "Plans a boolean fill with true.",
+        outputBehavior: replaceBehavior,
+      };
+    case "fill_missing_false":
+      return {
+        title: `Replace missing ${columnName} values with false`,
+        description: "Plans a boolean fill with false.",
+        outputBehavior: replaceBehavior,
+      };
+  }
+};
+
+const getOutputColumnForBehavior = (outputBehavior: OutputBehavior): string | undefined => {
+  if (outputBehavior.mode === "new_column") return outputBehavior.newColumnName;
+  if (outputBehavior.mode === "new_columns_per_category") {
+    return `${outputBehavior.sourceColumnName}_encoded`;
+  }
+  return undefined;
+};
+
+const getOutputBehaviorLabel = (outputBehavior: OutputBehavior): string => {
+  if (outputBehavior.mode === "replace") return `Replaces ${outputBehavior.targetColumnName}`;
+  if (outputBehavior.mode === "new_column") return `Creates ${outputBehavior.newColumnName}`;
+  return `Creates one column per ${outputBehavior.sourceColumnName} category`;
+};
+
+const getOutputBehaviorClassName = (outputBehavior: OutputBehavior): string =>
+  `prepare-transformations-output-pill ${
+    outputBehavior.mode === "replace" ? "mode-replace" : "mode-new-column"
+  }`;
+
+const getColumnProfileFacts = (column: SchemaColumn): string[] => {
+  const facts = [
+    column.null_count > 0
+      ? `${column.null_count.toLocaleString()} missing values - fill actions apply.`
+      : "No missing values - fill actions have no effect.",
+  ];
+
+  if (column.inferred_type === "numeric") {
+    if (column.numeric_stats) {
+      facts.push(`Min ${column.numeric_stats.min.toLocaleString()}`);
+      facts.push(`Max ${column.numeric_stats.max.toLocaleString()}`);
+    } else {
+      if (column.min !== undefined) facts.push(`Min ${String(column.min)}`);
+      if (column.max !== undefined) facts.push(`Max ${String(column.max)}`);
+    }
+  }
+
+  if ((column.inferred_type === "categorical" || column.inferred_type === "text") && column.top_values?.[0]) {
+    const topValue = column.top_values[0];
+    facts.push(`Top value ${topValue.value} (${topValue.count.toLocaleString()} rows)`);
+  }
+
+  if (column.inferred_type === "date" && column.date_range) {
+    facts.push(`Earliest ${column.date_range.min}`);
+    facts.push(`Latest ${column.date_range.max}`);
+  }
+
+  return facts;
+};
+
 const createTransformationConfigKey = (
   columnName: string,
   kind: TransformationStepKind,
@@ -278,108 +599,6 @@ const createConfiguredTransformationParameters = (
     return { kind, order: parseOrdinalOrder(config.orderText) };
   }
   return { kind, anchorDate: config.anchorDate.trim() };
-};
-
-const transformationKindCopy: Record<
-  Exclude<TransformationStepKind, "sql_select_transform">,
-  { label: string; description: string }
-> = {
-  fill_missing_mean: {
-    label: "Fill missing with mean",
-    description: "Plan a numeric fill using the column average.",
-  },
-  fill_missing_median: {
-    label: "Fill missing with median",
-    description: "Plan a numeric fill using the column midpoint.",
-  },
-  fill_missing_mode: {
-    label: "Fill missing with mode",
-    description: "Plan a fill using the most common value.",
-  },
-  fill_missing_zero: {
-    label: "Fill missing with zero",
-    description: "Plan a numeric fill with zero.",
-  },
-  fill_missing_custom: {
-    label: "Fill missing with custom value",
-    description: "Needs a configured replacement value.",
-  },
-  cap_outliers_percentile: {
-    label: "Cap outliers by percentile",
-    description: "Needs configured lower and upper percentile limits.",
-  },
-  log_transform: {
-    label: "Log transform",
-    description: "Plan a log-scaled output column.",
-  },
-  z_score_scale: {
-    label: "Z-score scale",
-    description: "Plan a standardized numeric output column.",
-  },
-  min_max_scale: {
-    label: "Min-max scale",
-    description: "Plan a numeric output scaled between minimum and maximum.",
-  },
-  fill_missing_unknown: {
-    label: "Fill missing with Unknown",
-    description: "Plan a text or category fill with Unknown.",
-  },
-  one_hot_encode: {
-    label: "One-hot encode",
-    description: "Plan indicator fields for categories.",
-  },
-  ordinal_encode: {
-    label: "Ordinal encode",
-    description: "Needs a configured category order.",
-  },
-  frequency_encode: {
-    label: "Frequency encode",
-    description: "Plan category values as frequency signals.",
-  },
-  trim_whitespace: {
-    label: "Trim whitespace",
-    description: "Plan leading and trailing whitespace cleanup.",
-  },
-  lowercase: {
-    label: "Lowercase",
-    description: "Plan a lowercase text output.",
-  },
-  uppercase: {
-    label: "Uppercase",
-    description: "Plan an uppercase text output.",
-  },
-  extract_year: {
-    label: "Extract year",
-    description: "Plan a year field from date values.",
-  },
-  extract_month: {
-    label: "Extract month",
-    description: "Plan a month field from date values.",
-  },
-  extract_quarter: {
-    label: "Extract quarter",
-    description: "Plan a quarter field from date values.",
-  },
-  extract_day_of_week: {
-    label: "Extract day of week",
-    description: "Plan a weekday field from date values.",
-  },
-  days_since: {
-    label: "Days since",
-    description: "Needs a configured anchor date.",
-  },
-  boolean_to_integer: {
-    label: "Boolean to integer",
-    description: "Plan true and false values as numeric indicators.",
-  },
-  fill_missing_true: {
-    label: "Fill missing with true",
-    description: "Plan a boolean fill with true.",
-  },
-  fill_missing_false: {
-    label: "Fill missing with false",
-    description: "Plan a boolean fill with false.",
-  },
 };
 
 type HumanSignalIcon =
@@ -1397,10 +1616,23 @@ function DataCleanPreparePage({
     transformationColumns.find((column) => column.name === selectedColumnName) || null;
   const supportedTransformationKinds = selectedColumn
     ? getSupportedTransformationsForColumn(selectedColumn).filter(
-        (kind): kind is Exclude<TransformationStepKind, "sql_select_transform"> =>
+        (kind): kind is ColumnTransformationKind =>
           kind !== "sql_select_transform",
       )
     : [];
+  const visibleTransformationIntentGroups = selectedColumn
+    ? transformationIntentGroups[selectedColumn.inferred_type]
+        .map((group) => ({
+          ...group,
+          kinds: group.kinds.filter((kind) => supportedTransformationKinds.includes(kind)),
+        }))
+        .filter((group) => group.kinds.length > 0)
+    : [];
+  const selectedColumnProfileFacts = selectedColumn ? getColumnProfileFacts(selectedColumn) : [];
+  const visibleDraftSteps = visibleDraftPipeline.steps.filter(
+    (pipelineStep): pipelineStep is VisibleTransformationStep =>
+      pipelineStep.kind !== "sql_select_transform",
+  );
   const updateTransformationConfig = useCallback(
     (
       columnName: string,
@@ -1420,10 +1652,12 @@ function DataCleanPreparePage({
     [],
   );
   const addTransformationStep = useCallback(
-    (kind: TransformationStepKind, parameters?: TransformationStepParametersInput) => {
+    (kind: ColumnTransformationKind, parameters?: TransformationStepParametersInput) => {
       if (!selectedColumn) return;
       if (!enabledTransformationKinds.has(kind) && !isConfigurableTransformationKind(kind)) return;
       if (isConfigurableTransformationKind(kind) && !parameters) return;
+      const action = describeTransformationAction(kind, selectedColumn.name, parameters);
+      const outputColumn = getOutputColumnForBehavior(action.outputBehavior);
       setDraftPipeline((currentPipeline) => {
         const pipeline =
           currentPipeline.worksheetId === transformationWorksheetId &&
@@ -1441,6 +1675,7 @@ function DataCleanPreparePage({
           sequenceIndex: pipeline.steps.length,
           kind,
           targetColumn: selectedColumn,
+          outputColumn,
           parameters,
         });
         return createEmptyTransformationPipeline({
@@ -1740,9 +1975,17 @@ function DataCleanPreparePage({
                       <dd>{selectedColumn.unique_count.toLocaleString()}</dd>
                     </div>
                   </dl>
+                  <div className="prepare-transformations-profile-context" aria-label="Selected column profile context">
+                    {selectedColumnProfileFacts.map((fact) => (
+                      <p key={fact}>{fact}</p>
+                    ))}
+                  </div>
                   <div className="prepare-transformations-options">
-                    {supportedTransformationKinds.map((kind) => {
-                      const copy = transformationKindCopy[kind];
+                    {visibleTransformationIntentGroups.map((group) => (
+                      <section className="prepare-transformations-intent-group" key={group.headingLabel}>
+                        <h4>{group.headingLabel}</h4>
+                        <div className="prepare-transformations-intent-options">
+                          {group.kinds.map((kind) => {
                       const isConfigurable = isConfigurableTransformationKind(kind);
                       const configKey = createTransformationConfigKey(selectedColumn.name, kind);
                       const config = isConfigurable
@@ -1753,6 +1996,15 @@ function DataCleanPreparePage({
                         : null;
                       const validationMessage =
                         isConfigurable && config ? validateTransformationConfig(kind, config) : null;
+                      const configuredParameters =
+                        isConfigurable && config && !validationMessage
+                          ? createConfiguredTransformationParameters(kind, config)
+                          : undefined;
+                      const action = describeTransformationAction(
+                        kind,
+                        selectedColumn.name,
+                        configuredParameters,
+                      );
                       const isEnabled = enabledTransformationKinds.has(kind);
                       return (
                         <article
@@ -1762,8 +2014,11 @@ function DataCleanPreparePage({
                           key={kind}
                         >
                           <div>
-                            <h4>{copy.label}</h4>
-                            <p>{copy.description}</p>
+                            <h5>{action.title}</h5>
+                            <p>{action.description}</p>
+                            <span className={getOutputBehaviorClassName(action.outputBehavior)}>
+                              {getOutputBehaviorLabel(action.outputBehavior)}
+                            </span>
                           </div>
                           {isConfigurable && config && (
                             <div className="prepare-transformations-config-area">
@@ -1867,15 +2122,18 @@ function DataCleanPreparePage({
                             disabled={!isEnabled}
                             title={
                               isEnabled
-                                ? `Add ${copy.label}`
-                                : "Needs configuration — coming in a later slice."
+                                ? `Add ${action.title}`
+                                : "Needs configuration - use the fields on this card."
                             }
                           >
                             Add
                           </button>
                         </article>
                       );
-                    })}
+                          })}
+                        </div>
+                      </section>
+                    ))}
                   </div>
                 </>
               )}
@@ -1886,7 +2144,10 @@ function DataCleanPreparePage({
             <div className="prepare-transformations-draft-header">
               <div>
                 <p className="section-label">Draft pipeline</p>
-                <h3>Local plan only</h3>
+                <h3>
+                  Draft plan · {visibleDraftSteps.length} step
+                  {visibleDraftSteps.length !== 1 ? "s" : ""} on {sourceName}
+                </h3>
               </div>
               <div className="prepare-transformations-draft-actions" aria-label="Unavailable transformation actions">
                 <button
@@ -1901,7 +2162,7 @@ function DataCleanPreparePage({
                   type="button"
                   className="secondary-button"
                   disabled
-                  title="Not available yet. This slice only builds a draft plan."
+                  title="Transformed-row preview is not implemented yet. This slice only builds a draft plan."
                 >
                   Preview
                 </button>
@@ -1909,46 +2170,55 @@ function DataCleanPreparePage({
                   type="button"
                   className="primary-button"
                   disabled
-                  title="Not available yet. This slice only builds a draft plan."
+                  title="Cleaned-copy generation is not implemented yet. This slice only builds a draft plan."
                 >
                   Apply
                 </button>
               </div>
             </div>
 
-            {visibleDraftPipeline.steps.length === 0 ? (
+            {visibleDraftSteps.length === 0 ? (
               <p className="prepare-transformations-empty">
                 No transformations added yet. Pick a column and add a transformation.
               </p>
             ) : (
               <>
-                <p>{summarizeTransformationPipeline(visibleDraftPipeline)}</p>
                 <ol className="prepare-transformations-step-list">
-                  {visibleDraftPipeline.steps.map((pipelineStep) => (
-                    <li className="prepare-transformations-step-row" key={pipelineStep.id}>
-                      <span>{pipelineStep.order + 1}</span>
-                      <p>{summarizeTransformationStep(pipelineStep)}</p>
-                      <button
-                        type="button"
-                        className="prepare-transformations-remove-step"
-                        onClick={() => handleRemoveStep(pipelineStep.id)}
-                      >
-                        Remove
-                      </button>
-                    </li>
-                  ))}
+                  {visibleDraftSteps.map((pipelineStep) => {
+                    const action = describeTransformationAction(
+                      pipelineStep.kind,
+                      pipelineStep.targetColumn,
+                      pipelineStep.parameters,
+                    );
+                    return (
+                      <li className="prepare-transformations-step-row" key={pipelineStep.id}>
+                        <span>{pipelineStep.order + 1}</span>
+                        <div className="prepare-transformations-step-copy">
+                          <p>{action.title}</p>
+                          <span className={getOutputBehaviorClassName(action.outputBehavior)}>
+                            {getOutputBehaviorLabel(action.outputBehavior)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="prepare-transformations-remove-step"
+                          onClick={() => handleRemoveStep(pipelineStep.id)}
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ol>
               </>
             )}
-            <div className="prepare-transformations-readiness">
-              <span>Status: {visibleDraftPipeline.status}</span>
-              <span>
-                Preview ready: {visibleDraftPipeline.readiness.previewReady ? "yes" : "no"}
-              </span>
-              <span>Apply ready: no</span>
+            <div className="prepare-transformations-readiness" aria-live="polite">
+              <span>Draft status: {visibleDraftPipeline.status}</span>
+              <span>Preview: unavailable · execution not implemented yet</span>
+              <span>Apply: unavailable · cleaned-copy generation not implemented yet</span>
             </div>
             <p className="prepare-transformations-safety-note">
-              Preview and Apply are disabled in this foundation slice.
+              Every step is a plan-only draft. Nothing is executed, previewed, or applied. Your original upload is never modified.
             </p>
           </div>
         </section>
