@@ -242,7 +242,7 @@ const createHeaderIntegrityAlert = (
         ? pluralize(affectedWorksheetNames.length, "worksheet")
         : "Active dataset schema",
     action: repeatedHeaderEvidence.length > 0 ? "clean-prepare" : "preview",
-    actionLabel: repeatedHeaderEvidence.length > 0 ? "Review Clean & Prepare" : "Preview dataset",
+    actionLabel: repeatedHeaderEvidence.length > 0 ? "Review Prepare Data" : "Preview dataset",
   }, affectedWorksheetIds, reviewedScopeKeys, dismissedScopeKeys, resolvedWorksheetIds);
 };
 
@@ -307,7 +307,7 @@ const createTemplateLayoutAlert = (
     evidence: unique(layoutEvidence).slice(0, 4),
     affectedSummary: pluralize(affectedWorksheets.length, "worksheet"),
     action: "clean-prepare",
-    actionLabel: "Review Clean & Prepare",
+    actionLabel: "Review Prepare Data",
   }, affectedWorksheetIds, reviewedScopeKeys, dismissedScopeKeys, new Set(activeCleanedWorksheetId ? [activeCleanedWorksheetId] : []));
 };
 

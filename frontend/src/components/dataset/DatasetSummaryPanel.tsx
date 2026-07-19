@@ -113,6 +113,7 @@ type DatasetSummaryPanelProps = {
 
 type DataWorkflowMenu = "details";
 type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
+type PrepareTab = "structural" | "transformations" | "sql-cleaning";
 type DataWorkspaceCommandTarget =
   | "overview"
   | "missingValues"
@@ -125,6 +126,14 @@ type DataWorkspaceCommandTarget =
   | "semantics";
 
 const datasetIntelligenceDetailRouteId: ControlledHashDetailRouteId = "detail:dataset-intelligence";
+
+const prepareTabLabels: Record<PrepareTab, string> = {
+  structural: "Structural fixes",
+  transformations: "Column transformations",
+  "sql-cleaning": "SQL cleaning",
+};
+
+const prepareTabComingSoon: PrepareTab[] = ["transformations", "sql-cleaning"];
 
 type HumanSignalIcon =
   | "trend"
@@ -1072,6 +1081,7 @@ function DataCleanPreparePage({
   onBack: () => void;
 }) {
   const { step, goToReview, goToDecide, goToApply } = useCleanPrepareStep();
+  const [activePrepareTab, setActivePrepareTab] = useState<PrepareTab>("structural");
   // Deterministic page-header summary. The detailed signal counts and per-
   // worksheet issue breakdown surface inside the embedded
   // CleanPrepareReviewPanel below — the page chrome stays compact with just
@@ -1118,9 +1128,9 @@ function DataCleanPreparePage({
   return (
     <FocusedWorkspaceShell
       className="data-clean-prepare-page"
-      eyebrow="DATASET PREPARATION"
-      title={`Clean & Prepare · ${sourceName}`}
-      summary="Review structural issues before creating a cleaned working copy."
+      eyebrow="PREPARE DATA"
+      title={`Prepare Data · ${sourceName}`}
+      summary="Fix structural issues, transform columns, or write cleaning SQL. Nothing applies until you Apply."
       backLabel="Back to Data"
       onBack={onBack}
     >
@@ -1143,72 +1153,134 @@ function DataCleanPreparePage({
         </div>
       </section>
 
-      <nav className="data-clean-prepare-step-bar" aria-label="Clean and prepare steps">
-        {cleanPrepareSteps.map((stepItem, index) => {
-          const stateClass =
-            index < activeStepIndex
-              ? "is-complete"
-              : stepItem === step
-                ? "is-current"
-                : "is-future";
-          const goToStep =
-            stepItem === "review"
-              ? goToReview
-              : stepItem === "decide"
-                ? goToDecide
-                : goToApply;
-
-          return (
-            <button
-              type="button"
-              key={stepItem}
-              className={stateClass}
-              onClick={goToStep}
-              aria-current={stepItem === step ? "step" : undefined}
-            >
-              <span className="data-clean-prepare-step-marker" aria-hidden="true">
-                {index < activeStepIndex ? "✓" : index + 1}
-              </span>
-              <span>{stepLabels[stepItem]}</span>
-            </button>
-          );
-        })}
+      <nav className="prepare-tab-strip" aria-label="Prepare data tools">
+        {(Object.keys(prepareTabLabels) as PrepareTab[]).map((tab) => (
+          <button
+            type="button"
+            key={tab}
+            className={`prepare-tab-button${activePrepareTab === tab ? " is-active" : ""}`}
+            onClick={() => setActivePrepareTab(tab)}
+            aria-current={activePrepareTab === tab ? "page" : undefined}
+          >
+            <span>{prepareTabLabels[tab]}</span>
+            {prepareTabComingSoon.includes(tab) && (
+              <span className="prepare-tab-coming-soon-chip">Soon</span>
+            )}
+          </button>
+        ))}
       </nav>
 
-      <CleanPrepareReviewPanel
-        dataset={dataset}
-        sourceName={sourceName}
-        onAnalysisSourceSelect={onAnalysisSourceSelect}
-        onPreviewDataset={onPreviewWorksheet}
-        restoreContext={cleanPrepareRestoreContext}
-        onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
-        onContinueInAnalyst={onContinueInAnalyst}
-        activeStep={step}
-        embedded
-      />
+      {activePrepareTab === "structural" && (
+        <>
+          <nav className="data-clean-prepare-step-bar" aria-label="Clean and prepare steps">
+            {cleanPrepareSteps.map((stepItem, index) => {
+              const stateClass =
+                index < activeStepIndex
+                  ? "is-complete"
+                  : stepItem === step
+                    ? "is-current"
+                    : "is-future";
+              const goToStep =
+                stepItem === "review"
+                  ? goToReview
+                  : stepItem === "decide"
+                    ? goToDecide
+                    : goToApply;
 
-      <div className="data-clean-prepare-step-actions" aria-label="Clean and prepare step navigation">
-        {step === "review" && (
-          <button type="button" className="primary-button" onClick={goToDecide}>
-            Next: Decide
-          </button>
-        )}
-        {step === "decide" && (
-          <>
-            <button type="button" className="secondary-button" onClick={goToReview}>
-              Back: Review
-            </button>
-            <button type="button" className="primary-button" onClick={goToApply}>
-              Next: Apply
-            </button>
-          </>
-        )}
-        {step === "apply" && (
-          <button type="button" className="secondary-button" onClick={goToDecide}>
-            Back: Decide
-          </button>
-        )}
-      </div>
+              return (
+                <button
+                  type="button"
+                  key={stepItem}
+                  className={stateClass}
+                  onClick={goToStep}
+                  aria-current={stepItem === step ? "step" : undefined}
+                >
+                  <span className="data-clean-prepare-step-marker" aria-hidden="true">
+                    {index < activeStepIndex ? "✓" : index + 1}
+                  </span>
+                  <span>{stepLabels[stepItem]}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <CleanPrepareReviewPanel
+            dataset={dataset}
+            sourceName={sourceName}
+            onAnalysisSourceSelect={onAnalysisSourceSelect}
+            onPreviewDataset={onPreviewWorksheet}
+            restoreContext={cleanPrepareRestoreContext}
+            onRestoreContextConsumed={onCleanPrepareRestoreConsumed}
+            onContinueInAnalyst={onContinueInAnalyst}
+            activeStep={step}
+            embedded
+          />
+
+          <div className="data-clean-prepare-step-actions" aria-label="Clean and prepare step navigation">
+            {step === "review" && (
+              <button type="button" className="primary-button" onClick={goToDecide}>
+                Next: Decide
+              </button>
+            )}
+            {step === "decide" && (
+              <>
+                <button type="button" className="secondary-button" onClick={goToReview}>
+                  Back: Review
+                </button>
+                <button type="button" className="primary-button" onClick={goToApply}>
+                  Next: Apply
+                </button>
+              </>
+            )}
+            {step === "apply" && (
+              <button type="button" className="secondary-button" onClick={goToDecide}>
+                Back: Decide
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {activePrepareTab === "transformations" && (
+        <section className="prepare-tab-placeholder" aria-label="Column transformations coming soon">
+          <div className="prepare-tab-placeholder-icon" aria-hidden="true">T</div>
+          <div className="prepare-tab-placeholder-body">
+            <span className="prepare-tab-placeholder-chip">Coming soon</span>
+            <h3>Column transformations</h3>
+            <p>
+              A no-code transformation workspace will help reshape fields with a live preview
+              before anything is applied.
+            </p>
+            <ul className="prepare-tab-placeholder-preview-list">
+              <li>Fill nulls with mean, median, mode, or a custom value</li>
+              <li>Encode categorical fields</li>
+              <li>Type conversion</li>
+              <li>Outlier and log transforms</li>
+              <li>Live preview before applying</li>
+            </ul>
+          </div>
+        </section>
+      )}
+
+      {activePrepareTab === "sql-cleaning" && (
+        <section className="prepare-tab-placeholder" aria-label="SQL cleaning coming soon">
+          <div className="prepare-tab-placeholder-icon" aria-hidden="true">SQL</div>
+          <div className="prepare-tab-placeholder-body">
+            <span className="prepare-tab-placeholder-chip">Coming soon</span>
+            <h3>SQL cleaning</h3>
+            <p>
+              A governed SQL cleaning workspace will make scripted cleanup explicit,
+              previewable, and separate from Analyst query execution.
+            </p>
+            <ul className="prepare-tab-placeholder-preview-list">
+              <li>Monaco editor with SQL safety validation</li>
+              <li>Ask FiltraQueri cleaning prompt examples</li>
+              <li>Live preview against working copy</li>
+              <li>Chain with no-code transformations</li>
+            </ul>
+          </div>
+        </section>
+      )}
     </FocusedWorkspaceShell>
   );
 }
@@ -1920,7 +1992,7 @@ function DatasetSummaryPanel({
                       type="button"
                       className="secondary-button data-action-btn data-clean-prepare-toggle"
                       onClick={() => setIsCleanPreparePageOpen(true)}
-                      title="Review missing values, field types, and cleanup suggestions before analysis."
+                      title="Prepare structural fixes, column transformations, or SQL cleaning before analysis."
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -1934,7 +2006,7 @@ function DatasetSummaryPanel({
                         <path d="M3 6h18M3 12h18M3 18h12" />
                         <path d="m17 17 2 2 4-4" />
                       </svg>
-                      Clean & Prepare
+                      Prepare Data
                     </button>
                   )}
                 </div>

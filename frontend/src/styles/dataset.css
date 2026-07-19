@@ -3800,6 +3800,125 @@
   line-height: 1.4;
 }
 
+.prepare-tab-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
+}
+
+.prepare-tab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--brand-slate);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prepare-tab-button.is-active {
+  border-color: var(--brand-violet-soft);
+  background: var(--brand-violet-soft);
+  color: var(--brand-violet);
+}
+
+.prepare-tab-coming-soon-chip,
+.prepare-tab-placeholder-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--brand-amber-soft);
+  color: var(--brand-amber);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.prepare-tab-placeholder {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
+}
+
+.prepare-tab-placeholder-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--brand-violet-soft);
+  color: var(--brand-violet);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.prepare-tab-placeholder-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prepare-tab-placeholder-body h3 {
+  margin: 0;
+  color: var(--brand-slate);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.prepare-tab-placeholder-body p {
+  max-width: 720px;
+  margin: 0;
+  color: var(--brand-slate);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.prepare-tab-placeholder-preview-list {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prepare-tab-placeholder-preview-list li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--brand-slate);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.prepare-tab-placeholder-preview-list li::before {
+  position: absolute;
+  top: 0.5em;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--brand-mint);
+  content: "";
+}
+
 .data-clean-prepare-step-bar {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
