@@ -1479,6 +1479,67 @@ function DataCleanPreparePage({
     },
     [addTransformationStep, selectedColumn, transformationConfigs],
   );
+  const handleRemoveStep = useCallback(
+    (stepId: string) => {
+      setDraftPipeline((currentPipeline) => {
+        const pipeline =
+          currentPipeline.worksheetId === transformationWorksheetId &&
+          currentPipeline.sourceTableName === transformationSourceTableName &&
+          currentPipeline.sourceType === transformationSourceType
+            ? currentPipeline
+            : createEmptyTransformationPipeline({
+                worksheetId: transformationWorksheetId,
+                sourceTableName: transformationSourceTableName,
+                sourceType: transformationSourceType,
+                seed: transformationPipelineSeed,
+              });
+        const remainingSteps = pipeline.steps.filter((pipelineStep) => pipelineStep.id !== stepId);
+        const rebuiltSteps = remainingSteps.map((pipelineStep, sequenceIndex) => {
+          const targetColumn =
+            transformationColumns.find((column) => column.name === pipelineStep.targetColumn) || null;
+          return createTransformationStep({
+            pipelineId: pipeline.id,
+            sequenceIndex,
+            kind: pipelineStep.kind,
+            targetColumn,
+            outputColumn: pipelineStep.outputColumn,
+            parameters: pipelineStep.parameters,
+            warnings: pipelineStep.warnings,
+          });
+        });
+        return createEmptyTransformationPipeline({
+          worksheetId: pipeline.worksheetId,
+          sourceTableName: pipeline.sourceTableName,
+          sourceType: pipeline.sourceType,
+          seed: transformationPipelineSeed,
+          steps: rebuiltSteps,
+          warnings: pipeline.warnings,
+        });
+      });
+    },
+    [
+      transformationColumns,
+      transformationPipelineSeed,
+      transformationSourceTableName,
+      transformationSourceType,
+      transformationWorksheetId,
+    ],
+  );
+  const handleResetDraft = useCallback(() => {
+    setDraftPipeline(
+      createEmptyTransformationPipeline({
+        worksheetId: transformationWorksheetId,
+        sourceTableName: transformationSourceTableName,
+        sourceType: transformationSourceType,
+        seed: transformationPipelineSeed,
+      }),
+    );
+  }, [
+    transformationPipelineSeed,
+    transformationSourceTableName,
+    transformationSourceType,
+    transformationWorksheetId,
+  ]);
   const isMultiWorksheetWorkbook = Boolean(workbook && worksheetCount > 1);
   const missingCellsSubtitle = isMultiWorksheetWorkbook
     ? `across ${worksheetCount.toLocaleString()} worksheets${
@@ -1830,6 +1891,14 @@ function DataCleanPreparePage({
               <div className="prepare-transformations-draft-actions" aria-label="Unavailable transformation actions">
                 <button
                   type="button"
+                  className="secondary-button prepare-transformations-reset-action"
+                  onClick={handleResetDraft}
+                  disabled={visibleDraftPipeline.steps.length === 0}
+                >
+                  Reset draft
+                </button>
+                <button
+                  type="button"
                   className="secondary-button"
                   disabled
                   title="Not available yet. This slice only builds a draft plan."
@@ -1859,6 +1928,13 @@ function DataCleanPreparePage({
                     <li className="prepare-transformations-step-row" key={pipelineStep.id}>
                       <span>{pipelineStep.order + 1}</span>
                       <p>{summarizeTransformationStep(pipelineStep)}</p>
+                      <button
+                        type="button"
+                        className="prepare-transformations-remove-step"
+                        onClick={() => handleRemoveStep(pipelineStep.id)}
+                      >
+                        Remove
+                      </button>
                     </li>
                   ))}
                 </ol>

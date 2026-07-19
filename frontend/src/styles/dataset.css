@@ -4168,6 +4168,10 @@
   justify-content: flex-end;
 }
 
+.prepare-transformations-reset-action {
+  margin-right: auto;
+}
+
 .prepare-transformations-step-list {
   display: grid;
   gap: 8px;
@@ -4178,7 +4182,7 @@
 
 .prepare-transformations-step-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: start;
   padding: 10px;
@@ -4197,6 +4201,28 @@
   color: var(--brand-mint);
   font-size: 12px;
   font-weight: 800;
+}
+
+.prepare-transformations-step-row p {
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.prepare-transformations-remove-step {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--brand-coral-soft);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--brand-coral);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.prepare-transformations-remove-step:hover {
+  background: var(--brand-coral-soft);
 }
 
 .prepare-transformations-readiness {
@@ -4228,7 +4254,8 @@
   .prepare-transformations-layout,
   .prepare-transformations-column-row,
   .prepare-transformations-option-card,
-  .prepare-transformations-config-grid {
+  .prepare-transformations-config-grid,
+  .prepare-transformations-step-row {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -4244,6 +4271,14 @@
 
   .prepare-transformations-draft-actions {
     justify-content: flex-start;
+  }
+
+  .prepare-transformations-reset-action {
+    margin-right: 0;
+  }
+
+  .prepare-transformations-remove-step {
+    justify-self: start;
   }
 }
 
