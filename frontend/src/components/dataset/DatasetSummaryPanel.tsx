@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -12,6 +13,15 @@ import {
   type CleanPrepareStep,
   useCleanPrepareStep,
 } from "../../features/cleanPrepare/useCleanPrepareStep";
+import {
+  createEmptyTransformationPipeline,
+  createTransformationStep,
+  getSupportedTransformationsForColumn,
+  summarizeTransformationPipeline,
+  summarizeTransformationStep,
+  type TransformationPipeline,
+  type TransformationStepKind,
+} from "../../features/dataPreparation/transformationPipeline";
 import {
   getOriginalWorkbookLayout,
   getPreview,
@@ -133,7 +143,132 @@ const prepareTabLabels: Record<PrepareTab, string> = {
   "sql-cleaning": "SQL cleaning",
 };
 
-const prepareTabComingSoon: PrepareTab[] = ["transformations", "sql-cleaning"];
+const prepareTabComingSoon: PrepareTab[] = ["sql-cleaning"];
+
+const enabledTransformationKinds = new Set<TransformationStepKind>([
+  "fill_missing_mean",
+  "fill_missing_median",
+  "fill_missing_mode",
+  "fill_missing_zero",
+  "fill_missing_unknown",
+  "log_transform",
+  "z_score_scale",
+  "min_max_scale",
+  "one_hot_encode",
+  "frequency_encode",
+  "trim_whitespace",
+  "lowercase",
+  "uppercase",
+  "extract_year",
+  "extract_month",
+  "extract_quarter",
+  "extract_day_of_week",
+  "boolean_to_integer",
+  "fill_missing_true",
+  "fill_missing_false",
+]);
+
+const transformationKindCopy: Record<
+  Exclude<TransformationStepKind, "sql_select_transform">,
+  { label: string; description: string }
+> = {
+  fill_missing_mean: {
+    label: "Fill missing with mean",
+    description: "Plan a numeric fill using the column average.",
+  },
+  fill_missing_median: {
+    label: "Fill missing with median",
+    description: "Plan a numeric fill using the column midpoint.",
+  },
+  fill_missing_mode: {
+    label: "Fill missing with mode",
+    description: "Plan a fill using the most common value.",
+  },
+  fill_missing_zero: {
+    label: "Fill missing with zero",
+    description: "Plan a numeric fill with zero.",
+  },
+  fill_missing_custom: {
+    label: "Fill missing with custom value",
+    description: "Needs a configured replacement value.",
+  },
+  cap_outliers_percentile: {
+    label: "Cap outliers by percentile",
+    description: "Needs configured lower and upper percentile limits.",
+  },
+  log_transform: {
+    label: "Log transform",
+    description: "Plan a log-scaled output column.",
+  },
+  z_score_scale: {
+    label: "Z-score scale",
+    description: "Plan a standardized numeric output column.",
+  },
+  min_max_scale: {
+    label: "Min-max scale",
+    description: "Plan a numeric output scaled between minimum and maximum.",
+  },
+  fill_missing_unknown: {
+    label: "Fill missing with Unknown",
+    description: "Plan a text or category fill with Unknown.",
+  },
+  one_hot_encode: {
+    label: "One-hot encode",
+    description: "Plan indicator fields for categories.",
+  },
+  ordinal_encode: {
+    label: "Ordinal encode",
+    description: "Needs a configured category order.",
+  },
+  frequency_encode: {
+    label: "Frequency encode",
+    description: "Plan category values as frequency signals.",
+  },
+  trim_whitespace: {
+    label: "Trim whitespace",
+    description: "Plan leading and trailing whitespace cleanup.",
+  },
+  lowercase: {
+    label: "Lowercase",
+    description: "Plan a lowercase text output.",
+  },
+  uppercase: {
+    label: "Uppercase",
+    description: "Plan an uppercase text output.",
+  },
+  extract_year: {
+    label: "Extract year",
+    description: "Plan a year field from date values.",
+  },
+  extract_month: {
+    label: "Extract month",
+    description: "Plan a month field from date values.",
+  },
+  extract_quarter: {
+    label: "Extract quarter",
+    description: "Plan a quarter field from date values.",
+  },
+  extract_day_of_week: {
+    label: "Extract day of week",
+    description: "Plan a weekday field from date values.",
+  },
+  days_since: {
+    label: "Days since",
+    description: "Needs a configured anchor date.",
+  },
+  boolean_to_integer: {
+    label: "Boolean to integer",
+    description: "Plan true and false values as numeric indicators.",
+  },
+  fill_missing_true: {
+    label: "Fill missing with true",
+    description: "Plan a boolean fill with true.",
+  },
+  fill_missing_false: {
+    label: "Fill missing with false",
+    description: "Plan a boolean fill with false.",
+  },
+};
 
 type HumanSignalIcon =
   | "trend"
@@ -1110,6 +1245,86 @@ function DataCleanPreparePage({
     workbook?.worksheets.find((worksheet) => worksheet.worksheetId === activeWorksheetId) || null;
   const activeWorksheetName =
     activeWorksheet?.displayName || activeWorksheet?.sheetName || dataset.original_filename;
+  const transformationColumns = dataset.schema;
+  const transformationWorksheetId = activeWorksheet?.worksheetId || dataset.dataset_id;
+  const transformationSourceTableName = activeWorksheet?.tableName || dataset.table_name;
+  const transformationSourceType: TransformationPipeline["sourceType"] =
+    workbook?.activeAnalysisSource?.type === "cleaned_working_copy" ? "cleaned_working_copy" : "original";
+  const transformationPipelineSeed = [
+    dataset.dataset_id,
+    transformationWorksheetId,
+    transformationSourceTableName,
+    transformationSourceType,
+  ].join(":");
+  const [selectedColumnName, setSelectedColumnName] = useState<string | null>(
+    transformationColumns[0]?.name || null,
+  );
+  const [draftPipeline, setDraftPipeline] = useState<TransformationPipeline>(() =>
+    createEmptyTransformationPipeline({
+      worksheetId: transformationWorksheetId,
+      sourceTableName: transformationSourceTableName,
+      sourceType: transformationSourceType,
+      seed: transformationPipelineSeed,
+    }),
+  );
+  const visibleDraftPipeline =
+    draftPipeline.worksheetId === transformationWorksheetId &&
+    draftPipeline.sourceTableName === transformationSourceTableName &&
+    draftPipeline.sourceType === transformationSourceType
+      ? draftPipeline
+      : createEmptyTransformationPipeline({
+          worksheetId: transformationWorksheetId,
+          sourceTableName: transformationSourceTableName,
+          sourceType: transformationSourceType,
+          seed: transformationPipelineSeed,
+        });
+  const selectedColumn =
+    transformationColumns.find((column) => column.name === selectedColumnName) || null;
+  const supportedTransformationKinds = selectedColumn
+    ? getSupportedTransformationsForColumn(selectedColumn).filter(
+        (kind): kind is Exclude<TransformationStepKind, "sql_select_transform"> =>
+          kind !== "sql_select_transform",
+      )
+    : [];
+  const addTransformationStep = useCallback(
+    (kind: TransformationStepKind) => {
+      if (!selectedColumn || !enabledTransformationKinds.has(kind)) return;
+      setDraftPipeline((currentPipeline) => {
+        const pipeline =
+          currentPipeline.worksheetId === transformationWorksheetId &&
+          currentPipeline.sourceTableName === transformationSourceTableName &&
+          currentPipeline.sourceType === transformationSourceType
+            ? currentPipeline
+            : createEmptyTransformationPipeline({
+                worksheetId: transformationWorksheetId,
+                sourceTableName: transformationSourceTableName,
+                sourceType: transformationSourceType,
+                seed: transformationPipelineSeed,
+              });
+        const nextStep = createTransformationStep({
+          pipelineId: pipeline.id,
+          sequenceIndex: pipeline.steps.length,
+          kind,
+          targetColumn: selectedColumn,
+        });
+        return createEmptyTransformationPipeline({
+          worksheetId: pipeline.worksheetId,
+          sourceTableName: pipeline.sourceTableName,
+          sourceType: pipeline.sourceType,
+          seed: transformationPipelineSeed,
+          steps: [...pipeline.steps, nextStep],
+          warnings: pipeline.warnings,
+        });
+      });
+    },
+    [
+      selectedColumn,
+      transformationPipelineSeed,
+      transformationSourceTableName,
+      transformationSourceType,
+      transformationWorksheetId,
+    ],
+  );
   const isMultiWorksheetWorkbook = Boolean(workbook && worksheetCount > 1);
   const missingCellsSubtitle = isMultiWorksheetWorkbook
     ? `across ${worksheetCount.toLocaleString()} worksheets${
@@ -1242,22 +1457,159 @@ function DataCleanPreparePage({
       )}
 
       {activePrepareTab === "transformations" && (
-        <section className="prepare-tab-placeholder" aria-label="Column transformations coming soon">
-          <div className="prepare-tab-placeholder-icon" aria-hidden="true">T</div>
-          <div className="prepare-tab-placeholder-body">
-            <span className="prepare-tab-placeholder-chip">Coming soon</span>
-            <h3>Column transformations</h3>
-            <p>
-              A no-code transformation workspace will help reshape fields with a live preview
-              before anything is applied.
+        <section aria-label="Column transformations draft planner">
+          <div className="prepare-transformations-layout">
+            <div className="prepare-transformations-column-list" aria-label="Worksheet columns">
+              <div className="prepare-transformations-panel-heading">
+                <p className="section-label">Active worksheet columns</p>
+                <strong>{transformationColumns.length.toLocaleString()}</strong>
+              </div>
+              {transformationColumns.length === 0 ? (
+                <p className="prepare-transformations-empty">
+                  No columns are available for this worksheet yet.
+                </p>
+              ) : (
+                transformationColumns.map((column) => {
+                  const isSelected = column.name === selectedColumn?.name;
+                  return (
+                    <button
+                      type="button"
+                      key={column.name}
+                      className={`prepare-transformations-column-row${
+                        isSelected ? " is-selected" : ""
+                      }`}
+                      onClick={() => setSelectedColumnName(column.name)}
+                      aria-pressed={isSelected}
+                    >
+                      <span>
+                        <strong>{column.name}</strong>
+                        <small>{column.inferred_type}</small>
+                      </span>
+                      <span>
+                        <small>
+                          {column.null_count > 0
+                            ? `${column.null_count.toLocaleString()} missing`
+                            : "no missing"}
+                        </small>
+                        <small>{column.unique_count.toLocaleString()} unique</small>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="prepare-transformations-detail" aria-label="Available transformations">
+              {!selectedColumn ? (
+                <p className="prepare-transformations-empty">
+                  Select a column on the left to see available transformations.
+                </p>
+              ) : (
+                <>
+                  <div className="prepare-transformations-detail-header">
+                    <div>
+                      <p className="section-label">Selected column</p>
+                      <h3>{selectedColumn.name}</h3>
+                    </div>
+                    <span className={`prepare-transformations-type-badge type-${selectedColumn.inferred_type}`}>
+                      {selectedColumn.inferred_type}
+                    </span>
+                  </div>
+                  <dl className="prepare-transformations-column-facts">
+                    <div>
+                      <dt>Missing</dt>
+                      <dd>{selectedColumn.null_count.toLocaleString()}</dd>
+                    </div>
+                    <div>
+                      <dt>Unique</dt>
+                      <dd>{selectedColumn.unique_count.toLocaleString()}</dd>
+                    </div>
+                  </dl>
+                  <div className="prepare-transformations-options">
+                    {supportedTransformationKinds.map((kind) => {
+                      const copy = transformationKindCopy[kind];
+                      const isEnabled = enabledTransformationKinds.has(kind);
+                      return (
+                        <article className="prepare-transformations-option-card" key={kind}>
+                          <div>
+                            <h4>{copy.label}</h4>
+                            <p>{copy.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            className={isEnabled ? "secondary-button" : "secondary-button prepare-transformations-disabled-action"}
+                            onClick={() => addTransformationStep(kind)}
+                            disabled={!isEnabled}
+                            title={
+                              isEnabled
+                                ? `Add ${copy.label}`
+                                : "Needs configuration — coming in a later slice."
+                            }
+                          >
+                            Add
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="prepare-transformations-draft-pipeline" aria-label="Draft transformation pipeline">
+            <div className="prepare-transformations-draft-header">
+              <div>
+                <p className="section-label">Draft pipeline</p>
+                <h3>Local plan only</h3>
+              </div>
+              <div className="prepare-transformations-draft-actions" aria-label="Unavailable transformation actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled
+                  title="Not available yet. This slice only builds a draft plan."
+                >
+                  Preview
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled
+                  title="Not available yet. This slice only builds a draft plan."
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+
+            {visibleDraftPipeline.steps.length === 0 ? (
+              <p className="prepare-transformations-empty">
+                No transformations added yet. Pick a column and add a transformation.
+              </p>
+            ) : (
+              <>
+                <p>{summarizeTransformationPipeline(visibleDraftPipeline)}</p>
+                <ol className="prepare-transformations-step-list">
+                  {visibleDraftPipeline.steps.map((pipelineStep) => (
+                    <li className="prepare-transformations-step-row" key={pipelineStep.id}>
+                      <span>{pipelineStep.order + 1}</span>
+                      <p>{summarizeTransformationStep(pipelineStep)}</p>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
+            <div className="prepare-transformations-readiness">
+              <span>Status: {visibleDraftPipeline.status}</span>
+              <span>
+                Preview ready: {visibleDraftPipeline.readiness.previewReady ? "yes" : "no"}
+              </span>
+              <span>Apply ready: no</span>
+            </div>
+            <p className="prepare-transformations-safety-note">
+              Preview and Apply are disabled in this foundation slice.
             </p>
-            <ul className="prepare-tab-placeholder-preview-list">
-              <li>Fill nulls with mean, median, mode, or a custom value</li>
-              <li>Encode categorical fields</li>
-              <li>Type conversion</li>
-              <li>Outlier and log transforms</li>
-              <li>Live preview before applying</li>
-            </ul>
           </div>
         </section>
       )}
