@@ -14,6 +14,11 @@ import {
   useCleanPrepareStep,
 } from "../../features/cleanPrepare/useCleanPrepareStep";
 import {
+  getPrepareBackTransition,
+  invokePrepareBackTransition,
+  type PrepareTab,
+} from "../../features/cleanPrepare/prepareBackNavigation";
+import {
   createEmptyTransformationPipeline,
   createTransformationStep,
   getSupportedTransformationsForColumn,
@@ -129,7 +134,6 @@ type DatasetSummaryPanelProps = {
 
 type DataWorkflowMenu = "details";
 type FocusedOperationalWorkspace = "connections" | "entities" | "kpis" | "trends";
-type PrepareTab = "structural" | "transformations" | "sql-cleaning";
 type DataWorkspaceCommandTarget =
   | "overview"
   | "missingValues"
@@ -1918,6 +1922,14 @@ function DataCleanPreparePage({
     apply: "Apply",
   };
   const activeStepIndex = cleanPrepareSteps.indexOf(step);
+  const prepareBackTransition = getPrepareBackTransition(activePrepareTab, step);
+  const handlePrepareBack = useCallback(() => {
+    invokePrepareBackTransition(prepareBackTransition, {
+      goToDecide,
+      goToReview,
+      onBackToData: onBack,
+    });
+  }, [goToDecide, goToReview, onBack, prepareBackTransition]);
 
   return (
     <FocusedWorkspaceShell
@@ -1925,8 +1937,8 @@ function DataCleanPreparePage({
       eyebrow="PREPARE DATA"
       title={`Prepare Data · ${sourceName}`}
       summary="Fix structural issues, transform columns, or write cleaning SQL. Nothing applies until you Apply."
-      backLabel="Back to Data"
-      onBack={onBack}
+      backLabel={prepareBackTransition.label}
+      onBack={handlePrepareBack}
     >
       <section className="data-clean-prepare-page-intro" aria-label="What cleaning does">
         <div className="data-clean-prepare-page-stats">
@@ -2012,9 +2024,14 @@ function DataCleanPreparePage({
 
           <div className="data-clean-prepare-step-actions" aria-label="Clean and prepare step navigation">
             {step === "review" && (
-              <button type="button" className="primary-button" onClick={goToDecide}>
-                Next: Decide
-              </button>
+              <>
+                <button type="button" className="secondary-button" onClick={onBack}>
+                  Back to Data
+                </button>
+                <button type="button" className="primary-button" onClick={goToDecide}>
+                  Next: Decide
+                </button>
+              </>
             )}
             {step === "decide" && (
               <>

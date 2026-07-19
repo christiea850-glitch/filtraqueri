@@ -82,13 +82,17 @@ type PreparationIssue = {
   detail: string;
 };
 
-type SuggestedFix = {
+export type SuggestedFix = {
   id: string;
   title: string;
   detail: string;
 };
 
-type SuggestedFixDecision = "use_recommendation" | "keep_original" | "decide_later";
+export type SuggestedFixDecision =
+  | "unresolved"
+  | "use_recommendation"
+  | "keep_original"
+  | "decide_later";
 
 type PreparationReview = {
   priority: PreparationPriority;
@@ -96,28 +100,29 @@ type PreparationReview = {
   suggestedFixes: SuggestedFix[];
 };
 
-const suggestedFixDecisionLabels: Record<SuggestedFixDecision, string> = {
-  use_recommendation: "Use recommendation",
-  keep_original: "Keep original",
-  decide_later: "Decide later",
+const suggestedFixDecisionStatusLabels: Record<SuggestedFixDecision, string> = {
+  unresolved: "Needs decision",
+  use_recommendation: "Recommendation accepted",
+  keep_original: "Original preserved",
+  decide_later: "Deferred",
 };
 
-const getSuggestedFixRecommendationLabel = (fix: SuggestedFix) => {
-  if (fix.id.includes("side_note")) return "Exclude side-note regions";
-  if (fix.id.includes("generated-columns")) return "Drop generated columns";
-  if (fix.id.includes("sparse_layout_gap")) return "Exclude layout separator rows";
-  if (fix.id.includes("serial_only_placeholder_rows")) return "Remove empty template slots";
-  if (fix.id.includes("repeated_header")) return "Remove repeated header rows";
+export const getSuggestedFixRecommendationLabel = (fix: SuggestedFix) => {
+  if (fix.id.includes("side_note")) return "Exclude side-note columns from the cleaned copy";
+  if (fix.id.includes("generated-columns")) return "Review generated column names before creating the cleaned copy";
+  if (fix.id.includes("sparse_layout_gap")) return "Exclude layout separator rows from the cleaned copy";
+  if (fix.id.includes("serial_only_placeholder_rows")) return "Remove empty template slots from the cleaned copy";
+  if (fix.id.includes("repeated_header")) return "Remove repeated header rows from the cleaned copy";
   if (fix.id.includes("section_banner")) return "Keep section labels out of data rows";
-  if (fix.id.includes("date_title_row")) return "Carry section dates forward";
+  if (fix.id.includes("date_title_row")) return "Carry section dates into the cleaned copy";
   if (fix.id.includes("missing-values") || fix.id.includes("repeated_missing_pattern")) {
     return "Review blanks before filling values";
   }
   return fix.title;
 };
 
-const getSuggestedFixKeepOriginalLabel = (fix: SuggestedFix) => {
-  if (fix.id.includes("side_note")) return "Keep side-note regions";
+export const getSuggestedFixKeepOriginalLabel = (fix: SuggestedFix) => {
+  if (fix.id.includes("side_note")) return "Keep side-note columns";
   if (fix.id.includes("generated-columns")) return "Keep generated columns";
   if (fix.id.includes("sparse_layout_gap")) return "Keep layout separator rows";
   if (fix.id.includes("serial_only_placeholder_rows")) return "Keep empty template slots";
@@ -128,6 +133,51 @@ const getSuggestedFixKeepOriginalLabel = (fix: SuggestedFix) => {
     return "Keep blanks as-is";
   }
   return "Do not apply this fix";
+};
+
+export type SuggestedFixDecisionProgress = {
+  total: number;
+  resolved: number;
+  unresolved: number;
+  deferred: number;
+};
+
+export const getSuggestedFixDecision = (
+  fixId: string,
+  decisions: Record<string, SuggestedFixDecision>,
+): SuggestedFixDecision => decisions[fixId] || "unresolved";
+
+export const getSuggestedFixDecisionProgress = (
+  fixes: SuggestedFix[],
+  decisions: Record<string, SuggestedFixDecision>,
+): SuggestedFixDecisionProgress =>
+  fixes.reduce<SuggestedFixDecisionProgress>(
+    (progress, fix) => {
+      const decision = getSuggestedFixDecision(fix.id, decisions);
+      if (decision === "decide_later") return { ...progress, deferred: progress.deferred + 1 };
+      if (decision === "unresolved") return { ...progress, unresolved: progress.unresolved + 1 };
+      return { ...progress, resolved: progress.resolved + 1 };
+    },
+    { total: fixes.length, resolved: 0, unresolved: 0, deferred: 0 },
+  );
+
+export const getSuggestedFixCleaningPlan = (
+  fixes: SuggestedFix[],
+  decisions: Record<string, SuggestedFixDecision>,
+): string[] => {
+  const planItems = fixes.flatMap((fix) => {
+    const decision = getSuggestedFixDecision(fix.id, decisions);
+    if (decision === "use_recommendation") return [getSuggestedFixRecommendationLabel(fix)];
+    if (decision === "keep_original") return [getSuggestedFixKeepOriginalLabel(fix)];
+    return [];
+  });
+  const deferredCount = fixes.filter(
+    (fix) => getSuggestedFixDecision(fix.id, decisions) === "decide_later",
+  ).length;
+  if (deferredCount > 0) {
+    planItems.push(`${deferredCount} recommendation${deferredCount === 1 ? "" : "s"} deferred`);
+  }
+  return planItems;
 };
 
 const getIssueCategory = (issue: PreparationIssue) => {
@@ -466,6 +516,14 @@ export function CleanPrepareReviewPanel({
     "wide" | "perColumn"
   >("wide");
   const review = useMemo(() => buildPreparationReview(dataset), [dataset]);
+  const suggestedFixDecisionProgress = useMemo(
+    () => getSuggestedFixDecisionProgress(review.suggestedFixes, fixDecisionDrafts),
+    [fixDecisionDrafts, review.suggestedFixes],
+  );
+  const suggestedFixCleaningPlan = useMemo(
+    () => getSuggestedFixCleaningPlan(review.suggestedFixes, fixDecisionDrafts),
+    [fixDecisionDrafts, review.suggestedFixes],
+  );
   const issueGroups = useMemo(
     () =>
       Array.from(
@@ -1075,38 +1133,68 @@ export function CleanPrepareReviewPanel({
                 Nothing changes until Step 3 Apply.
               </p>
             )}
+            {embedded && review.suggestedFixes.length > 0 && (
+              <>
+                <div className="clean-prepare-structural-progress" aria-live="polite">
+                  <span>{pluralise(suggestedFixDecisionProgress.total, "recommendation")}</span>
+                  <span>{suggestedFixDecisionProgress.resolved.toLocaleString()} resolved</span>
+                  <span>{suggestedFixDecisionProgress.unresolved.toLocaleString()} unresolved</span>
+                  <span>{suggestedFixDecisionProgress.deferred.toLocaleString()} deferred</span>
+                </div>
+                <div className="clean-prepare-structural-plan">
+                  <strong>Structural cleaning plan</strong>
+                  {suggestedFixCleaningPlan.length > 0 ? (
+                    <>
+                      <ul>
+                        {suggestedFixCleaningPlan.map((planItem) => (
+                          <li key={planItem}>{planItem}</li>
+                        ))}
+                      </ul>
+                      <p>These decisions will be reviewed in Step 3 before creating a cleaned working copy.</p>
+                    </>
+                  ) : (
+                    <p>No structural cleaning decisions have been made yet.</p>
+                  )}
+                </div>
+              </>
+            )}
             {review.suggestedFixes.length > 0 ? (
               <ul className={embedded ? "clean-prepare-decision-rows" : undefined}>
                 {review.suggestedFixes.map((fix) => {
-                  const decision = fixDecisionDrafts[fix.id] || "decide_later";
+                  const decision = getSuggestedFixDecision(fix.id, fixDecisionDrafts);
                   const recommendationLabel = getSuggestedFixRecommendationLabel(fix);
                   const keepOriginalLabel = getSuggestedFixKeepOriginalLabel(fix);
+                  const radioGroupId = `clean-prepare-fix-${fix.id}`;
                   return (
-                    <li key={fix.id}>
+                    <li key={fix.id} className={`is-${decision}`}>
                       <div className="clean-prepare-decision-row-copy">
-                        <strong>{fix.title}</strong>
-                        <span>{fix.detail}</span>
+                        <div className="clean-prepare-structural-card-heading">
+                          <strong id={`${radioGroupId}-heading`}>{fix.title}</strong>
+                          <span className={`clean-prepare-decision-status is-${decision}`}>
+                            {suggestedFixDecisionStatusLabels[decision]}
+                          </span>
+                        </div>
+                        <span className="clean-prepare-structural-evidence">{fix.detail}</span>
                       </div>
                       {embedded ? (
-                        <>
-                          <div className="clean-prepare-recommendation-copy">
-                            <span>Recommendation</span>
-                            <strong>{recommendationLabel}</strong>
-                          </div>
-                          <fieldset className="clean-prepare-decision-control">
-                            <legend>Your decision</legend>
-                            {([
-                              ["use_recommendation", recommendationLabel],
-                              ["keep_original", keepOriginalLabel],
-                              ["decide_later", "Decide later"],
-                            ] as Array<[SuggestedFixDecision, string]>).map(([value, label]) => (
+                        <fieldset
+                          className="clean-prepare-decision-control"
+                          aria-labelledby={`${radioGroupId}-heading`}
+                        >
+                          <legend>Your decision</legend>
+                          {([
+                            ["use_recommendation", "Recommended action", recommendationLabel, ""],
+                            ["keep_original", "Alternative", keepOriginalLabel, ""],
+                            ["decide_later", "Defer", "Decide later", "Leave this recommendation unresolved for now."],
+                          ] as Array<[Exclude<SuggestedFixDecision, "unresolved">, string, string, string]>).map(
+                            ([value, groupLabel, label, helper]) => (
                               <label
                                 key={value}
                                 className={decision === value ? "is-selected" : ""}
                               >
                                 <input
                                   type="radio"
-                                  name={`clean-prepare-fix-${fix.id}`}
+                                  name={radioGroupId}
                                   value={value}
                                   checked={decision === value}
                                   onChange={() =>
@@ -1117,13 +1205,14 @@ export function CleanPrepareReviewPanel({
                                   }
                                 />
                                 <span>
-                                  <strong>{suggestedFixDecisionLabels[value]}</strong>
-                                  <small>{label}</small>
+                                  <small>{groupLabel}</small>
+                                  <strong>{label}</strong>
+                                  {helper && <em>{helper}</em>}
                                 </span>
                               </label>
-                            ))}
-                          </fieldset>
-                        </>
+                            ),
+                          )}
+                        </fieldset>
                       ) : (
                         <span>{recommendationLabel}</span>
                       )}

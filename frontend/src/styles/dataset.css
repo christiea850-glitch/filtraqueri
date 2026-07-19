@@ -4580,3 +4580,8 @@
   margin-top: 0;
   padding-top: 0;
 }
+
+.clean-prepare-assistant.is-embedded .clean-prepare-step-pane {
+  scroll-margin-top: 18px;
+  padding-top: 2px;
+}

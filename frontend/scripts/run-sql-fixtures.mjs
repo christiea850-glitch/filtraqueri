@@ -17,6 +17,16 @@ const fixtures = [
     exportName: "runTransformationPreviewFixtures",
   },
   {
+    label: "Clean Prepare structural decisions",
+    modulePath: "/src/components/workspace/__tests__/cleanPrepareStructuralDecisions.test.ts",
+    exportName: "runCleanPrepareStructuralDecisionFixtures",
+  },
+  {
+    label: "Prepare Data back navigation",
+    modulePath: "/src/features/cleanPrepare/__tests__/prepareBackNavigation.test.ts",
+    exportName: "runPrepareBackNavigationFixtures",
+  },
+  {
     label: "Single-table template adapter",
     modulePath: "/src/features/analyst/sql/__tests__/sqlSingleTableTemplateAdapter.test.ts",
     exportName: "runSqlSingleTableTemplateAdapterFixtures",
