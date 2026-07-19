@@ -7,6 +7,11 @@ const fixtures = [
     exportName: "runSqlAskFiltraQueriAdapterFixtures",
   },
   {
+    label: "Transformation pipeline contract",
+    modulePath: "/src/features/dataPreparation/__tests__/transformationPipeline.test.ts",
+    exportName: "runTransformationPipelineFixtures",
+  },
+  {
     label: "Single-table template adapter",
     modulePath: "/src/features/analyst/sql/__tests__/sqlSingleTableTemplateAdapter.test.ts",
     exportName: "runSqlSingleTableTemplateAdapterFixtures",
