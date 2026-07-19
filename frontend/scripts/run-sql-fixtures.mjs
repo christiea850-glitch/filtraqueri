@@ -12,6 +12,11 @@ const fixtures = [
     exportName: "runTransformationPipelineFixtures",
   },
   {
+    label: "Transformation sample preview",
+    modulePath: "/src/features/dataPreparation/__tests__/previewTransformationPipeline.test.ts",
+    exportName: "runTransformationPreviewFixtures",
+  },
+  {
     label: "Single-table template adapter",
     modulePath: "/src/features/analyst/sql/__tests__/sqlSingleTableTemplateAdapter.test.ts",
     exportName: "runSqlSingleTableTemplateAdapterFixtures",

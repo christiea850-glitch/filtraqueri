@@ -23,6 +23,12 @@ import {
   type TransformationStepKind,
 } from "../../features/dataPreparation/transformationPipeline";
 import {
+  isTransformationPreviewStepSupported,
+  previewTransformationPipeline,
+  type TransformationPipelinePreview,
+  type TransformationPreviewStepResult,
+} from "../../features/dataPreparation/previewTransformationPipeline";
+import {
   getOriginalWorkbookLayout,
   getPreview,
   type OriginalWorkbookCellStyle,
@@ -512,6 +518,50 @@ const getColumnProfileFacts = (column: SchemaColumn): string[] => {
   }
 
   return facts;
+};
+
+const formatPreviewSampleValue = (value: unknown): string => {
+  if (value === null) return "null";
+  if (value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return Number.isFinite(value) ? value.toLocaleString() : String(value);
+  if (typeof value === "string") return value || "empty string";
+  return JSON.stringify(value) || String(value);
+};
+
+const getPreviewCreatedColumns = (previewResult: TransformationPipelinePreview): string[] => {
+  const createdColumns = new Set<string>();
+  previewResult.stepResults.forEach((stepResult) => {
+    stepResult.outputColumns.forEach((columnName) => {
+      const existedBefore = previewResult.originalRows.some((row) =>
+        Object.prototype.hasOwnProperty.call(row, columnName),
+      );
+      if (!existedBefore) createdColumns.add(columnName);
+    });
+  });
+  return [...createdColumns];
+};
+
+const getPreviewRelevantColumns = (
+  previewResult: TransformationPipelinePreview,
+  steps: VisibleTransformationStep[],
+): string[] => {
+  const columns = new Set<string>();
+  steps.forEach((step) => {
+    columns.add(step.targetColumn);
+    if (step.outputColumn && step.outputColumn !== step.targetColumn) columns.add(step.outputColumn);
+  });
+  previewResult.changes.forEach((change) => columns.add(change.columnName));
+  return [...columns].filter((columnName) =>
+    previewResult.originalRows.some((row) => Object.prototype.hasOwnProperty.call(row, columnName)) ||
+    previewResult.transformedRows.some((row) => Object.prototype.hasOwnProperty.call(row, columnName)),
+  );
+};
+
+const getPreviewStepResultLabel = (stepResult: TransformationPreviewStepResult): string => {
+  if (stepResult.status === "applied") return "Applied";
+  if (stepResult.status === "blocked") return "Blocked";
+  return "Unsupported";
 };
 
 const createTransformationConfigKey = (
@@ -1522,6 +1572,7 @@ function DatasetPreviewPage({
  */
 function DataCleanPreparePage({
   dataset,
+  recentDatasets,
   sourceName,
   onAnalysisSourceSelect,
   onPreviewWorksheet,
@@ -1531,6 +1582,7 @@ function DataCleanPreparePage({
   onBack,
 }: {
   dataset: DatasetMetadata;
+  recentDatasets: DatasetSession[];
   sourceName: string;
   onAnalysisSourceSelect: (
     worksheetId: string,
@@ -1601,6 +1653,11 @@ function DataCleanPreparePage({
   const [transformationConfigs, setTransformationConfigs] = useState<
     Record<string, DraftTransformationConfig>
   >({});
+  const [transformationPreviewResult, setTransformationPreviewResult] =
+    useState<TransformationPipelinePreview | null>(null);
+  const [transformationPreviewStatus, setTransformationPreviewStatus] = useState<
+    "idle" | "ready" | "blocked"
+  >("idle");
   const visibleDraftPipeline =
     draftPipeline.worksheetId === transformationWorksheetId &&
     draftPipeline.sourceTableName === transformationSourceTableName &&
@@ -1633,6 +1690,56 @@ function DataCleanPreparePage({
     (pipelineStep): pipelineStep is VisibleTransformationStep =>
       pipelineStep.kind !== "sql_select_transform",
   );
+  const currentDatasetSession =
+    recentDatasets.find((session) => session.dataset.dataset_id === dataset.dataset_id) || null;
+  const transformationSampleRows = currentDatasetSession?.previewResult.rows || [];
+  const previewCreatedColumns = transformationPreviewResult
+    ? getPreviewCreatedColumns(transformationPreviewResult)
+    : [];
+  const previewRelevantColumns = transformationPreviewResult
+    ? getPreviewRelevantColumns(transformationPreviewResult, visibleDraftSteps)
+    : [];
+  const canPreviewTransformationDraft =
+    visibleDraftSteps.length > 0 &&
+    transformationSampleRows.length > 0 &&
+    visibleDraftSteps.every(
+      (pipelineStep) =>
+        pipelineStep.status === "valid" &&
+        isTransformationPreviewStepSupported(pipelineStep.kind),
+    );
+  const draftHasPreviewBlockers =
+    visibleDraftSteps.some(
+      (pipelineStep) =>
+        pipelineStep.status === "blocked" ||
+        !isTransformationPreviewStepSupported(pipelineStep.kind),
+    );
+  const previewReadinessLabel =
+    transformationPreviewStatus === "ready"
+      ? "Preview: sample generated · nothing applied"
+      : transformationPreviewStatus === "blocked"
+        ? "Preview: blocked · review the draft steps"
+        : draftHasPreviewBlockers
+          ? "Preview: blocked · review the draft steps"
+        : visibleDraftSteps.length === 0
+          ? "Preview: add at least one valid supported step"
+          : transformationSampleRows.length === 0
+            ? "Preview: no loaded sample rows"
+          : !canPreviewTransformationDraft
+            ? "Preview: add at least one valid supported step"
+            : "Preview: ready for manual sample preview";
+  const clearTransformationPreview = useCallback(() => {
+    setTransformationPreviewResult(null);
+    setTransformationPreviewStatus("idle");
+  }, []);
+  useEffect(() => {
+    clearTransformationPreview();
+  }, [
+    clearTransformationPreview,
+    transformationPipelineSeed,
+    transformationSourceTableName,
+    transformationSourceType,
+    transformationWorksheetId,
+  ]);
   const updateTransformationConfig = useCallback(
     (
       columnName: string,
@@ -1658,6 +1765,7 @@ function DataCleanPreparePage({
       if (isConfigurableTransformationKind(kind) && !parameters) return;
       const action = describeTransformationAction(kind, selectedColumn.name, parameters);
       const outputColumn = getOutputColumnForBehavior(action.outputBehavior);
+      clearTransformationPreview();
       setDraftPipeline((currentPipeline) => {
         const pipeline =
           currentPipeline.worksheetId === transformationWorksheetId &&
@@ -1690,6 +1798,7 @@ function DataCleanPreparePage({
     },
     [
       selectedColumn,
+      clearTransformationPreview,
       transformationPipelineSeed,
       transformationSourceTableName,
       transformationSourceType,
@@ -1716,6 +1825,7 @@ function DataCleanPreparePage({
   );
   const handleRemoveStep = useCallback(
     (stepId: string) => {
+      clearTransformationPreview();
       setDraftPipeline((currentPipeline) => {
         const pipeline =
           currentPipeline.worksheetId === transformationWorksheetId &&
@@ -1754,6 +1864,7 @@ function DataCleanPreparePage({
     },
     [
       transformationColumns,
+      clearTransformationPreview,
       transformationPipelineSeed,
       transformationSourceTableName,
       transformationSourceType,
@@ -1761,6 +1872,7 @@ function DataCleanPreparePage({
     ],
   );
   const handleResetDraft = useCallback(() => {
+    clearTransformationPreview();
     setDraftPipeline(
       createEmptyTransformationPipeline({
         worksheetId: transformationWorksheetId,
@@ -1770,10 +1882,27 @@ function DataCleanPreparePage({
       }),
     );
   }, [
+    clearTransformationPreview,
     transformationPipelineSeed,
     transformationSourceTableName,
     transformationSourceType,
     transformationWorksheetId,
+  ]);
+  const handlePreviewTransformationDraft = useCallback(() => {
+    if (!canPreviewTransformationDraft) return;
+    const sampleRows = transformationSampleRows.map((row) => ({ ...row }));
+    const previewResult = previewTransformationPipeline({
+      rows: sampleRows,
+      pipeline: visibleDraftPipeline,
+      schema: transformationColumns,
+    });
+    setTransformationPreviewResult(previewResult);
+    setTransformationPreviewStatus(previewResult.status === "ready" ? "ready" : "blocked");
+  }, [
+    canPreviewTransformationDraft,
+    transformationColumns,
+    transformationSampleRows,
+    visibleDraftPipeline,
   ]);
   const isMultiWorksheetWorkbook = Boolean(workbook && worksheetCount > 1);
   const missingCellsSubtitle = isMultiWorksheetWorkbook
@@ -2161,8 +2290,13 @@ function DataCleanPreparePage({
                 <button
                   type="button"
                   className="secondary-button"
-                  disabled
-                  title="Transformed-row preview is not implemented yet. This slice only builds a draft plan."
+                  onClick={handlePreviewTransformationDraft}
+                  disabled={!canPreviewTransformationDraft}
+                  title={
+                    canPreviewTransformationDraft
+                      ? "Generate a read-only sample preview from cloned loaded rows."
+                      : "Add at least one valid transformation supported by sample preview."
+                  }
                 >
                   Preview
                 </button>
@@ -2214,12 +2348,162 @@ function DataCleanPreparePage({
             )}
             <div className="prepare-transformations-readiness" aria-live="polite">
               <span>Draft status: {visibleDraftPipeline.status}</span>
-              <span>Preview: unavailable · execution not implemented yet</span>
+              <span>{previewReadinessLabel}</span>
               <span>Apply: unavailable · cleaned-copy generation not implemented yet</span>
             </div>
             <p className="prepare-transformations-safety-note">
-              Every step is a plan-only draft. Nothing is executed, previewed, or applied. Your original upload is never modified.
+              Preview runs only against cloned sample rows in this browser. Nothing is executed against the workbook, and your original upload is never modified.
             </p>
+            {(draftHasPreviewBlockers || transformationPreviewResult) && (
+              <div className="prepare-transformations-preview-panel" aria-label="Sample transformation preview">
+                <div className="prepare-transformations-preview-header">
+                  <div>
+                    <p className="section-label">Sample preview</p>
+                    <h4>Before and after</h4>
+                  </div>
+                  <p>
+                    Preview uses the currently loaded sample rows only. Nothing has been applied to the workbook.
+                  </p>
+                </div>
+
+                {!transformationPreviewResult && draftHasPreviewBlockers && (
+                  <div className="prepare-transformations-preview-blocker" role="status">
+                    {visibleDraftSteps
+                      .filter(
+                        (pipelineStep) =>
+                          pipelineStep.status === "blocked" ||
+                          !isTransformationPreviewStepSupported(pipelineStep.kind),
+                      )
+                      .map((pipelineStep) => {
+                        const action = describeTransformationAction(
+                          pipelineStep.kind,
+                          pipelineStep.targetColumn,
+                          pipelineStep.parameters,
+                        );
+                        const blockerText =
+                          pipelineStep.status === "blocked"
+                            ? pipelineStep.blockers.map((blocker) => blocker.message).join(" ")
+                            : pipelineStep.kind === "one_hot_encode"
+                              ? "One-hot preview requires deterministic category-column generation and is deferred to a later slice."
+                              : "This step is not supported by sample preview yet.";
+                        return (
+                          <p key={pipelineStep.id}>
+                            Step {pipelineStep.order + 1}: {action.title}. {blockerText}
+                          </p>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {transformationPreviewResult && transformationPreviewResult.status === "blocked" && (
+                  <div className="prepare-transformations-preview-blocker" role="status">
+                    {transformationPreviewResult.stepResults
+                      .filter((stepResult) => stepResult.status !== "applied")
+                      .map((stepResult) => {
+                        const pipelineStep = visibleDraftSteps.find((stepItem) => stepItem.id === stepResult.stepId);
+                        const action = pipelineStep
+                          ? describeTransformationAction(
+                              pipelineStep.kind,
+                              pipelineStep.targetColumn,
+                              pipelineStep.parameters,
+                            )
+                          : null;
+                        return (
+                          <p key={stepResult.stepId}>
+                            Step {stepResult.order + 1}: {action?.title || stepResult.kind}.{" "}
+                            {stepResult.blockers.join(" ")}
+                          </p>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {transformationPreviewResult && transformationPreviewResult.status === "ready" && (
+                  <>
+                    <div className="prepare-transformations-preview-summary" aria-label="Preview summary">
+                      <span>{transformationPreviewResult.previewRowCount.toLocaleString()} sample rows</span>
+                      <span>{transformationPreviewResult.changes.length.toLocaleString()} changed cells</span>
+                      <span>{previewCreatedColumns.length.toLocaleString()} created columns</span>
+                      <span>
+                        {transformationPreviewResult.stepResults.filter((stepResult) => stepResult.status === "applied").length.toLocaleString()} applied steps
+                      </span>
+                    </div>
+                    {transformationPreviewResult.warnings.length > 0 && (
+                      <div className="prepare-transformations-preview-warning" role="status">
+                        {transformationPreviewResult.warnings.map((warning) => (
+                          <p key={warning}>{warning}</p>
+                        ))}
+                      </div>
+                    )}
+                    <div className="prepare-transformations-preview-step-results" aria-label="Preview step results">
+                      {transformationPreviewResult.stepResults.map((stepResult) => {
+                        const pipelineStep = visibleDraftSteps.find((stepItem) => stepItem.id === stepResult.stepId);
+                        const action = pipelineStep
+                          ? describeTransformationAction(
+                              pipelineStep.kind,
+                              pipelineStep.targetColumn,
+                              pipelineStep.parameters,
+                            )
+                          : null;
+                        return (
+                          <p key={stepResult.stepId}>
+                            <strong>{getPreviewStepResultLabel(stepResult)}</strong> ·{" "}
+                            {action?.title || stepResult.kind} ·{" "}
+                            {stepResult.affectedRowCount.toLocaleString()} sample row
+                            {stepResult.affectedRowCount !== 1 ? "s" : ""} changed
+                            {stepResult.outputColumns.length > 0
+                              ? ` · ${stepResult.outputColumns.join(", ")}`
+                              : ""}
+                          </p>
+                        );
+                      })}
+                    </div>
+                    {previewRelevantColumns.length === 0 ? (
+                      <p className="prepare-transformations-preview-empty">
+                        Preview ran successfully, but no relevant sample columns were available to compare.
+                      </p>
+                    ) : (
+                      <div className="prepare-transformations-preview-table-wrap">
+                        <table className="prepare-transformations-preview-table">
+                          <thead>
+                            <tr>
+                              <th>Row</th>
+                              {previewRelevantColumns.map((columnName) => (
+                                <th key={columnName}>{columnName}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {transformationPreviewResult.transformedRows.map((row, rowIndex) => (
+                              <tr key={`preview-row:${rowIndex}`}>
+                                <td>{rowIndex + 1}</td>
+                                {previewRelevantColumns.map((columnName) => {
+                                  const originalValue = transformationPreviewResult.originalRows[rowIndex]?.[columnName];
+                                  const transformedValue = row[columnName];
+                                  const isChanged = transformationPreviewResult.changes.some(
+                                    (change) => change.rowIndex === rowIndex && change.columnName === columnName,
+                                  );
+                                  const isCreated = previewCreatedColumns.includes(columnName);
+                                  return (
+                                    <td
+                                      key={`${rowIndex}:${columnName}`}
+                                      className={`${isChanged ? "is-changed" : ""}${isCreated ? " is-created" : ""}`}
+                                    >
+                                      <span>{formatPreviewSampleValue(originalValue)}</span>
+                                      <strong>{formatPreviewSampleValue(transformedValue)}</strong>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -2249,6 +2533,7 @@ function DataCleanPreparePage({
 
 function DatasetSummaryPanel({
   dataset,
+  recentDatasets,
   onOpenDataset,
   onDeleteDataset,
   onWorksheetSelect,
@@ -2580,6 +2865,7 @@ function DatasetSummaryPanel({
     return (
       <DataCleanPreparePage
         dataset={dataset}
+        recentDatasets={recentDatasets}
         sourceName={
           activeWorksheet?.displayName ||
           activeWorksheet?.sheetName ||
