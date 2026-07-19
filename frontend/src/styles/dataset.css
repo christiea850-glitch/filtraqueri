@@ -3742,27 +3742,31 @@
   gap: 6px;
 }
 
+.data-clean-prepare-page {
+  background: var(--app-background);
+}
+
 .data-clean-prepare-page-intro {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   margin: 8px 0 18px;
   padding: 18px 20px;
-  border-radius: 14px;
-  background: #F8F7FF;
-  border: 1px solid #DDD9FF;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
 }
 
 .data-clean-prepare-page-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .data-clean-prepare-page-stats > div {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
+  background: var(--app-background);
+  border: 1px solid var(--brand-violet-soft);
+  border-radius: 8px;
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -3776,14 +3780,14 @@
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #4F46C9;
+  color: var(--brand-violet);
 }
 
 .data-clean-prepare-page-stats strong {
   font-size: 20px;
   font-weight: 750;
-  letter-spacing: -0.01em;
-  color: #0F172A;
+  letter-spacing: 0;
+  color: var(--brand-slate);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3791,26 +3795,9 @@
 }
 
 .data-clean-prepare-page-stats small {
-  color: #64748B;
+  color: var(--brand-slate);
   font-size: 11.5px;
   line-height: 1.4;
-}
-
-.data-clean-prepare-page-helper {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: #475569;
-}
-
-.data-clean-prepare-continue {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .data-clean-prepare-step-bar {
@@ -3819,9 +3806,9 @@
   gap: 8px;
   margin: 0 0 16px;
   padding: 8px;
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
-  background: #FFFFFF;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
 }
 
 .data-clean-prepare-step-bar button {
@@ -3831,22 +3818,22 @@
   gap: 8px;
   min-height: 42px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
-  color: #64748B;
+  color: var(--brand-slate);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .data-clean-prepare-step-bar button.is-current {
-  border-color: #DDD6FE;
-  background: #F5F3FF;
-  color: #5B21B6;
+  border-color: var(--brand-violet-soft);
+  background: var(--brand-violet-soft);
+  color: var(--brand-violet);
 }
 
 .data-clean-prepare-step-bar button.is-complete {
-  color: #047857;
+  color: var(--brand-mint);
 }
 
 .data-clean-prepare-step-marker {
@@ -3855,19 +3842,22 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: #F1F5F9;
-  color: #64748B;
+  border: 1px solid currentColor;
+  background: var(--surface);
+  color: var(--brand-slate);
   font-size: 12px;
 }
 
 .data-clean-prepare-step-bar button.is-current .data-clean-prepare-step-marker {
-  background: #7C3AED;
-  color: #FFFFFF;
+  border-color: var(--brand-violet);
+  background: var(--brand-violet);
+  color: var(--surface);
 }
 
 .data-clean-prepare-step-bar button.is-complete .data-clean-prepare-step-marker {
-  background: #D1FAE5;
-  color: #047857;
+  border-color: var(--brand-mint);
+  background: var(--brand-mint);
+  color: var(--surface);
 }
 
 .data-clean-prepare-step-actions {
@@ -3875,6 +3865,10 @@
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--elevation-1);
 }
 
 /* Embedded variant of CleanPrepareReviewPanel — when mounted inside the

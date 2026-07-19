@@ -587,11 +587,9 @@ export function CleanPrepareReviewPanel({
       || worksheetTypeGroupDecisionsReady
     );
   // C-7C tri-state status for the Missing-value section's strong tag.
-  // Mirrors the composite logic the sidebar uses (decisionStatusCopy), but
-  // scoped to missing-value decisions specifically so the heading badge and
-  // the sidebar never disagree. The "Some decisions made" branch fires when
-  // the user has saved any worksheet-level, type-group, or per-column
-  // decision but hasn't reached the ready threshold yet.
+  // The "Some decisions made" branch fires when the user has saved any
+  // worksheet-level, type-group, or per-column decision but hasn't reached
+  // the ready threshold yet.
   const missingValueDecisionStatus = missingValueDecisionReady
     ? "Decisions ready"
     : Boolean(worksheetDecision) ||
@@ -763,70 +761,6 @@ export function CleanPrepareReviewPanel({
       ? `${pluralise(recipePreview.recipe.length, "draft recipe step")} ready to review.`
       : "No cleaning recipe is needed for this worksheet."
     : "Choose a ready worksheet to preview its draft cleaning recipe.";
-  type StatusChecklistState = "complete" | "active" | "available" | "pending" | "needs-decision";
-  const fixDecisionCount = review.suggestedFixes.filter(
-    (fix) => fixDecisionDrafts[fix.id] && fixDecisionDrafts[fix.id] !== "decide_later",
-  ).length;
-  const allSuggestedFixesDecided =
-    review.suggestedFixes.length > 0 && fixDecisionCount === review.suggestedFixes.length;
-  // C-7C — Include type-scoped worksheet decisions (numeric / text / date /
-  // unknown) in the draft count so the sidebar reflects partial type-group
-  // input as "Some decisions made" instead of "Not reviewed yet".
-  const missingValueDraftDecisionCount =
-    (worksheetDecision ? 1 : 0) + decidedColumnCount + worksheetTypeGroupDecisionCount;
-  const hasDraftDecisions = fixDecisionCount > 0 || missingValueDraftDecisionCount > 0;
-  const decisionsReady =
-    (review.suggestedFixes.length === 0 || allSuggestedFixesDecided) &&
-    (missingValueColumns.length === 0 || missingValueDecisionReady);
-  const decisionStatusCopy = decisionsReady
-    ? "Decisions ready"
-    : hasDraftDecisions
-      ? "Some decisions made"
-      : "Not reviewed yet";
-  const statusChecklistItems: Array<{
-    id: "review" | "decisions" | "cleaned-copy" | "active-source";
-    label: string;
-    state: StatusChecklistState;
-    copy: string;
-    step?: CleanPrepareStep;
-  }> = [
-    {
-      id: "review",
-      label: "Review",
-      state: "complete",
-      copy:
-        issueGroups.length > 0
-          ? `${pluralise(issueGroups.length, "category", "categories")} detected`
-          : "Issues reviewed",
-      step: "review",
-    },
-    {
-      id: "decisions",
-      label: "Decisions",
-      state: decisionsReady ? "complete" : hasDraftDecisions || activeStep === "decide" ? "needs-decision" : "pending",
-      copy: decisionStatusCopy,
-      step: "decide",
-    },
-    {
-      id: "cleaned-copy",
-      label: "Cleaned copy",
-      state: isUsingCleanedCopy ? "active" : hasCleanedWorkingCopy ? "available" : "pending",
-      copy: isUsingCleanedCopy
-        ? "Using cleaned copy"
-        : hasCleanedWorkingCopy
-          ? "Cleaned copy available"
-          : "Not created",
-      step: "apply",
-    },
-    {
-      id: "active-source",
-      label: "Active source",
-      state: isUsingCleanedCopy ? "complete" : "pending",
-      copy: isUsingCleanedCopy ? "Cleaned copy" : "Original",
-      step: "apply",
-    },
-  ];
-
   const updateApplyState = (worksheetId: string, next: ApplyState) => {
     setApplyStateByWorksheet((current) => ({ ...current, [worksheetId]: next }));
   };
@@ -2101,30 +2035,6 @@ export function CleanPrepareReviewPanel({
           </div>
             </div>
 
-            {embedded && (
-              <aside className="clean-prepare-status-sidebar" aria-label="Status checklist">
-                <h4>Status checklist</h4>
-                <ul>
-                  {statusChecklistItems.map((item) => (
-                    <li
-                      key={item.id}
-                      className={[
-                        `is-${item.state}`,
-                        item.step === activeStep ? "is-current" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <span className="clean-prepare-status-dot" aria-hidden="true" />
-                      <div>
-                        <strong>{item.label}</strong>
-                        <small>{item.copy}</small>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </aside>
-            )}
           </div>
         </div>
       )}

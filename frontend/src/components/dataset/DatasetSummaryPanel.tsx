@@ -1079,16 +1079,35 @@ function DataCleanPreparePage({
   const workbook = getWorkbookMetadata(dataset);
   const worksheetCount = workbook?.worksheets.length || 0;
   const cleanedSheetCount = workbook?.cleanedWorkingCopies.length || 0;
-  const totalNullCount = dataset.schema.reduce(
+  const activeWorksheetNullCount = dataset.schema.reduce(
     (total, column) => total + (column.null_count || 0),
     0,
   );
-  const headerSummary =
-    totalNullCount === 0
-      ? "No missing cells detected at the column level. Review the dataset signals below."
-      : `${totalNullCount.toLocaleString()} missing cell${totalNullCount === 1 ? "" : "s"} across ${
-          worksheetCount.toLocaleString()
-        } worksheet${worksheetCount === 1 ? "" : "s"}.`;
+  const workbookNullCount =
+    workbook && worksheetCount > 0
+      ? workbook.worksheets.reduce(
+          (worksheetTotal, worksheet) =>
+            worksheetTotal +
+            worksheet.schema.reduce(
+              (schemaTotal, column) => schemaTotal + (column.null_count || 0),
+              0,
+            ),
+          0,
+        )
+      : activeWorksheetNullCount;
+  const activeWorksheetId = workbook?.activeWorksheetId;
+  const activeWorksheet =
+    workbook?.worksheets.find((worksheet) => worksheet.worksheetId === activeWorksheetId) || null;
+  const activeWorksheetName =
+    activeWorksheet?.displayName || activeWorksheet?.sheetName || dataset.original_filename;
+  const isMultiWorksheetWorkbook = Boolean(workbook && worksheetCount > 1);
+  const missingCellsSubtitle = isMultiWorksheetWorkbook
+    ? `across ${worksheetCount.toLocaleString()} worksheets${
+        workbookNullCount !== activeWorksheetNullCount
+          ? ` · ${activeWorksheetNullCount.toLocaleString()} in ${activeWorksheetName}`
+          : ""
+      }`
+    : "total";
   const stepLabels: Record<CleanPrepareStep, string> = {
     review: "Review",
     decide: "Decide",
@@ -1099,47 +1118,29 @@ function DataCleanPreparePage({
   return (
     <FocusedWorkspaceShell
       className="data-clean-prepare-page"
-      eyebrow="Dataset preparation"
+      eyebrow="DATASET PREPARATION"
       title={`Clean & Prepare · ${sourceName}`}
-      summary={headerSummary}
+      summary="Review structural issues before creating a cleaned working copy."
       backLabel="Back to Data"
       onBack={onBack}
-      actions={
-        onContinueInAnalyst ? (
-          <button
-            type="button"
-            className="primary-button data-clean-prepare-continue"
-            onClick={onContinueInAnalyst}
-            title="Use this dataset in Analyst to build reports, templates, or SQL. Nothing runs until you click Run Query."
-          >
-            Continue in Analyst &rarr;
-          </button>
-        ) : null
-      }
     >
       <section className="data-clean-prepare-page-intro" aria-label="What cleaning does">
         <div className="data-clean-prepare-page-stats">
           <div>
-            <p className="section-label">Missing cells</p>
-            <strong>{totalNullCount.toLocaleString()}</strong>
-            <small>across {worksheetCount} worksheet{worksheetCount === 1 ? "" : "s"}</small>
+            <p className="section-label">
+              {isMultiWorksheetWorkbook ? "Workbook missing cells" : "Missing cells"}
+            </p>
+            <strong>
+              {(isMultiWorksheetWorkbook ? workbookNullCount : activeWorksheetNullCount).toLocaleString()}
+            </strong>
+            <small>{missingCellsSubtitle}</small>
           </div>
           <div>
             <p className="section-label">Cleaned copies</p>
             <strong>{cleanedSheetCount.toLocaleString()}</strong>
             <small>{cleanedSheetCount === 0 ? "none created yet" : "available for activation"}</small>
           </div>
-          <div>
-            <p className="section-label">Source</p>
-            <strong title={dataset.original_filename}>{dataset.original_filename}</strong>
-            <small>{dataset.row_count.toLocaleString()} rows · {dataset.column_count.toLocaleString()} columns</small>
-          </div>
         </div>
-        <p className="data-clean-prepare-page-helper">
-          Review missing values, field types, layout issues, and cleanup suggestions
-          before analysis. Nothing here runs automatically — you choose what to apply
-          and when to activate a cleaned working copy. Run Query stays in Analyst.
-        </p>
       </section>
 
       <nav className="data-clean-prepare-step-bar" aria-label="Clean and prepare steps">
