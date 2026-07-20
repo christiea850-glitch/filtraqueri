@@ -74,7 +74,7 @@ export async function runUxS2e4IntegrationFixtures(): Promise<UxS2e4IntegrationF
   const keyA = JSON.stringify({ structuralDecisionPlan: null, missingValuePlan: null, transformationPlan: textPlan });
   const keyB = JSON.stringify({ structuralDecisionPlan: null, missingValuePlan: null, transformationPlan: orderedPlan });
   results.push(fixture("transformation change invalidates current Step 3 preview", expect(keyA !== keyB, "Plan key should include transformations.")));
-  const structuralPlan: WorksheetStructuralDecisionPlan = { worksheetId, decisions: [{ recommendationId: "r1", evidenceType: "layout_rows", decision: "use_recommendation", evidenceIds: ["e1"] }] };
+  const structuralDecisionPlan: WorksheetStructuralDecisionPlan = { worksheetId, decisions: [{ recommendationId: "r1", evidenceType: "automatic_blank_row", decision: "use_recommendation", evidenceIds: ["e1"] }] };
   const missingValuePlan: WorksheetMissingValuePlan = { worksheetId, worksheetStrategy: "decide_per_column", columnDecisions: [{ columnName: "amount", strategy: "fill_zero" }] };
   const previewRequests = await capture(() => getCleaningRecipePreview("dataset-1", worksheetId, { rowLimitPreview: 10, structuralDecisionPlan, missingValuePlan, transformationPlan: textPlan }), previewPayload);
   const applyRequests = await capture(() => applyCleaningRecipe("dataset-1", worksheetId, { rowLimitPreview: 10, structuralDecisionPlan, missingValuePlan, transformationPlan: textPlan }), previewPayload as never);
