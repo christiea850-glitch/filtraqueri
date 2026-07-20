@@ -5,10 +5,14 @@ from unittest.mock import patch
 
 import duckdb
 from fastapi import HTTPException
+from openpyxl import load_workbook
 
 from backend.app.workbook_cleaning_apply import apply_cleaning_recipe_to_working_copy
 from backend.app.workbook_cleaning_preview import build_cleaning_recipe_preview
-from backend.app.workbook_cleaning_contract import WorkbookCleaningPreviewRequest
+from backend.app.workbook_cleaning_contract import (
+    WorkbookCleaningPreviewRequest,
+    WorkbookTransformationPlan,
+)
 from backend.tests import test_workbook_cleaning_missing_values as fixtures
 
 
@@ -24,10 +28,16 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
         )
         self.parse_patcher.start()
         with duckdb.connect(str(self.duckdb_path)) as connection:
-            connection.execute("CREATE TABLE original_source (id VARCHAR, amount VARCHAR)")
+            connection.execute(
+                "CREATE TABLE original_source (id VARCHAR, amount VARCHAR)"
+            )
             connection.execute("INSERT INTO original_source VALUES ('2', NULL)")
-            connection.execute("CREATE TABLE unrelated_worksheet (id VARCHAR, value VARCHAR)")
-            connection.execute("INSERT INTO unrelated_worksheet VALUES ('1', 'unchanged')")
+            connection.execute(
+                "CREATE TABLE unrelated_worksheet (id VARCHAR, value VARCHAR)"
+            )
+            connection.execute(
+                "INSERT INTO unrelated_worksheet VALUES ('1', 'unchanged')"
+            )
             connection.execute("CREATE VIEW data AS SELECT * FROM original_source")
         self.worksheet = fixtures._worksheet_metadata()
 
@@ -54,12 +64,18 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
             missing_value_plan=missing_value_plan,
         )
 
-    def assert_preview_apply_parity(self, missing_value_plan, structural_decision_plan=None) -> None:
+    def assert_preview_apply_parity(
+        self, missing_value_plan, structural_decision_plan=None
+    ) -> None:
         preview = self._preview(missing_value_plan, structural_decision_plan)
         apply = self._apply(missing_value_plan, structural_decision_plan)
 
-        self.assertEqual(preview["after_preview"]["row_count"], apply["after"]["row_count"])
-        self.assertEqual(preview["after_preview"]["column_count"], apply["after"]["column_count"])
+        self.assertEqual(
+            preview["after_preview"]["row_count"], apply["after"]["row_count"]
+        )
+        self.assertEqual(
+            preview["after_preview"]["column_count"], apply["after"]["column_count"]
+        )
         self.assertEqual(preview["after_preview"]["columns"], apply["after"]["columns"])
         self.assertEqual(preview["after_preview"]["rows"], apply["preview_rows"])
         self.assertEqual(preview["excluded"], apply["excluded"])
@@ -84,11 +100,15 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
         self.assertEqual(preview["after_preview"]["row_count"], 3)
 
     def test_missing_value_only_preview(self) -> None:
-        plan = fixtures._missing_plan(column_decisions=[{"column_name": "amount", "strategy": "fill_zero"}])
+        plan = fixtures._missing_plan(
+            column_decisions=[{"column_name": "amount", "strategy": "fill_zero"}]
+        )
         preview = self._preview(plan)
 
         self.assertEqual(preview["after_preview"]["rows"][1]["amount"], "0")
-        self.assertEqual(preview["missing_value_summary"]["columns_changed"], ["amount"])
+        self.assertEqual(
+            preview["missing_value_summary"]["columns_changed"], ["amount"]
+        )
         self.assertEqual(preview["missing_value_summary"]["cells_filled"], 1)
 
     def test_combined_structural_and_missing_preview(self) -> None:
@@ -101,7 +121,9 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
         self.worksheet = fixtures._structural_worksheet_metadata()
 
         self.assert_preview_apply_parity(
-            fixtures._missing_plan(column_decisions=[{"column_name": "amount", "strategy": "fill_mean"}]),
+            fixtures._missing_plan(
+                column_decisions=[{"column_name": "amount", "strategy": "fill_mean"}]
+            ),
             structural_decision_plan=fixtures._structural_plan(),
         )
 
@@ -113,17 +135,33 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
             [{"column_name": "region", "strategy": "fill_mode"}],
             [{"column_name": "comment", "strategy": "mark_unknown"}],
             [{"column_name": "amount", "strategy": "fill_custom", "custom_value": 42}],
-            [{"column_name": "comment", "strategy": "fill_custom", "custom_value": "TBD"}],
-            [{"column_name": "visit_date", "strategy": "custom_date", "custom_value": "2024-02-01"}],
+            [
+                {
+                    "column_name": "comment",
+                    "strategy": "fill_custom",
+                    "custom_value": "TBD",
+                }
+            ],
+            [
+                {
+                    "column_name": "visit_date",
+                    "strategy": "custom_date",
+                    "custom_value": "2024-02-01",
+                }
+            ],
         ]
         for decisions in cases:
             with self.subTest(decisions=decisions):
-                self.assert_preview_apply_parity(fixtures._missing_plan(column_decisions=decisions))
+                self.assert_preview_apply_parity(
+                    fixtures._missing_plan(column_decisions=decisions)
+                )
 
     def test_leave_unchanged_and_layout_space_are_no_op_preview(self) -> None:
         for strategy in ["leave_unchanged", "layout_space"]:
             with self.subTest(strategy=strategy):
-                preview = self._preview(fixtures._missing_plan(worksheet_strategy=strategy))
+                preview = self._preview(
+                    fixtures._missing_plan(worksheet_strategy=strategy)
+                )
                 self.assertEqual(preview["missing_value_summary"]["has_changes"], False)
                 self.assertEqual(preview["after_preview"]["row_count"], 3)
 
@@ -134,27 +172,48 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
         self.assertEqual(preview["after_preview"]["row_count"], 2)
         self.assertEqual(preview["missing_value_summary"]["rows_removed"], 1)
         self.assertEqual(
-            [row["original_row_index"] for row in preview["after_preview"]["row_provenance"]],
+            [
+                row["original_row_index"]
+                for row in preview["after_preview"]["row_provenance"]
+            ],
             [1, 3],
         )
         self.assert_preview_apply_parity(plan)
 
     def test_repeated_preview_is_deterministic(self) -> None:
-        plan = fixtures._missing_plan(column_decisions=[{"column_name": "region", "strategy": "fill_mode"}])
+        plan = fixtures._missing_plan(
+            column_decisions=[{"column_name": "region", "strategy": "fill_mode"}]
+        )
 
         self.assertEqual(self._preview(plan), self._preview(plan))
 
     def test_preview_is_read_only(self) -> None:
-        plan = fixtures._missing_plan(column_decisions=[{"column_name": "amount", "strategy": "fill_zero"}])
+        plan = fixtures._missing_plan(
+            column_decisions=[{"column_name": "amount", "strategy": "fill_zero"}]
+        )
 
         self._preview(plan)
 
         with duckdb.connect(str(self.duckdb_path)) as connection:
             tables = {row[0] for row in connection.execute("SHOW TABLES").fetchall()}
             self.assertFalse(any(table.startswith("cleaned_") for table in tables))
-            self.assertIsNone(connection.execute("SELECT amount FROM original_source WHERE id = '2'").fetchone()[0])
-            self.assertEqual(connection.execute("SELECT amount FROM data WHERE id = '2'").fetchone()[0], None)
-            self.assertEqual(connection.execute("SELECT value FROM unrelated_worksheet").fetchone()[0], "unchanged")
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT amount FROM original_source WHERE id = '2'"
+                ).fetchone()[0]
+            )
+            self.assertEqual(
+                connection.execute("SELECT amount FROM data WHERE id = '2'").fetchone()[
+                    0
+                ],
+                None,
+            )
+            self.assertEqual(
+                connection.execute("SELECT value FROM unrelated_worksheet").fetchone()[
+                    0
+                ],
+                "unchanged",
+            )
 
     def test_zero_row_worksheet_preview(self) -> None:
         worksheet = {
@@ -175,8 +234,12 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
 
     def test_invalid_preview_plans_are_rejected(self) -> None:
         cases = [
-            fixtures._missing_plan(column_decisions=[{"column_name": "missing", "strategy": "fill_zero"}]),
-            fixtures._missing_plan(column_decisions=[{"column_name": "region", "strategy": "fill_zero"}]),
+            fixtures._missing_plan(
+                column_decisions=[{"column_name": "missing", "strategy": "fill_zero"}]
+            ),
+            fixtures._missing_plan(
+                column_decisions=[{"column_name": "region", "strategy": "fill_zero"}]
+            ),
         ]
         for plan in cases:
             with self.subTest(plan=plan):
@@ -196,9 +259,21 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
         self.parse_patcher.start()
 
         with self.assertRaises(HTTPException):
-            self._preview(fixtures._missing_plan(column_decisions=[{"column_name": "amount", "strategy": "fill_mean"}]))
+            self._preview(
+                fixtures._missing_plan(
+                    column_decisions=[
+                        {"column_name": "amount", "strategy": "fill_mean"}
+                    ]
+                )
+            )
         with self.assertRaises(HTTPException):
-            self._preview(fixtures._missing_plan(column_decisions=[{"column_name": "region", "strategy": "fill_mode"}]))
+            self._preview(
+                fixtures._missing_plan(
+                    column_decisions=[
+                        {"column_name": "region", "strategy": "fill_mode"}
+                    ]
+                )
+            )
 
     def test_preview_request_accepts_missing_plan(self) -> None:
         request = WorkbookCleaningPreviewRequest(
@@ -206,11 +281,15 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
             missing_value_plan={
                 "worksheet_id": fixtures.WORKSHEET_ID,
                 "worksheet_strategy": "decide_per_column",
-                "column_decisions": [{"column_name": "amount", "strategy": "fill_zero"}],
+                "column_decisions": [
+                    {"column_name": "amount", "strategy": "fill_zero"}
+                ],
             },
         )
 
-        self.assertEqual(request.missing_value_plan.column_decisions[0].strategy, "fill_zero")
+        self.assertEqual(
+            request.missing_value_plan.column_decisions[0].strategy, "fill_zero"
+        )
 
     def test_worksheet_mismatch_is_rejected(self) -> None:
         plan = WorkbookCleaningPreviewRequest(
@@ -218,7 +297,9 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
             missing_value_plan={
                 "worksheet_id": fixtures.OTHER_WORKSHEET_ID,
                 "worksheet_strategy": "decide_per_column",
-                "column_decisions": [{"column_name": "amount", "strategy": "fill_zero"}],
+                "column_decisions": [
+                    {"column_name": "amount", "strategy": "fill_zero"}
+                ],
             },
         ).missing_value_plan
 
@@ -228,3 +309,111 @@ class WorkbookCleaningMissingValuePreviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WorkbookCleaningTransformationPreviewApplyTests(
+    WorkbookCleaningMissingValuePreviewTests
+):
+    def _preview(
+        self,
+        missing_value_plan=None,
+        structural_decision_plan=None,
+        transformation_plan=None,
+    ):
+        return build_cleaning_recipe_preview(
+            workbook_path=self.workbook_path,
+            worksheet=self.worksheet,
+            row_limit=25,
+            structural_decision_plan=structural_decision_plan,
+            missing_value_plan=missing_value_plan,
+            transformation_plan=transformation_plan,
+        )
+
+    def _apply(
+        self,
+        missing_value_plan=None,
+        structural_decision_plan=None,
+        transformation_plan=None,
+    ):
+        return apply_cleaning_recipe_to_working_copy(
+            workbook_path=self.workbook_path,
+            worksheet=self.worksheet,
+            duckdb_path=self.duckdb_path,
+            dataset_id="dataset-missing",
+            structural_decision_plan=structural_decision_plan,
+            missing_value_plan=missing_value_plan,
+            transformation_plan=transformation_plan,
+        )
+
+    def _transformation_plan(self):
+        return WorkbookTransformationPlan(
+            **{
+                "worksheet_id": fixtures.WORKSHEET_ID,
+                "pipeline_id": "p1",
+                "steps": [
+                    {
+                        "step_id": "trim",
+                        "order": 0,
+                        "kind": "trim_whitespace",
+                        "target_column": "comment",
+                        "output_column": "comment",
+                        "parameters": {},
+                    },
+                    {
+                        "step_id": "log",
+                        "order": 1,
+                        "kind": "log_transform",
+                        "target_column": "amount",
+                        "output_column": "amount_log",
+                        "parameters": {},
+                    },
+                ],
+            }
+        )
+
+    def test_missing_value_then_transformation_ordering_and_preview_apply_parity(self):
+        missing = fixtures._missing_plan(
+            column_decisions=[{"column_name": "amount", "strategy": "fill_zero"}]
+        )
+        preview = self._preview(
+            missing_value_plan=missing, transformation_plan=self._transformation_plan()
+        )
+        applied = self._apply(
+            missing_value_plan=missing, transformation_plan=self._transformation_plan()
+        )
+        self.assertEqual(
+            preview["after_preview"]["columns"], applied["after"]["columns"]
+        )
+        self.assertEqual(preview["after_preview"]["rows"], applied["preview_rows"])
+        self.assertEqual(
+            preview["transformation_summary"], applied["transformation_summary"]
+        )
+        self.assertIn("amount_log", applied["after"]["columns"])
+        self.assertEqual(preview["after_preview"]["rows"][1]["amount_log"], 0.0)
+
+    def test_selected_worksheet_original_and_unrelated_sources_are_protected_and_reapply_is_idempotent(
+        self,
+    ):
+        applied = self._apply(transformation_plan=self._transformation_plan())
+        reapplied = self._apply(transformation_plan=self._transformation_plan())
+        self.assertEqual(applied["cleaned_table_name"], reapplied["cleaned_table_name"])
+        with duckdb.connect(str(self.duckdb_path)) as connection:
+            self.assertEqual(
+                connection.execute("SELECT * FROM original_source").fetchall(),
+                [("2", None)],
+            )
+            self.assertEqual(
+                connection.execute("SELECT * FROM unrelated_worksheet").fetchall(),
+                [("1", "unchanged")],
+            )
+            self.assertEqual(
+                connection.execute("SELECT * FROM data").fetchall(), [("2", None)]
+            )
+        loaded = load_workbook(self.workbook_path)
+        self.assertEqual(loaded["Data"]["B3"].value, None)
+
+    def test_full_no_op_behavior(self):
+        result = self._apply()
+        self.assertEqual(result["status"], "no_recipe_needed")
+        self.assertIsNone(result["cleaned_table_name"])
+        self.assertEqual(result["transformation_summary"]["status"], "no_changes")

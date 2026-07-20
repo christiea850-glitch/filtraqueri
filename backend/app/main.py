@@ -33,7 +33,6 @@ from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_missing_value_apply import apply_missing_value_decisions_to_cleaned_copy
 from .workbook_original_layout import extract_original_workbook_layout
 
-
 BASE_DIR = Path(__file__).resolve().parents[1]
 STORAGE_DIR = BASE_DIR / "storage"
 UPLOADS_DIR = STORAGE_DIR / "uploads"
@@ -148,7 +147,9 @@ def json_safe_payload(payload: Any) -> Any:
     return json_safe_value(payload)
 
 
-def dataset_manifest_entry(metadata: dict[str, Any], source_type: str = "uploaded") -> dict[str, Any]:
+def dataset_manifest_entry(
+    metadata: dict[str, Any], source_type: str = "uploaded"
+) -> dict[str, Any]:
     entry = {
         "dataset_id": metadata["dataset_id"],
         "dataset_name": metadata["original_filename"],
@@ -161,11 +162,15 @@ def dataset_manifest_entry(metadata: dict[str, Any], source_type: str = "uploade
         "created_at": metadata["uploaded_at"],
     }
     if isinstance(metadata.get("workbook_metadata"), dict):
-        entry["workbook_metadata"] = normalize_workbook_manifest_metadata(metadata["workbook_metadata"])
+        entry["workbook_metadata"] = normalize_workbook_manifest_metadata(
+            metadata["workbook_metadata"]
+        )
     return entry
 
 
-def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None = None) -> dict[str, Any]:
+def create_workspace_manifest(
+    metadata: dict[str, Any], workspace_id: str | None = None
+) -> dict[str, Any]:
     resolved_workspace_id = workspace_id or metadata["dataset_id"]
     manifest = {
         "version": WORKSPACE_MANIFEST_VERSION,
@@ -185,7 +190,9 @@ def create_workspace_manifest(metadata: dict[str, Any], workspace_id: str | None
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if isinstance(metadata.get("workbook_metadata"), dict):
-        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(metadata["workbook_metadata"])
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(
+            metadata["workbook_metadata"]
+        )
     return manifest
 
 
@@ -193,7 +200,9 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
 
-    worksheets = value.get("worksheets") if isinstance(value.get("worksheets"), list) else []
+    worksheets = (
+        value.get("worksheets") if isinstance(value.get("worksheets"), list) else []
+    )
     normalized_worksheets: list[dict[str, Any]] = []
     worksheet_ids: list[str] = []
 
@@ -207,8 +216,14 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         if not table_name:
             continue
 
-        schema = worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
-        status = worksheet.get("status") if worksheet.get("status") in ("ready", "empty", "error", "skipped") else "error"
+        schema = (
+            worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
+        )
+        status = (
+            worksheet.get("status")
+            if worksheet.get("status") in ("ready", "empty", "error", "skipped")
+            else "error"
+        )
         normalized_worksheet = {
             **worksheet,
             "worksheet_id": worksheet_id,
@@ -220,9 +235,25 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
             "schema": schema,
             "row_count": max(0, int(worksheet.get("row_count") or 0)),
             "column_count": max(0, int(worksheet.get("column_count") or len(schema))),
-            "visible_columns": worksheet.get("visible_columns") if isinstance(worksheet.get("visible_columns"), list) else [column.get("name") for column in schema if isinstance(column, dict) and column.get("name")],
-            "hidden_columns": worksheet.get("hidden_columns") if isinstance(worksheet.get("hidden_columns"), list) else [],
-            "normalization": worksheet.get("normalization") if isinstance(worksheet.get("normalization"), dict) else {},
+            "visible_columns": (
+                worksheet.get("visible_columns")
+                if isinstance(worksheet.get("visible_columns"), list)
+                else [
+                    column.get("name")
+                    for column in schema
+                    if isinstance(column, dict) and column.get("name")
+                ]
+            ),
+            "hidden_columns": (
+                worksheet.get("hidden_columns")
+                if isinstance(worksheet.get("hidden_columns"), list)
+                else []
+            ),
+            "normalization": (
+                worksheet.get("normalization")
+                if isinstance(worksheet.get("normalization"), dict)
+                else {}
+            ),
         }
         worksheet_ids.append(worksheet_id)
         normalized_worksheets.append(normalized_worksheet)
@@ -271,26 +302,49 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         ):
             relationship_type = "unknown_candidate"
         direction = candidate.get("direction")
-        if direction not in ("source_to_target", "target_to_source", "bidirectional", "unknown"):
+        if direction not in (
+            "source_to_target",
+            "target_to_source",
+            "bidirectional",
+            "unknown",
+        ):
             direction = "unknown"
         try:
             confidence = float(candidate.get("confidence") or 0)
         except (TypeError, ValueError):
             confidence = 0
 
-        evidence = candidate.get("evidence") if isinstance(candidate.get("evidence"), dict) else {}
-        evidence["summaries"] = evidence.get("summaries") if isinstance(evidence.get("summaries"), list) else []
+        evidence = (
+            candidate.get("evidence")
+            if isinstance(candidate.get("evidence"), dict)
+            else {}
+        )
+        evidence["summaries"] = (
+            evidence.get("summaries")
+            if isinstance(evidence.get("summaries"), list)
+            else []
+        )
         normalized_relationship_candidates.append(
             {
                 **candidate,
-                "relationship_id": str(candidate.get("relationship_id") or f"relationship:{index + 1}"),
-                "workbook_id": str(candidate.get("workbook_id") or value.get("workbook_id") or "workbook"),
+                "relationship_id": str(
+                    candidate.get("relationship_id") or f"relationship:{index + 1}"
+                ),
+                "workbook_id": str(
+                    candidate.get("workbook_id")
+                    or value.get("workbook_id")
+                    or "workbook"
+                ),
                 "source_worksheet_id": str(candidate.get("source_worksheet_id") or ""),
-                "source_worksheet_name": str(candidate.get("source_worksheet_name") or "Source worksheet"),
+                "source_worksheet_name": str(
+                    candidate.get("source_worksheet_name") or "Source worksheet"
+                ),
                 "source_table": str(candidate.get("source_table") or ""),
                 "source_column": str(candidate.get("source_column") or ""),
                 "target_worksheet_id": str(candidate.get("target_worksheet_id") or ""),
-                "target_worksheet_name": str(candidate.get("target_worksheet_name") or "Target worksheet"),
+                "target_worksheet_name": str(
+                    candidate.get("target_worksheet_name") or "Target worksheet"
+                ),
                 "target_table": str(candidate.get("target_table") or ""),
                 "target_column": str(candidate.get("target_column") or ""),
                 "confidence": max(0, min(1, confidence)),
@@ -299,9 +353,21 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
                 "direction": direction,
                 "evidence": evidence,
                 "review_status": review_status,
-                "reviewed_at": candidate.get("reviewed_at") if isinstance(candidate.get("reviewed_at"), str) else None,
-                "reviewed_by": candidate.get("reviewed_by") if isinstance(candidate.get("reviewed_by"), str) else None,
-                "review_notes": candidate.get("review_notes") if isinstance(candidate.get("review_notes"), str) else None,
+                "reviewed_at": (
+                    candidate.get("reviewed_at")
+                    if isinstance(candidate.get("reviewed_at"), str)
+                    else None
+                ),
+                "reviewed_by": (
+                    candidate.get("reviewed_by")
+                    if isinstance(candidate.get("reviewed_by"), str)
+                    else None
+                ),
+                "review_notes": (
+                    candidate.get("review_notes")
+                    if isinstance(candidate.get("review_notes"), str)
+                    else None
+                ),
             }
         )
     accepted_contracts = (
@@ -341,7 +407,9 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         normalized_contracts.append(
             {
                 **contract,
-                "contract_id": str(contract.get("contract_id") or f"contract:{index + 1}"),
+                "contract_id": str(
+                    contract.get("contract_id") or f"contract:{index + 1}"
+                ),
                 "source_worksheet_id": str(contract.get("source_worksheet_id") or ""),
                 "source_table_name": str(contract.get("source_table_name") or ""),
                 "source_column_name": str(contract.get("source_column_name") or ""),
@@ -350,17 +418,33 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
                 "target_column_name": str(contract.get("target_column_name") or ""),
                 "relationship_type": relationship_type,
                 "confidence": max(0, min(1, confidence)),
-                "accepted_from_candidate_id": str(contract.get("accepted_from_candidate_id") or ""),
+                "accepted_from_candidate_id": str(
+                    contract.get("accepted_from_candidate_id") or ""
+                ),
                 "accepted_at": str(contract.get("accepted_at") or ""),
-                "accepted_by": contract.get("accepted_by") if isinstance(contract.get("accepted_by"), str) else None,
+                "accepted_by": (
+                    contract.get("accepted_by")
+                    if isinstance(contract.get("accepted_by"), str)
+                    else None
+                ),
                 "status": status,
                 "validation_state": validation_state,
-                "validation_summary": contract.get("validation_summary") if isinstance(contract.get("validation_summary"), list) else [],
+                "validation_summary": (
+                    contract.get("validation_summary")
+                    if isinstance(contract.get("validation_summary"), list)
+                    else []
+                ),
                 "overlap_ratio": max(0, min(1, overlap_ratio)),
                 "source_unique_ratio": max(0, min(1, source_unique_ratio)),
                 "target_unique_ratio": max(0, min(1, target_unique_ratio)),
-                "inferred_type_compatible": bool(contract.get("inferred_type_compatible")),
-                "last_validated_at": contract.get("last_validated_at") if isinstance(contract.get("last_validated_at"), str) else None,
+                "inferred_type_compatible": bool(
+                    contract.get("inferred_type_compatible")
+                ),
+                "last_validated_at": (
+                    contract.get("last_validated_at")
+                    if isinstance(contract.get("last_validated_at"), str)
+                    else None
+                ),
             }
         )
 
@@ -368,18 +452,37 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
         **value,
         "workbook_id": str(value.get("workbook_id") or "workbook"),
         "workspace_id": value.get("workspace_id"),
-        "name": str(value.get("name") or value.get("source_file", {}).get("original_filename") or "Workbook"),
-        "status": value.get("status") if value.get("status") in ("pending", "profiling", "ready", "partial", "error") else "partial",
+        "name": str(
+            value.get("name")
+            or value.get("source_file", {}).get("original_filename")
+            or "Workbook"
+        ),
+        "status": (
+            value.get("status")
+            if value.get("status")
+            in ("pending", "profiling", "ready", "partial", "error")
+            else "partial"
+        ),
         "worksheet_ids": worksheet_ids,
         "active_worksheet_id": active_worksheet_id,
         "worksheets": normalized_worksheets,
         "table_mappings": table_mappings,
         "relationship_candidates": normalized_relationship_candidates,
         "accepted_relationship_contracts": normalized_contracts,
-        "ingestion_profile": value.get("ingestion_profile") if isinstance(value.get("ingestion_profile"), dict) else {},
-        "normalization": value.get("normalization") if isinstance(value.get("normalization"), dict) else {},
+        "ingestion_profile": (
+            value.get("ingestion_profile")
+            if isinstance(value.get("ingestion_profile"), dict)
+            else {}
+        ),
+        "normalization": (
+            value.get("normalization")
+            if isinstance(value.get("normalization"), dict)
+            else {}
+        ),
     }
-    normalized_metadata["accepted_relationship_contracts"] = validate_relationship_contracts(normalized_metadata)
+    normalized_metadata["accepted_relationship_contracts"] = (
+        validate_relationship_contracts(normalized_metadata)
+    )
     return normalized_metadata
 
 
@@ -392,9 +495,13 @@ def normalize_workspace_name(value: Any, fallback: str) -> str:
 
 
 def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
-    datasets = manifest.get("datasets") if isinstance(manifest.get("datasets"), list) else []
+    datasets = (
+        manifest.get("datasets") if isinstance(manifest.get("datasets"), list) else []
+    )
     first_dataset = datasets[0] if datasets else {}
-    fallback_name = first_dataset.get("dataset_name") if isinstance(first_dataset, dict) else None
+    fallback_name = (
+        first_dataset.get("dataset_name") if isinstance(first_dataset, dict) else None
+    )
     created_at = manifest.get("created_at") or datetime.now(timezone.utc).isoformat()
 
     manifest["version"] = manifest.get("version", WORKSPACE_MANIFEST_VERSION)
@@ -405,7 +512,9 @@ def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     )
     manifest["created_at"] = created_at
     manifest["updated_at"] = manifest.get("updated_at") or created_at
-    manifest["last_opened_at"] = manifest.get("last_opened_at") or manifest["updated_at"]
+    manifest["last_opened_at"] = (
+        manifest.get("last_opened_at") or manifest["updated_at"]
+    )
     manifest["datasets"] = datasets
 
     if manifest.get("current_mode") not in ("human", "analyst"):
@@ -421,12 +530,18 @@ def normalize_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(manifest.get("sql_workspace_metadata"), dict):
         manifest["sql_workspace_metadata"] = {}
     if isinstance(manifest.get("workbook_metadata"), dict):
-        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(manifest["workbook_metadata"])
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(
+            manifest["workbook_metadata"]
+        )
     else:
         manifest.pop("workbook_metadata", None)
     for dataset in datasets:
-        if isinstance(dataset, dict) and isinstance(dataset.get("workbook_metadata"), dict):
-            dataset["workbook_metadata"] = normalize_workbook_manifest_metadata(dataset["workbook_metadata"])
+        if isinstance(dataset, dict) and isinstance(
+            dataset.get("workbook_metadata"), dict
+        ):
+            dataset["workbook_metadata"] = normalize_workbook_manifest_metadata(
+                dataset["workbook_metadata"]
+            )
 
     dataset_ids = {
         dataset.get("dataset_id")
@@ -462,18 +577,26 @@ def save_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     return manifest
 
 
-def read_workspace_manifest(workspace_id: str, mark_opened: bool = True) -> dict[str, Any]:
+def read_workspace_manifest(
+    workspace_id: str, mark_opened: bool = True
+) -> dict[str, Any]:
     path = workspace_manifest_path(workspace_id)
     if not path.exists():
         raise HTTPException(status_code=404, detail="Workspace manifest not found")
 
     try:
-        manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+        manifest = normalize_workspace_manifest(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
     except json.JSONDecodeError as error:
-        raise HTTPException(status_code=400, detail="Workspace manifest is invalid") from error
+        raise HTTPException(
+            status_code=400, detail="Workspace manifest is invalid"
+        ) from error
 
     if manifest.get("version") != WORKSPACE_MANIFEST_VERSION:
-        raise HTTPException(status_code=400, detail="Workspace manifest version is not supported")
+        raise HTTPException(
+            status_code=400, detail="Workspace manifest version is not supported"
+        )
 
     validate_workspace_manifest_files(manifest)
     hydrate_dataset_sessions_from_manifest(manifest)
@@ -486,7 +609,9 @@ def read_workspace_manifest(workspace_id: str, mark_opened: bool = True) -> dict
 def workspace_manifest_health(manifest: dict[str, Any]) -> dict[str, Any]:
     messages: list[str] = []
     status = "recoverable"
-    datasets = manifest.get("datasets") if isinstance(manifest.get("datasets"), list) else []
+    datasets = (
+        manifest.get("datasets") if isinstance(manifest.get("datasets"), list) else []
+    )
 
     if manifest.get("version") != WORKSPACE_MANIFEST_VERSION:
         messages.append("Unsupported manifest version.")
@@ -508,15 +633,24 @@ def workspace_manifest_health(manifest: dict[str, Any]) -> dict[str, Any]:
         uploaded_path_value = dataset_entry.get("uploaded_path")
         duckdb_path = Path(duckdb_path_value) if duckdb_path_value else None
         uploaded_path = Path(uploaded_path_value) if uploaded_path_value else None
-        if not duckdb_path or not uploaded_path or not duckdb_path.exists() or not uploaded_path.exists():
-            messages.append(f"Dataset files are missing for {dataset_entry.get('dataset_name', 'dataset')}.")
+        if (
+            not duckdb_path
+            or not uploaded_path
+            or not duckdb_path.exists()
+            or not uploaded_path.exists()
+        ):
+            messages.append(
+                f"Dataset files are missing for {dataset_entry.get('dataset_name', 'dataset')}."
+            )
             if status != "corrupted":
                 status = "stale"
             continue
 
         workbook_metadata = dataset_entry.get("workbook_metadata")
         if isinstance(workbook_metadata, dict):
-            workbook_messages = validate_workbook_manifest_tables(workbook_metadata, duckdb_path)
+            workbook_messages = validate_workbook_manifest_tables(
+                workbook_metadata, duckdb_path
+            )
             if workbook_messages:
                 messages.extend(workbook_messages)
                 if status != "corrupted":
@@ -529,7 +663,9 @@ def workspace_manifest_health(manifest: dict[str, Any]) -> dict[str, Any]:
         if isinstance(dataset, dict) and dataset.get("dataset_id")
     }
     if active_dataset_id and active_dataset_id not in dataset_ids:
-        messages.append("Active dataset reference is stale and will be reset on recovery.")
+        messages.append(
+            "Active dataset reference is stale and will be reset on recovery."
+        )
         if status == "recoverable":
             status = "stale"
 
@@ -563,14 +699,16 @@ def workspace_manifest_summary(
         "workspace_name": manifest["workspace_name"],
         "created_at": manifest["created_at"],
         "last_opened_at": manifest.get("last_opened_at") or manifest.get("updated_at"),
-        "active_dataset": {
-            "dataset_id": active_dataset.get("dataset_id"),
-            "dataset_name": active_dataset.get("dataset_name"),
-            "row_count": active_dataset.get("row_count", 0),
-            "column_count": active_dataset.get("column_count", 0),
-        }
-        if active_dataset
-        else None,
+        "active_dataset": (
+            {
+                "dataset_id": active_dataset.get("dataset_id"),
+                "dataset_name": active_dataset.get("dataset_name"),
+                "row_count": active_dataset.get("row_count", 0),
+                "column_count": active_dataset.get("column_count", 0),
+            }
+            if active_dataset
+            else None
+        ),
         "dataset_count": len(manifest.get("datasets", [])),
         "manifest_version": manifest.get("version"),
         "status": resolved_status,
@@ -589,7 +727,9 @@ def list_workspace_manifest_summaries() -> list[dict[str, Any]]:
     summaries: list[dict[str, Any]] = []
     for path in MANIFESTS_DIR.glob("*.json"):
         try:
-            manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+            manifest = normalize_workspace_manifest(
+                json.loads(path.read_text(encoding="utf-8"))
+            )
             health = workspace_manifest_health(manifest)
             summaries.append(
                 workspace_manifest_summary(
@@ -623,7 +763,9 @@ def list_workspace_manifest_summaries() -> list[dict[str, Any]]:
 
     return sorted(
         summaries,
-        key=lambda summary: summary.get("last_opened_at") or summary.get("created_at") or "",
+        key=lambda summary: summary.get("last_opened_at")
+        or summary.get("created_at")
+        or "",
         reverse=True,
     )
 
@@ -634,8 +776,15 @@ def validate_workspace_manifest_files(manifest: dict[str, Any]) -> None:
         uploaded_path_value = dataset_entry.get("uploaded_path")
         duckdb_path = Path(duckdb_path_value) if duckdb_path_value else None
         uploaded_path = Path(uploaded_path_value) if uploaded_path_value else None
-        if not duckdb_path or not uploaded_path or not duckdb_path.exists() or not uploaded_path.exists():
-            raise HTTPException(status_code=404, detail="Workspace dataset files are missing")
+        if (
+            not duckdb_path
+            or not uploaded_path
+            or not duckdb_path.exists()
+            or not uploaded_path.exists()
+        ):
+            raise HTTPException(
+                status_code=404, detail="Workspace dataset files are missing"
+            )
         workbook_metadata = dataset_entry.get("workbook_metadata")
         if isinstance(workbook_metadata, dict):
             workbook_messages = validate_workbook_manifest_tables(
@@ -645,7 +794,9 @@ def validate_workspace_manifest_files(manifest: dict[str, Any]) -> None:
                 include_compatibility_view_warning=False,
             )
             if workbook_messages:
-                raise HTTPException(status_code=404, detail="Workbook worksheet tables are missing")
+                raise HTTPException(
+                    status_code=404, detail="Workbook worksheet tables are missing"
+                )
 
 
 def validate_workbook_manifest_tables(
@@ -655,11 +806,17 @@ def validate_workbook_manifest_tables(
     include_active_source_warnings: bool = True,
     include_compatibility_view_warning: bool = True,
 ) -> list[str]:
-    worksheets = workbook_metadata.get("worksheets") if isinstance(workbook_metadata.get("worksheets"), list) else []
+    worksheets = (
+        workbook_metadata.get("worksheets")
+        if isinstance(workbook_metadata.get("worksheets"), list)
+        else []
+    )
     ready_table_names = [
         worksheet.get("table_name")
         for worksheet in worksheets
-        if isinstance(worksheet, dict) and worksheet.get("status") == "ready" and worksheet.get("table_name")
+        if isinstance(worksheet, dict)
+        and worksheet.get("status") == "ready"
+        and worksheet.get("table_name")
     ]
     if not ready_table_names:
         return ["Workbook has no ready worksheets."]
@@ -698,7 +855,9 @@ def validate_active_analysis_source(
 
     source_type = active_source.get("type")
     if source_type not in ("original", "cleaned_working_copy"):
-        return ["Active analysis source type is invalid and will be reset during restore."]
+        return [
+            "Active analysis source type is invalid and will be reset during restore."
+        ]
 
     worksheets = workbook_metadata.get("worksheets")
     worksheets = worksheets if isinstance(worksheets, list) else []
@@ -712,7 +871,9 @@ def validate_active_analysis_source(
         None,
     )
     if not worksheet:
-        return ["Active analysis source worksheet is missing and will be reset during restore."]
+        return [
+            "Active analysis source worksheet is missing and will be reset during restore."
+        ]
 
     original_table_name = worksheet.get("table_name")
     if not original_table_name or original_table_name not in existing_tables:
@@ -731,7 +892,9 @@ def validate_active_analysis_source(
         ),
         None,
     )
-    cleaned_table_name = cleaned_copy.get("cleaned_table_name") if cleaned_copy else None
+    cleaned_table_name = (
+        cleaned_copy.get("cleaned_table_name") if cleaned_copy else None
+    )
     if not cleaned_table_name or cleaned_table_name not in existing_tables:
         return [RESTORE_CLEANED_COPY_FALLBACK_WARNING]
     return []
@@ -750,7 +913,9 @@ def sanitize_restored_query_builder_metadata(
         values = query_builder_metadata.get(field)
         if isinstance(values, list):
             sanitized[field] = [
-                value for value in values if isinstance(value, str) and value in valid_columns
+                value
+                for value in values
+                if isinstance(value, str) and value in valid_columns
             ]
 
     aggregations = query_builder_metadata.get("aggregations")
@@ -766,7 +931,11 @@ def sanitize_restored_query_builder_metadata(
         ]
 
     sort_column = query_builder_metadata.get("sort_column")
-    if isinstance(sort_column, str) and sort_column and sort_column not in valid_columns:
+    if (
+        isinstance(sort_column, str)
+        and sort_column
+        and sort_column not in valid_columns
+    ):
         sanitized["sort_column"] = ""
 
     if sanitized == query_builder_metadata:
@@ -799,12 +968,15 @@ def reconcile_restored_analysis_source(
         (
             candidate
             for candidate in ready_worksheets
-            if candidate.get("worksheet_id") == workbook_metadata.get("active_worksheet_id")
+            if candidate.get("worksheet_id")
+            == workbook_metadata.get("active_worksheet_id")
         ),
         ready_worksheets[0],
     )
     active_source = workbook_metadata.get("active_analysis_source")
-    source_type = active_source.get("type") if isinstance(active_source, dict) else "original"
+    source_type = (
+        active_source.get("type") if isinstance(active_source, dict) else "original"
+    )
     source_worksheet_id = (
         active_source.get("worksheet_id") if isinstance(active_source, dict) else None
     )
@@ -818,7 +990,10 @@ def reconcile_restored_analysis_source(
     )
     should_persist = False
     fallback_warning: str | None = None
-    if source_type not in ("original", "cleaned_working_copy") or not candidate_worksheet:
+    if (
+        source_type not in ("original", "cleaned_working_copy")
+        or not candidate_worksheet
+    ):
         source_type = "original"
         fallback_warning = "Active analysis source metadata was invalid during restore, so FiltraQueri returned to the original analysis table."
     else:
@@ -826,7 +1001,9 @@ def reconcile_restored_analysis_source(
 
     original_table_name = str(worksheet.get("table_name") or "")
     if not original_table_name:
-        raise HTTPException(status_code=404, detail="Worksheet table mapping is missing")
+        raise HTTPException(
+            status_code=404, detail="Worksheet table mapping is missing"
+        )
 
     duckdb_path = Path(str(dataset_entry.get("duckdb_path") or ""))
     try:
@@ -838,22 +1015,29 @@ def reconcile_restored_analysis_source(
                 ).fetchall()
             }
             if original_table_name not in existing_tables:
-                raise HTTPException(status_code=404, detail="Worksheet table is missing")
+                raise HTTPException(
+                    status_code=404, detail="Worksheet table is missing"
+                )
 
             trusted_table_name = original_table_name
             if source_type == "cleaned_working_copy":
                 cleaned_copies = workbook_metadata.get("cleaned_working_copies")
-                cleaned_copies = cleaned_copies if isinstance(cleaned_copies, list) else []
+                cleaned_copies = (
+                    cleaned_copies if isinstance(cleaned_copies, list) else []
+                )
                 cleaned_copy = next(
                     (
                         candidate
                         for candidate in cleaned_copies
                         if isinstance(candidate, dict)
-                        and candidate.get("source_worksheet_id") == worksheet.get("worksheet_id")
+                        and candidate.get("source_worksheet_id")
+                        == worksheet.get("worksheet_id")
                     ),
                     None,
                 )
-                cleaned_table_name = cleaned_copy.get("cleaned_table_name") if cleaned_copy else None
+                cleaned_table_name = (
+                    cleaned_copy.get("cleaned_table_name") if cleaned_copy else None
+                )
                 if cleaned_table_name and cleaned_table_name in existing_tables:
                     trusted_table_name = str(cleaned_table_name)
                 else:
@@ -868,7 +1052,9 @@ def reconcile_restored_analysis_source(
     except HTTPException:
         raise
     except duckdb.Error as error:
-        raise HTTPException(status_code=400, detail=f"Workbook restore failed: {error}") from error
+        raise HTTPException(
+            status_code=400, detail=f"Workbook restore failed: {error}"
+        ) from error
 
     active_analysis_source = {
         "type": source_type,
@@ -896,10 +1082,13 @@ def reconcile_restored_analysis_source(
     dataset_entry["workbook_metadata"] = workbook_metadata
     if manifest.get("active_dataset_id") == dataset_entry.get("dataset_id"):
         manifest["workbook_metadata"] = workbook_metadata
-        should_persist = sanitize_restored_query_builder_metadata(
-            manifest,
-            {column["name"] for column in schema},
-        ) or should_persist
+        should_persist = (
+            sanitize_restored_query_builder_metadata(
+                manifest,
+                {column["name"] for column in schema},
+            )
+            or should_persist
+        )
     return should_persist
 
 
@@ -928,7 +1117,9 @@ def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
             "schema": dataset_entry["schema"],
         }
         if isinstance(dataset_entry.get("workbook_metadata"), dict):
-            metadata["workbook_metadata"] = normalize_workbook_manifest_metadata(dataset_entry["workbook_metadata"])
+            metadata["workbook_metadata"] = normalize_workbook_manifest_metadata(
+                dataset_entry["workbook_metadata"]
+            )
         dataset_sessions[dataset_id] = metadata
     if should_persist:
         save_workspace_manifest(manifest)
@@ -937,7 +1128,9 @@ def hydrate_dataset_sessions_from_manifest(manifest: dict[str, Any]) -> None:
 def load_workspace_manifests() -> None:
     for path in MANIFESTS_DIR.glob("*.json"):
         try:
-            manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+            manifest = normalize_workspace_manifest(
+                json.loads(path.read_text(encoding="utf-8"))
+            )
             if manifest.get("version") == WORKSPACE_MANIFEST_VERSION:
                 validate_workspace_manifest_files(manifest)
                 hydrate_dataset_sessions_from_manifest(manifest)
@@ -1009,7 +1202,9 @@ class WorkbookMissingValueColumnDecision(BaseModel):
 
 class WorkbookMissingValueApplyRequest(BaseModel):
     worksheet_strategy: str = Field(..., min_length=1)
-    column_decisions: list[WorkbookMissingValueColumnDecision] = Field(default_factory=list)
+    column_decisions: list[WorkbookMissingValueColumnDecision] = Field(
+        default_factory=list
+    )
 
 
 class WorkbookRelationshipReviewRequest(BaseModel):
@@ -1099,14 +1294,12 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
         unique_count = connection.execute(
             f"SELECT COUNT(DISTINCT {identifier}) FROM {TABLE_NAME}"
         ).fetchone()[0]
-        sample_rows = connection.execute(
-            f"""
+        sample_rows = connection.execute(f"""
             SELECT DISTINCT {identifier}
             FROM {TABLE_NAME}
             WHERE {identifier} IS NOT NULL
             LIMIT 12
-            """
-        ).fetchall()
+            """).fetchall()
         sample_values = [row[0] for row in sample_rows]
         inferred_type = infer_column_type(column_type, unique_count, row_count)
         profile: dict[str, Any] = {
@@ -1128,19 +1321,21 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
         # === Phase G1: additive distribution profile (failure-tolerant per branch) ===
         if inferred_type == "numeric":
             try:
-                stats_row = connection.execute(
-                    f"""
+                stats_row = connection.execute(f"""
                     SELECT MIN({identifier}), MAX({identifier}), AVG({identifier}),
                            MEDIAN({identifier}), STDDEV({identifier})
                     FROM {TABLE_NAME} WHERE {identifier} IS NOT NULL
-                    """
-                ).fetchone()
+                    """).fetchone()
                 if stats_row and stats_row[0] is not None:
                     profile["numeric_stats"] = {
                         "min": float(stats_row[0]),
                         "max": float(stats_row[1]),
-                        "mean": float(stats_row[2]) if stats_row[2] is not None else 0.0,
-                        "median": float(stats_row[3]) if stats_row[3] is not None else 0.0,
+                        "mean": (
+                            float(stats_row[2]) if stats_row[2] is not None else 0.0
+                        ),
+                        "median": (
+                            float(stats_row[3]) if stats_row[3] is not None else 0.0
+                        ),
                         "std": float(stats_row[4]) if stats_row[4] is not None else 0.0,
                     }
             except Exception:
@@ -1156,7 +1351,11 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
                             f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE {identifier} IS NOT NULL"
                         ).fetchone()[0]
                         profile["histogram_buckets"] = [
-                            {"bucket_min": col_min, "bucket_max": col_max, "count": int(single_count)}
+                            {
+                                "bucket_min": col_min,
+                                "bucket_max": col_max,
+                                "count": int(single_count),
+                            }
                         ]
                     else:
                         bucket_width = (col_max - col_min) / num_buckets
@@ -1177,11 +1376,13 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
                             idx = int(bucket_idx)
                             b_min = col_min + idx * bucket_width
                             b_max = col_min + (idx + 1) * bucket_width
-                            buckets.append({
-                                "bucket_min": float(b_min),
-                                "bucket_max": float(b_max),
-                                "count": int(bucket_count),
-                            })
+                            buckets.append(
+                                {
+                                    "bucket_min": float(b_min),
+                                    "bucket_max": float(b_max),
+                                    "count": int(bucket_count),
+                                }
+                            )
                         profile["histogram_buckets"] = buckets
             except Exception:
                 pass
@@ -1198,18 +1399,19 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
 
         elif inferred_type in ("categorical", "boolean"):
             try:
-                top_rows = connection.execute(
-                    f"""
+                top_rows = connection.execute(f"""
                     SELECT {identifier} AS top_value, COUNT(*) AS cnt
                     FROM {TABLE_NAME}
                     WHERE {identifier} IS NOT NULL
                     GROUP BY {identifier}
                     ORDER BY cnt DESC, top_value ASC
                     LIMIT 10
-                    """
-                ).fetchall()
+                    """).fetchall()
                 profile["top_values"] = [
-                    {"value": str(value) if value is not None else "", "count": int(cnt)}
+                    {
+                        "value": str(value) if value is not None else "",
+                        "count": int(cnt),
+                    }
                     for value, cnt in top_rows
                 ]
             except Exception:
@@ -1217,19 +1419,19 @@ def profile_dataset(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any
 
         elif inferred_type == "text":
             try:
-                length_row = connection.execute(
-                    f"""
+                length_row = connection.execute(f"""
                     SELECT MIN(LENGTH(CAST({identifier} AS VARCHAR))),
                            MAX(LENGTH(CAST({identifier} AS VARCHAR))),
                            AVG(LENGTH(CAST({identifier} AS VARCHAR)))
                     FROM {TABLE_NAME} WHERE {identifier} IS NOT NULL
-                    """
-                ).fetchone()
+                    """).fetchone()
                 if length_row and length_row[0] is not None:
                     profile["text_length_stats"] = {
                         "min_length": int(length_row[0]),
                         "max_length": int(length_row[1]),
-                        "avg_length": float(length_row[2]) if length_row[2] is not None else 0.0,
+                        "avg_length": (
+                            float(length_row[2]) if length_row[2] is not None else 0.0
+                        ),
                     }
             except Exception:
                 pass
@@ -1281,7 +1483,9 @@ def persist_dataset_manifest_metadata(metadata: dict[str, Any]) -> None:
     manifest = read_workspace_manifest(str(workspace_id), mark_opened=False)
     manifest["active_dataset_id"] = metadata["dataset_id"]
     if isinstance(workbook_metadata, dict):
-        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(workbook_metadata)
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(
+            workbook_metadata
+        )
 
     for dataset_entry in manifest.get("datasets", []):
         if dataset_entry.get("dataset_id") != metadata["dataset_id"]:
@@ -1291,7 +1495,9 @@ def persist_dataset_manifest_metadata(metadata: dict[str, Any]) -> None:
         dataset_entry["row_count"] = metadata["row_count"]
         dataset_entry["column_count"] = metadata["column_count"]
         if isinstance(workbook_metadata, dict):
-            dataset_entry["workbook_metadata"] = normalize_workbook_manifest_metadata(workbook_metadata)
+            dataset_entry["workbook_metadata"] = normalize_workbook_manifest_metadata(
+                workbook_metadata
+            )
 
     save_workspace_manifest(manifest)
 
@@ -1305,7 +1511,9 @@ def build_filter_where_clause(
 
     for filter_item in filters:
         if filter_item.column not in valid_columns:
-            raise HTTPException(status_code=400, detail=f"Unknown column: {filter_item.column}")
+            raise HTTPException(
+                status_code=400, detail=f"Unknown column: {filter_item.column}"
+            )
 
         identifier = quote_identifier(filter_item.column)
         filter_type = filter_item.type.lower()
@@ -1350,21 +1558,29 @@ def build_order_clause(order_by: SortDefinition | None, valid_columns: set[str])
 
     sort_direction = order_by.direction.upper()
     if sort_direction not in ALLOWED_SORT_DIRECTIONS:
-        raise HTTPException(status_code=400, detail="Sort direction must be ASC or DESC")
+        raise HTTPException(
+            status_code=400, detail="Sort direction must be ASC or DESC"
+        )
 
     if valid_columns and order_by.column not in valid_columns:
-        raise HTTPException(status_code=400, detail=f"Unknown sort column: {order_by.column}")
+        raise HTTPException(
+            status_code=400, detail=f"Unknown sort column: {order_by.column}"
+        )
 
     return f"ORDER BY {quote_identifier(order_by.column)} {sort_direction}"
 
 
-def rows_to_dicts(result: duckdb.DuckDBPyConnection) -> tuple[list[str], list[dict[str, Any]]]:
+def rows_to_dicts(
+    result: duckdb.DuckDBPyConnection,
+) -> tuple[list[str], list[dict[str, Any]]]:
     columns = [description[0] for description in result.description]
     rows = result.fetchall()
     return columns, [dict(zip(columns, row)) for row in rows]
 
 
-def csv_response(columns: list[str], rows: list[dict[str, Any]], filename: str) -> Response:
+def csv_response(
+    columns: list[str], rows: list[dict[str, Any]], filename: str
+) -> Response:
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=columns, extrasaction="ignore")
     writer.writeheader()
@@ -1404,14 +1620,18 @@ def build_query_builder_sql(
         function = aggregation.function.upper()
 
         if function not in ALLOWED_AGGREGATIONS:
-            raise HTTPException(status_code=400, detail=f"Unsupported aggregation: {function}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported aggregation: {function}"
+            )
 
         if function == "COUNT" and not aggregation.column:
             expression = "COUNT(*)"
             default_alias = "count_rows"
         else:
             if not aggregation.column or aggregation.column not in valid_columns:
-                raise HTTPException(status_code=400, detail="Aggregation column is required")
+                raise HTTPException(
+                    status_code=400, detail="Aggregation column is required"
+                )
 
             expression = f"{function}({quote_identifier(aggregation.column)})"
             default_alias = f"{function.lower()}_{safe_alias(aggregation.column)}"
@@ -1427,7 +1647,9 @@ def build_query_builder_sql(
         select_parts.append("*")
         output_columns.update(valid_columns)
 
-    non_grouped_columns = [column for column in selected_columns if column not in group_by]
+    non_grouped_columns = [
+        column for column in selected_columns if column not in group_by
+    ]
     if request.aggregations and non_grouped_columns:
         raise HTTPException(
             status_code=400,
@@ -1450,10 +1672,14 @@ def build_query_builder_sql(
         sort_direction = request.order_by.direction.upper()
 
         if sort_direction not in ALLOWED_SORT_DIRECTIONS:
-            raise HTTPException(status_code=400, detail="Sort direction must be ASC or DESC")
+            raise HTTPException(
+                status_code=400, detail="Sort direction must be ASC or DESC"
+            )
 
         if sort_column not in output_columns and sort_column not in valid_columns:
-            raise HTTPException(status_code=400, detail=f"Unknown sort column: {sort_column}")
+            raise HTTPException(
+                status_code=400, detail=f"Unknown sort column: {sort_column}"
+            )
 
         sql_parts.append(f"ORDER BY {quote_identifier(sort_column)} {sort_direction}")
 
@@ -1471,7 +1697,9 @@ def normalize_query(sql: str) -> str:
         query = query[:-1].strip()
 
     if ";" in query:
-        raise HTTPException(status_code=400, detail="Only one SELECT statement is allowed")
+        raise HTTPException(
+            status_code=400, detail="Only one SELECT statement is allowed"
+        )
 
     return query
 
@@ -1532,7 +1760,9 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     is_workbook_upload = filename_lower.endswith((".xlsx", ".xls"))
 
     if not is_csv_upload and not is_workbook_upload:
-        raise HTTPException(status_code=400, detail="Only CSV and Excel workbook uploads are supported")
+        raise HTTPException(
+            status_code=400, detail="Only CSV and Excel workbook uploads are supported"
+        )
 
     dataset_id = uuid4().hex
     safe_filename = sanitize_filename(file.filename)
@@ -1573,7 +1803,9 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     except duckdb.Error as error:
         uploaded_path.unlink(missing_ok=True)
         duckdb_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Could not load CSV: {error}") from error
+        raise HTTPException(
+            status_code=400, detail=f"Could not load CSV: {error}"
+        ) from error
     except HTTPException:
         uploaded_path.unlink(missing_ok=True)
         duckdb_path.unlink(missing_ok=True)
@@ -1583,7 +1815,9 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
 
     schema = json_safe_payload(schema)
     preview = json_safe_payload(preview)
-    workbook_metadata = json_safe_payload(workbook_metadata) if workbook_metadata else None
+    workbook_metadata = (
+        json_safe_payload(workbook_metadata) if workbook_metadata else None
+    )
 
     metadata = {
         "dataset_id": dataset_id,
@@ -1632,7 +1866,9 @@ def update_workspace_manifest(
     for key, value in updates.items():
         if value is not None:
             if key == "workspace_name":
-                manifest[key] = normalize_workspace_name(value, manifest.get("workspace_name", "Untitled workspace"))
+                manifest[key] = normalize_workspace_name(
+                    value, manifest.get("workspace_name", "Untitled workspace")
+                )
             else:
                 manifest[key] = value
 
@@ -1640,9 +1876,16 @@ def update_workspace_manifest(
         dataset["dataset_id"] == manifest["active_dataset_id"]
         for dataset in manifest.get("datasets", [])
     ):
-        manifest["active_dataset_id"] = manifest["datasets"][0]["dataset_id"] if manifest.get("datasets") else None
+        manifest["active_dataset_id"] = (
+            manifest["datasets"][0]["dataset_id"] if manifest.get("datasets") else None
+        )
 
-    if manifest.get("current_result_tab") not in (None, "preview", "filtered", "queried"):
+    if manifest.get("current_result_tab") not in (
+        None,
+        "preview",
+        "filtered",
+        "queried",
+    ):
         manifest["current_result_tab"] = "preview"
     if manifest.get("active_result_id") not in (None, "preview", "filtered", "queried"):
         manifest["active_result_id"] = manifest.get("current_result_tab") or "preview"
@@ -1659,7 +1902,9 @@ def delete_workspace_manifest(workspace_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Workspace manifest not found")
 
     try:
-        manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+        manifest = normalize_workspace_manifest(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
         health = workspace_manifest_health(manifest)
         status = health["status"]
     except (json.JSONDecodeError, OSError, TypeError):
@@ -1740,7 +1985,8 @@ def delete_dataset(dataset_id: str) -> dict[str, Any]:
             continue
 
         filtered_datasets = [
-            entry for entry in datasets
+            entry
+            for entry in datasets
             if not (isinstance(entry, dict) and entry.get("dataset_id") == dataset_id)
         ]
         changed = len(filtered_datasets) != len(datasets)
@@ -1792,9 +2038,13 @@ def get_dataset_preview(
     schema = metadata["schema"]
     total_count = metadata["row_count"]
     if worksheet_id:
-        workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+        workbook_metadata = normalize_workbook_manifest_metadata(
+            metadata.get("workbook_metadata")
+        )
         if not workbook_metadata:
-            raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+            raise HTTPException(
+                status_code=400, detail="Dataset does not contain workbook metadata"
+            )
 
         worksheet = next(
             (
@@ -1807,15 +2057,23 @@ def get_dataset_preview(
         if not worksheet:
             raise HTTPException(status_code=404, detail="Worksheet was not found")
         if worksheet.get("status") != "ready":
-            raise HTTPException(status_code=400, detail="Only ready worksheets can be previewed")
+            raise HTTPException(
+                status_code=400, detail="Only ready worksheets can be previewed"
+            )
 
         table_name = worksheet.get("table_name")
         if not table_name:
-            raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
-        schema = worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
+            raise HTTPException(
+                status_code=400, detail="Worksheet table mapping is missing"
+            )
+        schema = (
+            worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
+        )
 
     valid_columns = {column["name"] for column in schema}
-    order_by = SortDefinition(column=sort_by, direction=sort_direction) if sort_by else None
+    order_by = (
+        SortDefinition(column=sort_by, direction=sort_direction) if sort_by else None
+    )
     with get_connection(dataset_id) as connection:
         if worksheet_id:
             table_exists = connection.execute(
@@ -1827,12 +2085,16 @@ def get_dataset_preview(
                 [table_name],
             ).fetchone()[0]
             if not table_exists:
-                raise HTTPException(status_code=404, detail="Worksheet table is missing")
+                raise HTTPException(
+                    status_code=404, detail="Worksheet table is missing"
+                )
             total_count = connection.execute(
                 f"SELECT COUNT(*) FROM {quote_identifier(table_name)}"
             ).fetchone()[0]
 
-        rows = fetch_preview(connection, limit, page, order_by, valid_columns, table_name)
+        rows = fetch_preview(
+            connection, limit, page, order_by, valid_columns, table_name
+        )
 
     return {
         "dataset_id": dataset_id,
@@ -1867,14 +2129,24 @@ def get_original_workbook_layout(
     column_limit: int = 50,
 ) -> dict[str, Any]:
     if row_start < 1 or column_start < 1:
-        raise HTTPException(status_code=400, detail="Original workbook layout starts must be 1 or greater")
+        raise HTTPException(
+            status_code=400,
+            detail="Original workbook layout starts must be 1 or greater",
+        )
     if row_limit < 1 or column_limit < 1:
-        raise HTTPException(status_code=400, detail="Original workbook layout limits must be 1 or greater")
+        raise HTTPException(
+            status_code=400,
+            detail="Original workbook layout limits must be 1 or greater",
+        )
 
     metadata = get_dataset_metadata(dataset_id)
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     worksheet = next(
         (
@@ -1887,11 +2159,16 @@ def get_original_workbook_layout(
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     if worksheet.get("status") not in ("ready", "empty"):
-        raise HTTPException(status_code=400, detail="Worksheet is not available for original workbook view")
+        raise HTTPException(
+            status_code=400,
+            detail="Worksheet is not available for original workbook view",
+        )
 
     uploaded_path = metadata.get("uploaded_path")
     if not uploaded_path:
-        raise HTTPException(status_code=404, detail="Original workbook file mapping is missing")
+        raise HTTPException(
+            status_code=404, detail="Original workbook file mapping is missing"
+        )
 
     return extract_original_workbook_layout(
         workbook_path=Path(uploaded_path),
@@ -1913,21 +2190,29 @@ def _get_cleaning_recipe_preview(
     transformation_plan: Any | None = None,
 ) -> dict[str, Any]:
     if row_limit < 1:
-        raise HTTPException(status_code=400, detail="Cleaning recipe preview limit must be 1 or greater")
+        raise HTTPException(
+            status_code=400, detail="Cleaning recipe preview limit must be 1 or greater"
+        )
 
     metadata = get_dataset_metadata(dataset_id)
     uploaded_path = metadata.get("uploaded_path")
     if not uploaded_path:
-        raise HTTPException(status_code=404, detail="Original workbook file mapping is missing")
+        raise HTTPException(
+            status_code=404, detail="Original workbook file mapping is missing"
+        )
     if Path(uploaded_path).suffix.lower() != ".xlsx":
         raise HTTPException(
             status_code=400,
             detail="Cleaning recipe preview currently supports XLSX workbooks only",
         )
 
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     worksheet = next(
         (
@@ -1949,10 +2234,13 @@ def _get_cleaning_recipe_preview(
         row_limit=row_limit,
         structural_decision_plan=structural_decision_plan,
         missing_value_plan=missing_value_plan,
+        transformation_plan=transformation_plan,
     )
 
 
-@app.get("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview")
+@app.get(
+    "/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview"
+)
 def get_cleaning_recipe_preview(
     dataset_id: str,
     worksheet_id: str,
@@ -1965,7 +2253,9 @@ def get_cleaning_recipe_preview(
     )
 
 
-@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview")
+@app.post(
+    "/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview"
+)
 def preview_cleaning_recipe_with_structural_decisions(
     dataset_id: str,
     worksheet_id: str,
@@ -1981,7 +2271,9 @@ def preview_cleaning_recipe_with_structural_decisions(
     )
 
 
-@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/apply-cleaning-recipe")
+@app.post(
+    "/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/apply-cleaning-recipe"
+)
 def apply_workbook_cleaning_recipe(
     dataset_id: str,
     worksheet_id: str,
@@ -2021,7 +2313,9 @@ def apply_workbook_cleaning_recipe(
             ),
         )
 
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
         raise HTTPException(
             status_code=400,
@@ -2054,9 +2348,13 @@ def apply_workbook_cleaning_recipe(
             detail="Return to the original analysis table before recreating this cleaned working copy",
         )
 
-    validate_structural_decision_plan_scope(request.structural_decision_plan, worksheet_id)
+    validate_structural_decision_plan_scope(
+        request.structural_decision_plan, worksheet_id
+    )
     validate_missing_value_plan_scope(request.missing_value_plan, worksheet_id)
-    validate_transformation_plan_scope(request.transformation_plan, worksheet_id, worksheet)
+    validate_transformation_plan_scope(
+        request.transformation_plan, worksheet_id, worksheet
+    )
 
     result = apply_cleaning_recipe_to_working_copy(
         workbook_path=uploaded_path,
@@ -2066,6 +2364,7 @@ def apply_workbook_cleaning_recipe(
         row_limit_preview=request.row_limit_preview,
         structural_decision_plan=request.structural_decision_plan,
         missing_value_plan=request.missing_value_plan,
+        transformation_plan=request.transformation_plan,
     )
 
     # Persist a working-copy record only when something was actually written.
@@ -2075,8 +2374,11 @@ def apply_workbook_cleaning_recipe(
         cleaned_copies_raw = workbook_metadata.get("cleaned_working_copies")
         cleaned_copies = [
             entry
-            for entry in (cleaned_copies_raw if isinstance(cleaned_copies_raw, list) else [])
-            if isinstance(entry, dict) and entry.get("source_worksheet_id") != worksheet_id
+            for entry in (
+                cleaned_copies_raw if isinstance(cleaned_copies_raw, list) else []
+            )
+            if isinstance(entry, dict)
+            and entry.get("source_worksheet_id") != worksheet_id
         ]
         created_at = datetime.now(timezone.utc).isoformat()
         cleaned_copies.append(
@@ -2111,7 +2413,9 @@ def apply_workbook_cleaning_recipe(
     return result
 
 
-@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/apply-missing-value-decisions")
+@app.post(
+    "/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/apply-missing-value-decisions"
+)
 def apply_workbook_missing_value_decisions(
     dataset_id: str,
     worksheet_id: str,
@@ -2123,9 +2427,13 @@ def apply_workbook_missing_value_decisions(
     if not duckdb_path_value:
         raise HTTPException(status_code=400, detail="Dataset has no session storage")
 
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     worksheet = next(
         (
@@ -2138,7 +2446,10 @@ def apply_workbook_missing_value_decisions(
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     if worksheet.get("status") != "ready":
-        raise HTTPException(status_code=400, detail="Only ready worksheets can apply missing-value decisions")
+        raise HTTPException(
+            status_code=400,
+            detail="Only ready worksheets can apply missing-value decisions",
+        )
 
     active_analysis_source = workbook_metadata.get("active_analysis_source")
     if (
@@ -2155,7 +2466,8 @@ def apply_workbook_missing_value_decisions(
         (
             candidate
             for candidate in workbook_metadata.get("cleaned_working_copies", [])
-            if isinstance(candidate, dict) and candidate.get("source_worksheet_id") == worksheet_id
+            if isinstance(candidate, dict)
+            and candidate.get("source_worksheet_id") == worksheet_id
         ),
         None,
     )
@@ -2172,13 +2484,19 @@ def apply_workbook_missing_value_decisions(
         "decide_per_column",
     }
     if request.worksheet_strategy not in allowed_worksheet_strategies:
-        raise HTTPException(status_code=400, detail="Unsupported worksheet missing-value strategy")
+        raise HTTPException(
+            status_code=400, detail="Unsupported worksheet missing-value strategy"
+        )
 
     result = apply_missing_value_decisions_to_cleaned_copy(
         duckdb_path=Path(str(duckdb_path_value)),
         cleaned_table_name=str(cleaned_copy["cleaned_table_name"]),
-        worksheet_schema=worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else [],
-        worksheet_name=str(worksheet.get("display_name") or worksheet.get("sheet_name") or worksheet_id),
+        worksheet_schema=(
+            worksheet.get("schema") if isinstance(worksheet.get("schema"), list) else []
+        ),
+        worksheet_name=str(
+            worksheet.get("display_name") or worksheet.get("sheet_name") or worksheet_id
+        ),
         worksheet_strategy=request.worksheet_strategy,
         column_decisions=[
             {
@@ -2236,7 +2554,9 @@ def activate_workbook_analysis_table(
                 [table_name],
             ).fetchone()[0]
             if not table_exists:
-                raise HTTPException(status_code=404, detail="Analysis source table is missing")
+                raise HTTPException(
+                    status_code=404, detail="Analysis source table is missing"
+                )
 
             connection.execute(
                 f"CREATE OR REPLACE VIEW {quote_identifier(TABLE_NAME)} AS SELECT * FROM {quote_identifier(table_name)}"
@@ -2247,7 +2567,9 @@ def activate_workbook_analysis_table(
     except HTTPException:
         raise
     except duckdb.Error as error:
-        raise HTTPException(status_code=400, detail=f"Analysis source switch failed: {error}") from error
+        raise HTTPException(
+            status_code=400, detail=f"Analysis source switch failed: {error}"
+        ) from error
 
     activated_at = datetime.now(timezone.utc).isoformat()
     active_analysis_source = {
@@ -2280,15 +2602,21 @@ def activate_workbook_analysis_table(
     }
 
 
-@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/activate-cleaned-copy")
+@app.post(
+    "/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/activate-cleaned-copy"
+)
 def activate_cleaned_working_copy(
     dataset_id: str,
     worksheet_id: str,
 ) -> dict[str, Any]:
     metadata = get_dataset_metadata(dataset_id)
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     worksheet = next(
         (
@@ -2301,18 +2629,24 @@ def activate_cleaned_working_copy(
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     if worksheet.get("status") != "ready":
-        raise HTTPException(status_code=400, detail="Only ready worksheets can use a cleaned working copy")
+        raise HTTPException(
+            status_code=400,
+            detail="Only ready worksheets can use a cleaned working copy",
+        )
 
     cleaned_copy = next(
         (
             candidate
             for candidate in workbook_metadata.get("cleaned_working_copies", [])
-            if isinstance(candidate, dict) and candidate.get("source_worksheet_id") == worksheet_id
+            if isinstance(candidate, dict)
+            and candidate.get("source_worksheet_id") == worksheet_id
         ),
         None,
     )
     if not cleaned_copy or not cleaned_copy.get("cleaned_table_name"):
-        raise HTTPException(status_code=404, detail="Cleaned working copy was not found")
+        raise HTTPException(
+            status_code=404, detail="Cleaned working copy was not found"
+        )
 
     return activate_workbook_analysis_table(
         dataset_id=dataset_id,
@@ -2324,15 +2658,21 @@ def activate_cleaned_working_copy(
     )
 
 
-@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/activate-original-copy")
+@app.post(
+    "/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/activate-original-copy"
+)
 def activate_original_analysis_table(
     dataset_id: str,
     worksheet_id: str,
 ) -> dict[str, Any]:
     metadata = get_dataset_metadata(dataset_id)
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     worksheet = next(
         (
@@ -2345,10 +2685,14 @@ def activate_original_analysis_table(
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     if worksheet.get("status") != "ready":
-        raise HTTPException(status_code=400, detail="Only ready worksheets can be activated")
+        raise HTTPException(
+            status_code=400, detail="Only ready worksheets can be activated"
+        )
     table_name = worksheet.get("table_name")
     if not table_name:
-        raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
+        raise HTTPException(
+            status_code=400, detail="Worksheet table mapping is missing"
+        )
 
     return activate_workbook_analysis_table(
         dataset_id=dataset_id,
@@ -2366,9 +2710,13 @@ def select_workbook_worksheet(
     request: WorkbookWorksheetSelectionRequest,
 ) -> dict[str, Any]:
     metadata = get_dataset_metadata(dataset_id)
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     worksheet = next(
         (
@@ -2381,11 +2729,15 @@ def select_workbook_worksheet(
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     if worksheet.get("status") != "ready":
-        raise HTTPException(status_code=400, detail="Only ready worksheets can be selected")
+        raise HTTPException(
+            status_code=400, detail="Only ready worksheets can be selected"
+        )
 
     table_name = worksheet.get("table_name")
     if not table_name:
-        raise HTTPException(status_code=400, detail="Worksheet table mapping is missing")
+        raise HTTPException(
+            status_code=400, detail="Worksheet table mapping is missing"
+        )
 
     return activate_workbook_analysis_table(
         dataset_id=dataset_id,
@@ -2403,13 +2755,20 @@ def review_workbook_relationship(
     request: WorkbookRelationshipReviewRequest,
 ) -> dict[str, Any]:
     metadata = get_dataset_metadata(dataset_id)
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     review_status = request.review_status
     if review_status not in ("pending", "accepted", "dismissed"):
-        raise HTTPException(status_code=400, detail="Review status must be pending, accepted, or dismissed")
+        raise HTTPException(
+            status_code=400,
+            detail="Review status must be pending, accepted, or dismissed",
+        )
 
     candidates = workbook_metadata.get("relationship_candidates")
     if not isinstance(candidates, list):
@@ -2424,14 +2783,20 @@ def review_workbook_relationship(
         None,
     )
     if not candidate:
-        raise HTTPException(status_code=404, detail="Relationship candidate was not found")
+        raise HTTPException(
+            status_code=404, detail="Relationship candidate was not found"
+        )
 
     candidate["review_status"] = review_status
-    candidate["reviewed_at"] = datetime.now(timezone.utc).isoformat() if review_status != "pending" else None
+    candidate["reviewed_at"] = (
+        datetime.now(timezone.utc).isoformat() if review_status != "pending" else None
+    )
     candidate["reviewed_by"] = "local-workspace" if review_status != "pending" else None
     candidate["review_notes"] = (request.notes or "").strip()[:500] or None
     workbook_metadata["relationship_candidates"] = candidates
-    workbook_metadata = upsert_contract_for_candidate(workbook_metadata, candidate, review_status)
+    workbook_metadata = upsert_contract_for_candidate(
+        workbook_metadata, candidate, review_status
+    )
     workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
     metadata["workbook_metadata"] = workbook_metadata
     dataset_sessions[dataset_id] = metadata
@@ -2439,9 +2804,17 @@ def review_workbook_relationship(
 
     summary = {
         "total": len(candidates),
-        "pending": sum(1 for item in candidates if item.get("review_status", "pending") == "pending"),
-        "accepted": sum(1 for item in candidates if item.get("review_status") == "accepted"),
-        "dismissed": sum(1 for item in candidates if item.get("review_status") == "dismissed"),
+        "pending": sum(
+            1
+            for item in candidates
+            if item.get("review_status", "pending") == "pending"
+        ),
+        "accepted": sum(
+            1 for item in candidates if item.get("review_status") == "accepted"
+        ),
+        "dismissed": sum(
+            1 for item in candidates if item.get("review_status") == "dismissed"
+        ),
     }
 
     return {
@@ -2455,9 +2828,13 @@ def review_workbook_relationship(
 @app.get("/datasets/{dataset_id}/workbook/contract-diagnostics")
 def get_workbook_contract_diagnostics(dataset_id: str) -> dict[str, Any]:
     metadata = get_dataset_metadata(dataset_id)
-    workbook_metadata = normalize_workbook_manifest_metadata(metadata.get("workbook_metadata"))
+    workbook_metadata = normalize_workbook_manifest_metadata(
+        metadata.get("workbook_metadata")
+    )
     if not workbook_metadata:
-        raise HTTPException(status_code=400, detail="Dataset does not contain workbook metadata")
+        raise HTTPException(
+            status_code=400, detail="Dataset does not contain workbook metadata"
+        )
 
     existing_tables: set[str] = set()
     try:
@@ -2469,7 +2846,9 @@ def get_workbook_contract_diagnostics(dataset_id: str) -> dict[str, Any]:
                 ).fetchall()
             }
     except duckdb.Error as error:
-        raise HTTPException(status_code=400, detail=f"Contract diagnostics failed: {error}") from error
+        raise HTTPException(
+            status_code=400, detail=f"Contract diagnostics failed: {error}"
+        ) from error
 
     diagnostics = analyze_contract_diagnostics(workbook_metadata, existing_tables)
     return {
@@ -2486,7 +2865,9 @@ def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
 
     with get_connection(dataset_id) as connection:
         try:
-            where_clause, params = build_filter_where_clause(request.filters, valid_columns)
+            where_clause, params = build_filter_where_clause(
+                request.filters, valid_columns
+            )
             order_clause = build_order_clause(request.order_by, valid_columns)
             query = f"SELECT * FROM {TABLE_NAME} {where_clause} {order_clause} LIMIT ? OFFSET ?"
             count_query = f"SELECT COUNT(*) FROM {TABLE_NAME} {where_clause}"
@@ -2497,7 +2878,9 @@ def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
             columns, rows = rows_to_dicts(preview_result)
             filtered_count = connection.execute(count_query, params).fetchone()[0]
         except duckdb.Error as error:
-            raise HTTPException(status_code=400, detail=f"Filter failed: {error}") from error
+            raise HTTPException(
+                status_code=400, detail=f"Filter failed: {error}"
+            ) from error
 
     return {
         "dataset_id": dataset_id,
@@ -2512,18 +2895,24 @@ def filter_dataset(dataset_id: str, request: FilterRequest) -> dict[str, Any]:
 
 
 @app.post("/datasets/{dataset_id}/query-builder")
-def query_builder_dataset(dataset_id: str, request: QueryBuilderRequest) -> dict[str, Any]:
+def query_builder_dataset(
+    dataset_id: str, request: QueryBuilderRequest
+) -> dict[str, Any]:
     metadata = get_dataset_metadata(dataset_id)
     valid_columns = {column["name"] for column in metadata["schema"]}
 
     with get_connection(dataset_id) as connection:
         try:
-            sql, count_sql, params, count_params = build_query_builder_sql(request, valid_columns)
+            sql, count_sql, params, count_params = build_query_builder_sql(
+                request, valid_columns
+            )
             result = connection.execute(sql, params)
             columns, rows = rows_to_dicts(result)
             total_count = connection.execute(count_sql, count_params).fetchone()[0]
         except duckdb.Error as error:
-            raise HTTPException(status_code=400, detail=f"Query builder failed: {error}") from error
+            raise HTTPException(
+                status_code=400, detail=f"Query builder failed: {error}"
+            ) from error
 
     return {
         "dataset_id": dataset_id,
@@ -2546,7 +2935,9 @@ def export_dataset(dataset_id: str, request: ExportRequest) -> Response:
         try:
             if source == "query_builder":
                 if not request.query_builder:
-                    raise HTTPException(status_code=400, detail="Query builder definition is required")
+                    raise HTTPException(
+                        status_code=400, detail="Query builder definition is required"
+                    )
 
                 export_query = request.query_builder.model_copy(
                     update={"page": 1, "limit": request.limit}
@@ -2555,9 +2946,13 @@ def export_dataset(dataset_id: str, request: ExportRequest) -> Response:
                 result = connection.execute(sql, params)
 
             elif source in ("preview", "filter"):
-                where_clause, params = build_filter_where_clause(request.filters, valid_columns)
+                where_clause, params = build_filter_where_clause(
+                    request.filters, valid_columns
+                )
                 order_clause = build_order_clause(request.order_by, valid_columns)
-                sql = f"SELECT * FROM {TABLE_NAME} {where_clause} {order_clause} LIMIT ?"
+                sql = (
+                    f"SELECT * FROM {TABLE_NAME} {where_clause} {order_clause} LIMIT ?"
+                )
                 result = connection.execute(sql, [*params, request.limit])
 
             else:
@@ -2565,7 +2960,9 @@ def export_dataset(dataset_id: str, request: ExportRequest) -> Response:
 
             columns, rows = rows_to_dicts(result)
         except duckdb.Error as error:
-            raise HTTPException(status_code=400, detail=f"Export failed: {error}") from error
+            raise HTTPException(
+                status_code=400, detail=f"Export failed: {error}"
+            ) from error
 
     return csv_response(columns, rows, f"{metadata['filename']}_export.csv")
 
@@ -2576,7 +2973,9 @@ def query_dataset(dataset_id: str, request: QueryRequest) -> dict[str, Any]:
         try:
             result = run_limited_query(connection, request.sql, request.limit)
         except duckdb.Error as error:
-            raise HTTPException(status_code=400, detail=f"Query failed: {error}") from error
+            raise HTTPException(
+                status_code=400, detail=f"Query failed: {error}"
+            ) from error
 
     return {
         "dataset_id": dataset_id,

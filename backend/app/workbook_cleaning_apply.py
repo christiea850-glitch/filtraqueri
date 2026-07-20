@@ -23,17 +23,23 @@ from fastapi import HTTPException
 from .workbook_cleaning_contract import (
     WorkbookMissingValuePlan,
     WorkbookStructuralDecisionPlan,
+    WorkbookTransformationPlan,
     validate_missing_value_plan_scope,
+    validate_transformation_plan_scope,
 )
 from .workbook_cleaning_missing_value_plan import (
     apply_missing_value_plan_to_rows,
+    column_types_by_name,
     empty_missing_value_summary,
 )
 from .workbook_cleaning_preview import (
     MAX_CLEANING_PREVIEW_ROWS,
     compute_cleaning_recipe_plan,
 )
-
+from .workbook_cleaning_transformations import (
+    apply_transformation_plan_to_rows,
+    empty_transformation_summary,
+)
 
 MAX_CLEANED_TABLE_NAME_LENGTH = 120
 CLEANED_TABLE_PREFIX = "cleaned_"
@@ -95,6 +101,7 @@ def _no_op_response(
             for key, value in empty_missing_value_summary().items()
             if key != "kept_row_indexes"
         },
+        "transformation_summary": empty_transformation_summary(),
         "preview_rows": [],
         "preview_row_limit": row_limit_preview,
         "message": (
@@ -113,6 +120,7 @@ def apply_cleaning_recipe_to_working_copy(
     row_limit_preview: int = 25,
     structural_decision_plan: WorkbookStructuralDecisionPlan | None = None,
     missing_value_plan: WorkbookMissingValuePlan | None = None,
+    transformation_plan: WorkbookTransformationPlan | None = None,
 ) -> dict[str, Any]:
     """Apply the cleaning recipe to a new DuckDB table without mutating sources.
 
@@ -122,7 +130,9 @@ def apply_cleaning_recipe_to_working_copy(
     happens and a `no_recipe_needed` response is returned.
     """
     if not duckdb_path.exists():
-        raise HTTPException(status_code=404, detail="Dataset session storage is missing")
+        raise HTTPException(
+            status_code=404, detail="Dataset session storage is missing"
+        )
 
     plan = compute_cleaning_recipe_plan(
         workbook_path=workbook_path,
@@ -130,6 +140,12 @@ def apply_cleaning_recipe_to_working_copy(
         structural_decision_plan=structural_decision_plan,
     )
     validate_missing_value_plan_scope(missing_value_plan, str(plan["worksheet_id"]))
+    validate_transformation_plan_scope(
+        transformation_plan,
+        str(plan["worksheet_id"]),
+        worksheet,
+        shaped_columns=plan.get("output_columns", []),
+    )
     clamped_preview_limit = min(max(row_limit_preview, 1), MAX_CLEANING_PREVIEW_ROWS)
 
     output_columns: list[str] = plan.get("output_columns", [])
@@ -142,9 +158,22 @@ def apply_cleaning_recipe_to_working_copy(
             missing_value_plan=missing_value_plan,
         )
     )
+    transformation_result = apply_transformation_plan_to_rows(
+        rows=rows_after_missing_values,
+        columns=output_columns,
+        schema=column_types_by_name(worksheet),
+        transformation_plan=transformation_plan,
+    )
+    rows_after_missing_values = transformation_result.rows
+    output_columns = transformation_result.columns
+    has_transformation_changes = transformation_result.has_changes
     has_structural_changes = bool(plan.get("recipe"))
 
-    if plan.get("is_empty") or (not has_structural_changes and not has_missing_value_changes):
+    if plan.get("is_empty") or (
+        not has_structural_changes
+        and not has_missing_value_changes
+        and not has_transformation_changes
+    ):
         return _no_op_response(
             dataset_id=dataset_id,
             plan=plan,
@@ -172,13 +201,18 @@ def apply_cleaning_recipe_to_working_copy(
             # the latest recipe. Source tables and the active VIEW are not
             # referenced here at all.
             connection.execute(f"DROP TABLE IF EXISTS {quoted_table_name}")
-            connection.execute(f"CREATE TABLE {quoted_table_name} ({column_definitions})")
+            connection.execute(
+                f"CREATE TABLE {quoted_table_name} ({column_definitions})"
+            )
             if cleaned_rows:
                 placeholders = ", ".join(["?"] * len(output_columns))
                 connection.executemany(
                     f"INSERT INTO {quoted_table_name} VALUES ({placeholders})",
                     [
-                        tuple(_to_varchar_value(row.get(column)) for column in output_columns)
+                        tuple(
+                            _to_varchar_value(row.get(column))
+                            for column in output_columns
+                        )
                         for row in cleaned_rows
                     ],
                 )
@@ -213,6 +247,7 @@ def apply_cleaning_recipe_to_working_copy(
             for key, value in missing_value_summary.items()
             if key != "kept_row_indexes"
         },
+        "transformation_summary": transformation_result.transformation_summary,
         "preview_rows": preview_rows,
         "preview_row_limit": clamped_preview_limit,
         "message": (

@@ -7,7 +7,6 @@ from typing import Annotated, Any, Literal
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-
 StructuralDecisionValue = Literal["use_recommendation", "keep_original", "decide_later"]
 StructuralEvidenceType = Literal[
     "repeated_header",
@@ -138,7 +137,9 @@ class WorkbookMissingValuePlan(BaseModel):
 
     worksheet_id: str = Field(..., min_length=1)
     worksheet_strategy: str = Field(..., min_length=1)
-    column_decisions: list[WorkbookMissingValueColumnDecision] = Field(default_factory=list)
+    column_decisions: list[WorkbookMissingValueColumnDecision] = Field(
+        default_factory=list
+    )
 
 
 class WorkbookTransformationStep(BaseModel):
@@ -214,7 +215,9 @@ def validate_structural_decision_plan_scope(
                 status_code=400,
                 detail="Structural decision recommendation_id must be scoped to the selected worksheet",
             )
-        if decision.evidence_signal_id and not decision.evidence_signal_id.startswith(f"{worksheet_id}:"):
+        if decision.evidence_signal_id and not decision.evidence_signal_id.startswith(
+            f"{worksheet_id}:"
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Structural decision evidence_signal_id must be scoped to the selected worksheet",
@@ -284,7 +287,9 @@ def _column_types_by_name(worksheet: dict[str, Any] | None) -> dict[str, str]:
 
 
 def _is_valid_output_column_name(value: str | None) -> bool:
-    return bool(value and value.strip() == value and OUTPUT_COLUMN_NAME_PATTERN.fullmatch(value))
+    return bool(
+        value and value.strip() == value and OUTPUT_COLUMN_NAME_PATTERN.fullmatch(value)
+    )
 
 
 def _validate_transformation_parameters(step: WorkbookTransformationStep) -> None:
@@ -293,23 +298,38 @@ def _validate_transformation_parameters(step: WorkbookTransformationStep) -> Non
         lower = parameters.get("lower_percentile")
         upper = parameters.get("upper_percentile")
         if not isinstance(lower, (int, float)) or not isinstance(upper, (int, float)):
-            raise HTTPException(status_code=400, detail="Percentile transformation requires numeric bounds")
+            raise HTTPException(
+                status_code=400,
+                detail="Percentile transformation requires numeric bounds",
+            )
         if lower < 0 or upper > 100 or lower >= upper:
             raise HTTPException(status_code=400, detail="Percentile bounds are invalid")
     elif step.kind == "ordinal_encode":
         order = parameters.get("order")
-        if not isinstance(order, list) or len(order) < 2 or not all(str(item).strip() for item in order):
-            raise HTTPException(status_code=400, detail="Ordinal encoding requires a category order")
+        if (
+            not isinstance(order, list)
+            or len(order) < 2
+            or not all(str(item).strip() for item in order)
+        ):
+            raise HTTPException(
+                status_code=400, detail="Ordinal encoding requires a category order"
+            )
     elif step.kind == "days_since":
         anchor_date = parameters.get("anchor_date")
         if not isinstance(anchor_date, str) or not anchor_date.strip():
-            raise HTTPException(status_code=400, detail="days_since requires an anchor_date")
+            raise HTTPException(
+                status_code=400, detail="days_since requires an anchor_date"
+            )
         try:
             date.fromisoformat(anchor_date)
         except ValueError as error:
-            raise HTTPException(status_code=400, detail="days_since anchor_date must use yyyy-mm-dd") from error
+            raise HTTPException(
+                status_code=400, detail="days_since anchor_date must use yyyy-mm-dd"
+            ) from error
     elif parameters:
-        raise HTTPException(status_code=400, detail=f"{step.kind} does not accept parameters")
+        raise HTTPException(
+            status_code=400, detail=f"{step.kind} does not accept parameters"
+        )
 
 
 def validate_transformation_plan_scope(
@@ -336,52 +356,129 @@ def validate_transformation_plan_scope(
             detail="Transformation plan worksheet_id must match the selected worksheet",
         )
     if not plan.pipeline_id.strip():
-        raise HTTPException(status_code=400, detail="Transformation plan pipeline_id is required")
+        raise HTTPException(
+            status_code=400, detail="Transformation plan pipeline_id is required"
+        )
 
     column_types = _column_types_by_name(worksheet)
-    existing_columns = set(shaped_columns if shaped_columns is not None else column_types.keys())
+    existing_columns = set(
+        shaped_columns if shaped_columns is not None else column_types.keys()
+    )
     seen_step_ids: set[str] = set()
     seen_orders: set[int] = set()
     generated_outputs: set[str] = set()
 
-    for step in plan.steps:
+    for step in sorted(plan.steps, key=lambda item: item.order):
         if not step.step_id.strip():
-            raise HTTPException(status_code=400, detail="Transformation step_id is required")
+            raise HTTPException(
+                status_code=400, detail="Transformation step_id is required"
+            )
         if step.step_id in seen_step_ids:
-            raise HTTPException(status_code=400, detail="Transformation plan contains duplicate step_id values")
+            raise HTTPException(
+                status_code=400,
+                detail="Transformation plan contains duplicate step_id values",
+            )
         seen_step_ids.add(step.step_id)
 
         if step.order in seen_orders:
-            raise HTTPException(status_code=400, detail="Transformation plan contains duplicate order values")
+            raise HTTPException(
+                status_code=400,
+                detail="Transformation plan contains duplicate order values",
+            )
         seen_orders.add(step.order)
 
         if step.kind in BLOCKED_TRANSFORMATION_KINDS:
-            raise HTTPException(status_code=400, detail=f"Transformation kind is blocked: {step.kind}")
+            raise HTTPException(
+                status_code=400, detail=f"Transformation kind is blocked: {step.kind}"
+            )
         if step.kind not in SUPPORTED_TRANSFORMATION_KINDS:
-            raise HTTPException(status_code=400, detail=f"Unsupported transformation kind: {step.kind}")
+            raise HTTPException(
+                status_code=400, detail=f"Unsupported transformation kind: {step.kind}"
+            )
         if step.target_column not in existing_columns:
-            raise HTTPException(status_code=400, detail=f"Unknown transformation target column: {step.target_column}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown transformation target column: {step.target_column}",
+            )
 
         inferred_type = column_types.get(step.target_column)
-        if inferred_type and step.kind not in TRANSFORMATION_KINDS_BY_TYPE.get(inferred_type, set()):
-            raise HTTPException(status_code=400, detail="Transformation kind is invalid for target datatype")
+        if inferred_type and step.kind not in TRANSFORMATION_KINDS_BY_TYPE.get(
+            inferred_type, set()
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Transformation kind is invalid for target datatype",
+            )
 
         _validate_transformation_parameters(step)
 
         if step.kind in TRANSFORMATION_KINDS_REQUIRING_NEW_OUTPUT:
             if not _is_valid_output_column_name(step.output_column):
-                raise HTTPException(status_code=400, detail="Transformation output_column is invalid")
+                raise HTTPException(
+                    status_code=400, detail="Transformation output_column is invalid"
+                )
             if step.output_column == step.target_column:
                 raise HTTPException(
                     status_code=400,
                     detail="Transformation requires a new output column",
                 )
-            if step.output_column in existing_columns or step.output_column in generated_outputs:
-                raise HTTPException(status_code=400, detail="Transformation output_column collides with an existing column")
+            if (
+                step.output_column in existing_columns
+                or step.output_column in generated_outputs
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Transformation output_column collides with an existing column",
+                )
             generated_outputs.add(step.output_column)
+            existing_columns.add(step.output_column)
+            if step.kind in {
+                "extract_year",
+                "extract_month",
+                "extract_quarter",
+                "extract_day_of_week",
+                "days_since",
+                "ordinal_encode",
+                "frequency_encode",
+                "log_transform",
+                "z_score_scale",
+                "min_max_scale",
+            }:
+                column_types[step.output_column] = "numeric"
         elif step.kind in TRANSFORMATION_REPLACEMENT_KINDS:
-            if step.output_column is not None and step.output_column != step.target_column:
-                raise HTTPException(status_code=400, detail="Replacement transformation cannot create a new output column")
+            if (
+                step.kind == "boolean_to_integer"
+                and step.output_column
+                and step.output_column != step.target_column
+            ):
+                if not _is_valid_output_column_name(step.output_column):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Transformation output_column is invalid",
+                    )
+                if (
+                    step.output_column in existing_columns
+                    or step.output_column in generated_outputs
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Transformation output_column collides with an existing column",
+                    )
+                generated_outputs.add(step.output_column)
+                existing_columns.add(step.output_column)
+                column_types[step.output_column] = "numeric"
+            elif (
+                step.output_column is not None
+                and step.output_column != step.target_column
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Replacement transformation cannot create a new output column",
+                )
+            if step.kind == "boolean_to_integer":
+                column_types[step.target_column] = "numeric"
+            elif step.kind in {"trim_whitespace", "lowercase", "uppercase"}:
+                column_types[step.target_column] = "text"
 
     if seen_orders and seen_orders != set(range(len(seen_orders))):
         raise HTTPException(
