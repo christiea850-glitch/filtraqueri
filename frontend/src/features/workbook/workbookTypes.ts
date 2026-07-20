@@ -58,6 +58,11 @@ export type WorksheetStructuralDecision = {
   recommendationId: string;
   evidenceType: WorksheetTemplateStructureEvidenceType;
   decision: StructuralDecisionChoice;
+  evidenceIds?: string[];
+  evidenceSignalId?: string;
+  affectedRows?: number[];
+  affectedColumnIndexes?: number[];
+  affectedColumns?: string[];
 };
 
 export type WorksheetStructuralDecisionPlan = {

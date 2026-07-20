@@ -17,9 +17,11 @@ def valid_decision_payload() -> dict:
         "recommendation_id": f"{WORKSHEET_ID}:automatic_blank_row:0",
         "evidence_type": "automatic_blank_row",
         "evidence_signal_id": f"{WORKSHEET_ID}:automatic_blank_row:0",
+        "evidence_ids": [f"{WORKSHEET_ID}:automatic_blank_row:0"],
         "decision": "use_recommendation",
         "affected_rows": [7],
         "affected_column_indexes": [],
+        "affected_columns": [],
     }
 
 
@@ -48,6 +50,10 @@ class WorkbookCleaningContractTests(unittest.TestCase):
         validate_structural_decision_plan_scope(request.structural_decision_plan, WORKSHEET_ID)
         self.assertEqual(request.structural_decision_plan.worksheet_id, WORKSHEET_ID)
         self.assertEqual(request.structural_decision_plan.decisions[0].affected_rows, [7])
+        self.assertEqual(
+            request.structural_decision_plan.decisions[0].evidence_ids,
+            [f"{WORKSHEET_ID}:automatic_blank_row:0"],
+        )
 
     def test_camel_case_plan_is_rejected(self) -> None:
         with self.assertRaises(ValidationError):
@@ -125,6 +131,25 @@ class WorkbookCleaningContractTests(unittest.TestCase):
             WorkbookCleaningApplyRequest(
                 structural_decision_plan={"worksheet_id": WORKSHEET_ID, "decisions": [payload]}
             )
+
+    def test_cross_worksheet_evidence_ids_are_rejected(self) -> None:
+        payload = valid_decision_payload()
+        payload["evidence_ids"] = ["dataset-1:worksheet:2:automatic_blank_row:0"]
+        request = WorkbookCleaningApplyRequest(
+            structural_decision_plan={"worksheet_id": WORKSHEET_ID, "decisions": [payload]}
+        )
+
+        with self.assertRaises(HTTPException):
+            validate_structural_decision_plan_scope(request.structural_decision_plan, WORKSHEET_ID)
+
+    def test_affected_column_names_are_accepted_by_contract(self) -> None:
+        payload = valid_decision_payload()
+        payload["affected_columns"] = ["note"]
+        request = WorkbookCleaningApplyRequest(
+            structural_decision_plan={"worksheet_id": WORKSHEET_ID, "decisions": [payload]}
+        )
+
+        self.assertEqual(request.structural_decision_plan.decisions[0].affected_columns, ["note"])
 
 
 if __name__ == "__main__":

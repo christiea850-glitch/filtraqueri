@@ -24,6 +24,7 @@ from .workbook_ingestion import ingest_workbook
 from .workbook_cleaning_apply import apply_cleaning_recipe_to_working_copy
 from .workbook_cleaning_contract import (
     WorkbookCleaningApplyRequest,
+    WorkbookCleaningPreviewRequest,
     validate_structural_decision_plan_scope,
 )
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
@@ -1901,11 +1902,11 @@ def get_original_workbook_layout(
     )
 
 
-@app.get("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview")
-def get_cleaning_recipe_preview(
+def _get_cleaning_recipe_preview(
     dataset_id: str,
     worksheet_id: str,
     row_limit: int = 10,
+    structural_decision_plan: Any | None = None,
 ) -> dict[str, Any]:
     if row_limit < 1:
         raise HTTPException(status_code=400, detail="Cleaning recipe preview limit must be 1 or greater")
@@ -1934,11 +1935,40 @@ def get_cleaning_recipe_preview(
     )
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
+    validate_structural_decision_plan_scope(structural_decision_plan, worksheet_id)
 
     return build_cleaning_recipe_preview(
         workbook_path=Path(uploaded_path),
         worksheet=worksheet,
         row_limit=row_limit,
+        structural_decision_plan=structural_decision_plan,
+    )
+
+
+@app.get("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview")
+def get_cleaning_recipe_preview(
+    dataset_id: str,
+    worksheet_id: str,
+    row_limit: int = 10,
+) -> dict[str, Any]:
+    return _get_cleaning_recipe_preview(
+        dataset_id=dataset_id,
+        worksheet_id=worksheet_id,
+        row_limit=row_limit,
+    )
+
+
+@app.post("/datasets/{dataset_id}/workbook/worksheets/{worksheet_id}/cleaning-recipe-preview")
+def preview_cleaning_recipe_with_structural_decisions(
+    dataset_id: str,
+    worksheet_id: str,
+    request: WorkbookCleaningPreviewRequest,
+) -> dict[str, Any]:
+    return _get_cleaning_recipe_preview(
+        dataset_id=dataset_id,
+        worksheet_id=worksheet_id,
+        row_limit=request.row_limit_preview,
+        structural_decision_plan=request.structural_decision_plan,
     )
 
 
@@ -2023,6 +2053,7 @@ def apply_workbook_cleaning_recipe(
         duckdb_path=duckdb_path,
         dataset_id=dataset_id,
         row_limit_preview=request.row_limit_preview,
+        structural_decision_plan=request.structural_decision_plan,
     )
 
     # Persist a working-copy record only when something was actually written.

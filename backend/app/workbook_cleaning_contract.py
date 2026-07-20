@@ -27,8 +27,10 @@ class WorkbookStructuralDecision(BaseModel):
     evidence_type: StructuralEvidenceType
     decision: StructuralDecisionValue
     evidence_signal_id: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
     affected_rows: list[NonNegativeIndex] = Field(default_factory=list)
     affected_column_indexes: list[NonNegativeIndex] = Field(default_factory=list)
+    affected_columns: list[str] = Field(default_factory=list)
 
 
 class WorkbookStructuralDecisionPlan(BaseModel):
@@ -44,6 +46,13 @@ class WorkbookCleaningApplyRequest(BaseModel):
 
     row_limit_preview: int = Field(25, ge=1, le=200)
     confirm_preview_version: str | None = None
+    structural_decision_plan: WorkbookStructuralDecisionPlan | None = None
+
+
+class WorkbookCleaningPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    row_limit_preview: int = Field(10, ge=1, le=200)
     structural_decision_plan: WorkbookStructuralDecisionPlan | None = None
 
 
@@ -87,3 +96,9 @@ def validate_structural_decision_plan_scope(
                 status_code=400,
                 detail="Structural decision evidence_signal_id must be scoped to the selected worksheet",
             )
+        for evidence_id in decision.evidence_ids:
+            if not evidence_id.startswith(f"{worksheet_id}:"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Structural decision evidence_ids must be scoped to the selected worksheet",
+                )

@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from .workbook_cleaning_contract import WorkbookStructuralDecisionPlan
 from .workbook_ingestion import (
     contiguous_header_width,
     is_blank_cell,
@@ -18,6 +19,218 @@ from .workbook_ingestion import (
 
 
 MAX_CLEANING_PREVIEW_ROWS = 25
+STRUCTURAL_DECISION_EVIDENCE_TYPES = {
+    "repeated_header",
+    "date_title_row",
+    "section_banner",
+    "sparse_layout_gap",
+    "serial_only_placeholder_rows",
+    "side_note_region_candidate",
+    "repeated_missing_pattern",
+    "automatic_blank_row",
+}
+
+
+def _decision_evidence_key(evidence_type: str, indexes: list[int]) -> tuple[str, tuple[int, ...]]:
+    return evidence_type, tuple(sorted(indexes))
+
+
+def _decision_evidence_id(worksheet_id: str, evidence_type: str, index: int) -> str:
+    return f"{worksheet_id}:{evidence_type}:{index}"
+
+
+def _schema_column_names(worksheet: dict[str, Any]) -> set[str]:
+    schema = worksheet.get("schema")
+    if not isinstance(schema, list):
+        return set()
+    names: set[str] = set()
+    for column in schema:
+        if isinstance(column, dict) and isinstance(column.get("name"), str):
+            names.add(column["name"])
+    return names
+
+
+def _automatic_blank_row_indexes(raw_rows: list[Any], header_row_index: int) -> list[int]:
+    indexes: list[int] = []
+    for row_index, raw_row in enumerate(raw_rows):
+        if row_index <= header_row_index:
+            continue
+        row = raw_row if isinstance(raw_row, list) else []
+        if not non_empty_values(row):
+            indexes.append(row_index)
+    return indexes
+
+
+def _expected_structural_decision_evidence(
+    *,
+    worksheet: dict[str, Any],
+    raw_rows: list[Any],
+    header_row_index: int,
+) -> dict[str, dict[str, Any]]:
+    worksheet_id = str(worksheet.get("worksheet_id") or "")
+    expected: dict[str, dict[str, Any]] = {}
+    evidence = _worksheet_evidence(worksheet)
+    for index, item in enumerate(evidence):
+        evidence_type = item.get("type")
+        if evidence_type not in STRUCTURAL_DECISION_EVIDENCE_TYPES:
+            continue
+        evidence_id = _decision_evidence_id(worksheet_id, str(evidence_type), index)
+        rows = _evidence_rows(item)
+        columns = _evidence_columns(item)
+        expected[evidence_id] = {
+            "recommendation_id": evidence_id,
+            "evidence_type": evidence_type,
+            "evidence_ids": {evidence_id},
+            "affected_rows": set(rows),
+            "affected_column_indexes": set(columns),
+            "evidence_key": _decision_evidence_key(str(evidence_type), rows or columns),
+        }
+
+    automatic_blank_rows = _automatic_blank_row_indexes(raw_rows, header_row_index)
+    if automatic_blank_rows:
+        evidence_id = _decision_evidence_id(worksheet_id, "automatic_blank_row", 0)
+        expected[evidence_id] = {
+            "recommendation_id": evidence_id,
+            "evidence_type": "automatic_blank_row",
+            "evidence_ids": {evidence_id},
+            "affected_rows": set(automatic_blank_rows),
+            "affected_column_indexes": set(),
+            "evidence_key": _decision_evidence_key("automatic_blank_row", automatic_blank_rows),
+        }
+
+    return expected
+
+
+def _validate_structural_decision_plan_against_evidence(
+    *,
+    plan: WorkbookStructuralDecisionPlan | None,
+    worksheet: dict[str, Any],
+    raw_rows: list[Any],
+    header_row_index: int,
+) -> dict[str, Any] | None:
+    if plan is None:
+        return None
+    if not plan.decisions:
+        return {
+            "supplied": True,
+            "accepted_rows_by_type": {},
+            "accepted_columns_by_type": {},
+            "accepted_evidence_keys": set(),
+            "accepted": [],
+            "preserved": [],
+            "deferred": [],
+        }
+
+    worksheet_id = str(worksheet.get("worksheet_id") or "")
+    max_row_count = len(raw_rows)
+    max_column_count = max((len(row) for row in raw_rows if isinstance(row, list)), default=0)
+    column_names = _schema_column_names(worksheet)
+    expected = _expected_structural_decision_evidence(
+        worksheet=worksheet,
+        raw_rows=raw_rows,
+        header_row_index=header_row_index,
+    )
+    accepted_rows_by_type: dict[str, set[int]] = {}
+    accepted_columns_by_type: dict[str, set[int]] = {}
+    accepted_evidence_keys: set[tuple[str, tuple[int, ...]]] = set()
+    accepted: list[dict[str, str]] = []
+    preserved: list[dict[str, str]] = []
+    deferred: list[dict[str, str]] = []
+
+    for decision in plan.decisions:
+        expected_entry = expected.get(decision.recommendation_id)
+        if not expected_entry:
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision recommendation_id is stale or unsupported for this worksheet",
+            )
+        if expected_entry["evidence_type"] != decision.evidence_type:
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision evidence_type does not match backend evidence",
+            )
+
+        evidence_ids = set(decision.evidence_ids)
+        if decision.evidence_signal_id:
+            evidence_ids.add(decision.evidence_signal_id)
+        if evidence_ids and not evidence_ids.issubset(expected_entry["evidence_ids"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision evidence_ids are stale or unsupported for this worksheet",
+            )
+
+        supplied_rows = set(decision.affected_rows)
+        supplied_columns = set(decision.affected_column_indexes)
+        if any(row_index >= max_row_count for row_index in supplied_rows):
+            raise HTTPException(status_code=400, detail="Structural decision row index is out of bounds")
+        if any(column_index >= max_column_count for column_index in supplied_columns):
+            raise HTTPException(status_code=400, detail="Structural decision column index is out of bounds")
+        if supplied_rows and not supplied_rows.issubset(expected_entry["affected_rows"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision affected_rows do not match backend evidence",
+            )
+        if supplied_columns and not supplied_columns.issubset(expected_entry["affected_column_indexes"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision affected_column_indexes do not match backend evidence",
+            )
+        if decision.affected_columns and not set(decision.affected_columns).issubset(column_names):
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision affected_columns do not match worksheet columns",
+            )
+
+        summary = {
+            "recommendation_id": decision.recommendation_id,
+            "evidence_type": decision.evidence_type,
+            "decision": decision.decision,
+        }
+        if decision.decision == "use_recommendation":
+            accepted.append(summary)
+            accepted_evidence_keys.add(expected_entry["evidence_key"])
+            accepted_rows_by_type.setdefault(decision.evidence_type, set()).update(
+                expected_entry["affected_rows"]
+            )
+            accepted_columns_by_type.setdefault(decision.evidence_type, set()).update(
+                expected_entry["affected_column_indexes"]
+            )
+        elif decision.decision == "keep_original":
+            preserved.append(summary)
+        else:
+            deferred.append(summary)
+
+    return {
+        "supplied": True,
+        "accepted_rows_by_type": accepted_rows_by_type,
+        "accepted_columns_by_type": accepted_columns_by_type,
+        "accepted_evidence_keys": accepted_evidence_keys,
+        "accepted": accepted,
+        "preserved": preserved,
+        "deferred": deferred,
+    }
+
+
+def _accepted_rows(
+    decision_context: dict[str, Any] | None,
+    evidence_type: str,
+    fallback_rows: list[int],
+) -> list[int]:
+    if decision_context is None:
+        return fallback_rows
+    rows = decision_context["accepted_rows_by_type"].get(evidence_type, set())
+    return sorted(rows)
+
+
+def _accepted_columns(
+    decision_context: dict[str, Any] | None,
+    evidence_type: str,
+    fallback_columns: list[int],
+) -> list[int]:
+    if decision_context is None:
+        return fallback_columns
+    columns = decision_context["accepted_columns_by_type"].get(evidence_type, set())
+    return sorted(columns)
 
 
 def _evidence_rows(evidence: dict[str, Any]) -> list[int]:
@@ -157,6 +370,7 @@ def compute_cleaning_recipe_plan(
     *,
     workbook_path: Path,
     worksheet: dict[str, Any],
+    structural_decision_plan: WorkbookStructuralDecisionPlan | None = None,
 ) -> dict[str, Any]:
     """Compute the full cleaning recipe plan for a worksheet.
 
@@ -201,11 +415,6 @@ def compute_cleaning_recipe_plan(
     if business_width <= 0:
         return _empty_plan(worksheet=worksheet)
 
-    existing_headers: set[str] = set()
-    business_columns = [
-        normalize_header(value, index, existing_headers)[0]
-        for index, value in enumerate(header_row[:business_width])
-    ]
     header_signature = row_signature(header_row, business_width)
     evidence = _worksheet_evidence(worksheet)
     repeated_header_rows = _rows_for_type(evidence, "repeated_header")
@@ -213,8 +422,39 @@ def compute_cleaning_recipe_plan(
     section_banner_rows = _rows_for_type(evidence, "section_banner")
     sparse_layout_rows = _rows_for_type(evidence, "sparse_layout_gap")
     placeholder_rows = _rows_for_type(evidence, "serial_only_placeholder_rows")
-    side_note_columns = _columns_for_type(evidence, "side_note_region_candidate")
+    metadata_side_note_columns = _columns_for_type(evidence, "side_note_region_candidate")
+    side_note_columns = metadata_side_note_columns
     repeated_missing_rows = _rows_for_type(evidence, "repeated_missing_pattern")
+    decision_context = _validate_structural_decision_plan_against_evidence(
+        plan=structural_decision_plan,
+        worksheet=worksheet,
+        raw_rows=raw_rows,
+        header_row_index=header_row_index,
+    )
+    automatic_blank_rows = _accepted_rows(
+        decision_context,
+        "automatic_blank_row",
+        _automatic_blank_row_indexes(raw_rows, header_row_index),
+    )
+    repeated_header_rows = _accepted_rows(decision_context, "repeated_header", repeated_header_rows)
+    date_title_rows = _accepted_rows(decision_context, "date_title_row", date_title_rows)
+    section_banner_rows = _accepted_rows(decision_context, "section_banner", section_banner_rows)
+    sparse_layout_rows = _accepted_rows(decision_context, "sparse_layout_gap", sparse_layout_rows)
+    placeholder_rows = _accepted_rows(
+        decision_context,
+        "serial_only_placeholder_rows",
+        placeholder_rows,
+    )
+    side_note_columns = _accepted_columns(
+        decision_context,
+        "side_note_region_candidate",
+        side_note_columns,
+    )
+    repeated_missing_rows = _accepted_rows(
+        decision_context,
+        "repeated_missing_pattern",
+        repeated_missing_rows,
+    )
 
     repeated_header_set = set(repeated_header_rows)
     date_title_set = set(date_title_rows)
@@ -222,7 +462,21 @@ def compute_cleaning_recipe_plan(
     sparse_layout_set = set(sparse_layout_rows)
     placeholder_set = set(placeholder_rows)
     has_section_context = bool(date_title_rows or section_banner_rows)
-    output_columns = [*business_columns]
+    preserved_side_note_columns = (
+        [
+            column_index
+            for column_index in metadata_side_note_columns
+            if column_index not in set(side_note_columns)
+        ]
+        if decision_context is not None
+        else []
+    )
+    output_column_indexes = [*range(business_width), *preserved_side_note_columns]
+    existing_headers: set[str] = set()
+    output_columns = [
+        normalize_header(header_row[index] if index < len(header_row) else None, index, existing_headers)[0]
+        for index in output_column_indexes
+    ]
     if has_section_context:
         output_columns.extend(["_section_date", "_section_label"])
 
@@ -250,11 +504,13 @@ def compute_cleaning_recipe_plan(
 
         populated_values = non_empty_values(row)
         if original_row_index in repeated_header_set or (
-            populated_values and row_signature(row, business_width) == header_signature
+            decision_context is None
+            and populated_values
+            and row_signature(row, business_width) == header_signature
         ):
             counted_repeated_header_rows.add(original_row_index)
             continue
-        if not populated_values:
+        if original_row_index in automatic_blank_rows:
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "automatic_blank_row"
             continue
@@ -270,12 +526,15 @@ def compute_cleaning_recipe_plan(
             and not has_business_value_after_serial
         )
         if original_row_index in placeholder_set or (
-            first_business_value
+            decision_context is None
+            and first_business_value
             and looks_like_numeric_value(first_business_value)
             and not has_business_value_after_serial
         ):
             counted_placeholder_rows.add(original_row_index)
             continue
+        # These remain non-decision safety exclusions: they are inferred from
+        # header shape or empty business values, not surfaced as analyst cards.
         if has_only_header_shaped_serial:
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "automatic_header_shaped_serial"
@@ -284,14 +543,14 @@ def compute_cleaning_recipe_plan(
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "sparse_layout_gap"
             continue
-        if not any(not is_blank_cell(value) for value in business_values):
+        if decision_context is None and not any(not is_blank_cell(value) for value in business_values):
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "automatic_blank_business_values"
             continue
 
         values = {
-            column: None if index >= len(row) or is_blank_cell(row[index]) else row[index]
-            for index, column in enumerate(business_columns)
+            column: None if source_index >= len(row) or is_blank_cell(row[source_index]) else row[source_index]
+            for column, source_index in zip(output_columns, output_column_indexes)
         }
         if has_section_context:
             values["_section_date"] = current_section_date
@@ -351,11 +610,11 @@ def compute_cleaning_recipe_plan(
                 added_columns=["_section_date", "_section_label"],
             )
         )
-    if sparse_layout_rows:
+    if sorted_layout_rows:
         recipe.append(
             _recipe_step(
                 "ignore_layout_rows",
-                sparse_layout_rows,
+                sorted_layout_rows,
                 "Blank and sparse layout separator rows are omitted from the cleaned analysis preview.",
             )
         )
@@ -399,6 +658,11 @@ def compute_cleaning_recipe_plan(
         "excluded": excluded,
         "excluded_details": excluded_details,
         "has_section_context": has_section_context,
+        "structural_decision_summary": {
+            "accepted": decision_context["accepted"] if decision_context else [],
+            "preserved": decision_context["preserved"] if decision_context else [],
+            "deferred": decision_context["deferred"] if decision_context else [],
+        },
     }
 
 
@@ -418,6 +682,7 @@ def _empty_plan(*, worksheet: dict[str, Any]) -> dict[str, Any]:
         "excluded": _empty_excluded_counts(),
         "excluded_details": _empty_excluded_details(),
         "has_section_context": False,
+        "structural_decision_summary": {"accepted": [], "preserved": [], "deferred": []},
     }
 
 
@@ -426,10 +691,15 @@ def build_cleaning_recipe_preview(
     workbook_path: Path,
     worksheet: dict[str, Any],
     row_limit: int,
+    structural_decision_plan: WorkbookStructuralDecisionPlan | None = None,
 ) -> dict[str, Any]:
     """Read-only preview of the cleaning recipe, clamped to `row_limit` rows."""
     clamped_row_limit = min(max(row_limit, 1), MAX_CLEANING_PREVIEW_ROWS)
-    plan = compute_cleaning_recipe_plan(workbook_path=workbook_path, worksheet=worksheet)
+    plan = compute_cleaning_recipe_plan(
+        workbook_path=workbook_path,
+        worksheet=worksheet,
+        structural_decision_plan=structural_decision_plan,
+    )
     if plan.get("is_empty"):
         return _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
 
@@ -457,6 +727,10 @@ def build_cleaning_recipe_preview(
         "recipe": plan["recipe"],
         "excluded": plan["excluded"],
         "excluded_details": plan.get("excluded_details", _empty_excluded_details()),
+        "structural_decision_summary": plan.get(
+            "structural_decision_summary",
+            {"accepted": [], "preserved": [], "deferred": []},
+        ),
         "preview_row_limit": clamped_row_limit,
         "message": "Preview only - no changes have been applied.",
     }

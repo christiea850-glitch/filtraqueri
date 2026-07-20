@@ -1,4 +1,9 @@
-import { applyCleaningRecipe, type CleaningRecipeApplyResponse } from "../api";
+import {
+  applyCleaningRecipe,
+  getCleaningRecipePreview,
+  type CleaningRecipeApplyResponse,
+  type CleaningRecipePreview,
+} from "../api";
 import type {
   StructuralDecisionChoice,
   WorksheetStructuralDecisionPlan,
@@ -40,19 +45,53 @@ const responsePayload: CleaningRecipeApplyResponse = {
   message: "ok",
 };
 
-const withCapturedApplyBody = async (
+const previewResponsePayload: CleaningRecipePreview = {
+  status: "preview_only",
+  worksheet_id: "dataset-1:worksheet:1",
+  worksheet_name: "managers",
+  before: { row_count: 10, column_count: 4 },
+  after_preview: {
+    row_count: 9,
+    column_count: 4,
+    columns: ["name"],
+    rows: [],
+    row_provenance: [],
+  },
+  recipe: [],
+  excluded: {
+    repeated_headers: 0,
+    section_banners: 0,
+    date_title_rows: 0,
+    layout_rows: 0,
+    placeholder_rows: 0,
+    side_note_columns: 0,
+  },
+  excluded_details: {
+    layout_rows: {
+      count: 0,
+      row_indexes: [],
+      reasons: [],
+    },
+  },
+  preview_row_limit: 10,
+  message: "ok",
+};
+
+const withCapturedRequestBody = async (
   run: () => Promise<void>,
-): Promise<{ url: string; body: Record<string, unknown> }[]> => {
+  responsePayloadOverride: CleaningRecipeApplyResponse | CleaningRecipePreview = responsePayload,
+): Promise<{ url: string; method: string | undefined; body: Record<string, unknown> }[]> => {
   const originalFetch = globalThis.fetch;
-  const requests: { url: string; body: Record<string, unknown> }[] = [];
+  const requests: { url: string; method: string | undefined; body: Record<string, unknown> }[] = [];
 
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push({
       url: String(input),
+      method: init?.method,
       body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
     });
 
-    return new Response(JSON.stringify(responsePayload), {
+    return new Response(JSON.stringify(responsePayloadOverride), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -67,6 +106,8 @@ const withCapturedApplyBody = async (
   return requests;
 };
 
+const withCapturedApplyBody = (run: () => Promise<void>) => withCapturedRequestBody(run);
+
 const worksheetId = "dataset-1:worksheet:1";
 
 const structuralPlan: WorksheetStructuralDecisionPlan = {
@@ -76,6 +117,9 @@ const structuralPlan: WorksheetStructuralDecisionPlan = {
       recommendationId: `${worksheetId}:automatic_blank_row:0`,
       evidenceType: "automatic_blank_row",
       decision: "keep_original",
+      evidenceIds: [`${worksheetId}:automatic_blank_row:0`],
+      affectedRows: [7],
+      affectedColumnIndexes: [],
     },
   ],
 };
@@ -157,6 +201,20 @@ export async function runCleaningRecipeApiContractFixtures() {
   results.push(
     createResult("decision serializes correctly", [
       ...expect(serializedDecision?.decision === "keep_original", "Expected serialized decision."),
+      ...expect(
+        Array.isArray(serializedDecision?.evidence_ids) &&
+          serializedDecision?.evidence_ids[0] === `${worksheetId}:automatic_blank_row:0`,
+        "Expected evidence_ids to serialize.",
+      ),
+      ...expect(
+        Array.isArray(serializedDecision?.affected_rows) &&
+          serializedDecision?.affected_rows[0] === 7,
+        "Expected affected_rows to serialize.",
+      ),
+      ...expect(
+        Array.isArray(serializedDecision?.affected_column_indexes),
+        "Expected affected_column_indexes to serialize.",
+      ),
     ]),
   );
   results.push(
@@ -208,6 +266,45 @@ export async function runCleaningRecipeApiContractFixtures() {
           `/datasets/dataset-1/workbook/worksheets/${encodeURIComponent(worksheetId)}/apply-cleaning-recipe`,
         ) === true,
         "Structural plan should use the existing Apply endpoint.",
+      ),
+    ]),
+  );
+
+  const legacyPreviewRequests = await withCapturedRequestBody(async () => {
+    await getCleaningRecipePreview("dataset-1", worksheetId, 10);
+  }, previewResponsePayload);
+  results.push(
+    createResult("legacy preview remains GET without plan body", [
+      ...expect(legacyPreviewRequests[0]?.method === "GET", "Legacy preview should remain GET."),
+      ...expect(
+        !Object.hasOwn(legacyPreviewRequests[0]?.body ?? {}, "structural_decision_plan"),
+        "Legacy preview should not send structural_decision_plan.",
+      ),
+    ]),
+  );
+
+  const decisionPreviewRequests = await withCapturedRequestBody(async () => {
+    await getCleaningRecipePreview("dataset-1", worksheetId, {
+      rowLimit: 10,
+      structuralDecisionPlan: structuralPlan,
+    });
+  }, previewResponsePayload);
+  results.push(
+    createResult("decision preview uses same preview path with structural plan", [
+      ...expect(decisionPreviewRequests[0]?.method === "POST", "Decision preview should POST."),
+      ...expect(
+        decisionPreviewRequests[0]?.url.endsWith(
+          `/datasets/dataset-1/workbook/worksheets/${encodeURIComponent(worksheetId)}/cleaning-recipe-preview`,
+        ) === true,
+        "Decision preview should use the existing preview path.",
+      ),
+      ...expect(
+        Boolean(decisionPreviewRequests[0]?.body.structural_decision_plan),
+        "Decision preview should send structural_decision_plan.",
+      ),
+      ...expect(
+        decisionPreviewRequests[0]?.body.row_limit_preview === 10,
+        "Decision preview should send row_limit_preview.",
       ),
     ]),
   );

@@ -31,7 +31,9 @@ import {
 import {
   getWorkbookMetadata,
   type WorksheetMetadata,
+  type WorksheetStructuralDecisionPlan,
   type WorksheetTemplateStructureEvidence,
+  type WorksheetTemplateStructureEvidenceType,
 } from "../../features/workbook";
 import {
   applyCleaningRecipe,
@@ -488,6 +490,38 @@ export const hasCleaningRecipePreviewOperations = (
   preview: Pick<CleaningRecipePreview, "recipe" | "excluded"> | null,
 ): boolean => Boolean(preview && (preview.recipe.length > 0 || getCleaningRecipeExcludedCount(preview) > 0));
 
+export const structuralNoOpApplyHeading = "No cleaned copy needed";
+export const structuralNoOpApplyCopy =
+  "Your decisions preserve this worksheet as-is. No cleaned working copy was created, and the original workbook remains unchanged.";
+
+export const isStructuralNoOpDecisionPreview = (
+  preview: Pick<CleaningRecipePreview, "recipe" | "excluded"> | null,
+  hasDecisionPlan: boolean,
+): boolean => Boolean(hasDecisionPlan && preview && !hasCleaningRecipePreviewOperations(preview));
+
+export const getStructuralPreviewComparisonLabels = (isNoOpDecisionPreview: boolean) => ({
+  before: "Current analysis table",
+  after: isNoOpDecisionPreview
+    ? "Worksheet with preserved layout rows"
+    : "Preview after cleanup",
+});
+
+export const canCreateStructuralCleanedCopy = ({
+  preview,
+  canContinueToApply,
+  worksheetStatus,
+}: {
+  preview: Pick<CleaningRecipePreview, "recipe" | "excluded"> | null;
+  canContinueToApply: boolean;
+  worksheetStatus?: string;
+}): boolean =>
+  Boolean(
+    preview &&
+      worksheetStatus === "ready" &&
+      canContinueToApply &&
+      hasCleaningRecipePreviewOperations(preview),
+  );
+
 export const getAutomaticBlankRowEvidenceSignalsFromPreview = (
   preview: CleaningRecipePreview | null,
 ): StructuralEvidenceSignal[] => {
@@ -585,6 +619,52 @@ export const getSuggestedFixCleaningPlan = (
     planItems.push(`${deferredCount} recommendation${deferredCount === 1 ? "" : "s"} deferred`);
   }
   return planItems;
+};
+
+const structuralDecisionWireEvidenceTypes = new Set<WorksheetTemplateStructureEvidenceType>([
+  "repeated_header",
+  "date_title_row",
+  "section_banner",
+  "sparse_layout_gap",
+  "serial_only_placeholder_rows",
+  "side_note_region_candidate",
+  "repeated_missing_pattern",
+  "automatic_blank_row",
+]);
+
+const isWorksheetStructuralDecisionEvidenceType = (
+  evidenceType: string,
+): evidenceType is WorksheetTemplateStructureEvidenceType =>
+  structuralDecisionWireEvidenceTypes.has(evidenceType as WorksheetTemplateStructureEvidenceType);
+
+export const buildWorksheetStructuralDecisionPlan = (
+  worksheetId: string,
+  fixes: SuggestedFix[],
+  decisions: SuggestedFixDecisionMap,
+): WorksheetStructuralDecisionPlan | null => {
+  const planDecisions = fixes.flatMap((fix) => {
+    if (fix.worksheetId !== worksheetId) return [];
+    if (!isWorksheetStructuralDecisionEvidenceType(fix.evidenceType)) return [];
+    const decision = getSuggestedFixDecision(fix.id, decisions);
+    if (decision === "unresolved") return [];
+    return [
+      {
+        recommendationId: fix.recommendationId,
+        evidenceType: fix.evidenceType,
+        decision,
+        evidenceIds: fix.evidenceSignalId ? [fix.evidenceSignalId] : [fix.recommendationId],
+        evidenceSignalId: fix.evidenceSignalId,
+        affectedRows: fix.affectedRows || [],
+        affectedColumnIndexes: fix.affectedColumnIndexes || [],
+      },
+    ];
+  });
+
+  if (planDecisions.length === 0) return null;
+  return {
+    worksheetId,
+    decisions: planDecisions,
+  };
 };
 
 const getIssueCategory = (issue: PreparationIssue) => {
@@ -961,6 +1041,7 @@ export function CleanPrepareReviewPanel({
   const structuralProgressRef = useRef<HTMLDivElement | null>(null);
   const resetStructuralDecisionsButtonRef = useRef<HTMLButtonElement | null>(null);
   const structuralPreviewRequestIdsRef = useRef<Record<string, number>>({});
+  const decisionPreviewRequestIdsRef = useRef<Record<string, number>>({});
   // When embedded, the review is the whole reason the dedicated page exists,
   // so start open.
   const [isOpen, setIsOpen] = useState(embedded);
@@ -975,6 +1056,18 @@ export function CleanPrepareReviewPanel({
     Record<string, string | null>
   >({});
   const [recipeRetryByWorksheet, setRecipeRetryByWorksheet] = useState<Record<string, number>>({});
+  const [decisionRecipePreviewByWorksheet, setDecisionRecipePreviewByWorksheet] = useState<
+    Record<string, CleaningRecipePreview>
+  >({});
+  const [decisionRecipeStatusByWorksheet, setDecisionRecipeStatusByWorksheet] = useState<
+    Record<string, RecipePreviewStatus>
+  >({});
+  const [decisionRecipeErrorByWorksheet, setDecisionRecipeErrorByWorksheet] = useState<
+    Record<string, string | null>
+  >({});
+  const [decisionRecipePlanKeyByWorksheet, setDecisionRecipePlanKeyByWorksheet] = useState<
+    Record<string, string>
+  >({});
   const [applyStateByWorksheet, setApplyStateByWorksheet] = useState<
     Record<string, ApplyState>
   >({});
@@ -1060,6 +1153,15 @@ export function CleanPrepareReviewPanel({
     () => getWorksheetSuggestedFixDecisionDrafts(fixDecisionDraftsByWorksheet, decisionWorksheetId),
     [decisionWorksheetId, fixDecisionDraftsByWorksheet],
   );
+  const selectedWorksheetStructuralDecisionPlan = useMemo(
+    () =>
+      buildWorksheetStructuralDecisionPlan(
+        decisionWorksheetId,
+        visibleStructuralFixes,
+        fixDecisionDrafts,
+      ),
+    [decisionWorksheetId, fixDecisionDrafts, visibleStructuralFixes],
+  );
   const suggestedFixDecisionProgress = useMemo(
     () => getSuggestedFixDecisionProgress(visibleStructuralFixes, fixDecisionDrafts),
     [fixDecisionDrafts, visibleStructuralFixes],
@@ -1102,6 +1204,33 @@ export function CleanPrepareReviewPanel({
     () => getSuggestedFixCleaningPlan(visibleStructuralFixes, fixDecisionDrafts),
     [fixDecisionDrafts, visibleStructuralFixes],
   );
+  const readyStructuralDecisionPlan = structuralDecisionReadiness.canContinueToApply
+    ? selectedWorksheetStructuralDecisionPlan
+    : null;
+  const readyStructuralDecisionPlanKey = JSON.stringify(readyStructuralDecisionPlan);
+  const selectedWorksheetDecisionRecipePreview = isCleaningRecipePreviewForWorksheet(
+    decisionRecipePreviewByWorksheet[decisionWorksheetId] || null,
+    decisionWorksheetId,
+  )
+    ? decisionRecipePreviewByWorksheet[decisionWorksheetId]
+    : null;
+  const selectedWorksheetDecisionRecipeStatus =
+    decisionRecipeStatusByWorksheet[decisionWorksheetId] || "idle";
+  const selectedWorksheetDecisionRecipeError =
+    decisionRecipeErrorByWorksheet[decisionWorksheetId] || null;
+  const isSelectedWorksheetDecisionRecipeCurrent =
+    decisionRecipePlanKeyByWorksheet[decisionWorksheetId] === readyStructuralDecisionPlanKey;
+  const selectedWorksheetDisplayRecipePreview =
+    readyStructuralDecisionPlan
+      ? isSelectedWorksheetDecisionRecipeCurrent
+        ? selectedWorksheetDecisionRecipePreview
+        : null
+      : selectedWorksheetRecipePreview;
+  const isDecisionRecipePreviewPending = Boolean(
+    readyStructuralDecisionPlan &&
+    activeStep === "apply" &&
+    selectedWorksheetDecisionRecipeStatus === "loading",
+  );
   const hasStructuralDecisionDrafts = useMemo(
     () => hasExplicitSuggestedFixDecisions(visibleStructuralFixes, fixDecisionDrafts),
     [fixDecisionDrafts, visibleStructuralFixes],
@@ -1119,6 +1248,10 @@ export function CleanPrepareReviewPanel({
     setRecipeStatusByWorksheet({});
     setRecipeErrorByWorksheet({});
     setRecipeRetryByWorksheet({});
+    setDecisionRecipePreviewByWorksheet({});
+    setDecisionRecipeStatusByWorksheet({});
+    setDecisionRecipeErrorByWorksheet({});
+    setDecisionRecipePlanKeyByWorksheet({});
   }, [dataset.dataset_id]);
   useEffect(() => {
     setIsResetStructuralDecisionsConfirming(false);
@@ -1275,8 +1408,8 @@ export function CleanPrepareReviewPanel({
     missingValueApplyStateByWorksheet[decisionWorksheetId] || { status: "idle" };
   const previewWorksheetId = selectedWorksheet?.worksheetId;
   const previewWorksheetStatus = selectedWorksheet?.status;
-  const excludedEntries = selectedWorksheetRecipePreview
-    ? (Object.entries(selectedWorksheetRecipePreview.excluded) as [
+  const excludedEntries = selectedWorksheetDisplayRecipePreview
+    ? (Object.entries(selectedWorksheetDisplayRecipePreview.excluded) as [
         keyof CleaningRecipePreview["excluded"],
         number,
       ][]).filter(([, count]) => count > 0)
@@ -1438,6 +1571,82 @@ export function CleanPrepareReviewPanel({
     shouldLoadSelectedWorksheetPreview,
   ]);
 
+  useEffect(() => {
+    if (!selectedWorksheet || activeStep !== "apply" || !readyStructuralDecisionPlan) return;
+    const worksheetId = selectedWorksheet.worksheetId;
+    if (
+      decisionRecipePlanKeyByWorksheet[worksheetId] === readyStructuralDecisionPlanKey &&
+      selectedWorksheetDecisionRecipePreview
+    ) {
+      return;
+    }
+
+    const requestId = (decisionPreviewRequestIdsRef.current[worksheetId] || 0) + 1;
+    decisionPreviewRequestIdsRef.current[worksheetId] = requestId;
+    setDecisionRecipeStatusByWorksheet((current) => ({
+      ...current,
+      [worksheetId]: "loading",
+    }));
+    setDecisionRecipeErrorByWorksheet((current) => ({
+      ...current,
+      [worksheetId]: null,
+    }));
+
+    let cancelled = false;
+    getCleaningRecipePreview(dataset.dataset_id, worksheetId, {
+      rowLimit: 10,
+      structuralDecisionPlan: readyStructuralDecisionPlan,
+    })
+      .then((response) => {
+        if (cancelled) return;
+        if (decisionPreviewRequestIdsRef.current[worksheetId] !== requestId) return;
+        const validation = validateStructuralPreviewResponse(response, worksheetId, decisionWorksheetName);
+        if (!validation.ok) {
+          throw new Error(validation.message);
+        }
+        setDecisionRecipePreviewByWorksheet((current) => ({
+          ...current,
+          [worksheetId]: validation.preview,
+        }));
+        setDecisionRecipePlanKeyByWorksheet((current) => ({
+          ...current,
+          [worksheetId]: readyStructuralDecisionPlanKey,
+        }));
+        setDecisionRecipeStatusByWorksheet((current) => ({
+          ...current,
+          [worksheetId]: "ready",
+        }));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        if (decisionPreviewRequestIdsRef.current[worksheetId] !== requestId) return;
+        setDecisionRecipeErrorByWorksheet((current) => ({
+          ...current,
+          [worksheetId]:
+            error instanceof Error && error.message
+              ? error.message
+              : "Decision-aware cleaning preview could not be loaded.",
+        }));
+        setDecisionRecipeStatusByWorksheet((current) => ({
+          ...current,
+          [worksheetId]: "error",
+        }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeStep,
+    dataset.dataset_id,
+    decisionRecipePlanKeyByWorksheet,
+    decisionWorksheetName,
+    readyStructuralDecisionPlan,
+    readyStructuralDecisionPlanKey,
+    selectedWorksheet,
+    selectedWorksheetDecisionRecipePreview,
+  ]);
+
   const selectWorksheet = (worksheet: WorksheetMetadata) => {
     if (worksheet.status !== "ready" && worksheet.status !== "empty") return;
     setSelectedWorksheetId(worksheet.worksheetId);
@@ -1519,13 +1728,20 @@ export function CleanPrepareReviewPanel({
     workbookCleanedCount > 0 || workbookNeedsReviewCount > 0;
   const pluralise = (count: number, singular: string, plural = `${singular}s`) =>
     `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
-  const hasActionableRecipe =
-    selectedWorksheetRecipePreview !== null &&
-    selectedWorksheetRecipePreview.recipe.length > 0 &&
-    selectedWorksheetRecipeStatus === "ready" &&
-    selectedWorksheet?.status === "ready";
+  const hasActionableRecipe = canCreateStructuralCleanedCopy({
+    preview: selectedWorksheetDisplayRecipePreview,
+    canContinueToApply: structuralDecisionReadiness.canContinueToApply,
+    worksheetStatus: selectedWorksheet?.status,
+  });
   const hasSelectedWorksheetPreviewOperations = hasCleaningRecipePreviewOperations(
-    selectedWorksheetRecipePreview,
+    selectedWorksheetDisplayRecipePreview,
+  );
+  const isSelectedWorksheetNoOpDecisionPreview = isStructuralNoOpDecisionPreview(
+    selectedWorksheetDisplayRecipePreview,
+    Boolean(readyStructuralDecisionPlan),
+  );
+  const structuralPreviewComparisonLabels = getStructuralPreviewComparisonLabels(
+    isSelectedWorksheetNoOpDecisionPreview,
   );
   const selectedWorksheetName =
     selectedWorksheet?.displayName || selectedWorksheet?.sheetName || "Selected worksheet";
@@ -1533,22 +1749,24 @@ export function CleanPrepareReviewPanel({
     ? "Active cleaned copy"
     : hasCleanedWorkingCopy
       ? "Cleaned copy available"
-      : selectedWorksheetRecipePreview
+      : selectedWorksheetDisplayRecipePreview
         ? "Preview only"
         : "Original";
-  const selectedWorksheetChangeSummary = selectedWorksheetRecipePreview
+  const selectedWorksheetChangeSummary = selectedWorksheetDisplayRecipePreview
     ? hasSelectedWorksheetPreviewOperations
       ? [
-          selectedWorksheetRecipePreview.recipe.length > 0
-            ? pluralise(selectedWorksheetRecipePreview.recipe.length, "draft recipe step")
+          selectedWorksheetDisplayRecipePreview.recipe.length > 0
+            ? pluralise(selectedWorksheetDisplayRecipePreview.recipe.length, "draft recipe step")
             : null,
-          getCleaningRecipeExcludedCount(selectedWorksheetRecipePreview) > 0
-            ? pluralise(getCleaningRecipeExcludedCount(selectedWorksheetRecipePreview), "proposed exclusion")
+          getCleaningRecipeExcludedCount(selectedWorksheetDisplayRecipePreview) > 0
+            ? pluralise(getCleaningRecipeExcludedCount(selectedWorksheetDisplayRecipePreview), "proposed exclusion")
             : null,
         ]
           .filter(Boolean)
           .join(" and ") + " ready to review."
-      : "No cleaning recipe is needed for this worksheet."
+      : isSelectedWorksheetNoOpDecisionPreview
+        ? "Your decisions preserve this worksheet as-is."
+        : "No cleaning recipe is needed for this worksheet."
     : "Choose a ready worksheet to preview its draft cleaning recipe.";
   const updateApplyState = (worksheetId: string, next: ApplyState) => {
     setApplyStateByWorksheet((current) => ({ ...current, [worksheetId]: next }));
@@ -1639,11 +1857,13 @@ export function CleanPrepareReviewPanel({
   };
 
   const confirmApply = async () => {
-    if (!selectedWorksheet || !hasActionableRecipe) return;
+    if (!selectedWorksheet || !hasActionableRecipe || !structuralDecisionReadiness.canContinueToApply) return;
     const worksheetId = selectedWorksheet.worksheetId;
     updateApplyState(worksheetId, { status: "applying" });
     try {
-      const result = await applyCleaningRecipe(dataset.dataset_id, worksheetId);
+      const result = await applyCleaningRecipe(dataset.dataset_id, worksheetId, {
+        structuralDecisionPlan: readyStructuralDecisionPlan,
+      });
       updateApplyState(worksheetId, { status: "success", result });
     } catch (error) {
       const message =
@@ -2621,39 +2841,46 @@ export function CleanPrepareReviewPanel({
                 </div>
               )}
 
-              {selectedWorksheetRecipeStatus === "loading" || isStructuralPreviewPending ? (
+              {selectedWorksheetRecipeStatus === "loading" ||
+              isStructuralPreviewPending ||
+              isDecisionRecipePreviewPending ? (
                 <p className="clean-prepare-preview-state">Loading draft recipe preview...</p>
+              ) : readyStructuralDecisionPlan && selectedWorksheetDecisionRecipeStatus === "error" ? (
+                <p className="clean-prepare-preview-state is-error">
+                  {selectedWorksheetDecisionRecipeError ||
+                    "Decision-aware cleaning recipe preview could not be loaded."}
+                </p>
               ) : selectedWorksheetRecipeStatus === "error" ? (
                 <p className="clean-prepare-preview-state is-error">
                   {selectedWorksheetRecipeError || "Cleaning recipe preview could not be loaded."}
                 </p>
-              ) : selectedWorksheetRecipePreview ? (
+              ) : selectedWorksheetDisplayRecipePreview ? (
                 <>
                   <div className="clean-prepare-summary-grid">
                     <div>
-                      <span>Before</span>
+                      <span>{structuralPreviewComparisonLabels.before}</span>
                       <strong>
-                        {selectedWorksheetRecipePreview.before.row_count.toLocaleString()} rows /{" "}
-                        {selectedWorksheetRecipePreview.before.column_count.toLocaleString()} columns
+                        {selectedWorksheetDisplayRecipePreview.before.row_count.toLocaleString()} rows /{" "}
+                        {selectedWorksheetDisplayRecipePreview.before.column_count.toLocaleString()} columns
                       </strong>
                     </div>
                     <div>
-                      <span>Preview after cleanup</span>
+                      <span>{structuralPreviewComparisonLabels.after}</span>
                       <strong>
-                        {selectedWorksheetRecipePreview.after_preview.row_count.toLocaleString()} rows /{" "}
-                        {selectedWorksheetRecipePreview.after_preview.column_count.toLocaleString()} columns
+                        {selectedWorksheetDisplayRecipePreview.after_preview.row_count.toLocaleString()} rows /{" "}
+                        {selectedWorksheetDisplayRecipePreview.after_preview.column_count.toLocaleString()} columns
                       </strong>
                     </div>
                   </div>
 
-                  {selectedWorksheetRecipePreview.recipe.length > 0 ? (
+                  {selectedWorksheetDisplayRecipePreview.recipe.length > 0 ? (
                     <details className="clean-prepare-disclosure" open={embedded}>
                       <summary>
                         <strong>Draft recipe steps</strong>
-                        <span>{pluralise(selectedWorksheetRecipePreview.recipe.length, "step")}</span>
+                        <span>{pluralise(selectedWorksheetDisplayRecipePreview.recipe.length, "step")}</span>
                       </summary>
                       <ul className="clean-prepare-recipe-list">
-                        {selectedWorksheetRecipePreview.recipe.map((step) => (
+                        {selectedWorksheetDisplayRecipePreview.recipe.map((step) => (
                           <li key={step.type}>
                             <strong>{recipeStepLabels[step.type] || step.type}</strong>
                             <span>{step.explanation}</span>
@@ -2661,6 +2888,25 @@ export function CleanPrepareReviewPanel({
                         ))}
                       </ul>
                     </details>
+                  ) : isSelectedWorksheetNoOpDecisionPreview ? (
+                    <section className="clean-prepare-apply-area is-no-op" aria-live="polite">
+                      <h4>{structuralNoOpApplyHeading}</h4>
+                      <p className="clean-prepare-apply-helper">{structuralNoOpApplyCopy}</p>
+                      <div className="clean-prepare-apply-confirm-actions">
+                        <a className="secondary-button" href="#decide">
+                          Back to Decide
+                        </a>
+                        {onContinueInAnalyst && (
+                          <button
+                            type="button"
+                            className="primary-button"
+                            onClick={onContinueInAnalyst}
+                          >
+                            Continue with original in Analyst
+                          </button>
+                        )}
+                      </div>
+                    </section>
                   ) : !hasSelectedWorksheetPreviewOperations ? (
                     <p className="clean-prepare-preview-state">
                       No cleaning recipe is needed for this worksheet.
@@ -2689,32 +2935,32 @@ export function CleanPrepareReviewPanel({
                     </details>
                   )}
 
-                  {selectedWorksheetRecipePreview.after_preview.rows.length > 0 ? (
+                  {selectedWorksheetDisplayRecipePreview.after_preview.rows.length > 0 ? (
                     <details className="clean-prepare-disclosure" open={embedded}>
                       <summary>
                         <strong>Preview cleaned rows</strong>
-                        <span>{pluralise(selectedWorksheetRecipePreview.after_preview.rows.length, "sample row")}</span>
+                        <span>{pluralise(selectedWorksheetDisplayRecipePreview.after_preview.rows.length, "sample row")}</span>
                       </summary>
                       <div className="clean-prepare-preview-table-wrap">
                         <table className="clean-prepare-preview-table">
                         <thead>
                           <tr>
                             <th>#</th>
-                            {selectedWorksheetRecipePreview.after_preview.columns.map((column) => (
+                            {selectedWorksheetDisplayRecipePreview.after_preview.columns.map((column) => (
                               <th key={column}>{column}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedWorksheetRecipePreview.after_preview.rows.map((row, index) => {
+                          {selectedWorksheetDisplayRecipePreview.after_preview.rows.map((row, index) => {
                             const provenance =
-                              selectedWorksheetRecipePreview.after_preview.row_provenance[index]?.original_row_index;
+                              selectedWorksheetDisplayRecipePreview.after_preview.row_provenance[index]?.original_row_index;
                             return (
                               <tr key={`${provenance ?? "preview"}:${index}`}>
                                 <td title={provenance === undefined ? undefined : `Original workbook row ${provenance + 1}`}>
                                   {index + 1}
                                 </td>
-                                {selectedWorksheetRecipePreview.after_preview.columns.map((column) => (
+                                {selectedWorksheetDisplayRecipePreview.after_preview.columns.map((column) => (
                                   <td key={column}>{formatPreviewCell(row[column])}</td>
                                 ))}
                               </tr>
@@ -2917,7 +3163,7 @@ export function CleanPrepareReviewPanel({
                     </div>
                   )}
                 </>
-              ) : recipeStatusByWorksheet[decisionWorksheetId] === "ready" && !selectedWorksheetRecipePreview ? (
+              ) : recipeStatusByWorksheet[decisionWorksheetId] === "ready" && !selectedWorksheetDisplayRecipePreview ? (
                 <p className="clean-prepare-preview-state">
                   Loading the selected worksheet preview...
                 </p>
@@ -2933,7 +3179,8 @@ export function CleanPrepareReviewPanel({
             <section className="clean-prepare-draft-status">
             <h4>Draft recipe status</h4>
             {selectedWorksheetApplyState.status === "success" &&
-            selectedWorksheetApplyState.result.status === "applied_to_working_copy" ? (
+            selectedWorksheetApplyState.result.status === "applied_to_working_copy" &&
+            !isSelectedWorksheetNoOpDecisionPreview ? (
               <>
                 <strong>
                   Cleaned working copy created for {selectedWorksheetApplyState.result.worksheet_name}. Original workbook unchanged.
@@ -2945,15 +3192,21 @@ export function CleanPrepareReviewPanel({
             ) : (
               <>
                 <strong>
-                  {embedded
+                  {isSelectedWorksheetNoOpDecisionPreview
+                    ? structuralNoOpApplyHeading
+                    : embedded
                     ? "No changes applied yet."
                     : "Preview only - no changes have been applied to this worksheet yet."}
                 </strong>
-                <p>Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original.</p>
+                <p>
+                  {isSelectedWorksheetNoOpDecisionPreview
+                    ? structuralNoOpApplyCopy
+                    : "Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original."}
+                </p>
               </>
             )}
             </section>
-            {embedded && onContinueInAnalyst && (
+            {embedded && onContinueInAnalyst && !isSelectedWorksheetNoOpDecisionPreview && (
               <section className="clean-prepare-analyst-handoff">
                 <div>
                   <strong>Ready for analysis?</strong>

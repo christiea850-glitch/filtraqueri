@@ -1,6 +1,8 @@
 import {
   areStructuralDecisionReadinessEqual,
   buildPreparationReview,
+  buildWorksheetStructuralDecisionPlan,
+  canCreateStructuralCleanedCopy,
   clearSuggestedFixDecision,
   clearWorksheetSuggestedFixDecision,
   getSuggestedFixesForWorksheet,
@@ -12,6 +14,7 @@ import {
   hasCleaningRecipePreviewOperations,
   hasExplicitSuggestedFixDecisions,
   isCleaningRecipePreviewForWorksheet,
+  isStructuralNoOpDecisionPreview,
   resetSuggestedFixDecisions,
   resetWorksheetSuggestedFixDecisions,
   getSuggestedFixCleaningPlan,
@@ -19,6 +22,7 @@ import {
   getSuggestedFixDecisionProgress,
   getSuggestedFixKeepOriginalLabel,
   getSuggestedFixRecommendationLabel,
+  getStructuralPreviewComparisonLabels,
   getStructuralPreviewErrorReadiness,
   getStructuralPreviewIdleReadiness,
   getStructuralPreviewLoadingReadiness,
@@ -29,6 +33,8 @@ import {
   getColumnDisplayName,
   setWorksheetSuggestedFixDecision,
   structuralDecisionEmptyStateCopy,
+  structuralNoOpApplyCopy,
+  structuralNoOpApplyHeading,
   type SuggestedFix,
   type SuggestedFixDecision,
   type WorksheetSuggestedFixDecisionDrafts,
@@ -1324,6 +1330,95 @@ export const runCleanPrepareStructuralDecisionFixtures =
           ...expect(!plan.includes("unresolved"), "Unresolved should never be emitted."),
         ];
       }),
+      fixture("active worksheet plan serialization model includes only selected worksheet fixes", () => {
+        const worksheetFixes: SuggestedFix[] = [
+          {
+            id: "managers-id:automatic_blank_row:0",
+            recommendationId: "managers-id:automatic_blank_row:0",
+            evidenceType: "automatic_blank_row",
+            evidenceSignalId: "managers-id:automatic_blank_row:0",
+            worksheetId: "managers-id",
+            worksheetName: "managers",
+            affectedRows: [7],
+            affectedColumnIndexes: [],
+            title: "Exclude blank layout rows",
+            detail: "Blank row.",
+          },
+          {
+            id: "properties-id:automatic_blank_row:0",
+            recommendationId: "properties-id:automatic_blank_row:0",
+            evidenceType: "automatic_blank_row",
+            evidenceSignalId: "properties-id:automatic_blank_row:0",
+            worksheetId: "properties-id",
+            worksheetName: "properties",
+            affectedRows: [9],
+            affectedColumnIndexes: [],
+            title: "Exclude blank layout rows",
+            detail: "Blank row.",
+          },
+        ];
+        const plan = buildWorksheetStructuralDecisionPlan(
+          "managers-id",
+          worksheetFixes,
+          decisions({
+            "managers-id:automatic_blank_row:0": "use_recommendation",
+            "properties-id:automatic_blank_row:0": "keep_original",
+          }),
+        );
+        return [
+          ...expect(plan?.worksheetId === "managers-id", "Plan should use the active worksheet id."),
+          ...expect(plan?.decisions.length === 1, "Plan should include only active worksheet decisions."),
+          ...expect(
+            plan?.decisions[0]?.recommendationId === "managers-id:automatic_blank_row:0",
+            "Plan should not leak cross-worksheet decisions.",
+          ),
+          ...expect(plan?.decisions[0]?.affectedRows?.[0] === 7, "Plan should include affected rows."),
+        ];
+      }),
+      fixture("apply plan represents use keep and defer without unresolved", () => {
+        const worksheetFixes: SuggestedFix[] = [
+          { ...fixes[0], worksheetId: "managers-id", recommendationId: "managers-id:sparse_layout_gap:0", id: "managers-id:sparse_layout_gap:0", affectedRows: [2] },
+          { ...fixes[1], worksheetId: "managers-id", recommendationId: "managers-id:side_note_region_candidate:1", id: "managers-id:side_note_region_candidate:1", affectedColumnIndexes: [4] },
+          { ...fixes[2], worksheetId: "managers-id", recommendationId: "managers-id:repeated_missing_pattern:2", id: "managers-id:repeated_missing_pattern:2", evidenceType: "repeated_missing_pattern", affectedRows: [1] },
+        ];
+        const plan = buildWorksheetStructuralDecisionPlan(
+          "managers-id",
+          worksheetFixes,
+          decisions({
+            "managers-id:sparse_layout_gap:0": "use_recommendation",
+            "managers-id:side_note_region_candidate:1": "keep_original",
+            "managers-id:repeated_missing_pattern:2": "decide_later",
+          }),
+        );
+        return [
+          ...expect(
+            plan?.decisions.map((item) => item.decision).join(",") ===
+              "use_recommendation,keep_original,decide_later",
+            "Plan should represent all three wire decisions.",
+          ),
+          ...expect(
+            Boolean(plan && !plan.decisions.some((item) => item.decision === ("unresolved" as never))),
+            "Plan should never include unresolved.",
+          ),
+          ...expect(
+            Boolean(plan && !plan.decisions.some((item) => String(item.evidenceType) === "missing_values")),
+            "Plan should not send missing-value decisions.",
+          ),
+        ];
+      }),
+      fixture("zero recommendation worksheet keeps backward compatible null plan", () => [
+        ...expect(
+          buildWorksheetStructuralDecisionPlan("units-id", [], decisions({})) === null,
+          "Zero-recommendation worksheet should not require a structural plan.",
+        ),
+      ]),
+      fixture("unresolved structural recommendation is omitted from plan until Apply is ready", () => {
+        const worksheetFixes: SuggestedFix[] = [
+          { ...fixes[0], worksheetId: "managers-id", recommendationId: "managers-id:sparse_layout_gap:0", id: "managers-id:sparse_layout_gap:0", affectedRows: [2] },
+        ];
+        const plan = buildWorksheetStructuralDecisionPlan("managers-id", worksheetFixes, decisions({}));
+        return expect(plan === null, "Unresolved structural recommendations should not enter the wire plan.");
+      }),
       fixture("no unsupported unresolved strategy reaches backend-shaped decisions", () => {
         const explicitDecisions = Object.values(
           decisions({
@@ -1802,6 +1897,83 @@ export const runCleanPrepareStructuralDecisionFixtures =
           ...expect(hasCleaningRecipePreviewOperations(preview) === false, "Preview should have no recipe or exclusions."),
           ...expect(fixes.length === 0, "No preview exclusions should produce no preview recommendations."),
           ...expect(readiness.canContinueToApply === true, "True zero-operation preview should be ready."),
+        ];
+      }),
+      fixture("no-op decision preview disables cleaned-copy creation", () => {
+        const preview = recipePreview("managers-id", "managers", {
+          before: { row_count: 6, column_count: 7 },
+          after_preview: {
+            row_count: 7,
+            column_count: 7,
+            columns: ["manager_id"],
+            rows: [{ manager_id: null }],
+            row_provenance: [{ preview_row_index: 0, original_row_index: 7 }],
+          },
+        });
+        return [
+          ...expect(
+            isStructuralNoOpDecisionPreview(preview, true) === true,
+            "Decision-aware zero-operation preview should be classified as no-op.",
+          ),
+          ...expect(
+            canCreateStructuralCleanedCopy({
+              preview,
+              canContinueToApply: true,
+              worksheetStatus: "ready",
+            }) === false,
+            "No-op decision preview should not expose Create cleaned working copy.",
+          ),
+        ];
+      }),
+      fixture("no-op decision preview sends no Apply request by state", () => {
+        const preview = recipePreview("managers-id", "managers");
+        const canCreate = canCreateStructuralCleanedCopy({
+          preview,
+          canContinueToApply: true,
+          worksheetStatus: "ready",
+        });
+        return expect(canCreate === false, "No-op state should prevent confirm/apply handlers from running.");
+      }),
+      fixture("no-op state copy does not claim success-created", () => [
+        ...expect(structuralNoOpApplyHeading === "No cleaned copy needed", "No-op heading should be truthful."),
+        ...expect(
+          structuralNoOpApplyCopy.includes("No cleaned working copy was created"),
+          "No-op copy should say no cleaned copy was created.",
+        ),
+        ...expect(
+          !structuralNoOpApplyCopy.includes("created. Original workbook unchanged"),
+          "No-op copy should not reuse success-created wording.",
+        ),
+      ]),
+      fixture("preserved layout row comparison labels are truthful", () => {
+        const labels = getStructuralPreviewComparisonLabels(true);
+        return [
+          ...expect(labels.before === "Current analysis table", "Before label should name current analysis table."),
+          ...expect(
+            labels.after === "Worksheet with preserved layout rows",
+            "No-op after label should name preserved layout rows.",
+          ),
+        ];
+      }),
+      fixture("accepted operation preview still supports manual creation", () => {
+        const preview = managersAutomaticBlankRowPreview();
+        return [
+          ...expect(
+            isStructuralNoOpDecisionPreview(preview, true) === false,
+            "Accepted exclusion preview should not be no-op.",
+          ),
+          ...expect(
+            canCreateStructuralCleanedCopy({
+              preview,
+              canContinueToApply: true,
+              worksheetStatus: "ready",
+            }) === true,
+            "Accepted preview with exclusions should allow manual creation.",
+          ),
+          ...expect(
+            getStructuralPreviewComparisonLabels(false).after === "Preview after cleanup",
+            "Accepted path should preserve cleanup preview label.",
+          ),
         ];
       }),
       fixture("worksheet-wide incompatible missing strategies are excluded", () => {

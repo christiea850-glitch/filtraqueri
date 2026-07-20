@@ -20,6 +20,7 @@ from typing import Any
 import duckdb
 from fastapi import HTTPException
 
+from .workbook_cleaning_contract import WorkbookStructuralDecisionPlan
 from .workbook_cleaning_preview import (
     MAX_CLEANING_PREVIEW_ROWS,
     compute_cleaning_recipe_plan,
@@ -77,6 +78,10 @@ def _no_op_response(
         },
         "recipe_applied": [],
         "excluded": plan.get("excluded", {}),
+        "structural_decision_summary": plan.get(
+            "structural_decision_summary",
+            {"accepted": [], "preserved": [], "deferred": []},
+        ),
         "preview_rows": [],
         "preview_row_limit": row_limit_preview,
         "message": (
@@ -93,6 +98,7 @@ def apply_cleaning_recipe_to_working_copy(
     duckdb_path: Path,
     dataset_id: str,
     row_limit_preview: int = 25,
+    structural_decision_plan: WorkbookStructuralDecisionPlan | None = None,
 ) -> dict[str, Any]:
     """Apply the cleaning recipe to a new DuckDB table without mutating sources.
 
@@ -104,7 +110,11 @@ def apply_cleaning_recipe_to_working_copy(
     if not duckdb_path.exists():
         raise HTTPException(status_code=404, detail="Dataset session storage is missing")
 
-    plan = compute_cleaning_recipe_plan(workbook_path=workbook_path, worksheet=worksheet)
+    plan = compute_cleaning_recipe_plan(
+        workbook_path=workbook_path,
+        worksheet=worksheet,
+        structural_decision_plan=structural_decision_plan,
+    )
     clamped_preview_limit = min(max(row_limit_preview, 1), MAX_CLEANING_PREVIEW_ROWS)
 
     if plan.get("is_empty") or not plan.get("recipe"):
@@ -168,6 +178,10 @@ def apply_cleaning_recipe_to_working_copy(
         },
         "recipe_applied": plan["recipe"],
         "excluded": plan["excluded"],
+        "structural_decision_summary": plan.get(
+            "structural_decision_summary",
+            {"accepted": [], "preserved": [], "deferred": []},
+        ),
         "preview_rows": preview_rows,
         "preview_row_limit": clamped_preview_limit,
         "message": (

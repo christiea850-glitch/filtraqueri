@@ -183,6 +183,11 @@ export type CleaningRecipePreview = {
       }[];
     };
   };
+  structural_decision_summary?: {
+    accepted: Record<string, unknown>[];
+    preserved: Record<string, unknown>[];
+    deferred: Record<string, unknown>[];
+  };
   preview_row_limit: number;
   message: string;
 };
@@ -217,6 +222,11 @@ export type CleaningRecipeApplyResponse = {
     placeholder_rows: number;
     side_note_columns: number;
   };
+  structural_decision_summary?: {
+    accepted: Record<string, unknown>[];
+    preserved: Record<string, unknown>[];
+    deferred: Record<string, unknown>[];
+  };
   preview_rows: Record<string, unknown>[];
   preview_row_limit: number;
   message: string;
@@ -225,6 +235,11 @@ export type CleaningRecipeApplyResponse = {
 export type ApplyCleaningRecipeOptions = {
   rowLimitPreview?: number;
   confirmPreviewVersion?: string | null;
+  structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
+};
+
+export type CleaningRecipePreviewOptions = {
+  rowLimit?: number;
   structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
 };
 
@@ -373,15 +388,60 @@ export async function getOriginalWorkbookLayout(datasetId: string, worksheetId: 
   }
 }
 
+const serializeStructuralDecisionPlan = (plan: WorksheetStructuralDecisionPlan) => ({
+  worksheet_id: plan.worksheetId,
+  decisions: plan.decisions.map((decision) => ({
+    recommendation_id: decision.recommendationId,
+    evidence_type: decision.evidenceType,
+    decision: decision.decision,
+    ...(decision.evidenceSignalId ? { evidence_signal_id: decision.evidenceSignalId } : {}),
+    ...(decision.evidenceIds ? { evidence_ids: decision.evidenceIds } : {}),
+    ...(decision.affectedRows ? { affected_rows: decision.affectedRows } : {}),
+    ...(decision.affectedColumnIndexes
+      ? { affected_column_indexes: decision.affectedColumnIndexes }
+      : {}),
+    ...(decision.affectedColumns ? { affected_columns: decision.affectedColumns } : {}),
+  })),
+});
+
 export async function getCleaningRecipePreview(
   datasetId: string,
   worksheetId: string,
-  rowLimit = 10,
+  rowLimit?: number,
+): Promise<CleaningRecipePreview>;
+export async function getCleaningRecipePreview(
+  datasetId: string,
+  worksheetId: string,
+  options: CleaningRecipePreviewOptions,
+): Promise<CleaningRecipePreview>;
+export async function getCleaningRecipePreview(
+  datasetId: string,
+  worksheetId: string,
+  optionsOrRowLimit: CleaningRecipePreviewOptions | number = 10,
 ) {
+  const options =
+    typeof optionsOrRowLimit === "number" ? { rowLimit: optionsOrRowLimit } : optionsOrRowLimit;
+  const rowLimit = options.rowLimit ?? 10;
   const params = new URLSearchParams({ row_limit: String(rowLimit) });
+  const url = `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/cleaning-recipe-preview`;
+
+  if (options.structuralDecisionPlan) {
+    return requestJson<CleaningRecipePreview>(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          row_limit_preview: rowLimit,
+          structural_decision_plan: serializeStructuralDecisionPlan(options.structuralDecisionPlan),
+        }),
+      },
+      "Cleaning recipe preview could not be loaded.",
+    );
+  }
 
   return requestJson<CleaningRecipePreview>(
-    `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/cleaning-recipe-preview?${params.toString()}`,
+    `${url}?${params.toString()}`,
     {
       method: "GET",
     },
@@ -415,11 +475,7 @@ export async function applyCleaningRecipe(
     confirm_preview_version?: string | null;
     structural_decision_plan?: {
       worksheet_id: string;
-      decisions: {
-        recommendation_id: string;
-        evidence_type: string;
-        decision: string;
-      }[];
+      decisions: Record<string, unknown>[];
     };
   } = {
     row_limit_preview: options.rowLimitPreview ?? 25,
@@ -430,14 +486,7 @@ export async function applyCleaningRecipe(
   }
 
   if (options.structuralDecisionPlan) {
-    body.structural_decision_plan = {
-      worksheet_id: options.structuralDecisionPlan.worksheetId,
-      decisions: options.structuralDecisionPlan.decisions.map((decision) => ({
-        recommendation_id: decision.recommendationId,
-        evidence_type: decision.evidenceType,
-        decision: decision.decision,
-      })),
-    };
+    body.structural_decision_plan = serializeStructuralDecisionPlan(options.structuralDecisionPlan);
   }
 
   return requestJson<CleaningRecipeApplyResponse>(
