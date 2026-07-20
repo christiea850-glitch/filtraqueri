@@ -5,7 +5,15 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .workbook_cleaning_contract import WorkbookStructuralDecisionPlan
+from .workbook_cleaning_contract import (
+    WorkbookMissingValuePlan,
+    WorkbookStructuralDecisionPlan,
+    validate_missing_value_plan_scope,
+)
+from .workbook_cleaning_missing_value_plan import (
+    apply_missing_value_plan_to_rows,
+    empty_missing_value_summary,
+)
 from .workbook_ingestion import (
     contiguous_header_width,
     is_blank_cell,
@@ -683,6 +691,7 @@ def _empty_plan(*, worksheet: dict[str, Any]) -> dict[str, Any]:
         "excluded_details": _empty_excluded_details(),
         "has_section_context": False,
         "structural_decision_summary": {"accepted": [], "preserved": [], "deferred": []},
+        "missing_value_summary": empty_missing_value_summary(),
     }
 
 
@@ -692,6 +701,7 @@ def build_cleaning_recipe_preview(
     worksheet: dict[str, Any],
     row_limit: int,
     structural_decision_plan: WorkbookStructuralDecisionPlan | None = None,
+    missing_value_plan: WorkbookMissingValuePlan | None = None,
 ) -> dict[str, Any]:
     """Read-only preview of the cleaning recipe, clamped to `row_limit` rows."""
     clamped_row_limit = min(max(row_limit, 1), MAX_CLEANING_PREVIEW_ROWS)
@@ -700,16 +710,34 @@ def build_cleaning_recipe_preview(
         worksheet=worksheet,
         structural_decision_plan=structural_decision_plan,
     )
+    validate_missing_value_plan_scope(missing_value_plan, str(plan["worksheet_id"]))
     if plan.get("is_empty"):
-        return _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
+        preview = _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
+        preview["missing_value_summary"] = {
+            key: value
+            for key, value in empty_missing_value_summary().items()
+            if key != "kept_row_indexes"
+        }
+        return preview
 
-    preview_rows = plan["rows"][:clamped_row_limit]
+    rows, missing_value_summary, _ = apply_missing_value_plan_to_rows(
+        rows=plan["rows"],
+        output_columns=plan["output_columns"],
+        worksheet=worksheet,
+        missing_value_plan=missing_value_plan,
+    )
+    kept_row_indexes = missing_value_summary.get("kept_row_indexes")
+    source_provenance = plan["row_provenance"]
+    if isinstance(kept_row_indexes, list) and len(kept_row_indexes) == len(rows):
+        source_provenance = [plan["row_provenance"][index] for index in kept_row_indexes]
+
+    preview_rows = rows[:clamped_row_limit]
     row_provenance = [
         {
             "preview_row_index": index,
             "original_row_index": entry["original_row_index"],
         }
-        for index, entry in enumerate(plan["row_provenance"][:clamped_row_limit])
+        for index, entry in enumerate(source_provenance[:clamped_row_limit])
     ]
 
     return {
@@ -718,7 +746,7 @@ def build_cleaning_recipe_preview(
         "worksheet_name": plan["worksheet_name"],
         "before": plan["before"],
         "after_preview": {
-            "row_count": len(plan["rows"]),
+            "row_count": len(rows),
             "column_count": len(plan["output_columns"]),
             "columns": plan["output_columns"],
             "rows": preview_rows,
@@ -731,6 +759,11 @@ def build_cleaning_recipe_preview(
             "structural_decision_summary",
             {"accepted": [], "preserved": [], "deferred": []},
         ),
+        "missing_value_summary": {
+            key: value
+            for key, value in missing_value_summary.items()
+            if key != "kept_row_indexes"
+        },
         "preview_row_limit": clamped_row_limit,
         "message": "Preview only - no changes have been applied.",
     }

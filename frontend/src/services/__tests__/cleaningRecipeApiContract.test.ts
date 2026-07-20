@@ -75,6 +75,23 @@ const previewResponsePayload: CleaningRecipePreview = {
       reasons: [],
     },
   },
+  missing_value_summary: {
+    worksheet_strategy: "decide_per_column",
+    decisions_applied: [],
+    columns_changed: ["amount"],
+    columns_changed_count: 1,
+    cells_filled: 1,
+    rows_removed: 0,
+    operations: [
+      {
+        column_name: "amount",
+        strategy: "fill_zero",
+        affected_cells: 1,
+        preview_value: "0",
+      },
+    ],
+    has_changes: true,
+  },
   preview_row_limit: 10,
   message: "ok",
 };
@@ -433,6 +450,10 @@ export async function runCleaningRecipeApiContractFixtures() {
         !Object.hasOwn(legacyPreviewRequests[0]?.body ?? {}, "structural_decision_plan"),
         "Legacy preview should not send structural_decision_plan.",
       ),
+      ...expect(
+        !Object.hasOwn(legacyPreviewRequests[0]?.body ?? {}, "missing_value_plan"),
+        "Legacy preview should not send missing_value_plan.",
+      ),
     ]),
   );
 
@@ -456,8 +477,109 @@ export async function runCleaningRecipeApiContractFixtures() {
         "Decision preview should send structural_decision_plan.",
       ),
       ...expect(
+        !Object.hasOwn(decisionPreviewRequests[0]?.body ?? {}, "missing_value_plan"),
+        "Structural-only preview should not send missing_value_plan.",
+      ),
+      ...expect(
         decisionPreviewRequests[0]?.body.row_limit_preview === 10,
         "Decision preview should send row_limit_preview.",
+      ),
+    ]),
+  );
+
+  const missingOnlyPreviewRequests = await withCapturedRequestBody(async () => {
+    await getCleaningRecipePreview("dataset-1", worksheetId, {
+      rowLimitPreview: 10,
+      missingValuePlan,
+    });
+  }, previewResponsePayload);
+  const serializedPreviewMissingPlan = missingOnlyPreviewRequests[0]?.body.missing_value_plan as
+    | {
+        worksheet_id?: unknown;
+        worksheet_strategy?: unknown;
+        column_decisions?: Record<string, unknown>[];
+      }
+    | undefined;
+  results.push(
+    createResult("missing-only preview POST serializes missing_value_plan", [
+      ...expect(missingOnlyPreviewRequests[0]?.method === "POST", "Missing preview should POST."),
+      ...expect(
+        missingOnlyPreviewRequests[0]?.url.includes("/cleaning-recipe-preview") === true,
+        "Missing preview should use preview endpoint.",
+      ),
+      ...expect(
+        serializedPreviewMissingPlan?.worksheet_id === worksheetId,
+        "Missing preview should serialize worksheet_id.",
+      ),
+      ...expect(
+        serializedPreviewMissingPlan?.worksheet_strategy === "decide_per_column",
+        "Missing preview should serialize worksheet_strategy.",
+      ),
+      ...expect(
+        serializedPreviewMissingPlan?.column_decisions?.[0]?.column_name === "amount",
+        "Missing preview should serialize column_name.",
+      ),
+      ...expect(
+        serializedPreviewMissingPlan?.column_decisions?.[0]?.strategy === "fill_zero",
+        "Missing preview should serialize strategy.",
+      ),
+    ]),
+  );
+
+  const combinedPreviewRequests = await withCapturedRequestBody(async () => {
+    await getCleaningRecipePreview("dataset-1", worksheetId, {
+      rowLimitPreview: 10,
+      structuralDecisionPlan: structuralPlan,
+      missingValuePlan,
+    });
+  }, previewResponsePayload);
+  results.push(
+    createResult("combined preview serializes structural and missing plans", [
+      ...expect(combinedPreviewRequests[0]?.method === "POST", "Combined preview should POST."),
+      ...expect(
+        Boolean(combinedPreviewRequests[0]?.body.structural_decision_plan),
+        "Combined preview should send structural_decision_plan.",
+      ),
+      ...expect(
+        Boolean(combinedPreviewRequests[0]?.body.missing_value_plan),
+        "Combined preview should send missing_value_plan.",
+      ),
+      ...expect(
+        combinedPreviewRequests[0]?.body.row_limit_preview === 10,
+        "Combined preview should serialize row_limit_preview.",
+      ),
+    ]),
+  );
+
+  results.push(
+    createResult("preview response summary typing exposes missing-value effects", [
+      ...expect(
+        previewResponsePayload.missing_value_summary?.worksheet_strategy === "decide_per_column",
+        "Preview summary should expose worksheet strategy.",
+      ),
+      ...expect(
+        previewResponsePayload.missing_value_summary?.columns_changed_count === 1,
+        "Preview summary should expose affected column count.",
+      ),
+      ...expect(
+        previewResponsePayload.missing_value_summary?.cells_filled === 1,
+        "Preview summary should expose cells filled.",
+      ),
+      ...expect(
+        previewResponsePayload.missing_value_summary?.operations?.[0]?.strategy === "fill_zero",
+        "Preview summary should expose operations.",
+      ),
+    ]),
+  );
+  results.push(
+    createResult("preview helper does not call Apply", [
+      ...expect(
+        missingOnlyPreviewRequests[0]?.url.includes("/apply-cleaning-recipe") === false,
+        "Missing preview must not call Apply endpoint.",
+      ),
+      ...expect(
+        combinedPreviewRequests[0]?.url.includes("/apply-cleaning-recipe") === false,
+        "Combined preview must not call Apply endpoint.",
       ),
     ]),
   );

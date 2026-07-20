@@ -132,6 +132,52 @@ class WorkbookCleaningPreviewEndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("worksheet_id", response.json()["detail"])
 
+    def test_missing_value_post_preview_accepts_no_op_plan(self) -> None:
+        encoded_worksheet_id = quote(MANAGERS_WORKSHEET_ID, safe="")
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/datasets/{DATASET_ID}/workbook/worksheets/"
+                f"{encoded_worksheet_id}/cleaning-recipe-preview",
+                json={
+                    "row_limit_preview": 10,
+                    "missing_value_plan": {
+                        "worksheet_id": MANAGERS_WORKSHEET_ID,
+                        "worksheet_strategy": "leave_unchanged",
+                        "column_decisions": [],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "preview_only")
+        self.assertEqual(payload["missing_value_summary"]["worksheet_strategy"], "leave_unchanged")
+        self.assertEqual(payload["missing_value_summary"]["cells_filled"], 0)
+        self.assertNotIn("cleaned_table_name", payload)
+
+    def test_missing_value_post_preview_rejects_unsupported_strategy(self) -> None:
+        encoded_worksheet_id = quote(MANAGERS_WORKSHEET_ID, safe="")
+
+        with TestClient(app) as client:
+            response = client.post(
+                f"/datasets/{DATASET_ID}/workbook/worksheets/"
+                f"{encoded_worksheet_id}/cleaning-recipe-preview",
+                json={
+                    "row_limit_preview": 10,
+                    "missing_value_plan": {
+                        "worksheet_id": MANAGERS_WORKSHEET_ID,
+                        "worksheet_strategy": "decide_per_column",
+                        "column_decisions": [
+                            {"column_name": "amount", "strategy": "forward_fill"}
+                        ],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Unsupported column missing-value strategy", response.json()["detail"])
+
     def test_post_preview_and_apply_are_separate_routes(self) -> None:
         preview_route = next(
             route

@@ -1908,6 +1908,7 @@ def _get_cleaning_recipe_preview(
     worksheet_id: str,
     row_limit: int = 10,
     structural_decision_plan: Any | None = None,
+    missing_value_plan: Any | None = None,
 ) -> dict[str, Any]:
     if row_limit < 1:
         raise HTTPException(status_code=400, detail="Cleaning recipe preview limit must be 1 or greater")
@@ -1937,12 +1938,14 @@ def _get_cleaning_recipe_preview(
     if not worksheet:
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     validate_structural_decision_plan_scope(structural_decision_plan, worksheet_id)
+    validate_missing_value_plan_scope(missing_value_plan, worksheet_id)
 
     return build_cleaning_recipe_preview(
         workbook_path=Path(uploaded_path),
         worksheet=worksheet,
         row_limit=row_limit,
         structural_decision_plan=structural_decision_plan,
+        missing_value_plan=missing_value_plan,
     )
 
 
@@ -1970,6 +1973,7 @@ def preview_cleaning_recipe_with_structural_decisions(
         worksheet_id=worksheet_id,
         row_limit=request.row_limit_preview,
         structural_decision_plan=request.structural_decision_plan,
+        missing_value_plan=request.missing_value_plan,
     )
 
 

@@ -189,6 +189,16 @@ export type CleaningRecipePreview = {
     preserved: Record<string, unknown>[];
     deferred: Record<string, unknown>[];
   };
+  missing_value_summary?: {
+    worksheet_strategy: string | null;
+    decisions_applied: Record<string, unknown>[];
+    columns_changed: string[];
+    columns_changed_count?: number;
+    cells_filled?: number;
+    rows_removed: number;
+    operations?: Record<string, unknown>[];
+    has_changes?: boolean;
+  };
   preview_row_limit: number;
   message: string;
 };
@@ -248,7 +258,9 @@ export type ApplyCleaningRecipeOptions = {
 
 export type CleaningRecipePreviewOptions = {
   rowLimit?: number;
+  rowLimitPreview?: number;
   structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
+  missingValuePlan?: WorksheetMissingValuePlan | null;
 };
 
 export type MissingValueDecisionApplyRequest = {
@@ -439,20 +451,30 @@ export async function getCleaningRecipePreview(
 ) {
   const options =
     typeof optionsOrRowLimit === "number" ? { rowLimit: optionsOrRowLimit } : optionsOrRowLimit;
-  const rowLimit = options.rowLimit ?? 10;
+  const rowLimit = options.rowLimitPreview ?? options.rowLimit ?? 10;
   const params = new URLSearchParams({ row_limit: String(rowLimit) });
   const url = `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/cleaning-recipe-preview`;
 
-  if (options.structuralDecisionPlan) {
+  if (options.structuralDecisionPlan || options.missingValuePlan) {
+    const body: {
+      row_limit_preview: number;
+      structural_decision_plan?: ReturnType<typeof serializeStructuralDecisionPlan>;
+      missing_value_plan?: ReturnType<typeof serializeMissingValuePlan>;
+    } = {
+      row_limit_preview: rowLimit,
+    };
+    if (options.structuralDecisionPlan) {
+      body.structural_decision_plan = serializeStructuralDecisionPlan(options.structuralDecisionPlan);
+    }
+    if (options.missingValuePlan) {
+      body.missing_value_plan = serializeMissingValuePlan(options.missingValuePlan);
+    }
     return requestJson<CleaningRecipePreview>(
       url,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          row_limit_preview: rowLimit,
-          structural_decision_plan: serializeStructuralDecisionPlan(options.structuralDecisionPlan),
-        }),
+        body: JSON.stringify(body),
       },
       "Cleaning recipe preview could not be loaded.",
     );

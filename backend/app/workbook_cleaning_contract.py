@@ -86,6 +86,7 @@ class WorkbookCleaningPreviewRequest(BaseModel):
 
     row_limit_preview: int = Field(10, ge=1, le=200)
     structural_decision_plan: WorkbookStructuralDecisionPlan | None = None
+    missing_value_plan: WorkbookMissingValuePlan | None = None
 
 
 def validate_structural_decision_plan_scope(
