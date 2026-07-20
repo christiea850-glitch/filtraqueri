@@ -1,5 +1,6 @@
 import type { UploadResponse } from "../features/dataset/datasetTypes";
 import type {
+  WorksheetMissingValuePlan,
   WorksheetRelationshipCandidate,
   WorksheetStructuralDecisionPlan,
 } from "../features/workbook";
@@ -227,6 +228,12 @@ export type CleaningRecipeApplyResponse = {
     preserved: Record<string, unknown>[];
     deferred: Record<string, unknown>[];
   };
+  missing_value_summary?: {
+    worksheet_strategy: string | null;
+    decisions_applied: Record<string, unknown>[];
+    columns_changed: string[];
+    rows_removed: number;
+  };
   preview_rows: Record<string, unknown>[];
   preview_row_limit: number;
   message: string;
@@ -236,6 +243,7 @@ export type ApplyCleaningRecipeOptions = {
   rowLimitPreview?: number;
   confirmPreviewVersion?: string | null;
   structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
+  missingValuePlan?: WorksheetMissingValuePlan | null;
 };
 
 export type CleaningRecipePreviewOptions = {
@@ -404,6 +412,16 @@ const serializeStructuralDecisionPlan = (plan: WorksheetStructuralDecisionPlan) 
   })),
 });
 
+const serializeMissingValuePlan = (plan: WorksheetMissingValuePlan) => ({
+  worksheet_id: plan.worksheetId,
+  worksheet_strategy: plan.worksheetStrategy,
+  column_decisions: plan.columnDecisions.map((decision) => ({
+    column_name: decision.columnName,
+    strategy: decision.strategy,
+    ...(decision.customValue !== undefined ? { custom_value: decision.customValue } : {}),
+  })),
+});
+
 export async function getCleaningRecipePreview(
   datasetId: string,
   worksheetId: string,
@@ -477,6 +495,11 @@ export async function applyCleaningRecipe(
       worksheet_id: string;
       decisions: Record<string, unknown>[];
     };
+    missing_value_plan?: {
+      worksheet_id: string;
+      worksheet_strategy: string;
+      column_decisions: Record<string, unknown>[];
+    };
   } = {
     row_limit_preview: options.rowLimitPreview ?? 25,
   };
@@ -487,6 +510,10 @@ export async function applyCleaningRecipe(
 
   if (options.structuralDecisionPlan) {
     body.structural_decision_plan = serializeStructuralDecisionPlan(options.structuralDecisionPlan);
+  }
+
+  if (options.missingValuePlan) {
+    body.missing_value_plan = serializeMissingValuePlan(options.missingValuePlan);
   }
 
   return requestJson<CleaningRecipeApplyResponse>(

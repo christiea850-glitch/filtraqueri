@@ -25,6 +25,7 @@ from .workbook_cleaning_apply import apply_cleaning_recipe_to_working_copy
 from .workbook_cleaning_contract import (
     WorkbookCleaningApplyRequest,
     WorkbookCleaningPreviewRequest,
+    validate_missing_value_plan_scope,
     validate_structural_decision_plan_scope,
 )
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
@@ -2046,6 +2047,7 @@ def apply_workbook_cleaning_recipe(
         )
 
     validate_structural_decision_plan_scope(request.structural_decision_plan, worksheet_id)
+    validate_missing_value_plan_scope(request.missing_value_plan, worksheet_id)
 
     result = apply_cleaning_recipe_to_working_copy(
         workbook_path=uploaded_path,
@@ -2054,6 +2056,7 @@ def apply_workbook_cleaning_recipe(
         dataset_id=dataset_id,
         row_limit_preview=request.row_limit_preview,
         structural_decision_plan=request.structural_decision_plan,
+        missing_value_plan=request.missing_value_plan,
     )
 
     # Persist a working-copy record only when something was actually written.
@@ -2075,6 +2078,7 @@ def apply_workbook_cleaning_recipe(
                 "cleaned_table_name": result["cleaned_table_name"],
                 "recipe_applied": result["recipe_applied"],
                 "excluded": result["excluded"],
+                "missing_value_summary": result.get("missing_value_summary"),
                 "before": result["before"],
                 "after": {
                     "row_count": result["after"]["row_count"],

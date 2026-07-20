@@ -70,6 +70,33 @@ export type WorksheetStructuralDecisionPlan = {
   decisions: WorksheetStructuralDecision[];
 };
 
+export type MissingValueWorksheetStrategy =
+  | "leave_unchanged"
+  | "layout_space"
+  | "remove_mostly_blank_rows"
+  | "decide_per_column";
+
+export type MissingValueColumnStrategy =
+  | "fill_zero"
+  | "fill_mean"
+  | "fill_median"
+  | "fill_custom"
+  | "mark_unknown"
+  | "fill_mode"
+  | "custom_date";
+
+export type MissingValueColumnDecision = {
+  columnName: string;
+  strategy: MissingValueColumnStrategy;
+  customValue?: string | number | boolean | null;
+};
+
+export type WorksheetMissingValuePlan = {
+  worksheetId: WorksheetId;
+  worksheetStrategy: MissingValueWorksheetStrategy;
+  columnDecisions: MissingValueColumnDecision[];
+};
+
 export type WorksheetTemplateStructureEvidence = {
   type: WorksheetTemplateStructureEvidenceType;
   rowIndex: number | null;

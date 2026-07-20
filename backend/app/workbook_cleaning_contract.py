@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,6 +18,21 @@ StructuralEvidenceType = Literal[
     "automatic_blank_row",
 ]
 NonNegativeIndex = Annotated[int, Field(ge=0)]
+SUPPORTED_MISSING_VALUE_WORKSHEET_STRATEGIES = {
+    "leave_unchanged",
+    "layout_space",
+    "remove_mostly_blank_rows",
+    "decide_per_column",
+}
+SUPPORTED_MISSING_VALUE_COLUMN_STRATEGIES = {
+    "fill_zero",
+    "fill_mean",
+    "fill_median",
+    "fill_custom",
+    "mark_unknown",
+    "fill_mode",
+    "custom_date",
+}
 
 
 class WorkbookStructuralDecision(BaseModel):
@@ -41,12 +56,29 @@ class WorkbookStructuralDecisionPlan(BaseModel):
     decisions: list[WorkbookStructuralDecision] = Field(default_factory=list)
 
 
+class WorkbookMissingValueColumnDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    column_name: str = Field(..., min_length=1)
+    strategy: str = Field(..., min_length=1)
+    custom_value: Any | None = None
+
+
+class WorkbookMissingValuePlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    worksheet_id: str = Field(..., min_length=1)
+    worksheet_strategy: str = Field(..., min_length=1)
+    column_decisions: list[WorkbookMissingValueColumnDecision] = Field(default_factory=list)
+
+
 class WorkbookCleaningApplyRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     row_limit_preview: int = Field(25, ge=1, le=200)
     confirm_preview_version: str | None = None
     structural_decision_plan: WorkbookStructuralDecisionPlan | None = None
+    missing_value_plan: WorkbookMissingValuePlan | None = None
 
 
 class WorkbookCleaningPreviewRequest(BaseModel):
@@ -102,3 +134,46 @@ def validate_structural_decision_plan_scope(
                     status_code=400,
                     detail="Structural decision evidence_ids must be scoped to the selected worksheet",
                 )
+
+
+def validate_missing_value_plan_scope(
+    plan: WorkbookMissingValuePlan | None,
+    worksheet_id: str,
+) -> None:
+    if plan is None:
+        return
+
+    if plan.worksheet_id != worksheet_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing-value plan worksheet_id must match the selected worksheet",
+        )
+    if plan.worksheet_strategy not in SUPPORTED_MISSING_VALUE_WORKSHEET_STRATEGIES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported worksheet missing-value strategy",
+        )
+    if plan.worksheet_strategy in SUPPORTED_MISSING_VALUE_COLUMN_STRATEGIES:
+        raise HTTPException(
+            status_code=400,
+            detail="Column missing-value strategy cannot be used as worksheet_strategy",
+        )
+
+    seen_columns: set[str] = set()
+    for decision in plan.column_decisions:
+        if decision.column_name in seen_columns:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing-value plan contains duplicate column_name values",
+            )
+        seen_columns.add(decision.column_name)
+        if decision.strategy not in SUPPORTED_MISSING_VALUE_COLUMN_STRATEGIES:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported column missing-value strategy",
+            )
+        if decision.strategy in SUPPORTED_MISSING_VALUE_WORKSHEET_STRATEGIES:
+            raise HTTPException(
+                status_code=400,
+                detail="Worksheet missing-value strategy cannot be used as a column strategy",
+            )

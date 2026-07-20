@@ -32,6 +32,9 @@ export {
 export type {
   AcceptedRelationshipContract,
   CleanedWorkingCopy,
+  MissingValueColumnDecision,
+  MissingValueColumnStrategy,
+  MissingValueWorksheetStrategy,
   StructuralDecisionChoice,
   WorkbookAnalysisSource,
   WorkbookId,
@@ -41,6 +44,7 @@ export type {
   WorkbookStatus,
   WorksheetId,
   WorksheetMetadata,
+  WorksheetMissingValuePlan,
   WorksheetRelationshipCandidate,
   WorksheetRelationshipEvidence,
   WorksheetRelationshipId,

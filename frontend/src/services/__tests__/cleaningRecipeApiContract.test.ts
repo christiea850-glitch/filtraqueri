@@ -5,7 +5,9 @@ import {
   type CleaningRecipePreview,
 } from "../api";
 import type {
+  MissingValueColumnStrategy,
   StructuralDecisionChoice,
+  WorksheetMissingValuePlan,
   WorksheetStructuralDecisionPlan,
 } from "../../features/workbook";
 
@@ -124,6 +126,16 @@ const structuralPlan: WorksheetStructuralDecisionPlan = {
   ],
 };
 
+const missingValuePlan: WorksheetMissingValuePlan = {
+  worksheetId,
+  worksheetStrategy: "decide_per_column",
+  columnDecisions: [
+    { columnName: "amount", strategy: "fill_zero" },
+    { columnName: "region", strategy: "fill_mode" },
+    { columnName: "comment", strategy: "fill_custom", customValue: "Unknown" },
+  ],
+};
+
 export async function runCleaningRecipeApiContractFixtures() {
   const results: FixtureResult[] = [];
 
@@ -138,6 +150,10 @@ export async function runCleaningRecipeApiContractFixtures() {
       ...expect(
         !Object.hasOwn(legacyBody ?? {}, "structural_decision_plan"),
         "Legacy call should not send structural_decision_plan.",
+      ),
+      ...expect(
+        !Object.hasOwn(legacyBody ?? {}, "missing_value_plan"),
+        "Legacy call should not send missing_value_plan.",
       ),
       ...expect(
         legacyRequests[0]?.url.includes("/apply-cleaning-recipe") === true,
@@ -255,8 +271,145 @@ export async function runCleaningRecipeApiContractFixtures() {
         !Object.hasOwn(absentPlanRequests[0]?.body ?? {}, "structural_decision_plan"),
         "Absent plan should not send structural_decision_plan.",
       ),
+      ...expect(
+        !Object.hasOwn(nullPlanRequests[0]?.body ?? {}, "missing_value_plan"),
+        "Null structural plan call should not send missing_value_plan.",
+      ),
+      ...expect(
+        !Object.hasOwn(absentPlanRequests[0]?.body ?? {}, "missing_value_plan"),
+        "Absent plan should not send missing_value_plan.",
+      ),
       ...expect(nullPlanRequests[0]?.body.row_limit_preview === 25, "Null plan should keep row_limit_preview."),
       ...expect(absentPlanRequests[0]?.body.row_limit_preview === 25, "Absent plan should keep row_limit_preview."),
+    ]),
+  );
+
+  const missingValueRequests = await withCapturedApplyBody(async () => {
+    await applyCleaningRecipe("dataset-1", worksheetId, {
+      rowLimitPreview: 25,
+      missingValuePlan,
+    });
+  });
+  const missingValueBody = missingValueRequests[0]?.body;
+  const serializedMissingPlan = missingValueBody?.missing_value_plan as
+    | {
+        worksheet_id?: unknown;
+        worksheet_strategy?: unknown;
+        column_decisions?: Record<string, unknown>[];
+      }
+    | undefined;
+  const serializedMissingDecision = serializedMissingPlan?.column_decisions?.[2];
+  results.push(
+    createResult("missing_value_plan serializes correctly", [
+      ...expect(Boolean(serializedMissingPlan), "Apply should send missing_value_plan when provided."),
+      ...expect(
+        !Object.hasOwn(missingValueBody ?? {}, "missingValuePlan"),
+        "Apply should not send camelCase missingValuePlan.",
+      ),
+      ...expect(
+        serializedMissingPlan?.worksheet_id === worksheetId,
+        "Missing-value plan should serialize worksheet_id.",
+      ),
+      ...expect(
+        serializedMissingPlan?.worksheet_strategy === "decide_per_column",
+        "Missing-value plan should serialize worksheet_strategy.",
+      ),
+      ...expect(
+        serializedMissingPlan?.column_decisions?.[0]?.column_name === "amount",
+        "Missing-value decision should serialize column_name.",
+      ),
+      ...expect(
+        serializedMissingPlan?.column_decisions?.[0]?.strategy === "fill_zero",
+        "Missing-value decision should serialize strategy.",
+      ),
+      ...expect(
+        serializedMissingDecision?.custom_value === "Unknown",
+        "Missing-value decision should serialize custom_value.",
+      ),
+    ]),
+  );
+
+  const combinedRequests = await withCapturedApplyBody(async () => {
+    await applyCleaningRecipe("dataset-1", worksheetId, {
+      rowLimitPreview: 25,
+      structuralDecisionPlan: structuralPlan,
+      missingValuePlan,
+    });
+  });
+  results.push(
+    createResult("combined structural and missing-value plan serializes", [
+      ...expect(
+        Boolean(combinedRequests[0]?.body.structural_decision_plan),
+        "Combined Apply should include structural_decision_plan.",
+      ),
+      ...expect(
+        Boolean(combinedRequests[0]?.body.missing_value_plan),
+        "Combined Apply should include missing_value_plan.",
+      ),
+      ...expect(
+        combinedRequests[0]?.url.includes("/apply-cleaning-recipe") === true,
+        "Combined Apply should use the existing endpoint.",
+      ),
+    ]),
+  );
+
+  const nullMissingValueRequests = await withCapturedApplyBody(async () => {
+    await applyCleaningRecipe("dataset-1", worksheetId, {
+      rowLimitPreview: 25,
+      missingValuePlan: null,
+    });
+  });
+  results.push(
+    createResult("missing value plan omitted when absent or null", [
+      ...expect(
+        !Object.hasOwn(nullMissingValueRequests[0]?.body ?? {}, "missing_value_plan"),
+        "Null missingValuePlan should not send missing_value_plan.",
+      ),
+      ...expect(
+        !Object.hasOwn(absentPlanRequests[0]?.body ?? {}, "missing_value_plan"),
+        "Absent missingValuePlan should not send missing_value_plan.",
+      ),
+    ]),
+  );
+
+  results.push(
+    createResult("unsupported missing-value strategies are excluded from wire type", [
+      ...expect(
+        ([
+          "fill_zero",
+          "fill_mean",
+          "fill_median",
+          "fill_custom",
+          "mark_unknown",
+          "fill_mode",
+          "custom_date",
+        ] satisfies MissingValueColumnStrategy[]).length === 7,
+        "Expected seven supported column strategies.",
+      ),
+      ...expect(
+        ![
+          "fill_zero",
+          "fill_mean",
+          "fill_median",
+          "fill_custom",
+          "mark_unknown",
+          "fill_mode",
+          "custom_date",
+        ].includes("forward_fill"),
+        "forward_fill should not be representable in the supported column strategy fixture.",
+      ),
+      ...expect(
+        ![
+          "fill_zero",
+          "fill_mean",
+          "fill_median",
+          "fill_custom",
+          "mark_unknown",
+          "fill_mode",
+          "custom_date",
+        ].includes("decide_later"),
+        "decide_later should not be representable in the supported column strategy fixture.",
+      ),
     ]),
   );
   results.push(
