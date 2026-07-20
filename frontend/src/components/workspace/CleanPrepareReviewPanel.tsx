@@ -35,6 +35,7 @@ import {
   getWorkbookMetadata,
   type WorksheetMetadata,
   type WorksheetStructuralDecisionPlan,
+  type WorkbookTransformationPlan,
   type WorksheetTemplateStructureEvidence,
   type WorksheetTemplateStructureEvidenceType,
 } from "../../features/workbook";
@@ -78,6 +79,7 @@ type CleanPrepareReviewPanelProps = {
   embedded?: boolean;
   activeStep?: CleanPrepareStep;
   onStructuralDecisionReadinessChange?: (readiness: StructuralDecisionReadiness) => void;
+  transformationPlan?: WorkbookTransformationPlan | null;
 };
 
 type PreparationPriority = "low" | "medium" | "high";
@@ -1082,6 +1084,7 @@ export function CleanPrepareReviewPanel({
   embedded = false,
   activeStep = "review",
   onStructuralDecisionReadinessChange,
+  transformationPlan = null,
 }: CleanPrepareReviewPanelProps) {
   const reviewRef = useRef<HTMLDivElement | null>(null);
   const structuralProgressRef = useRef<HTMLDivElement | null>(null);
@@ -1309,9 +1312,14 @@ export function CleanPrepareReviewPanel({
   const readyStructuralDecisionPlan = combinedDecisionReadiness.canContinueToApply
     ? selectedWorksheetStructuralDecisionPlan
     : null;
+  const readyTransformationPlan =
+    transformationPlan?.worksheetId === decisionWorksheetId && transformationPlan.steps.length > 0
+      ? transformationPlan
+      : null;
   const readyPreviewPlanKey = JSON.stringify({
     structuralDecisionPlan: readyStructuralDecisionPlan,
     missingValuePlan: readyMissingValuePlan,
+    transformationPlan: readyTransformationPlan,
   });
   const selectedWorksheetDecisionRecipePreview = isCleaningRecipePreviewForWorksheet(
     decisionRecipePreviewByWorksheet[decisionWorksheetId] || null,
@@ -1323,7 +1331,7 @@ export function CleanPrepareReviewPanel({
     decisionRecipeStatusByWorksheet[decisionWorksheetId] || "idle";
   const selectedWorksheetDecisionRecipeError =
     decisionRecipeErrorByWorksheet[decisionWorksheetId] || null;
-  const hasReadyDecisionPlan = Boolean(readyStructuralDecisionPlan || readyMissingValuePlan);
+  const hasReadyDecisionPlan = Boolean(readyStructuralDecisionPlan || readyMissingValuePlan || readyTransformationPlan);
   const isSelectedWorksheetDecisionRecipeCurrent =
     decisionRecipePlanKeyByWorksheet[decisionWorksheetId] === readyPreviewPlanKey;
   const selectedWorksheetDisplayRecipePreview =
@@ -1687,7 +1695,7 @@ export function CleanPrepareReviewPanel({
       !selectedWorksheet ||
       activeStep !== "apply" ||
       !combinedDecisionReadiness.canContinueToApply ||
-      (!readyStructuralDecisionPlan && !readyMissingValuePlan)
+      (!readyStructuralDecisionPlan && !readyMissingValuePlan && !readyTransformationPlan)
     ) return;
     const worksheetId = selectedWorksheet.worksheetId;
     if (
@@ -1713,6 +1721,7 @@ export function CleanPrepareReviewPanel({
       rowLimit: 10,
       structuralDecisionPlan: readyStructuralDecisionPlan,
       missingValuePlan: readyMissingValuePlan,
+      transformationPlan: readyTransformationPlan,
     })
       .then((response) => {
         if (cancelled) return;
@@ -1760,6 +1769,7 @@ export function CleanPrepareReviewPanel({
     decisionWorksheetName,
     combinedDecisionReadiness.canContinueToApply,
     readyMissingValuePlan,
+    readyTransformationPlan,
     readyPreviewPlanKey,
     readyStructuralDecisionPlan,
     selectedWorksheet,
@@ -1851,6 +1861,7 @@ export function CleanPrepareReviewPanel({
     selectedWorksheetDisplayRecipePreview,
   );
   const missingValuePreviewSummary = selectedWorksheetDisplayRecipePreview?.missing_value_summary;
+  const transformationPreviewSummary = selectedWorksheetDisplayRecipePreview?.transformation_summary;
   const hasMissingValuePreviewChanges = hasMissingValuePreviewSummaryChanges(
     missingValuePreviewSummary,
   );
@@ -1952,6 +1963,7 @@ export function CleanPrepareReviewPanel({
       const result = await applyCleaningRecipe(dataset.dataset_id, worksheetId, {
         structuralDecisionPlan: readyStructuralDecisionPlan,
         missingValuePlan: readyMissingValuePlan,
+        transformationPlan: readyTransformationPlan,
       });
       updateApplyState(worksheetId, { status: "success", result });
     } catch (error) {
@@ -3059,6 +3071,32 @@ export function CleanPrepareReviewPanel({
                             ))}
                           </ul>
                         )}
+                    </details>
+                  )}
+
+                  {transformationPreviewSummary && transformationPreviewSummary.step_count > 0 && (
+                    <details className="clean-prepare-disclosure" open={embedded}>
+                      <summary>
+                        <strong>Transformation changes</strong>
+                        <span>
+                          {transformationPreviewSummary.step_count.toLocaleString()} steps / {transformationPreviewSummary.cells_changed.toLocaleString()} cells
+                        </span>
+                      </summary>
+                      <div className="clean-prepare-missing-summary">
+                        <span>Status: {String(transformationPreviewSummary.status)}</span>
+                        <span>{pluralise(transformationPreviewSummary.changed_columns.length, "changed column")}</span>
+                        <span>{pluralise(transformationPreviewSummary.added_columns.length, "added column")}</span>
+                      </div>
+                      {transformationPreviewSummary.operations.length > 0 && (
+                        <ul className="clean-prepare-recipe-list">
+                          {transformationPreviewSummary.operations.map((operation, index) => (
+                            <li key={`transformation-preview:${index}`}>
+                              <strong>{String(operation.kind || operation.type || "Transformation")}</strong>
+                              <span>{String(operation.detail || operation.column_name || operation.target_column || "Applied by backend preview")}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </details>
                   )}
 

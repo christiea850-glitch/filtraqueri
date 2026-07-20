@@ -27,6 +27,11 @@ const fixtures = [
     exportName: "runCleaningRecipeApiContractFixtures",
   },
   {
+    label: "UX-S2E-4 transformation preview/apply integration",
+    modulePath: "/src/features/cleanPrepare/__tests__/uxS2e4Integration.test.ts",
+    exportName: "runUxS2e4IntegrationFixtures",
+  },
+  {
     label: "Prepare Data back navigation",
     modulePath: "/src/features/cleanPrepare/__tests__/prepareBackNavigation.test.ts",
     exportName: "runPrepareBackNavigationFixtures",
