@@ -45,6 +45,9 @@ export type {
   WorksheetId,
   WorksheetMetadata,
   WorksheetMissingValuePlan,
+  WorkbookTransformationPlan,
+  WorkbookTransformationStep,
+  WorkbookTransformationStepParameters,
   WorksheetRelationshipCandidate,
   WorksheetRelationshipEvidence,
   WorksheetRelationshipId,
@@ -54,6 +57,7 @@ export type {
   WorksheetTableMapping,
   WorksheetTemplateStructureEvidence,
   WorksheetTemplateStructureEvidenceType,
+  SupportedWorkbookTransformationKind,
 } from "./workbookTypes";
 export type {
   AnalysisScopeSelection,

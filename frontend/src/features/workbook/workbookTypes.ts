@@ -97,6 +97,44 @@ export type WorksheetMissingValuePlan = {
   columnDecisions: MissingValueColumnDecision[];
 };
 
+export type SupportedWorkbookTransformationKind =
+  | "trim_whitespace"
+  | "lowercase"
+  | "uppercase"
+  | "cap_outliers_percentile"
+  | "log_transform"
+  | "z_score_scale"
+  | "min_max_scale"
+  | "ordinal_encode"
+  | "frequency_encode"
+  | "extract_year"
+  | "extract_month"
+  | "extract_quarter"
+  | "extract_day_of_week"
+  | "days_since"
+  | "boolean_to_integer";
+
+export type WorkbookTransformationStepParameters =
+  | { kind: "cap_outliers_percentile"; lowerPercentile: number; upperPercentile: number }
+  | { kind: "ordinal_encode"; order: string[] }
+  | { kind: "days_since"; anchorDate: string }
+  | { kind: Exclude<SupportedWorkbookTransformationKind, "cap_outliers_percentile" | "ordinal_encode" | "days_since"> };
+
+export type WorkbookTransformationStep = {
+  stepId: string;
+  order: number;
+  kind: SupportedWorkbookTransformationKind;
+  targetColumn: string;
+  outputColumn?: string;
+  parameters?: WorkbookTransformationStepParameters;
+};
+
+export type WorkbookTransformationPlan = {
+  worksheetId: WorksheetId;
+  pipelineId: string;
+  steps: WorkbookTransformationStep[];
+};
+
 export type WorksheetTemplateStructureEvidence = {
   type: WorksheetTemplateStructureEvidenceType;
   rowIndex: number | null;

@@ -27,6 +27,7 @@ from .workbook_cleaning_contract import (
     WorkbookCleaningPreviewRequest,
     validate_missing_value_plan_scope,
     validate_structural_decision_plan_scope,
+    validate_transformation_plan_scope,
 )
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_missing_value_apply import apply_missing_value_decisions_to_cleaned_copy
@@ -1909,6 +1910,7 @@ def _get_cleaning_recipe_preview(
     row_limit: int = 10,
     structural_decision_plan: Any | None = None,
     missing_value_plan: Any | None = None,
+    transformation_plan: Any | None = None,
 ) -> dict[str, Any]:
     if row_limit < 1:
         raise HTTPException(status_code=400, detail="Cleaning recipe preview limit must be 1 or greater")
@@ -1939,6 +1941,7 @@ def _get_cleaning_recipe_preview(
         raise HTTPException(status_code=404, detail="Worksheet was not found")
     validate_structural_decision_plan_scope(structural_decision_plan, worksheet_id)
     validate_missing_value_plan_scope(missing_value_plan, worksheet_id)
+    validate_transformation_plan_scope(transformation_plan, worksheet_id, worksheet)
 
     return build_cleaning_recipe_preview(
         workbook_path=Path(uploaded_path),
@@ -1974,6 +1977,7 @@ def preview_cleaning_recipe_with_structural_decisions(
         row_limit=request.row_limit_preview,
         structural_decision_plan=request.structural_decision_plan,
         missing_value_plan=request.missing_value_plan,
+        transformation_plan=request.transformation_plan,
     )
 
 
@@ -2052,6 +2056,7 @@ def apply_workbook_cleaning_recipe(
 
     validate_structural_decision_plan_scope(request.structural_decision_plan, worksheet_id)
     validate_missing_value_plan_scope(request.missing_value_plan, worksheet_id)
+    validate_transformation_plan_scope(request.transformation_plan, worksheet_id, worksheet)
 
     result = apply_cleaning_recipe_to_working_copy(
         workbook_path=uploaded_path,

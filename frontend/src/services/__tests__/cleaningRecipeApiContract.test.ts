@@ -7,6 +7,8 @@ import {
 import type {
   MissingValueColumnStrategy,
   StructuralDecisionChoice,
+  SupportedWorkbookTransformationKind,
+  WorkbookTransformationPlan,
   WorksheetMissingValuePlan,
   WorksheetStructuralDecisionPlan,
 } from "../../features/workbook";
@@ -153,6 +155,75 @@ const missingValuePlan: WorksheetMissingValuePlan = {
   ],
 };
 
+const transformationPlan: WorkbookTransformationPlan = {
+  worksheetId,
+  pipelineId: "pipeline-1",
+  steps: [
+    {
+      stepId: "step-1",
+      order: 0,
+      kind: "trim_whitespace",
+      targetColumn: "name",
+      outputColumn: "name",
+      parameters: { kind: "trim_whitespace" },
+    },
+    {
+      stepId: "step-2",
+      order: 1,
+      kind: "cap_outliers_percentile",
+      targetColumn: "amount",
+      outputColumn: "amount",
+      parameters: {
+        kind: "cap_outliers_percentile",
+        lowerPercentile: 5,
+        upperPercentile: 95,
+      },
+    },
+    {
+      stepId: "step-3",
+      order: 2,
+      kind: "ordinal_encode",
+      targetColumn: "status",
+      outputColumn: "status_ordinal",
+      parameters: { kind: "ordinal_encode", order: ["low", "high"] },
+    },
+    {
+      stepId: "step-4",
+      order: 3,
+      kind: "days_since",
+      targetColumn: "start_date",
+      outputColumn: "start_date_days_since",
+      parameters: { kind: "days_since", anchorDate: "2026-01-01" },
+    },
+    {
+      stepId: "step-5",
+      order: 4,
+      kind: "boolean_to_integer",
+      targetColumn: "active",
+      outputColumn: "active",
+      parameters: { kind: "boolean_to_integer" },
+    },
+  ],
+};
+
+const supportedTransformationKinds: SupportedWorkbookTransformationKind[] = [
+  "trim_whitespace",
+  "lowercase",
+  "uppercase",
+  "cap_outliers_percentile",
+  "log_transform",
+  "z_score_scale",
+  "min_max_scale",
+  "ordinal_encode",
+  "frequency_encode",
+  "extract_year",
+  "extract_month",
+  "extract_quarter",
+  "extract_day_of_week",
+  "days_since",
+  "boolean_to_integer",
+];
+
 export async function runCleaningRecipeApiContractFixtures() {
   const results: FixtureResult[] = [];
 
@@ -171,6 +242,10 @@ export async function runCleaningRecipeApiContractFixtures() {
       ...expect(
         !Object.hasOwn(legacyBody ?? {}, "missing_value_plan"),
         "Legacy call should not send missing_value_plan.",
+      ),
+      ...expect(
+        !Object.hasOwn(legacyBody ?? {}, "transformation_plan"),
+        "Legacy call should not send transformation_plan.",
       ),
       ...expect(
         legacyRequests[0]?.url.includes("/apply-cleaning-recipe") === true,
@@ -295,6 +370,14 @@ export async function runCleaningRecipeApiContractFixtures() {
         !Object.hasOwn(absentPlanRequests[0]?.body ?? {}, "missing_value_plan"),
         "Absent plan should not send missing_value_plan.",
       ),
+      ...expect(
+        !Object.hasOwn(nullPlanRequests[0]?.body ?? {}, "transformation_plan"),
+        "Null structural plan call should not send transformation_plan.",
+      ),
+      ...expect(
+        !Object.hasOwn(absentPlanRequests[0]?.body ?? {}, "transformation_plan"),
+        "Absent plan should not send transformation_plan.",
+      ),
       ...expect(nullPlanRequests[0]?.body.row_limit_preview === 25, "Null plan should keep row_limit_preview."),
       ...expect(absentPlanRequests[0]?.body.row_limit_preview === 25, "Absent plan should keep row_limit_preview."),
     ]),
@@ -365,6 +448,97 @@ export async function runCleaningRecipeApiContractFixtures() {
       ...expect(
         combinedRequests[0]?.url.includes("/apply-cleaning-recipe") === true,
         "Combined Apply should use the existing endpoint.",
+      ),
+    ]),
+  );
+
+  const transformationApplyRequests = await withCapturedApplyBody(async () => {
+    await applyCleaningRecipe("dataset-1", worksheetId, {
+      rowLimitPreview: 25,
+      transformationPlan,
+    });
+  });
+  const serializedTransformationPlan = transformationApplyRequests[0]?.body.transformation_plan as
+    | {
+        worksheet_id?: unknown;
+        pipeline_id?: unknown;
+        steps?: Record<string, unknown>[];
+      }
+    | undefined;
+  const serializedTransformationStep = serializedTransformationPlan?.steps?.[1];
+  results.push(
+    createResult("valid transformation plan serializes canonical snake_case", [
+      ...expect(Boolean(serializedTransformationPlan), "Apply should send transformation_plan when provided."),
+      ...expect(
+        serializedTransformationPlan?.worksheet_id === worksheetId,
+        "Transformation plan should serialize worksheet_id.",
+      ),
+      ...expect(
+        serializedTransformationPlan?.pipeline_id === "pipeline-1",
+        "Transformation plan should serialize pipeline_id.",
+      ),
+      ...expect(
+        serializedTransformationStep?.step_id === "step-2",
+        "Transformation step should serialize step_id.",
+      ),
+      ...expect(serializedTransformationStep?.target_column === "amount", "Step should serialize target_column."),
+      ...expect(serializedTransformationStep?.output_column === "amount", "Step should serialize output_column."),
+      ...expect(
+        (serializedTransformationStep?.parameters as Record<string, unknown> | undefined)?.lower_percentile === 5,
+        "Percentile parameters should serialize lower_percentile.",
+      ),
+      ...expect(
+        (serializedTransformationStep?.parameters as Record<string, unknown> | undefined)?.upper_percentile === 95,
+        "Percentile parameters should serialize upper_percentile.",
+      ),
+    ]),
+  );
+  results.push(
+    createResult("transformation serialization omits frontend runtime fields", [
+      ...expect(
+        !Object.hasOwn(transformationApplyRequests[0]?.body ?? {}, "transformationPlan"),
+        "Apply should not send camelCase transformationPlan.",
+      ),
+      ...expect(
+        !Object.hasOwn(serializedTransformationPlan ?? {}, "readiness"),
+        "Transformation plan should not serialize readiness.",
+      ),
+      ...expect(
+        !Object.hasOwn(serializedTransformationPlan ?? {}, "safety"),
+        "Transformation plan should not serialize safety.",
+      ),
+      ...expect(
+        !Object.hasOwn(serializedTransformationPlan ?? {}, "summary"),
+        "Transformation plan should not serialize summary.",
+      ),
+      ...expect(
+        !Object.hasOwn(serializedTransformationStep ?? {}, "executionDisabled"),
+        "Transformation step should not serialize executionDisabled.",
+      ),
+      ...expect(
+        !Object.hasOwn(serializedTransformationStep ?? {}, "warnings"),
+        "Transformation step should not serialize warnings.",
+      ),
+      ...expect(
+        !Object.hasOwn(serializedTransformationStep ?? {}, "blockers"),
+        "Transformation step should not serialize blockers.",
+      ),
+    ]),
+  );
+  results.push(
+    createResult("frontend transformation wire type exposes only supported Apply kinds", [
+      ...expect(supportedTransformationKinds.length === 15, "Expected first-release transformation allowlist."),
+      ...expect(
+        !supportedTransformationKinds.includes("fill_missing_mean" as SupportedWorkbookTransformationKind),
+        "Missing-value fill transformations should stay out of transformation wire type.",
+      ),
+      ...expect(
+        !supportedTransformationKinds.includes("one_hot_encode" as SupportedWorkbookTransformationKind),
+        "One-hot should stay out of transformation wire type.",
+      ),
+      ...expect(
+        !supportedTransformationKinds.includes("sql_select_transform" as SupportedWorkbookTransformationKind),
+        "SQL transform should stay out of transformation wire type.",
       ),
     ]),
   );
@@ -530,7 +704,7 @@ export async function runCleaningRecipeApiContractFixtures() {
       rowLimitPreview: 10,
       structuralDecisionPlan: structuralPlan,
       missingValuePlan,
-    });
+  });
   }, previewResponsePayload);
   results.push(
     createResult("combined preview serializes structural and missing plans", [
@@ -547,6 +721,49 @@ export async function runCleaningRecipeApiContractFixtures() {
         combinedPreviewRequests[0]?.body.row_limit_preview === 10,
         "Combined preview should serialize row_limit_preview.",
       ),
+    ]),
+  );
+
+  const transformationPreviewRequests = await withCapturedRequestBody(async () => {
+    await getCleaningRecipePreview("dataset-1", worksheetId, {
+      rowLimitPreview: 10,
+      transformationPlan,
+    });
+  }, previewResponsePayload);
+  const serializedPreviewTransformationPlan = transformationPreviewRequests[0]?.body.transformation_plan as
+    | {
+        worksheet_id?: unknown;
+        pipeline_id?: unknown;
+        steps?: Record<string, unknown>[];
+      }
+    | undefined;
+  results.push(
+    createResult("preview serializes transformation_plan with same shape as Apply", [
+      ...expect(transformationPreviewRequests[0]?.method === "POST", "Transformation preview should POST."),
+      ...expect(
+        transformationPreviewRequests[0]?.url.includes("/cleaning-recipe-preview") === true,
+        "Transformation preview should use preview endpoint.",
+      ),
+      ...expect(
+        JSON.stringify(serializedPreviewTransformationPlan) === JSON.stringify(serializedTransformationPlan),
+        "Preview and Apply should serialize the same transformation plan shape.",
+      ),
+    ]),
+  );
+
+  const combinedAllPreviewRequests = await withCapturedRequestBody(async () => {
+    await getCleaningRecipePreview("dataset-1", worksheetId, {
+      rowLimitPreview: 10,
+      structuralDecisionPlan: structuralPlan,
+      missingValuePlan,
+      transformationPlan,
+    });
+  }, previewResponsePayload);
+  results.push(
+    createResult("combined preview serializes structural missing and transformation plans", [
+      ...expect(Boolean(combinedAllPreviewRequests[0]?.body.structural_decision_plan), "Combined preview should send structural plan."),
+      ...expect(Boolean(combinedAllPreviewRequests[0]?.body.missing_value_plan), "Combined preview should send missing plan."),
+      ...expect(Boolean(combinedAllPreviewRequests[0]?.body.transformation_plan), "Combined preview should send transformation plan."),
     ]),
   );
 

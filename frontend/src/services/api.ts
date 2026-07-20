@@ -3,6 +3,7 @@ import type {
   WorksheetMissingValuePlan,
   WorksheetRelationshipCandidate,
   WorksheetStructuralDecisionPlan,
+  WorkbookTransformationPlan,
 } from "../features/workbook";
 import type {
   FilterDefinition,
@@ -254,6 +255,7 @@ export type ApplyCleaningRecipeOptions = {
   confirmPreviewVersion?: string | null;
   structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
   missingValuePlan?: WorksheetMissingValuePlan | null;
+  transformationPlan?: WorkbookTransformationPlan | null;
 };
 
 export type CleaningRecipePreviewOptions = {
@@ -261,6 +263,7 @@ export type CleaningRecipePreviewOptions = {
   rowLimitPreview?: number;
   structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
   missingValuePlan?: WorksheetMissingValuePlan | null;
+  transformationPlan?: WorkbookTransformationPlan | null;
 };
 
 export type MissingValueDecisionApplyRequest = {
@@ -468,6 +471,41 @@ const serializeMissingValuePlan = (plan: WorksheetMissingValuePlan) => ({
   })),
 });
 
+const serializeTransformationParameters = (
+  parameters: WorkbookTransformationPlan["steps"][number]["parameters"],
+) => {
+  if (!parameters) return undefined;
+  if (parameters.kind === "cap_outliers_percentile") {
+    return {
+      lower_percentile: parameters.lowerPercentile,
+      upper_percentile: parameters.upperPercentile,
+    };
+  }
+  if (parameters.kind === "ordinal_encode") {
+    return { order: parameters.order };
+  }
+  if (parameters.kind === "days_since") {
+    return { anchor_date: parameters.anchorDate };
+  }
+  return undefined;
+};
+
+const serializeTransformationPlan = (plan: WorkbookTransformationPlan) => ({
+  worksheet_id: plan.worksheetId,
+  pipeline_id: plan.pipelineId,
+  steps: plan.steps.map((step) => {
+    const parameters = serializeTransformationParameters(step.parameters);
+    return {
+      step_id: step.stepId,
+      order: step.order,
+      kind: step.kind,
+      target_column: step.targetColumn,
+      ...(step.outputColumn !== undefined ? { output_column: step.outputColumn } : {}),
+      ...(parameters !== undefined ? { parameters } : {}),
+    };
+  }),
+});
+
 export async function getCleaningRecipePreview(
   datasetId: string,
   worksheetId: string,
@@ -489,11 +527,12 @@ export async function getCleaningRecipePreview(
   const params = new URLSearchParams({ row_limit: String(rowLimit) });
   const url = `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/cleaning-recipe-preview`;
 
-  if (options.structuralDecisionPlan || options.missingValuePlan) {
+  if (options.structuralDecisionPlan || options.missingValuePlan || options.transformationPlan) {
     const body: {
       row_limit_preview: number;
       structural_decision_plan?: ReturnType<typeof serializeStructuralDecisionPlan>;
       missing_value_plan?: ReturnType<typeof serializeMissingValuePlan>;
+      transformation_plan?: ReturnType<typeof serializeTransformationPlan>;
     } = {
       row_limit_preview: rowLimit,
     };
@@ -502,6 +541,9 @@ export async function getCleaningRecipePreview(
     }
     if (options.missingValuePlan) {
       body.missing_value_plan = serializeMissingValuePlan(options.missingValuePlan);
+    }
+    if (options.transformationPlan) {
+      body.transformation_plan = serializeTransformationPlan(options.transformationPlan);
     }
     return requestJson<CleaningRecipePreview>(
       url,
@@ -556,6 +598,7 @@ export async function applyCleaningRecipe(
       worksheet_strategy: string;
       column_decisions: Record<string, unknown>[];
     };
+    transformation_plan?: ReturnType<typeof serializeTransformationPlan>;
   } = {
     row_limit_preview: options.rowLimitPreview ?? 25,
   };
@@ -570,6 +613,10 @@ export async function applyCleaningRecipe(
 
   if (options.missingValuePlan) {
     body.missing_value_plan = serializeMissingValuePlan(options.missingValuePlan);
+  }
+
+  if (options.transformationPlan) {
+    body.transformation_plan = serializeTransformationPlan(options.transformationPlan);
   }
 
   return requestJson<CleaningRecipeApplyResponse>(
