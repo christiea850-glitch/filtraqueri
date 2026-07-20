@@ -10,7 +10,9 @@ import type { DatasetMetadata } from "../../features/dataset/datasetTypes";
 import type { CleanPrepareStep } from "../../features/cleanPrepare/useCleanPrepareStep";
 import { buildPreparationSignalReport } from "../../features/dataPreparation/preparationSignals";
 import {
+  buildWorksheetMissingValuePlan,
   classifyColumnMissingTypeGroup,
+  clearMissingValueDecision,
   createMissingValueDecision,
   createMissingValueDecisionKey,
   decisionNeedsCustomValue,
@@ -21,6 +23,7 @@ import {
   missingValueStrategyLabels,
   missingValueStrategyShortLabels,
   readMissingValueDecisions,
+  resetMissingValueDecisionsForWorksheet,
   WORKSHEET_DECISION_COLUMN,
   worksheetMissingTypeGroupLabels,
   worksheetMissingValueStrategies,
@@ -37,11 +40,9 @@ import {
 } from "../../features/workbook";
 import {
   applyCleaningRecipe,
-  applyMissingValueDecisions,
   getCleaningRecipePreview,
   type CleaningRecipeApplyResponse,
   type CleaningRecipePreview,
-  type MissingValueDecisionApplyResponse,
 } from "../../services/api";
 
 type ApplyState =
@@ -56,12 +57,6 @@ export type RecipePreviewStatus = "idle" | "loading" | "ready" | "error";
 type ActivationState =
   | { status: "idle" }
   | { status: "switching"; worksheetId: string }
-  | { status: "error"; message: string };
-
-type MissingValueApplyState =
-  | { status: "idle" }
-  | { status: "applying" }
-  | { status: "success"; result: MissingValueDecisionApplyResponse }
   | { status: "error"; message: string };
 
 type CleanPrepareReviewPanelProps = {
@@ -490,9 +485,60 @@ export const hasCleaningRecipePreviewOperations = (
   preview: Pick<CleaningRecipePreview, "recipe" | "excluded"> | null,
 ): boolean => Boolean(preview && (preview.recipe.length > 0 || getCleaningRecipeExcludedCount(preview) > 0));
 
+export const getMissingValuePreviewChangedColumnCount = (
+  summary: CleaningRecipePreview["missing_value_summary"] | undefined,
+): number => summary?.columns_changed_count ?? summary?.columns_changed?.length ?? 0;
+
+export const hasMissingValuePreviewSummaryChanges = (
+  summary: CleaningRecipePreview["missing_value_summary"] | undefined,
+): boolean =>
+  Boolean(
+    summary?.has_changes ||
+      (summary?.cells_filled || 0) > 0 ||
+      (summary?.rows_removed || 0) > 0 ||
+      getMissingValuePreviewChangedColumnCount(summary) > 0,
+  );
+
 export const structuralNoOpApplyHeading = "No cleaned copy needed";
 export const structuralNoOpApplyCopy =
   "Your decisions preserve this worksheet as-is. No cleaned working copy was created, and the original workbook remains unchanged.";
+
+export const getDraftRecipeStatusCopy = ({
+  embedded,
+  hasCleanedWorkingCopy,
+  isUsingCleanedCopy,
+  isNoOpDecisionPreview,
+}: {
+  embedded: boolean;
+  hasCleanedWorkingCopy: boolean;
+  isUsingCleanedCopy: boolean;
+  isNoOpDecisionPreview: boolean;
+}): { heading: string; body: string } => {
+  if (isNoOpDecisionPreview) {
+    return {
+      heading: structuralNoOpApplyHeading,
+      body: structuralNoOpApplyCopy,
+    };
+  }
+  if (isUsingCleanedCopy) {
+    return {
+      heading: "Active cleaned copy unchanged by this draft.",
+      body: "The current analysis source is already a cleaned working copy. New draft decisions have not been applied.",
+    };
+  }
+  if (hasCleanedWorkingCopy) {
+    return {
+      heading: "Existing cleaned copy unchanged by this draft.",
+      body: "A cleaned working copy already exists for this worksheet. New draft decisions have not been applied.",
+    };
+  }
+  return {
+    heading: embedded
+      ? "No draft changes applied yet."
+      : "Preview only - no draft changes have been applied to this worksheet yet.",
+    body: "Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original.",
+  };
+};
 
 export const isStructuralNoOpDecisionPreview = (
   preview: Pick<CleaningRecipePreview, "recipe" | "excluded"> | null,
@@ -1040,6 +1086,7 @@ export function CleanPrepareReviewPanel({
   const reviewRef = useRef<HTMLDivElement | null>(null);
   const structuralProgressRef = useRef<HTMLDivElement | null>(null);
   const resetStructuralDecisionsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const resetMissingValueDecisionsButtonRef = useRef<HTMLButtonElement | null>(null);
   const structuralPreviewRequestIdsRef = useRef<Record<string, number>>({});
   const decisionPreviewRequestIdsRef = useRef<Record<string, number>>({});
   // When embedded, the review is the whole reason the dedicated page exists,
@@ -1072,13 +1119,12 @@ export function CleanPrepareReviewPanel({
     Record<string, ApplyState>
   >({});
   const [activationState, setActivationState] = useState<ActivationState>({ status: "idle" });
-  const [missingValueApplyStateByWorksheet, setMissingValueApplyStateByWorksheet] = useState<
-    Record<string, MissingValueApplyState>
-  >({});
   const [missingValueDecisions, setMissingValueDecisions] = useState(readMissingValueDecisions);
   const [fixDecisionDraftsByWorksheet, setFixDecisionDraftsByWorksheet] =
     useState<WorksheetSuggestedFixDecisionDrafts>({});
   const [isResetStructuralDecisionsConfirming, setIsResetStructuralDecisionsConfirming] =
+    useState(false);
+  const [isResetMissingValueDecisionsConfirming, setIsResetMissingValueDecisionsConfirming] =
     useState(false);
   const [shouldFocusStructuralProgress, setShouldFocusStructuralProgress] = useState(false);
   // C-7B — UI view mode for the Missing-value handling card. "wide" shows
@@ -1153,6 +1199,37 @@ export function CleanPrepareReviewPanel({
     () => getWorksheetSuggestedFixDecisionDrafts(fixDecisionDraftsByWorksheet, decisionWorksheetId),
     [decisionWorksheetId, fixDecisionDraftsByWorksheet],
   );
+  const planDecisionColumns = useMemo(() => {
+    const sourceColumns = selectedWorksheet?.schema || dataset.schema;
+    if (!selectedWorksheetRecipePreview?.after_preview.columns.length) return sourceColumns;
+    const previewColumnSet = new Set(selectedWorksheetRecipePreview.after_preview.columns);
+    return sourceColumns.filter((column) => previewColumnSet.has(column.name));
+  }, [dataset.schema, selectedWorksheet?.schema, selectedWorksheetRecipePreview]);
+  const planWorksheetDecisionKey = createMissingValueDecisionKey(
+    dataset.dataset_id,
+    decisionWorksheetId,
+    WORKSHEET_DECISION_COLUMN,
+  );
+  const planWorksheetDecision = missingValueDecisions[planWorksheetDecisionKey];
+  const planIsPerColumnDecision = planWorksheetDecision?.strategy === "decide_per_column";
+  const missingValuePlanReadiness = useMemo(
+    () =>
+      buildWorksheetMissingValuePlan({
+        datasetId: dataset.dataset_id,
+        worksheetId: decisionWorksheetId,
+        columns: planDecisionColumns,
+        decisions: missingValueDecisions,
+      }),
+    [dataset.dataset_id, planDecisionColumns, decisionWorksheetId, missingValueDecisions],
+  );
+  const readyMissingValuePlan = missingValuePlanReadiness.ready
+    ? missingValuePlanReadiness.totalColumns > 0
+      ? missingValuePlanReadiness.plan
+      : null
+    : null;
+  useEffect(() => {
+    setMissingValueViewMode(planIsPerColumnDecision ? "perColumn" : "wide");
+  }, [decisionWorksheetId, planIsPerColumnDecision]);
   const selectedWorksheetStructuralDecisionPlan = useMemo(
     () =>
       buildWorksheetStructuralDecisionPlan(
@@ -1204,10 +1281,38 @@ export function CleanPrepareReviewPanel({
     () => getSuggestedFixCleaningPlan(visibleStructuralFixes, fixDecisionDrafts),
     [fixDecisionDrafts, visibleStructuralFixes],
   );
-  const readyStructuralDecisionPlan = structuralDecisionReadiness.canContinueToApply
+  const combinedDecisionReadiness = useMemo<StructuralDecisionReadiness>(() => {
+    if (!structuralDecisionReadiness.canContinueToApply) return structuralDecisionReadiness;
+    if (missingValuePlanReadiness.ready) {
+      return {
+        ...structuralDecisionReadiness,
+        totalCount: structuralDecisionReadiness.totalCount + missingValuePlanReadiness.totalColumns,
+        resolvedCount:
+          structuralDecisionReadiness.resolvedCount + missingValuePlanReadiness.decidedColumns,
+        unresolvedCount: missingValuePlanReadiness.unresolvedColumns,
+        blockingMessage: null,
+        canContinueToApply: true,
+      };
+    }
+    return {
+      ...structuralDecisionReadiness,
+      totalCount: structuralDecisionReadiness.totalCount + missingValuePlanReadiness.totalColumns,
+      resolvedCount:
+        structuralDecisionReadiness.resolvedCount + missingValuePlanReadiness.decidedColumns,
+      unresolvedCount: Math.max(1, missingValuePlanReadiness.unresolvedColumns),
+      canContinueToApply: false,
+      blockingMessage:
+        missingValuePlanReadiness.blockingMessage ||
+        "Resolve missing-value decisions before previewing Apply.",
+    };
+  }, [missingValuePlanReadiness, structuralDecisionReadiness]);
+  const readyStructuralDecisionPlan = combinedDecisionReadiness.canContinueToApply
     ? selectedWorksheetStructuralDecisionPlan
     : null;
-  const readyStructuralDecisionPlanKey = JSON.stringify(readyStructuralDecisionPlan);
+  const readyPreviewPlanKey = JSON.stringify({
+    structuralDecisionPlan: readyStructuralDecisionPlan,
+    missingValuePlan: readyMissingValuePlan,
+  });
   const selectedWorksheetDecisionRecipePreview = isCleaningRecipePreviewForWorksheet(
     decisionRecipePreviewByWorksheet[decisionWorksheetId] || null,
     decisionWorksheetId,
@@ -1218,16 +1323,17 @@ export function CleanPrepareReviewPanel({
     decisionRecipeStatusByWorksheet[decisionWorksheetId] || "idle";
   const selectedWorksheetDecisionRecipeError =
     decisionRecipeErrorByWorksheet[decisionWorksheetId] || null;
+  const hasReadyDecisionPlan = Boolean(readyStructuralDecisionPlan || readyMissingValuePlan);
   const isSelectedWorksheetDecisionRecipeCurrent =
-    decisionRecipePlanKeyByWorksheet[decisionWorksheetId] === readyStructuralDecisionPlanKey;
+    decisionRecipePlanKeyByWorksheet[decisionWorksheetId] === readyPreviewPlanKey;
   const selectedWorksheetDisplayRecipePreview =
-    readyStructuralDecisionPlan
+    hasReadyDecisionPlan
       ? isSelectedWorksheetDecisionRecipeCurrent
         ? selectedWorksheetDecisionRecipePreview
         : null
       : selectedWorksheetRecipePreview;
   const isDecisionRecipePreviewPending = Boolean(
-    readyStructuralDecisionPlan &&
+    hasReadyDecisionPlan &&
     activeStep === "apply" &&
     selectedWorksheetDecisionRecipeStatus === "loading",
   );
@@ -1236,8 +1342,8 @@ export function CleanPrepareReviewPanel({
     [fixDecisionDrafts, visibleStructuralFixes],
   );
   useEffect(() => {
-    onStructuralDecisionReadinessChange?.(structuralDecisionReadiness);
-  }, [onStructuralDecisionReadinessChange, structuralDecisionReadiness]);
+    onStructuralDecisionReadinessChange?.(combinedDecisionReadiness);
+  }, [combinedDecisionReadiness, onStructuralDecisionReadinessChange]);
   useEffect(() => {
     if (!hasStructuralDecisionDrafts) {
       setIsResetStructuralDecisionsConfirming(false);
@@ -1288,6 +1394,36 @@ export function CleanPrepareReviewPanel({
     },
     [cancelResetStructuralDecisions],
   );
+  const hasMissingValueDecisionDrafts = useMemo(() => {
+    const prefix = `${dataset.dataset_id}:${decisionWorksheetId}:`;
+    return Object.keys(missingValueDecisions).some((key) => key.startsWith(prefix));
+  }, [dataset.dataset_id, decisionWorksheetId, missingValueDecisions]);
+  const clearOneMissingValueDecision = useCallback((key: string) => {
+    setMissingValueDecisions((current) => {
+      const next = clearMissingValueDecision(current, key);
+      writeMissingValueDecisions(next);
+      return next;
+    });
+  }, []);
+  const beginResetMissingValueDecisions = useCallback(() => {
+    setIsResetMissingValueDecisionsConfirming(true);
+  }, []);
+  const cancelResetMissingValueDecisions = useCallback(() => {
+    setIsResetMissingValueDecisionsConfirming(false);
+    resetMissingValueDecisionsButtonRef.current?.focus();
+  }, []);
+  const confirmResetMissingValueDecisions = useCallback(() => {
+    setMissingValueDecisions((current) => {
+      const next = resetMissingValueDecisionsForWorksheet(
+        current,
+        dataset.dataset_id,
+        decisionWorksheetId,
+      );
+      writeMissingValueDecisions(next);
+      return next;
+    });
+    setIsResetMissingValueDecisionsConfirming(false);
+  }, [dataset.dataset_id, decisionWorksheetId]);
   const issueGroups = useMemo(
     () =>
       Array.from(
@@ -1300,30 +1436,15 @@ export function CleanPrepareReviewPanel({
     [review.issues],
   );
   const isPrioritized = review.priority !== "low";
-  const decisionColumns = selectedWorksheet?.schema || dataset.schema;
+  const decisionColumns = planDecisionColumns;
   const decisionRowCount = selectedWorksheet?.rowCount || dataset.row_count;
   const missingValueColumns = decisionColumns
     .filter((column) => column.null_count > 0)
     .sort((left, right) => right.null_count - left.null_count);
-  const worksheetDecisionKey = createMissingValueDecisionKey(
-    dataset.dataset_id,
-    decisionWorksheetId,
-    WORKSHEET_DECISION_COLUMN,
-  );
-  const worksheetDecision = missingValueDecisions[worksheetDecisionKey];
-  const isPerColumnDecision = worksheetDecision?.strategy === "decide_per_column";
-  const decidedColumnCount = missingValueColumns.filter((column) => {
-    const decision =
-      missingValueDecisions[
-        createMissingValueDecisionKey(dataset.dataset_id, decisionWorksheetId, column.name)
-      ];
-    return Boolean(
-      decision &&
-      (!decisionNeedsCustomValue(decision.strategy) || decision.customValue?.trim()),
-    );
-  }).length;
-  // C-7B — Group missing-value columns by type so the worksheet-wide UI can
-  // expose type-aware fill choices (Replace with 0 / mean / Unknown / etc.).
+  const worksheetDecisionKey = planWorksheetDecisionKey;
+  const worksheetDecision = planWorksheetDecision;
+  const isPerColumnDecision = planIsPerColumnDecision;
+  const decidedColumnCount = missingValuePlanReadiness.decidedColumns;
   const missingValueColumnsByGroup = useMemo(() => {
     const groups: Record<WorksheetMissingTypeGroup, typeof missingValueColumns> = {
       numeric: [],
@@ -1345,6 +1466,8 @@ export function CleanPrepareReviewPanel({
       ),
     [missingValueColumnsByGroup],
   );
+  // C-7B — Group missing-value columns by type so the worksheet-wide UI can
+  // expose type-aware fill choices (Replace with 0 / mean / Unknown / etc.).
 
   // C-7B — Tally how many of the present type-groups have a saved decision.
   // Drives the readiness logic so users get credit for picking worksheet-wide
@@ -1373,10 +1496,6 @@ export function CleanPrepareReviewPanel({
     decisionWorksheetId,
   ]);
 
-  const worksheetTypeGroupDecisionsReady =
-    presentMissingTypeGroups.length > 0 &&
-    worksheetTypeGroupDecisionCount === presentMissingTypeGroups.length;
-
   // C-7B — Sync the view-mode toggle with the persisted worksheet decision
   // when the user navigates back to this worksheet. If they previously chose
   // decide_per_column the UI lands in per-column view; otherwise it stays
@@ -1385,13 +1504,7 @@ export function CleanPrepareReviewPanel({
     setMissingValueViewMode(isPerColumnDecision ? "perColumn" : "wide");
   }, [decisionWorksheetId, isPerColumnDecision]);
 
-  const missingValueDecisionReady =
-    missingValueColumns.length > 0 &&
-    (
-      (Boolean(worksheetDecision) &&
-        (!isPerColumnDecision || decidedColumnCount === missingValueColumns.length))
-      || worksheetTypeGroupDecisionsReady
-    );
+  const missingValueDecisionReady = missingValuePlanReadiness.ready;
   // C-7C tri-state status for the Missing-value section's strong tag.
   // The "Some decisions made" branch fires when the user has saved any
   // worksheet-level, type-group, or per-column decision but hasn't reached
@@ -1404,8 +1517,6 @@ export function CleanPrepareReviewPanel({
       ? "Some decisions made"
       : "Not reviewed yet";
   const worstBlankColumns = missingValueColumns.slice(0, 3);
-  const selectedMissingValueApplyState: MissingValueApplyState =
-    missingValueApplyStateByWorksheet[decisionWorksheetId] || { status: "idle" };
   const previewWorksheetId = selectedWorksheet?.worksheetId;
   const previewWorksheetStatus = selectedWorksheet?.status;
   const excludedEntries = selectedWorksheetDisplayRecipePreview
@@ -1572,10 +1683,15 @@ export function CleanPrepareReviewPanel({
   ]);
 
   useEffect(() => {
-    if (!selectedWorksheet || activeStep !== "apply" || !readyStructuralDecisionPlan) return;
+    if (
+      !selectedWorksheet ||
+      activeStep !== "apply" ||
+      !combinedDecisionReadiness.canContinueToApply ||
+      (!readyStructuralDecisionPlan && !readyMissingValuePlan)
+    ) return;
     const worksheetId = selectedWorksheet.worksheetId;
     if (
-      decisionRecipePlanKeyByWorksheet[worksheetId] === readyStructuralDecisionPlanKey &&
+      decisionRecipePlanKeyByWorksheet[worksheetId] === readyPreviewPlanKey &&
       selectedWorksheetDecisionRecipePreview
     ) {
       return;
@@ -1596,6 +1712,7 @@ export function CleanPrepareReviewPanel({
     getCleaningRecipePreview(dataset.dataset_id, worksheetId, {
       rowLimit: 10,
       structuralDecisionPlan: readyStructuralDecisionPlan,
+      missingValuePlan: readyMissingValuePlan,
     })
       .then((response) => {
         if (cancelled) return;
@@ -1610,7 +1727,7 @@ export function CleanPrepareReviewPanel({
         }));
         setDecisionRecipePlanKeyByWorksheet((current) => ({
           ...current,
-          [worksheetId]: readyStructuralDecisionPlanKey,
+          [worksheetId]: readyPreviewPlanKey,
         }));
         setDecisionRecipeStatusByWorksheet((current) => ({
           ...current,
@@ -1641,8 +1758,10 @@ export function CleanPrepareReviewPanel({
     dataset.dataset_id,
     decisionRecipePlanKeyByWorksheet,
     decisionWorksheetName,
+    combinedDecisionReadiness.canContinueToApply,
+    readyMissingValuePlan,
+    readyPreviewPlanKey,
     readyStructuralDecisionPlan,
-    readyStructuralDecisionPlanKey,
     selectedWorksheet,
     selectedWorksheetDecisionRecipePreview,
   ]);
@@ -1728,17 +1847,25 @@ export function CleanPrepareReviewPanel({
     workbookCleanedCount > 0 || workbookNeedsReviewCount > 0;
   const pluralise = (count: number, singular: string, plural = `${singular}s`) =>
     `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
-  const hasActionableRecipe = canCreateStructuralCleanedCopy({
-    preview: selectedWorksheetDisplayRecipePreview,
-    canContinueToApply: structuralDecisionReadiness.canContinueToApply,
-    worksheetStatus: selectedWorksheet?.status,
-  });
   const hasSelectedWorksheetPreviewOperations = hasCleaningRecipePreviewOperations(
     selectedWorksheetDisplayRecipePreview,
   );
-  const isSelectedWorksheetNoOpDecisionPreview = isStructuralNoOpDecisionPreview(
-    selectedWorksheetDisplayRecipePreview,
-    Boolean(readyStructuralDecisionPlan),
+  const missingValuePreviewSummary = selectedWorksheetDisplayRecipePreview?.missing_value_summary;
+  const hasMissingValuePreviewChanges = hasMissingValuePreviewSummaryChanges(
+    missingValuePreviewSummary,
+  );
+  const hasActionableRecipe = Boolean(
+    selectedWorksheetDisplayRecipePreview &&
+      selectedWorksheet?.status === "ready" &&
+      combinedDecisionReadiness.canContinueToApply &&
+      isSelectedWorksheetDecisionRecipeCurrent &&
+      (hasSelectedWorksheetPreviewOperations || hasMissingValuePreviewChanges),
+  );
+  const isSelectedWorksheetNoOpDecisionPreview = Boolean(
+    hasReadyDecisionPlan &&
+      selectedWorksheetDisplayRecipePreview &&
+      !hasSelectedWorksheetPreviewOperations &&
+      !hasMissingValuePreviewChanges,
   );
   const structuralPreviewComparisonLabels = getStructuralPreviewComparisonLabels(
     isSelectedWorksheetNoOpDecisionPreview,
@@ -1753,13 +1880,22 @@ export function CleanPrepareReviewPanel({
         ? "Preview only"
         : "Original";
   const selectedWorksheetChangeSummary = selectedWorksheetDisplayRecipePreview
-    ? hasSelectedWorksheetPreviewOperations
+    ? hasSelectedWorksheetPreviewOperations || hasMissingValuePreviewChanges
       ? [
           selectedWorksheetDisplayRecipePreview.recipe.length > 0
             ? pluralise(selectedWorksheetDisplayRecipePreview.recipe.length, "draft recipe step")
             : null,
           getCleaningRecipeExcludedCount(selectedWorksheetDisplayRecipePreview) > 0
             ? pluralise(getCleaningRecipeExcludedCount(selectedWorksheetDisplayRecipePreview), "proposed exclusion")
+            : null,
+          getMissingValuePreviewChangedColumnCount(missingValuePreviewSummary) > 0
+            ? pluralise(getMissingValuePreviewChangedColumnCount(missingValuePreviewSummary), "missing-value column")
+            : null,
+          (missingValuePreviewSummary?.cells_filled || 0) > 0
+            ? pluralise(missingValuePreviewSummary?.cells_filled || 0, "cell fill")
+            : null,
+          (missingValuePreviewSummary?.rows_removed || 0) > 0
+            ? pluralise(missingValuePreviewSummary?.rows_removed || 0, "missing-value row removal")
             : null,
         ]
           .filter(Boolean)
@@ -1768,6 +1904,12 @@ export function CleanPrepareReviewPanel({
         ? "Your decisions preserve this worksheet as-is."
         : "No cleaning recipe is needed for this worksheet."
     : "Choose a ready worksheet to preview its draft cleaning recipe.";
+  const draftRecipeStatusCopy = getDraftRecipeStatusCopy({
+    embedded,
+    hasCleanedWorkingCopy,
+    isUsingCleanedCopy,
+    isNoOpDecisionPreview: isSelectedWorksheetNoOpDecisionPreview,
+  });
   const updateApplyState = (worksheetId: string, next: ApplyState) => {
     setApplyStateByWorksheet((current) => ({ ...current, [worksheetId]: next }));
   };
@@ -1787,65 +1929,6 @@ export function CleanPrepareReviewPanel({
     });
   };
 
-  const applyMissingValueDecisionDraft = async () => {
-    if (
-      !selectedWorksheet ||
-      !worksheetDecision ||
-      !missingValueDecisionReady ||
-      !hasCleanedWorkingCopy ||
-      isUsingCleanedCopy
-    ) {
-      return;
-    }
-    const shouldApply = window.confirm(
-      "Apply missing-value decisions to cleaned working copy? Original workbook will remain unchanged.",
-    );
-    if (!shouldApply) return;
-
-    const worksheetId = selectedWorksheet.worksheetId;
-    setMissingValueApplyStateByWorksheet((current) => ({
-      ...current,
-      [worksheetId]: { status: "applying" },
-    }));
-    try {
-      const columnDecisions =
-        worksheetDecision.strategy === "decide_per_column"
-          ? missingValueColumns.flatMap((column) => {
-              const decision =
-                missingValueDecisions[
-                  createMissingValueDecisionKey(dataset.dataset_id, worksheetId, column.name)
-                ];
-              return decision
-                ? [{
-                    column_name: column.name,
-                    strategy: decision.strategy,
-                    custom_value: decision.customValue,
-                  }]
-                : [];
-            })
-          : [];
-      const result = await applyMissingValueDecisions(dataset.dataset_id, worksheetId, {
-        worksheet_strategy: worksheetDecision.strategy,
-        column_decisions: columnDecisions,
-      });
-      setMissingValueApplyStateByWorksheet((current) => ({
-        ...current,
-        [worksheetId]: { status: "success", result },
-      }));
-    } catch (error) {
-      setMissingValueApplyStateByWorksheet((current) => ({
-        ...current,
-        [worksheetId]: {
-          status: "error",
-          message:
-            error instanceof Error && error.message
-              ? error.message
-              : "Missing-value decisions could not be applied.",
-        },
-      }));
-    }
-  };
-
   const beginApplyConfirm = () => {
     if (!selectedWorksheet || !hasActionableRecipe) return;
     updateApplyState(selectedWorksheet.worksheetId, { status: "confirming" });
@@ -1857,12 +1940,18 @@ export function CleanPrepareReviewPanel({
   };
 
   const confirmApply = async () => {
-    if (!selectedWorksheet || !hasActionableRecipe || !structuralDecisionReadiness.canContinueToApply) return;
+    if (
+      !selectedWorksheet ||
+      !hasActionableRecipe ||
+      !combinedDecisionReadiness.canContinueToApply ||
+      !isSelectedWorksheetDecisionRecipeCurrent
+    ) return;
     const worksheetId = selectedWorksheet.worksheetId;
     updateApplyState(worksheetId, { status: "applying" });
     try {
       const result = await applyCleaningRecipe(dataset.dataset_id, worksheetId, {
         structuralDecisionPlan: readyStructuralDecisionPlan,
+        missingValuePlan: readyMissingValuePlan,
       });
       updateApplyState(worksheetId, { status: "success", result });
     } catch (error) {
@@ -2296,6 +2385,52 @@ export function CleanPrepareReviewPanel({
                 <strong>{missingValueDecisionStatus}</strong>
               </div>
 
+              {hasMissingValueDecisionDrafts && (
+                <button
+                  type="button"
+                  className="secondary-button clean-prepare-reset-decisions-button"
+                  ref={resetMissingValueDecisionsButtonRef}
+                  onClick={beginResetMissingValueDecisions}
+                  disabled={isResetMissingValueDecisionsConfirming}
+                >
+                  Reset missing-value decisions
+                </button>
+              )}
+
+              {isResetMissingValueDecisionsConfirming && (
+                <div
+                  className="clean-prepare-reset-confirm"
+                  role="group"
+                  aria-label="Confirm reset missing-value decisions"
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape") return;
+                    event.stopPropagation();
+                    cancelResetMissingValueDecisions();
+                  }}
+                >
+                  <p>
+                    Reset missing-value decisions for {selectedWorksheetName}? Other worksheets
+                    keep their own decisions.
+                  </p>
+                  <div className="clean-prepare-reset-confirm-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={cancelResetMissingValueDecisions}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={confirmResetMissingValueDecisions}
+                    >
+                      Reset decisions
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {selectedWorksheet?.normalization.templateStructureCandidate && (
                 <p className="clean-prepare-missing-warning">
                   This worksheet has template-layout signals. Review blanks before choosing any fill
@@ -2315,6 +2450,12 @@ export function CleanPrepareReviewPanel({
                   <span>{decidedColumnCount.toLocaleString()} of {missingValueColumns.length.toLocaleString()} columns decided</span>
                 )}
               </div>
+
+              {!missingValuePlanReadiness.ready && (
+                <p className="clean-prepare-preview-state is-error">
+                  {missingValuePlanReadiness.blockingMessage}
+                </p>
+              )}
 
               {/*
                 C-7B — Prominent "Customize by column" toggle. Switches the
@@ -2388,6 +2529,15 @@ export function CleanPrepareReviewPanel({
                                 missingValueStrategyLabels[groupDecision.strategy]
                               : "Decision needed"}
                           </span>
+                          {groupDecision && (
+                            <button
+                              type="button"
+                              className="clean-prepare-clear-decision-button"
+                              onClick={() => clearOneMissingValueDecision(groupKey)}
+                            >
+                              Clear
+                            </button>
+                          )}
                         </header>
                         <fieldset className="clean-prepare-missing-strategy-control">
                           <legend className="visually-hidden-legend">
@@ -2456,7 +2606,7 @@ export function CleanPrepareReviewPanel({
                     );
                   })}
                   <p className="clean-prepare-missing-draft-note">
-                    Saved as a draft decision. Apply support may depend on the cleaning engine.
+                    These choices will be included in the Step 3 preview. Nothing changes until you create the cleaned working copy.
                   </p>
                 </div>
               )}
@@ -2477,6 +2627,15 @@ export function CleanPrepareReviewPanel({
                   </summary>
                   <fieldset className="clean-prepare-missing-strategy-control">
                     <legend className="visually-hidden-legend">Worksheet treatment</legend>
+                    {worksheetDecision && worksheetDecision.strategy !== "decide_per_column" && (
+                      <button
+                        type="button"
+                        className="clean-prepare-clear-decision-button"
+                        onClick={() => clearOneMissingValueDecision(worksheetDecisionKey)}
+                      >
+                        Clear worksheet treatment
+                      </button>
+                    )}
                     <div className="clean-prepare-missing-strategy-options">
                       {worksheetMissingValueStrategies
                         .filter((strategy) => strategy !== "decide_per_column")
@@ -2527,7 +2686,7 @@ export function CleanPrepareReviewPanel({
                     return (
                       <li key={column.name}>
                         <strong>{getColumnDisplayName(column.name)}</strong>
-                        <span>{column.null_count.toLocaleString()} blanks ({rate.toFixed(1)}%). {rate >= 70 ? "High blank rate: review before filling." : "Review before future cleanup."}</span>
+                        <span>{column.null_count.toLocaleString()} blanks ({rate.toFixed(1)}%). {rate >= 70 ? "High blank rate: review before filling." : "Review before the Step 3 preview."}</span>
                       </li>
                     );
                   })}
@@ -2645,6 +2804,15 @@ export function CleanPrepareReviewPanel({
                                 </label>
                               )}
                           </fieldset>
+                          {decision && (
+                            <button
+                              type="button"
+                              className="clean-prepare-clear-decision-button"
+                              onClick={() => clearOneMissingValueDecision(decisionKey)}
+                            >
+                              Clear decision
+                            </button>
+                          )}
                         </article>
                       );
                     })}
@@ -2653,99 +2821,8 @@ export function CleanPrepareReviewPanel({
               )}
 
               <p className="clean-prepare-missing-draft-note">
-                Draft decision only. Decision saved for a future cleanup plan; no values have been
-                changed.
+                This choice will be included in the Step 3 preview. Nothing changes until you create the cleaned working copy.
               </p>
-
-              {missingValueDecisionReady && hasCleanedWorkingCopy && !isUsingCleanedCopy && (
-                <button
-                  type="button"
-                  className="primary-button clean-prepare-missing-apply-button"
-                  onClick={applyMissingValueDecisionDraft}
-                  disabled={selectedMissingValueApplyState.status === "applying"}
-                >
-                  {selectedMissingValueApplyState.status === "applying"
-                    ? "Applying missing-value decisions..."
-                    : "Apply missing-value decisions"}
-                </button>
-              )}
-
-              {missingValueDecisionReady && isUsingCleanedCopy && (
-                <p className="clean-prepare-missing-warning">
-                  Return to the original analysis table before updating this cleaned working copy.
-                </p>
-              )}
-
-              {selectedMissingValueApplyState.status === "error" && (
-                <p className="clean-prepare-preview-state is-error">
-                  {selectedMissingValueApplyState.message}
-                </p>
-              )}
-
-              {selectedMissingValueApplyState.status === "success" && (
-                <div className="clean-prepare-missing-apply-summary" role="status">
-                  <strong>Missing-value decisions applied to cleaned working copy.</strong>
-                  <p>{selectedMissingValueApplyState.result.worksheet_name}</p>
-                  <div className="clean-prepare-missing-summary">
-                    <span>Cleaned working copy updated</span>
-                    <span>{pluralise(selectedMissingValueApplyState.result.decisions_applied.length, "decision")} applied</span>
-                    <span>{pluralise(selectedMissingValueApplyState.result.columns_changed.length, "column")} changed</span>
-                    <span>{selectedMissingValueApplyState.result.rows_removed.toLocaleString()} rows removed</span>
-                    <span>{pluralise(selectedMissingValueApplyState.result.skipped_decisions.length, "decision")} skipped</span>
-                  </div>
-                  <p>
-                    Cleaned table: <code>{selectedMissingValueApplyState.result.cleaned_table_name}</code>
-                  </p>
-                  <p>
-                    Columns changed:{" "}
-                    {selectedMissingValueApplyState.result.columns_changed.length > 0
-                      ? selectedMissingValueApplyState.result.columns_changed.join(", ")
-                      : "None"}
-                  </p>
-                  {selectedMissingValueApplyState.result.decisions_applied.length > 0 && (
-                    <details className="clean-prepare-disclosure">
-                      <summary>
-                        <strong>Applied decisions</strong>
-                        <span>{selectedMissingValueApplyState.result.decisions_applied.length.toLocaleString()}</span>
-                      </summary>
-                      <ul>
-                        {selectedMissingValueApplyState.result.decisions_applied.map((decision, index) => (
-                          <li key={`${decision.column_name || decision.scope || "worksheet"}:${decision.strategy}:${index}`}>
-                            <strong>{decision.column_name || "Worksheet decision"}</strong>
-                            <span>{decision.strategy.replace(/_/g, " ")}. {decision.explanation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                  {selectedMissingValueApplyState.result.skipped_decisions.length > 0 && (
-                    <details className="clean-prepare-disclosure">
-                      <summary>
-                        <strong>Skipped decisions</strong>
-                        <span>{selectedMissingValueApplyState.result.skipped_decisions.length.toLocaleString()}</span>
-                      </summary>
-                      <ul>
-                        {selectedMissingValueApplyState.result.skipped_decisions.map((decision) => (
-                          <li key={`${decision.column_name}:${decision.strategy}`}>
-                            <strong>{decision.column_name || "Worksheet decision"}</strong>
-                            <span>{decision.explanation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-                  <p>Original workbook unchanged. Activation remains a separate user choice.</p>
-                  {onPreviewDataset && selectedWorksheet && (
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      onClick={previewDataset}
-                    >
-                      Preview dataset
-                    </button>
-                  )}
-                </div>
-              )}
               </section>
             )}
           </div>
@@ -2845,7 +2922,7 @@ export function CleanPrepareReviewPanel({
               isStructuralPreviewPending ||
               isDecisionRecipePreviewPending ? (
                 <p className="clean-prepare-preview-state">Loading draft recipe preview...</p>
-              ) : readyStructuralDecisionPlan && selectedWorksheetDecisionRecipeStatus === "error" ? (
+              ) : hasReadyDecisionPlan && selectedWorksheetDecisionRecipeStatus === "error" ? (
                 <p className="clean-prepare-preview-state is-error">
                   {selectedWorksheetDecisionRecipeError ||
                     "Decision-aware cleaning recipe preview could not be loaded."}
@@ -2907,13 +2984,13 @@ export function CleanPrepareReviewPanel({
                         )}
                       </div>
                     </section>
-                  ) : !hasSelectedWorksheetPreviewOperations ? (
+                  ) : !hasSelectedWorksheetPreviewOperations && !hasMissingValuePreviewChanges ? (
                     <p className="clean-prepare-preview-state">
                       No cleaning recipe is needed for this worksheet.
                     </p>
                   ) : (
                     <p className="clean-prepare-preview-state">
-                      Review the proposed exclusions before creating a cleaned working copy.
+                      Review the proposed changes before creating a cleaned working copy.
                     </p>
                   )}
 
@@ -2932,6 +3009,56 @@ export function CleanPrepareReviewPanel({
                           ))}
                         </div>
                       </div>
+                    </details>
+                  )}
+
+                  {missingValuePreviewSummary && (
+                    <details className="clean-prepare-disclosure" open={embedded}>
+                      <summary>
+                        <strong>Missing-value changes</strong>
+                        <span>
+                          {hasMissingValuePreviewChanges
+                            ? `${getMissingValuePreviewChangedColumnCount(missingValuePreviewSummary).toLocaleString()} columns / ${(missingValuePreviewSummary.cells_filled || 0).toLocaleString()} cells`
+                            : "No changes"}
+                        </span>
+                      </summary>
+                      <div className="clean-prepare-missing-summary">
+                        <span>
+                          Worksheet strategy:{" "}
+                          {String(missingValuePreviewSummary.worksheet_strategy || "leave_unchanged")}
+                        </span>
+                        <span>
+                          {pluralise(getMissingValuePreviewChangedColumnCount(missingValuePreviewSummary), "column")} affected
+                        </span>
+                        <span>{pluralise(missingValuePreviewSummary.cells_filled || 0, "cell")} filled</span>
+                        <span>{pluralise(missingValuePreviewSummary.rows_removed || 0, "row")} removed</span>
+                      </div>
+                      {missingValuePreviewSummary.operations &&
+                        missingValuePreviewSummary.operations.length > 0 && (
+                          <ul className="clean-prepare-recipe-list">
+                            {missingValuePreviewSummary.operations.map((operation, index) => (
+                              <li key={`missing-preview:${index}`}>
+                                <strong>
+                                  {operation.column_name
+                                    ? getColumnDisplayName(String(operation.column_name))
+                                    : "Worksheet rows"}
+                                </strong>
+                                <span>
+                                  {String(operation.strategy)}
+                                  {typeof operation.affected_cells === "number"
+                                    ? ` - ${pluralise(operation.affected_cells, "cell")} filled`
+                                    : ""}
+                                  {typeof operation.affected_rows === "number"
+                                    ? ` - ${pluralise(operation.affected_rows, "row")} removed`
+                                    : ""}
+                                  {operation.preview_value !== undefined
+                                    ? ` - preview value ${formatPreviewCell(operation.preview_value)}`
+                                    : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                     </details>
                   )}
 
@@ -3192,16 +3319,10 @@ export function CleanPrepareReviewPanel({
             ) : (
               <>
                 <strong>
-                  {isSelectedWorksheetNoOpDecisionPreview
-                    ? structuralNoOpApplyHeading
-                    : embedded
-                    ? "No changes applied yet."
-                    : "Preview only - no changes have been applied to this worksheet yet."}
+                  {draftRecipeStatusCopy.heading}
                 </strong>
                 <p>
-                  {isSelectedWorksheetNoOpDecisionPreview
-                    ? structuralNoOpApplyCopy
-                    : "Use Create cleaned working copy on a ready XLSX worksheet to produce a cleaned table alongside the original."}
+                  {draftRecipeStatusCopy.body}
                 </p>
               </>
             )}

@@ -1,4 +1,9 @@
 import type { SchemaColumn } from "../dataset/datasetTypes";
+import type {
+  MissingValueColumnStrategy,
+  MissingValueWorksheetStrategy,
+  WorksheetMissingValuePlan,
+} from "../workbook";
 
 export type MissingValueStrategy =
   | "leave_unchanged"
@@ -23,6 +28,25 @@ export type MissingValueDecision = {
 };
 
 export type MissingValueDecisionMap = Record<string, MissingValueDecision>;
+export type MissingValueValidationIssue = {
+  columnName?: string;
+  strategy?: MissingValueStrategy;
+  message: string;
+};
+
+export type MissingValuePlanBuildResult = {
+  plan: WorksheetMissingValuePlan | null;
+  ready: boolean;
+  totalColumns: number;
+  decidedColumns: number;
+  unresolvedColumns: number;
+  invalidIssues: MissingValueValidationIssue[];
+  unsupportedIssues: MissingValueValidationIssue[];
+  effectiveStrategies: Record<string, MissingValueStrategy>;
+  worksheetStrategy: MissingValueWorksheetStrategy;
+  hasChanges: boolean;
+  blockingMessage: string | null;
+};
 
 export const MISSING_VALUE_DECISION_STORAGE_KEY = "filtraqueri:missing-value-decisions";
 export const WORKSHEET_DECISION_COLUMN = "__worksheet__";
@@ -84,12 +108,12 @@ export const getWorksheetMissingTypeStrategies = (
     return strategies;
   }
   if (group === "date") {
-    return ["leave_unchanged", "forward_fill", "custom_date"];
+    return ["leave_unchanged", "custom_date"];
   }
   if (group === "boolean") {
     return ["leave_unchanged", "fill_custom"];
   }
-  return ["leave_unchanged", "fill_custom", "decide_later"];
+  return ["leave_unchanged", "fill_custom"];
 };
 
 export const worksheetMissingTypeGroupLabels: Record<WorksheetMissingTypeGroup, string> = {
@@ -233,7 +257,7 @@ export const getColumnMissingValueStrategies = (
     return strategies;
   }
   if (column.inferred_type === "date") {
-    return ["leave_unchanged", "forward_fill", "custom_date"];
+    return ["leave_unchanged", "custom_date"];
   }
   if (column.inferred_type === "text" || column.inferred_type === "categorical") {
     const strategies: MissingValueStrategy[] = ["leave_unchanged", "mark_unknown"];
@@ -247,8 +271,244 @@ export const getColumnMissingValueStrategies = (
     return ["leave_unchanged", "fill_custom"];
   }
   // Safe generic fallback when the column type is unknown / not inferred.
-  return ["leave_unchanged", "fill_custom", "decide_later"];
+  return ["leave_unchanged", "fill_custom"];
 };
 
 export const decisionNeedsCustomValue = (strategy?: MissingValueStrategy) =>
   strategy === "fill_custom" || strategy === "custom_date";
+
+const supportedColumnStrategies = new Set<MissingValueStrategy>([
+  "fill_zero",
+  "fill_mean",
+  "fill_median",
+  "fill_custom",
+  "mark_unknown",
+  "fill_mode",
+  "custom_date",
+]);
+
+const supportedWorksheetStrategies = new Set<MissingValueStrategy>([
+  "leave_unchanged",
+  "layout_space",
+  "remove_mostly_blank_rows",
+  "decide_per_column",
+]);
+
+const isColumnStrategy = (strategy: MissingValueStrategy): strategy is MissingValueColumnStrategy =>
+  supportedColumnStrategies.has(strategy);
+
+const isWorksheetStrategy = (
+  strategy: MissingValueStrategy,
+): strategy is MissingValueWorksheetStrategy => supportedWorksheetStrategies.has(strategy);
+
+const normalizeColumnStrategy = (strategy: MissingValueStrategy): MissingValueColumnStrategy | null => {
+  if (strategy === "leave_unchanged") return null;
+  return isColumnStrategy(strategy) ? strategy : null;
+};
+
+const normalizeCustomValue = (
+  column: SchemaColumn,
+  decision: MissingValueDecision,
+): string | number | boolean | undefined => {
+  if (!decisionNeedsCustomValue(decision.strategy) || decision.customValue === undefined) {
+    return undefined;
+  }
+  if (column.inferred_type === "numeric") return Number(decision.customValue);
+  if (column.inferred_type === "boolean") return decision.customValue.trim().toLowerCase() === "true";
+  return decision.customValue;
+};
+
+const isFiniteNumericText = (value: string | undefined): boolean => {
+  if (!value || !value.trim()) return false;
+  const parsed = Number(value);
+  return Number.isFinite(parsed);
+};
+
+const isValidIsoDate = (value: string | undefined): boolean =>
+  Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`)));
+
+const isValidBooleanText = (value: string | undefined): boolean =>
+  Boolean(value && ["true", "false"].includes(value.trim().toLowerCase()));
+
+export const validateMissingValueDecisionForColumn = (
+  column: SchemaColumn,
+  decision: MissingValueDecision | undefined,
+): MissingValueValidationIssue[] => {
+  if (!decision) return [{ columnName: column.name, message: "Decision needed for this column." }];
+  const strategy = decision.strategy;
+  const allowed = getColumnMissingValueStrategies(column);
+  if (!allowed.includes(strategy) || (!isColumnStrategy(strategy) && strategy !== "leave_unchanged")) {
+    return [{
+      columnName: column.name,
+      strategy,
+      message: "This missing-value strategy is not supported for this column.",
+    }];
+  }
+  if (!decisionNeedsCustomValue(strategy)) return [];
+  const value = decision.customValue;
+  if (strategy === "custom_date") {
+    return isValidIsoDate(value)
+      ? []
+      : [{ columnName: column.name, strategy, message: "Enter a date as yyyy-mm-dd." }];
+  }
+  if (column.inferred_type === "numeric") {
+    return isFiniteNumericText(value)
+      ? []
+      : [{ columnName: column.name, strategy, message: "Enter a finite numeric value." }];
+  }
+  if (column.inferred_type === "boolean") {
+    return isValidBooleanText(value)
+      ? []
+      : [{ columnName: column.name, strategy, message: "Enter true or false." }];
+  }
+  return value && value.trim()
+    ? []
+    : [{ columnName: column.name, strategy, message: "Enter a non-empty text value." }];
+};
+
+export const buildWorksheetMissingValuePlan = ({
+  datasetId,
+  worksheetId,
+  columns,
+  decisions,
+}: {
+  datasetId: string;
+  worksheetId: string;
+  columns: SchemaColumn[];
+  decisions: MissingValueDecisionMap;
+}): MissingValuePlanBuildResult => {
+  const missingColumns = columns.filter((column) => column.null_count > 0);
+  const worksheetDecision =
+    decisions[createMissingValueDecisionKey(datasetId, worksheetId, WORKSHEET_DECISION_COLUMN)];
+  const rawWorksheetStrategy = worksheetDecision?.strategy || "leave_unchanged";
+  const worksheetStrategy = isWorksheetStrategy(rawWorksheetStrategy)
+    ? rawWorksheetStrategy
+    : "leave_unchanged";
+  const invalidIssues: MissingValueValidationIssue[] = [];
+  const unsupportedIssues: MissingValueValidationIssue[] = [];
+  const effectiveStrategies: Record<string, MissingValueStrategy> = {};
+  const columnDecisions: WorksheetMissingValuePlan["columnDecisions"] = [];
+  let decidedColumns = 0;
+
+  for (const column of missingColumns) {
+    const group = classifyColumnMissingTypeGroup(column.inferred_type);
+    const columnDecision =
+      decisions[createMissingValueDecisionKey(datasetId, worksheetId, column.name)];
+    const groupDecision =
+      decisions[
+        createMissingValueDecisionKey(
+          datasetId,
+          worksheetId,
+          getWorksheetMissingTypeDecisionColumn(group),
+        )
+      ];
+    const worksheetFallback =
+      worksheetDecision && isWorksheetStrategy(worksheetDecision.strategy) && worksheetStrategy !== "decide_per_column"
+        ? worksheetDecision
+        : undefined;
+    const effectiveDecision = columnDecision || groupDecision || worksheetFallback;
+    if (!effectiveDecision) {
+      invalidIssues.push({
+        columnName: column.name,
+        message: "Decision needed for this column.",
+      });
+      continue;
+    }
+    effectiveStrategies[column.name] = effectiveDecision.strategy;
+    if (isWorksheetStrategy(effectiveDecision.strategy)) {
+      if (effectiveDecision.strategy === "decide_per_column") {
+        invalidIssues.push({
+          columnName: column.name,
+          strategy: effectiveDecision.strategy,
+          message: "Decision needed for this column.",
+        });
+        continue;
+      }
+      decidedColumns += 1;
+      continue;
+    }
+    const issues = validateMissingValueDecisionForColumn(column, effectiveDecision);
+    if (issues.length) {
+      if (
+        issues.some((issue) =>
+          issue.message.toLowerCase().includes("not supported") ||
+          ["forward_fill", "flag_for_review", "decide_later"].includes(String(issue.strategy)),
+        )
+      ) {
+        unsupportedIssues.push(...issues);
+      } else {
+        invalidIssues.push(...issues);
+      }
+      continue;
+    }
+    decidedColumns += 1;
+    const wireStrategy = normalizeColumnStrategy(effectiveDecision.strategy);
+    if (wireStrategy) {
+      const customValue = normalizeCustomValue(column, effectiveDecision);
+      columnDecisions.push({
+        columnName: column.name,
+        strategy: wireStrategy,
+        ...(customValue !== undefined
+          ? { customValue }
+          : {}),
+      });
+    }
+  }
+
+  if (worksheetDecision && !isWorksheetStrategy(worksheetDecision.strategy)) {
+    unsupportedIssues.push({
+      strategy: worksheetDecision.strategy,
+      message: "This worksheet-level missing-value strategy is not supported.",
+    });
+  }
+
+  const unresolvedColumns = Math.max(0, missingColumns.length - decidedColumns);
+  const ready =
+    invalidIssues.length === 0 &&
+    unsupportedIssues.length === 0 &&
+    (missingColumns.length === 0 || unresolvedColumns === 0);
+  const hasChanges =
+    worksheetStrategy === "remove_mostly_blank_rows" || columnDecisions.length > 0;
+  const blockingMessage = ready
+    ? null
+    : unsupportedIssues[0]?.message ||
+      invalidIssues[0]?.message ||
+      "Resolve missing-value decisions before previewing Apply.";
+  return {
+    plan: ready
+      ? {
+          worksheetId,
+          worksheetStrategy,
+          columnDecisions,
+        }
+      : null,
+    ready,
+    totalColumns: missingColumns.length,
+    decidedColumns,
+    unresolvedColumns,
+    invalidIssues,
+    unsupportedIssues,
+    effectiveStrategies,
+    worksheetStrategy,
+    hasChanges,
+    blockingMessage,
+  };
+};
+
+export const clearMissingValueDecision = (
+  decisions: MissingValueDecisionMap,
+  key: string,
+): MissingValueDecisionMap => {
+  const next = { ...decisions };
+  delete next[key];
+  return next;
+};
+
+export const resetMissingValueDecisionsForWorksheet = (
+  decisions: MissingValueDecisionMap,
+  datasetId: string,
+  worksheetId: string,
+): MissingValueDecisionMap => {
+  const prefix = `${datasetId}:${worksheetId}:`;
+  return Object.fromEntries(Object.entries(decisions).filter(([key]) => !key.startsWith(prefix)));
+};

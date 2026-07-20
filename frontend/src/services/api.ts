@@ -295,10 +295,48 @@ export type MissingValueDecisionApplyResponse = {
   message: string;
 };
 
+export function formatApiErrorPayload(payload: unknown, fallbackMessage: string): string {
+  if (typeof payload === "string") return payload || fallbackMessage;
+  if (payload instanceof Error) return payload.message || fallbackMessage;
+  if (!payload || typeof payload !== "object") return fallbackMessage;
+
+  const record = payload as Record<string, unknown>;
+  if (typeof record.detail === "string") return record.detail || fallbackMessage;
+  if (Array.isArray(record.detail)) {
+    const messages = record.detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (!item || typeof item !== "object") return "";
+        const issue = item as Record<string, unknown>;
+        const location = Array.isArray(issue.loc)
+          ? issue.loc.map((part) => String(part)).join(".")
+          : "";
+        const message = typeof issue.msg === "string" ? issue.msg : "";
+        return [location, message].filter(Boolean).join(": ");
+      })
+      .filter(Boolean);
+    return messages.length ? messages.join("; ") : fallbackMessage;
+  }
+  if (record.detail && typeof record.detail === "object") {
+    return formatApiErrorPayload(record.detail, fallbackMessage);
+  }
+  if (typeof record.message === "string") return record.message || fallbackMessage;
+  if (Array.isArray(record.errors)) {
+    return formatApiErrorPayload({ detail: record.errors }, fallbackMessage);
+  }
+
+  try {
+    const serialized = JSON.stringify(record);
+    return serialized && serialized !== "{}" ? serialized : fallbackMessage;
+  } catch {
+    return fallbackMessage;
+  }
+}
+
 async function parseError(response: Response, fallbackMessage: string) {
   try {
     const payload = await response.json();
-    return payload.detail || fallbackMessage;
+    return formatApiErrorPayload(payload, fallbackMessage);
   } catch {
     return fallbackMessage;
   }
@@ -416,10 +454,6 @@ const serializeStructuralDecisionPlan = (plan: WorksheetStructuralDecisionPlan) 
     decision: decision.decision,
     ...(decision.evidenceSignalId ? { evidence_signal_id: decision.evidenceSignalId } : {}),
     ...(decision.evidenceIds ? { evidence_ids: decision.evidenceIds } : {}),
-    ...(decision.affectedRows ? { affected_rows: decision.affectedRows } : {}),
-    ...(decision.affectedColumnIndexes
-      ? { affected_column_indexes: decision.affectedColumnIndexes }
-      : {}),
     ...(decision.affectedColumns ? { affected_columns: decision.affectedColumns } : {}),
   })),
 });

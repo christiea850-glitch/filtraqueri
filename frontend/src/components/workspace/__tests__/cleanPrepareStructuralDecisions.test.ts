@@ -27,9 +27,12 @@ import {
   getStructuralPreviewIdleReadiness,
   getStructuralPreviewLoadingReadiness,
   getStructuralPreviewLifecycleState,
+  getMissingValuePreviewChangedColumnCount,
+  getDraftRecipeStatusCopy,
   shouldMarkStructuralPreviewVerificationError,
   shouldStartStructuralPreviewRequest,
   validateStructuralPreviewResponse,
+  hasMissingValuePreviewSummaryChanges,
   getColumnDisplayName,
   setWorksheetSuggestedFixDecision,
   structuralDecisionEmptyStateCopy,
@@ -41,11 +44,22 @@ import {
 } from "../CleanPrepareReviewPanel";
 import type { DatasetMetadata, SchemaColumn } from "../../../features/dataset/datasetTypes";
 import type { WorkbookMetadata, WorksheetMetadata, WorksheetTemplateStructureEvidence } from "../../../features/workbook";
-import type { CleaningRecipePreview } from "../../../services/api";
 import {
+  formatApiErrorPayload,
+  type CleaningRecipePreview,
+} from "../../../services/api";
+import {
+  buildWorksheetMissingValuePlan,
   classifyColumnMissingTypeGroup,
+  clearMissingValueDecision,
+  createMissingValueDecision,
+  createMissingValueDecisionKey,
   getColumnMissingValueStrategies,
+  getWorksheetMissingTypeDecisionColumn,
   getWorksheetMissingTypeStrategies,
+  resetMissingValueDecisionsForWorksheet,
+  WORKSHEET_DECISION_COLUMN,
+  type MissingValueDecisionMap,
 } from "../../../features/dataPreparation/missingValueDecisions";
 import {
   getStructuralApplyNavigationBlockMessage,
@@ -143,6 +157,18 @@ const typedColumn = (
   sample_values: [],
   ...patch,
 });
+
+const missingDecisionMap = (
+  datasetId: string,
+  worksheetId: string,
+  values: Record<string, { strategy: Parameters<typeof createMissingValueDecision>[0]; customValue?: string }>,
+): MissingValueDecisionMap =>
+  Object.fromEntries(
+    Object.entries(values).map(([columnName, decision]) => [
+      createMissingValueDecisionKey(datasetId, worksheetId, columnName),
+      createMissingValueDecision(decision.strategy, decision.customValue),
+    ]),
+  );
 
 const evidence = (
   type: WorksheetTemplateStructureEvidence["type"],
@@ -1989,6 +2015,404 @@ export const runCleanPrepareStructuralDecisionFixtures =
           ...expect(!numericStrategies.includes("mark_unknown"), "Numeric group should exclude Unknown text fill."),
           ...expect(!textStrategies.includes("fill_median"), "Text group should exclude median."),
         ];
+      }),
+      fixture("zero missing columns are missing-value ready with no column decisions", () => {
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:clean",
+          columns: [typedColumn("amount", "numeric", { null_count: 0 })],
+          decisions: {},
+        });
+        return [
+          ...expect(result.ready === true, "Zero-blank worksheet should be ready."),
+          ...expect(result.plan?.columnDecisions.length === 0, "Zero-blank plan should not invent column decisions."),
+          ...expect(result.totalColumns === 0, "UI should be able to omit a missing-value wire plan when no blank columns exist."),
+        ];
+      }),
+      fixture("blank columns require explicit missing-value coverage", () => {
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:blank",
+          columns: [typedColumn("amount", "numeric")],
+          decisions: {},
+        });
+        return [
+          ...expect(result.ready === false, "Blank column should not be implicitly ready."),
+          ...expect(result.blockingMessage !== null, "Uncovered blank column should block Apply."),
+        ];
+      }),
+      fixture("worksheet-wide leave unchanged covers every blank column", () => {
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:leave",
+          columns: [typedColumn("amount", "numeric"), typedColumn("name", "text")],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:leave", {
+            [WORKSHEET_DECISION_COLUMN]: { strategy: "leave_unchanged" },
+          }),
+        });
+        return [
+          ...expect(result.ready === true, "Explicit worksheet-wide leave unchanged should be ready."),
+          ...expect(result.plan?.worksheetStrategy === "leave_unchanged", "Worksheet strategy should serialize as leave_unchanged."),
+          ...expect(result.plan?.columnDecisions.length === 0, "Leave unchanged should not serialize fill decisions."),
+        ];
+      }),
+      fixture("numeric fill zero mean and median serialize as supported column strategies", () => {
+        const columns = [
+          typedColumn("zero_amount", "numeric", {
+            numeric_stats: { min: 0, max: 10, mean: 4, median: 5, std: 2 },
+          }),
+          typedColumn("mean_amount", "numeric", {
+            numeric_stats: { min: 0, max: 10, mean: 4, median: 5, std: 2 },
+          }),
+          typedColumn("median_amount", "numeric", {
+            numeric_stats: { min: 0, max: 10, mean: 4, median: 5, std: 2 },
+          }),
+        ];
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:numeric",
+          columns,
+          decisions: missingDecisionMap("dataset:mv", "worksheet:numeric", {
+            zero_amount: { strategy: "fill_zero" },
+            mean_amount: { strategy: "fill_mean" },
+            median_amount: { strategy: "fill_median" },
+          }),
+        });
+        const strategies = result.plan?.columnDecisions.map((decision) => decision.strategy) || [];
+        return [
+          ...expect(result.ready === true, "Numeric supported strategies should be ready."),
+          ...expect(strategies.includes("fill_zero"), "fill_zero should serialize."),
+          ...expect(strategies.includes("fill_mean"), "fill_mean should serialize."),
+          ...expect(strategies.includes("fill_median"), "fill_median should serialize."),
+        ];
+      }),
+      fixture("text Unknown and valid mode serialize for populated categorical columns", () => {
+        const columns = [
+          typedColumn("status", "text", { top_values: [{ value: "Open", count: 4 }] }),
+          typedColumn("category", "categorical", { top_values: [{ value: "A", count: 3 }] }),
+        ];
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:text",
+          columns,
+          decisions: missingDecisionMap("dataset:mv", "worksheet:text", {
+            status: { strategy: "mark_unknown" },
+            category: { strategy: "fill_mode" },
+          }),
+        });
+        return [
+          ...expect(result.ready === true, "Text supported strategies should be ready."),
+          ...expect(
+            result.plan?.columnDecisions.some((decision) => decision.strategy === "mark_unknown") === true,
+            "mark_unknown should serialize.",
+          ),
+          ...expect(
+            result.plan?.columnDecisions.some((decision) => decision.strategy === "fill_mode") === true,
+            "fill_mode should serialize when a populated value exists.",
+          ),
+        ];
+      }),
+      fixture("mode is hidden for all-null categorical column", () => {
+        const strategies = getColumnMissingValueStrategies(
+          typedColumn("category", "categorical", { sample_values: [], top_values: [], unique_count: 0 }),
+        );
+        return expect(!strategies.includes("fill_mode"), "All-null categorical column should not offer fill_mode.");
+      }),
+      fixture("custom numeric text date and boolean values validate and normalize", () => {
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:custom",
+          columns: [
+            typedColumn("amount", "numeric"),
+            typedColumn("comment", "text"),
+            typedColumn("due_date", "date"),
+            typedColumn("active", "boolean"),
+          ],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:custom", {
+            amount: { strategy: "fill_custom", customValue: "42.5" },
+            comment: { strategy: "fill_custom", customValue: "Unknown" },
+            due_date: { strategy: "custom_date", customValue: "2026-07-19" },
+            active: { strategy: "fill_custom", customValue: "true" },
+          }),
+        });
+        const decisionsByColumn = Object.fromEntries(
+          (result.plan?.columnDecisions || []).map((decision) => [decision.columnName, decision]),
+        );
+        return [
+          ...expect(result.ready === true, "Valid custom values should be ready."),
+          ...expect(decisionsByColumn.amount?.customValue === 42.5, "Numeric custom value should become a number."),
+          ...expect(decisionsByColumn.comment?.customValue === "Unknown", "Text custom value should remain text."),
+          ...expect(decisionsByColumn.due_date?.customValue === "2026-07-19", "Date custom value should remain yyyy-mm-dd."),
+          ...expect(decisionsByColumn.active?.customValue === true, "Boolean custom value should become boolean."),
+        ];
+      }),
+      fixture("invalid custom values block missing-value readiness", () => {
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:invalid",
+          columns: [
+            typedColumn("amount", "numeric"),
+            typedColumn("comment", "text"),
+            typedColumn("due_date", "date"),
+          ],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:invalid", {
+            amount: { strategy: "fill_custom", customValue: "nope" },
+            comment: { strategy: "fill_custom", customValue: " " },
+            due_date: { strategy: "custom_date", customValue: "07/19/2026" },
+          }),
+        });
+        return [
+          ...expect(result.ready === false, "Invalid custom values should block readiness."),
+          ...expect(result.invalidIssues.length === 3, "Every invalid custom value should be reported."),
+        ];
+      }),
+      fixture("unsupported legacy forward_fill is rejected and not serialized", () => {
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:legacy",
+          columns: [typedColumn("due_date", "date")],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:legacy", {
+            due_date: { strategy: "forward_fill" },
+          }),
+        });
+        return [
+          ...expect(result.ready === false, "forward_fill should block readiness."),
+          ...expect(result.plan === null, "Unsupported forward_fill should not serialize."),
+        ];
+      }),
+      fixture("per-column decisions override type group decisions", () => {
+        const groupKey = getWorksheetMissingTypeDecisionColumn("numeric");
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:precedence",
+          columns: [typedColumn("amount", "numeric")],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:precedence", {
+            [groupKey]: { strategy: "fill_zero" },
+            amount: { strategy: "fill_custom", customValue: "9" },
+          }),
+        });
+        return [
+          ...expect(result.ready === true, "Override plan should be ready."),
+          ...expect(result.plan?.columnDecisions[0]?.strategy === "fill_custom", "Per-column strategy should win."),
+          ...expect(result.plan?.columnDecisions[0]?.customValue === 9, "Per-column custom value should serialize."),
+        ];
+      }),
+      fixture("type group decisions override worksheet default", () => {
+        const groupKey = getWorksheetMissingTypeDecisionColumn("text");
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:type",
+          columns: [typedColumn("status", "text")],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:type", {
+            [WORKSHEET_DECISION_COLUMN]: { strategy: "leave_unchanged" },
+            [groupKey]: { strategy: "mark_unknown" },
+          }),
+        });
+        return expect(
+          result.plan?.columnDecisions[0]?.strategy === "mark_unknown",
+          "Type-group strategy should win over worksheet default.",
+        );
+      }),
+      fixture("missing-value decisions are isolated by selected worksheet", () => {
+        const decisions = {
+          ...missingDecisionMap("dataset:mv", "worksheet:a", {
+            amount: { strategy: "fill_zero" },
+          }),
+          ...missingDecisionMap("dataset:mv", "worksheet:b", {
+            amount: { strategy: "fill_custom", customValue: "7" },
+          }),
+        };
+        const columns = [typedColumn("amount", "numeric")];
+        const a = buildWorksheetMissingValuePlan({ datasetId: "dataset:mv", worksheetId: "worksheet:a", columns, decisions });
+        const b = buildWorksheetMissingValuePlan({ datasetId: "dataset:mv", worksheetId: "worksheet:b", columns, decisions });
+        return [
+          ...expect(a.plan?.columnDecisions[0]?.strategy === "fill_zero", "Worksheet A should restore its own strategy."),
+          ...expect(b.plan?.columnDecisions[0]?.strategy === "fill_custom", "Worksheet B should restore its own strategy."),
+        ];
+      }),
+      fixture("clear one missing decision and reset selected worksheet only", () => {
+        const original = {
+          ...missingDecisionMap("dataset:mv", "worksheet:a", {
+            amount: { strategy: "fill_zero" },
+            status: { strategy: "mark_unknown" },
+          }),
+          ...missingDecisionMap("dataset:mv", "worksheet:b", {
+            amount: { strategy: "fill_custom", customValue: "7" },
+          }),
+        };
+        const cleared = clearMissingValueDecision(
+          original,
+          createMissingValueDecisionKey("dataset:mv", "worksheet:a", "amount"),
+        );
+        const reset = resetMissingValueDecisionsForWorksheet(cleared, "dataset:mv", "worksheet:a");
+        return [
+          ...expect(
+            !cleared[createMissingValueDecisionKey("dataset:mv", "worksheet:a", "amount")],
+            "Clear should remove exactly one selected decision.",
+          ),
+          ...expect(
+            Boolean(cleared[createMissingValueDecisionKey("dataset:mv", "worksheet:a", "status")]),
+            "Clear should preserve sibling decisions.",
+          ),
+          ...expect(
+            !Object.keys(reset).some((key) => key.startsWith("dataset:mv:worksheet:a:")),
+            "Reset should remove only selected worksheet decisions.",
+          ),
+          ...expect(
+            Boolean(reset[createMissingValueDecisionKey("dataset:mv", "worksheet:b", "amount")]),
+            "Reset should preserve other worksheet decisions.",
+          ),
+        ];
+      }),
+      fixture("missing-value plan serializes only actual worksheet columns", () => {
+        const syntheticKey = getWorksheetMissingTypeDecisionColumn("numeric");
+        const result = buildWorksheetMissingValuePlan({
+          datasetId: "dataset:mv",
+          worksheetId: "worksheet:wire",
+          columns: [typedColumn("amount", "numeric")],
+          decisions: missingDecisionMap("dataset:mv", "worksheet:wire", {
+            [syntheticKey]: { strategy: "fill_zero" },
+          }),
+        });
+        return [
+          ...expect(result.ready === true, "Type-group strategy should build a plan."),
+          ...expect(result.plan?.columnDecisions[0]?.columnName === "amount", "Plan should serialize the actual column name."),
+          ...expect(
+            result.plan?.columnDecisions.every((decision) => !decision.columnName.startsWith("__worksheet_")) === true,
+            "Synthetic storage keys must not reach the backend plan.",
+          ),
+        ];
+      }),
+      fixture("combined preview summary makes missing-value-only changes actionable", () => {
+        const preview: CleaningRecipePreview = {
+          ...recipePreview("worksheet:mv", "Missing Values"),
+          missing_value_summary: {
+            worksheet_strategy: "leave_unchanged",
+            decisions_applied: [],
+            columns_changed: ["amount"],
+            columns_changed_count: 1,
+            cells_filled: 3,
+            rows_removed: 0,
+            operations: [{ column_name: "amount", strategy: "fill_zero", affected_cells: 3, preview_value: 0 }],
+            has_changes: true,
+          },
+        };
+        return [
+          ...expect(hasCleaningRecipePreviewOperations(preview) === false, "Missing-only preview should not fake structural operations."),
+          ...expect(hasMissingValuePreviewSummaryChanges(preview.missing_value_summary) === true, "Missing-only summary should be actionable."),
+          ...expect(getMissingValuePreviewChangedColumnCount(preview.missing_value_summary) === 1, "Changed column count should be exposed."),
+        ];
+      }),
+      fixture("no-op missing-value summary hides Apply semantics", () => {
+        const preview: CleaningRecipePreview = {
+          ...recipePreview("worksheet:noop", "Noop"),
+          missing_value_summary: {
+            worksheet_strategy: "leave_unchanged",
+            decisions_applied: [],
+            columns_changed: [],
+            columns_changed_count: 0,
+            cells_filled: 0,
+            rows_removed: 0,
+            operations: [],
+            has_changes: false,
+          },
+        };
+        return expect(
+          hasMissingValuePreviewSummaryChanges(preview.missing_value_summary) === false,
+          "No-op summary should not be considered a create-cleaned-copy action.",
+        );
+      }),
+      fixture("backend validation error detail array is readable text", () => {
+        const message = formatApiErrorPayload(
+          {
+            detail: [
+              {
+                type: "extra_forbidden",
+                loc: ["body", "missing_value_plan"],
+                msg: "Extra inputs are not permitted",
+                input: { worksheet_id: "worksheet:1" },
+              },
+            ],
+          },
+          "Fallback",
+        );
+        return [
+          ...expect(message.includes("body.missing_value_plan"), "Validation location should be included."),
+          ...expect(message.includes("Extra inputs are not permitted"), "Validation message should be included."),
+          ...expect(message !== "[object Object]", "Validation object must not stringify as [object Object]."),
+        ];
+      }),
+      fixture("nested backend detail object is readable text", () => {
+        const message = formatApiErrorPayload(
+          { detail: { message: "Preview backend has not loaded the missing-value contract." } },
+          "Fallback",
+        );
+        return expect(
+          message === "Preview backend has not loaded the missing-value contract.",
+          "Nested detail.message should be extracted.",
+        );
+      }),
+      fixture("active cleaned copy draft status separates active source from pending draft", () => {
+        const copy = getDraftRecipeStatusCopy({
+          embedded: true,
+          hasCleanedWorkingCopy: true,
+          isUsingCleanedCopy: true,
+          isNoOpDecisionPreview: false,
+        });
+        return [
+          ...expect(copy.heading.includes("Active cleaned copy"), "Heading should name the active cleaned copy."),
+          ...expect(copy.body.includes("New draft decisions have not been applied"), "Body should refer to the new draft."),
+          ...expect(!copy.heading.includes("No changes applied yet"), "Active-copy heading should not use ambiguous no-changes copy."),
+        ];
+      }),
+      fixture("no active cleaned copy draft status remains truthful", () => {
+        const copy = getDraftRecipeStatusCopy({
+          embedded: true,
+          hasCleanedWorkingCopy: false,
+          isUsingCleanedCopy: false,
+          isNoOpDecisionPreview: false,
+        });
+        return [
+          ...expect(copy.heading === "No draft changes applied yet.", "No-copy heading should be draft-specific."),
+          ...expect(copy.body.includes("Create cleaned working copy"), "No-copy body should direct manual creation."),
+        ];
+      }),
+      fixture("combined plan preview key changes when missing-value decision changes", () => {
+        const structuralPlan = {
+          worksheetId: "worksheet:1",
+          decisions: [
+            {
+              recommendationId: "worksheet:1:automatic_blank_row:0",
+              evidenceType: "automatic_blank_row" as const,
+              decision: "use_recommendation" as const,
+            },
+          ],
+        };
+        const firstMissingPlan = {
+          worksheetId: "worksheet:1",
+          worksheetStrategy: "leave_unchanged" as const,
+          columnDecisions: [
+            { columnName: "amount", strategy: "fill_zero" as const },
+          ],
+        };
+        const nextMissingPlan = {
+          ...firstMissingPlan,
+          columnDecisions: [
+            { columnName: "amount", strategy: "fill_custom" as const, customValue: 7 },
+          ],
+        };
+        const currentPreviewKey = JSON.stringify({
+          structuralDecisionPlan: structuralPlan,
+          missingValuePlan: firstMissingPlan,
+        });
+        const nextPreviewKey = JSON.stringify({
+          structuralDecisionPlan: structuralPlan,
+          missingValuePlan: nextMissingPlan,
+        });
+        return expect(
+          currentPreviewKey !== nextPreviewKey,
+          "Changing a missing-value decision should invalidate the previous preview key.",
+        );
       }),
       fixture("unnamed columns use neutral copy", () => [
         ...expect(getColumnDisplayName("column_12") === "Unnamed column 12", "Generated column should use neutral label."),

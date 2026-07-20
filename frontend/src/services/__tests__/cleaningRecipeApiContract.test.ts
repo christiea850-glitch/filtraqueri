@@ -240,13 +240,12 @@ export async function runCleaningRecipeApiContractFixtures() {
         "Expected evidence_ids to serialize.",
       ),
       ...expect(
-        Array.isArray(serializedDecision?.affected_rows) &&
-          serializedDecision?.affected_rows[0] === 7,
-        "Expected affected_rows to serialize.",
+        !!serializedDecision && !("affected_rows" in serializedDecision),
+        "Expected affected_rows to stay UI-local instead of serializing.",
       ),
       ...expect(
-        Array.isArray(serializedDecision?.affected_column_indexes),
-        "Expected affected_column_indexes to serialize.",
+        !!serializedDecision && !("affected_column_indexes" in serializedDecision),
+        "Expected affected_column_indexes to stay UI-local instead of serializing.",
       ),
     ]),
   );
