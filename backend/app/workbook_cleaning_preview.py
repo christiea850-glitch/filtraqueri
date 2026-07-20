@@ -8,11 +8,18 @@ from fastapi import HTTPException
 from .workbook_cleaning_contract import (
     WorkbookMissingValuePlan,
     WorkbookStructuralDecisionPlan,
+    WorkbookTransformationPlan,
     validate_missing_value_plan_scope,
+    validate_transformation_plan_scope,
 )
 from .workbook_cleaning_missing_value_plan import (
     apply_missing_value_plan_to_rows,
+    column_types_by_name,
     empty_missing_value_summary,
+)
+from .workbook_cleaning_transformations import (
+    apply_transformation_plan_to_rows,
+    empty_transformation_summary,
 )
 from .workbook_ingestion import (
     contiguous_header_width,
@@ -24,7 +31,6 @@ from .workbook_ingestion import (
     parse_xlsx_workbook,
     row_signature,
 )
-
 
 MAX_CLEANING_PREVIEW_ROWS = 25
 STRUCTURAL_DECISION_EVIDENCE_TYPES = {
@@ -39,7 +45,9 @@ STRUCTURAL_DECISION_EVIDENCE_TYPES = {
 }
 
 
-def _decision_evidence_key(evidence_type: str, indexes: list[int]) -> tuple[str, tuple[int, ...]]:
+def _decision_evidence_key(
+    evidence_type: str, indexes: list[int]
+) -> tuple[str, tuple[int, ...]]:
     return evidence_type, tuple(sorted(indexes))
 
 
@@ -58,7 +66,9 @@ def _schema_column_names(worksheet: dict[str, Any]) -> set[str]:
     return names
 
 
-def _automatic_blank_row_indexes(raw_rows: list[Any], header_row_index: int) -> list[int]:
+def _automatic_blank_row_indexes(
+    raw_rows: list[Any], header_row_index: int
+) -> list[int]:
     indexes: list[int] = []
     for row_index, raw_row in enumerate(raw_rows):
         if row_index <= header_row_index:
@@ -103,7 +113,9 @@ def _expected_structural_decision_evidence(
             "evidence_ids": {evidence_id},
             "affected_rows": set(automatic_blank_rows),
             "affected_column_indexes": set(),
-            "evidence_key": _decision_evidence_key("automatic_blank_row", automatic_blank_rows),
+            "evidence_key": _decision_evidence_key(
+                "automatic_blank_row", automatic_blank_rows
+            ),
         }
 
     return expected
@@ -131,7 +143,9 @@ def _validate_structural_decision_plan_against_evidence(
 
     worksheet_id = str(worksheet.get("worksheet_id") or "")
     max_row_count = len(raw_rows)
-    max_column_count = max((len(row) for row in raw_rows if isinstance(row, list)), default=0)
+    max_column_count = max(
+        (len(row) for row in raw_rows if isinstance(row, list)), default=0
+    )
     column_names = _schema_column_names(worksheet)
     expected = _expected_structural_decision_evidence(
         worksheet=worksheet,
@@ -170,20 +184,31 @@ def _validate_structural_decision_plan_against_evidence(
         supplied_rows = set(decision.affected_rows)
         supplied_columns = set(decision.affected_column_indexes)
         if any(row_index >= max_row_count for row_index in supplied_rows):
-            raise HTTPException(status_code=400, detail="Structural decision row index is out of bounds")
+            raise HTTPException(
+                status_code=400, detail="Structural decision row index is out of bounds"
+            )
         if any(column_index >= max_column_count for column_index in supplied_columns):
-            raise HTTPException(status_code=400, detail="Structural decision column index is out of bounds")
-        if supplied_rows and not supplied_rows.issubset(expected_entry["affected_rows"]):
+            raise HTTPException(
+                status_code=400,
+                detail="Structural decision column index is out of bounds",
+            )
+        if supplied_rows and not supplied_rows.issubset(
+            expected_entry["affected_rows"]
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Structural decision affected_rows do not match backend evidence",
             )
-        if supplied_columns and not supplied_columns.issubset(expected_entry["affected_column_indexes"]):
+        if supplied_columns and not supplied_columns.issubset(
+            expected_entry["affected_column_indexes"]
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Structural decision affected_column_indexes do not match backend evidence",
             )
-        if decision.affected_columns and not set(decision.affected_columns).issubset(column_names):
+        if decision.affected_columns and not set(decision.affected_columns).issubset(
+            column_names
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Structural decision affected_columns do not match worksheet columns",
@@ -281,7 +306,11 @@ def _worksheet_evidence(worksheet: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(normalization, dict):
         return []
     evidence = normalization.get("template_structure_evidence")
-    return [item for item in evidence if isinstance(item, dict)] if isinstance(evidence, list) else []
+    return (
+        [item for item in evidence if isinstance(item, dict)]
+        if isinstance(evidence, list)
+        else []
+    )
 
 
 def _rows_for_type(evidence: list[dict[str, Any]], evidence_type: str) -> list[int]:
@@ -394,7 +423,9 @@ def compute_cleaning_recipe_plan(
             detail="Cleaning recipe currently supports XLSX workbooks only",
         )
     if not workbook_path.exists():
-        raise HTTPException(status_code=404, detail="Original workbook file mapping is missing")
+        raise HTTPException(
+            status_code=404, detail="Original workbook file mapping is missing"
+        )
 
     if worksheet.get("status") == "empty":
         return _empty_plan(worksheet=worksheet)
@@ -407,7 +438,9 @@ def compute_cleaning_recipe_plan(
     sheets = parse_xlsx_workbook(workbook_path)
     worksheet_index = int(worksheet.get("original_index") or 0)
     if worksheet_index < 0 or worksheet_index >= len(sheets):
-        raise HTTPException(status_code=404, detail="Original workbook worksheet is missing")
+        raise HTTPException(
+            status_code=404, detail="Original workbook worksheet is missing"
+        )
 
     raw_rows = sheets[worksheet_index].get("rows")
     if not isinstance(raw_rows, list):
@@ -430,7 +463,9 @@ def compute_cleaning_recipe_plan(
     section_banner_rows = _rows_for_type(evidence, "section_banner")
     sparse_layout_rows = _rows_for_type(evidence, "sparse_layout_gap")
     placeholder_rows = _rows_for_type(evidence, "serial_only_placeholder_rows")
-    metadata_side_note_columns = _columns_for_type(evidence, "side_note_region_candidate")
+    metadata_side_note_columns = _columns_for_type(
+        evidence, "side_note_region_candidate"
+    )
     side_note_columns = metadata_side_note_columns
     repeated_missing_rows = _rows_for_type(evidence, "repeated_missing_pattern")
     decision_context = _validate_structural_decision_plan_against_evidence(
@@ -444,10 +479,18 @@ def compute_cleaning_recipe_plan(
         "automatic_blank_row",
         _automatic_blank_row_indexes(raw_rows, header_row_index),
     )
-    repeated_header_rows = _accepted_rows(decision_context, "repeated_header", repeated_header_rows)
-    date_title_rows = _accepted_rows(decision_context, "date_title_row", date_title_rows)
-    section_banner_rows = _accepted_rows(decision_context, "section_banner", section_banner_rows)
-    sparse_layout_rows = _accepted_rows(decision_context, "sparse_layout_gap", sparse_layout_rows)
+    repeated_header_rows = _accepted_rows(
+        decision_context, "repeated_header", repeated_header_rows
+    )
+    date_title_rows = _accepted_rows(
+        decision_context, "date_title_row", date_title_rows
+    )
+    section_banner_rows = _accepted_rows(
+        decision_context, "section_banner", section_banner_rows
+    )
+    sparse_layout_rows = _accepted_rows(
+        decision_context, "sparse_layout_gap", sparse_layout_rows
+    )
     placeholder_rows = _accepted_rows(
         decision_context,
         "serial_only_placeholder_rows",
@@ -482,7 +525,11 @@ def compute_cleaning_recipe_plan(
     output_column_indexes = [*range(business_width), *preserved_side_note_columns]
     existing_headers: set[str] = set()
     output_columns = [
-        normalize_header(header_row[index] if index < len(header_row) else None, index, existing_headers)[0]
+        normalize_header(
+            header_row[index] if index < len(header_row) else None,
+            index,
+            existing_headers,
+        )[0]
         for index in output_column_indexes
     ]
     if has_section_context:
@@ -524,7 +571,9 @@ def compute_cleaning_recipe_plan(
             continue
 
         business_values = row[:business_width]
-        first_business_value = normalize_cell_text(business_values[0]) if business_values else ""
+        first_business_value = (
+            normalize_cell_text(business_values[0]) if business_values else ""
+        )
         has_business_value_after_serial = any(
             not is_blank_cell(value) for value in business_values[1:]
         )
@@ -547,17 +596,26 @@ def compute_cleaning_recipe_plan(
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "automatic_header_shaped_serial"
             continue
-        if original_row_index in sparse_layout_set and not has_business_value_after_serial:
+        if (
+            original_row_index in sparse_layout_set
+            and not has_business_value_after_serial
+        ):
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "sparse_layout_gap"
             continue
-        if decision_context is None and not any(not is_blank_cell(value) for value in business_values):
+        if decision_context is None and not any(
+            not is_blank_cell(value) for value in business_values
+        ):
             counted_layout_rows.add(original_row_index)
             layout_row_reasons[original_row_index] = "automatic_blank_business_values"
             continue
 
         values = {
-            column: None if source_index >= len(row) or is_blank_cell(row[source_index]) else row[source_index]
+            column: (
+                None
+                if source_index >= len(row) or is_blank_cell(row[source_index])
+                else row[source_index]
+            )
             for column, source_index in zip(output_columns, output_column_indexes)
         }
         if has_section_context:
@@ -690,8 +748,13 @@ def _empty_plan(*, worksheet: dict[str, Any]) -> dict[str, Any]:
         "excluded": _empty_excluded_counts(),
         "excluded_details": _empty_excluded_details(),
         "has_section_context": False,
-        "structural_decision_summary": {"accepted": [], "preserved": [], "deferred": []},
+        "structural_decision_summary": {
+            "accepted": [],
+            "preserved": [],
+            "deferred": [],
+        },
         "missing_value_summary": empty_missing_value_summary(),
+        "transformation_summary": empty_transformation_summary(),
     }
 
 
@@ -702,6 +765,7 @@ def build_cleaning_recipe_preview(
     row_limit: int,
     structural_decision_plan: WorkbookStructuralDecisionPlan | None = None,
     missing_value_plan: WorkbookMissingValuePlan | None = None,
+    transformation_plan: WorkbookTransformationPlan | None = None,
 ) -> dict[str, Any]:
     """Read-only preview of the cleaning recipe, clamped to `row_limit` rows."""
     clamped_row_limit = min(max(row_limit, 1), MAX_CLEANING_PREVIEW_ROWS)
@@ -711,6 +775,12 @@ def build_cleaning_recipe_preview(
         structural_decision_plan=structural_decision_plan,
     )
     validate_missing_value_plan_scope(missing_value_plan, str(plan["worksheet_id"]))
+    validate_transformation_plan_scope(
+        transformation_plan,
+        str(plan["worksheet_id"]),
+        worksheet,
+        shaped_columns=plan.get("output_columns", []),
+    )
     if plan.get("is_empty"):
         preview = _empty_preview(worksheet=worksheet, row_limit=clamped_row_limit)
         preview["missing_value_summary"] = {
@@ -718,6 +788,7 @@ def build_cleaning_recipe_preview(
             for key, value in empty_missing_value_summary().items()
             if key != "kept_row_indexes"
         }
+        preview["transformation_summary"] = empty_transformation_summary()
         return preview
 
     rows, missing_value_summary, _ = apply_missing_value_plan_to_rows(
@@ -729,7 +800,18 @@ def build_cleaning_recipe_preview(
     kept_row_indexes = missing_value_summary.get("kept_row_indexes")
     source_provenance = plan["row_provenance"]
     if isinstance(kept_row_indexes, list) and len(kept_row_indexes) == len(rows):
-        source_provenance = [plan["row_provenance"][index] for index in kept_row_indexes]
+        source_provenance = [
+            plan["row_provenance"][index] for index in kept_row_indexes
+        ]
+
+    transformation_result = apply_transformation_plan_to_rows(
+        rows=rows,
+        columns=plan["output_columns"],
+        schema=column_types_by_name(worksheet),
+        transformation_plan=transformation_plan,
+    )
+    rows = transformation_result.rows
+    output_columns = transformation_result.columns
 
     preview_rows = rows[:clamped_row_limit]
     row_provenance = [
@@ -747,8 +829,8 @@ def build_cleaning_recipe_preview(
         "before": plan["before"],
         "after_preview": {
             "row_count": len(rows),
-            "column_count": len(plan["output_columns"]),
-            "columns": plan["output_columns"],
+            "column_count": len(output_columns),
+            "columns": output_columns,
             "rows": preview_rows,
             "row_provenance": row_provenance,
         },
@@ -764,6 +846,7 @@ def build_cleaning_recipe_preview(
             for key, value in missing_value_summary.items()
             if key != "kept_row_indexes"
         },
+        "transformation_summary": transformation_result.transformation_summary,
         "preview_row_limit": clamped_row_limit,
         "message": "Preview only - no changes have been applied.",
     }
