@@ -1,5 +1,8 @@
 import type { UploadResponse } from "../features/dataset/datasetTypes";
-import type { WorksheetRelationshipCandidate } from "../features/workbook";
+import type {
+  WorksheetRelationshipCandidate,
+  WorksheetStructuralDecisionPlan,
+} from "../features/workbook";
 import type {
   FilterDefinition,
   FilterRequest,
@@ -219,6 +222,12 @@ export type CleaningRecipeApplyResponse = {
   message: string;
 };
 
+export type ApplyCleaningRecipeOptions = {
+  rowLimitPreview?: number;
+  confirmPreviewVersion?: string | null;
+  structuralDecisionPlan?: WorksheetStructuralDecisionPlan | null;
+};
+
 export type MissingValueDecisionApplyRequest = {
   worksheet_strategy: string;
   column_decisions: {
@@ -383,14 +392,60 @@ export async function getCleaningRecipePreview(
 export async function applyCleaningRecipe(
   datasetId: string,
   worksheetId: string,
-  rowLimitPreview = 25,
-) {
+): Promise<CleaningRecipeApplyResponse>;
+export async function applyCleaningRecipe(
+  datasetId: string,
+  worksheetId: string,
+  rowLimitPreview: number,
+): Promise<CleaningRecipeApplyResponse>;
+export async function applyCleaningRecipe(
+  datasetId: string,
+  worksheetId: string,
+  options: ApplyCleaningRecipeOptions,
+): Promise<CleaningRecipeApplyResponse>;
+export async function applyCleaningRecipe(
+  datasetId: string,
+  worksheetId: string,
+  optionsOrRowLimit: ApplyCleaningRecipeOptions | number = {},
+): Promise<CleaningRecipeApplyResponse> {
+  const options =
+    typeof optionsOrRowLimit === "number" ? { rowLimitPreview: optionsOrRowLimit } : optionsOrRowLimit;
+  const body: {
+    row_limit_preview: number;
+    confirm_preview_version?: string | null;
+    structural_decision_plan?: {
+      worksheet_id: string;
+      decisions: {
+        recommendation_id: string;
+        evidence_type: string;
+        decision: string;
+      }[];
+    };
+  } = {
+    row_limit_preview: options.rowLimitPreview ?? 25,
+  };
+
+  if (options.confirmPreviewVersion !== undefined) {
+    body.confirm_preview_version = options.confirmPreviewVersion;
+  }
+
+  if (options.structuralDecisionPlan) {
+    body.structural_decision_plan = {
+      worksheet_id: options.structuralDecisionPlan.worksheetId,
+      decisions: options.structuralDecisionPlan.decisions.map((decision) => ({
+        recommendation_id: decision.recommendationId,
+        evidence_type: decision.evidenceType,
+        decision: decision.decision,
+      })),
+    };
+  }
+
   return requestJson<CleaningRecipeApplyResponse>(
     `${API_BASE_URL}/datasets/${encodeURIComponent(datasetId)}/workbook/worksheets/${encodeURIComponent(worksheetId)}/apply-cleaning-recipe`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ row_limit_preview: rowLimitPreview }),
+      body: JSON.stringify(body),
     },
     "Cleaned working copy could not be created.",
   );

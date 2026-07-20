@@ -20,7 +20,13 @@ import {
   getSuggestedFixKeepOriginalLabel,
   getSuggestedFixRecommendationLabel,
   getStructuralPreviewErrorReadiness,
+  getStructuralPreviewIdleReadiness,
   getStructuralPreviewLoadingReadiness,
+  getStructuralPreviewLifecycleState,
+  shouldMarkStructuralPreviewVerificationError,
+  shouldStartStructuralPreviewRequest,
+  validateStructuralPreviewResponse,
+  getColumnDisplayName,
   setWorksheetSuggestedFixDecision,
   structuralDecisionEmptyStateCopy,
   type SuggestedFix,
@@ -30,6 +36,11 @@ import {
 import type { DatasetMetadata, SchemaColumn } from "../../../features/dataset/datasetTypes";
 import type { WorkbookMetadata, WorksheetMetadata, WorksheetTemplateStructureEvidence } from "../../../features/workbook";
 import type { CleaningRecipePreview } from "../../../services/api";
+import {
+  classifyColumnMissingTypeGroup,
+  getColumnMissingValueStrategies,
+  getWorksheetMissingTypeStrategies,
+} from "../../../features/dataPreparation/missingValueDecisions";
 import {
   getStructuralApplyNavigationBlockMessage,
   invokeStructuralApplyNavigation,
@@ -111,6 +122,20 @@ const column = (name: string): SchemaColumn => ({
   null_count: 0,
   unique_count: 1,
   sample_values: [],
+});
+
+const typedColumn = (
+  name: string,
+  inferredType: SchemaColumn["inferred_type"],
+  patch: Partial<SchemaColumn> = {},
+): SchemaColumn => ({
+  name,
+  type: inferredType,
+  inferred_type: inferredType,
+  null_count: 1,
+  unique_count: 1,
+  sample_values: [],
+  ...patch,
 });
 
 const evidence = (
@@ -964,6 +989,131 @@ export const runCleanPrepareStructuralDecisionFixtures =
           ),
         ];
       }),
+      fixture("preview response validation accepts matching worksheet preview", () => {
+        const validation = validateStructuralPreviewResponse(
+          managersAutomaticBlankRowPreview(),
+          "02eadd4b599a45798269e553dd02d4e4:worksheet:1",
+          "managers",
+        );
+        return [
+          ...expect(validation.ok === true, "Matching preview with layout details should validate."),
+        ];
+      }),
+      fixture("worksheet mismatch validation transitions to error", () => {
+        const validation = validateStructuralPreviewResponse(
+          managersAutomaticBlankRowPreview(),
+          "02eadd4b599a45798269e553dd02d4e4:worksheet:2",
+          "realtors",
+        );
+        return [
+          ...expect(validation.ok === false, "Mismatched preview should be rejected."),
+          ...expect(
+            validation.ok === false && validation.message.includes("couldn't verify"),
+            "Mismatched preview should use verification error copy.",
+          ),
+        ];
+      }),
+      fixture("missing excluded_details with layout exclusions blocks as contract error", () => {
+        const validation = validateStructuralPreviewResponse(
+          recipePreview("managers-id", "managers", {
+            excluded: {
+              repeated_headers: 0,
+              section_banners: 0,
+              date_title_rows: 0,
+              layout_rows: 1,
+              placeholder_rows: 0,
+              side_note_columns: 0,
+            },
+          }),
+          "managers-id",
+          "managers",
+        );
+        return [
+          ...expect(validation.ok === false, "Layout exclusions without details should be rejected."),
+          ...expect(
+            validation.ok === false && validation.message.includes("Structural preview details are incomplete"),
+            "Missing details should expose a contract-alignment error.",
+          ),
+        ];
+      }),
+      fixture("zero-operation response validates before zero-ready readiness", () => {
+        const preview = recipePreview("clean:worksheet:1", "Clean");
+        const validation = validateStructuralPreviewResponse(preview, "clean:worksheet:1", "Clean");
+        const readiness = getStructuralDecisionReadiness(
+          getPreviewSuggestedFixes(preview),
+          {},
+          "clean:worksheet:1",
+          "Clean",
+        );
+        return [
+          ...expect(validation.ok === true, "Zero-operation preview should validate."),
+          ...expect(readiness.canContinueToApply === true, "Validated zero-operation preview should allow Apply."),
+        ];
+      }),
+      fixture("structural lifecycle resolves loading to ready", () => {
+        const loading = getStructuralPreviewLifecycleState(true, "loading", false);
+        const ready = getStructuralPreviewLifecycleState(true, "ready", true);
+        return [
+          ...expect(loading.status === "loading", "Lifecycle should expose loading while request is in flight."),
+          ...expect(loading.isPending === true, "Loading lifecycle should be pending."),
+          ...expect(ready.status === "ready", "Lifecycle should resolve to ready when a verified preview exists."),
+          ...expect(ready.isPending === false, "Ready lifecycle should not remain pending."),
+        ];
+      }),
+      fixture("structural lifecycle resolves loading to error", () => {
+        const error = getStructuralPreviewLifecycleState(true, "error", false);
+        return [
+          ...expect(error.status === "error", "Lifecycle should expose error after failure."),
+          ...expect(error.isError === true, "Error lifecycle should be marked error."),
+          ...expect(error.isPending === false, "Error lifecycle should not remain pending."),
+        ];
+      }),
+      fixture("structural lifecycle leaves idle non-pending before request starts", () => {
+        const idle = getStructuralPreviewLifecycleState(true, "idle", false);
+        const readiness = getStructuralPreviewIdleReadiness("managers-id", "managers");
+        return [
+          ...expect(idle.status === "idle", "Idle lifecycle should stay idle until the request effect starts."),
+          ...expect(idle.isPending === false, "Idle lifecycle should not render permanent checking copy."),
+          ...expect(readiness.canContinueToApply === false, "Idle-before-preview should block Apply."),
+          ...expect(
+            readiness.blockingMessage === "Structural recommendations for managers have not been checked yet.",
+            "Idle-before-preview should not claim zero-ready.",
+          ),
+          ...expect(shouldStartStructuralPreviewRequest(true, "idle", false) === true, "Idle selected worksheet should start one request."),
+        ];
+      }),
+      fixture("preview request guard treats loading error and verified ready as settled", () => {
+        return [
+          ...expect(shouldStartStructuralPreviewRequest(true, "loading", false) === false, "Loading should not start another request."),
+          ...expect(shouldStartStructuralPreviewRequest(true, "error", false) === false, "Error should not automatically retry."),
+          ...expect(shouldStartStructuralPreviewRequest(true, "ready", true) === false, "Verified ready preview should not refetch."),
+        ];
+      }),
+      fixture("retry lifecycle returns only selected worksheet to idle", () => {
+        const before = {
+          "finance:worksheet:income": "error",
+          "finance:worksheet:balance": "ready",
+        } as const;
+        const after = {
+          ...before,
+          "finance:worksheet:income": "idle",
+        };
+        return [
+          ...expect(after["finance:worksheet:income"] === "idle", "Retry should reset selected worksheet status."),
+          ...expect(after["finance:worksheet:balance"] === "ready", "Retry should preserve other worksheet cache status."),
+        ];
+      }),
+      fixture("ready without verified preview transitions to explicit error", () => {
+        const lifecycle = getStructuralPreviewLifecycleState(true, "ready", false);
+        return [
+          ...expect(lifecycle.status === "error", "Ready status without verified preview should expose an error."),
+          ...expect(lifecycle.isPending === false, "Unverified ready state should not stay in checking."),
+          ...expect(
+            shouldMarkStructuralPreviewVerificationError(true, "ready", false) === true,
+            "Unverified ready should be marked as a verification error.",
+          ),
+        ];
+      }),
       fixture("zero active-worksheet recommendations produce empty ready readiness", () => {
         const review = buildPreparationReview(workbookDatasetWithEmptyWorksheet());
         const propertiesFixes = getSuggestedFixesForWorksheet(review.scopedSuggestedFixes, "properties-id");
@@ -1528,6 +1678,163 @@ export const runCleanPrepareStructuralDecisionFixtures =
           "Blank-cell keep-original wording should match current behavior.",
         ),
       ]),
+      fixture("clean single-table CSV has zero decisions ready", () => {
+        const dataset: DatasetMetadata = {
+          dataset_id: "dataset:clean-csv",
+          filename: "clean.csv",
+          original_filename: "clean.csv",
+          table_name: "clean_table",
+          uploaded_at: "2026-07-19T00:00:00.000Z",
+          row_count: 3,
+          column_count: 2,
+          schema: [typedColumn("order_id", "text", { null_count: 0 }), typedColumn("amount", "numeric", { null_count: 0 })],
+        };
+        const review = buildPreparationReview(dataset);
+        const readiness = getStructuralDecisionReadiness(review.scopedSuggestedFixes, {});
+        return [
+          ...expect(review.scopedSuggestedFixes.length === 0, "Clean CSV should have no structural recommendations."),
+          ...expect(readiness.canContinueToApply === true, "Zero structural recommendations should be ready."),
+        ];
+      }),
+      fixture("sales CSV missing options are type appropriate", () => {
+        const revenue = typedColumn("revenue", "numeric", {
+          numeric_stats: { min: 1, max: 20, mean: 10, median: 9, std: 2 },
+        });
+        const region = typedColumn("region", "categorical", {
+          top_values: [{ value: "North", count: 4 }],
+          sample_values: ["North", "South"],
+        });
+        const numericStrategies = getColumnMissingValueStrategies(revenue);
+        const categoryStrategies = getColumnMissingValueStrategies(region);
+        return [
+          ...expect(numericStrategies.includes("fill_mean"), "Numeric column should offer mean when stats exist."),
+          ...expect(numericStrategies.includes("fill_median"), "Numeric column should offer median when stats exist."),
+          ...expect(!numericStrategies.includes("mark_unknown"), "Numeric column should not offer Unknown text fill."),
+          ...expect(categoryStrategies.includes("fill_mode"), "Categorical column with values should offer most-common fill."),
+          ...expect(!categoryStrategies.includes("fill_mean"), "Categorical column should not offer mean."),
+        ];
+      }),
+      fixture("healthcare worksheet date and boolean columns use inferred types only", () => {
+        const visitDate = typedColumn("visit_date", "date");
+        const consented = typedColumn("consented", "boolean");
+        return [
+          ...expect(classifyColumnMissingTypeGroup(visitDate.inferred_type) === "date", "Date column should classify as date."),
+          ...expect(classifyColumnMissingTypeGroup(consented.inferred_type) === "boolean", "Boolean column should classify as boolean."),
+          ...expect(getColumnMissingValueStrategies(visitDate).includes("custom_date"), "Date column should offer custom date."),
+          ...expect(!getColumnMissingValueStrategies(consented).includes("mark_unknown"), "Boolean column should not offer Unknown by name."),
+        ];
+      }),
+      fixture("survey workbook recommendations differ by evidence", () => {
+        const survey = worksheet("survey:worksheet:responses", "Responses", [
+          evidence("repeated_header", { rowIndexes: [10, 20] }),
+          evidence("sparse_layout_gap", { rowRange: [5, 5] }),
+        ]);
+        const dataset = workbookDataset();
+        dataset.workbook_metadata = {
+          ...dataset.workbook_metadata!,
+          worksheets: [survey],
+          worksheetIds: [survey.worksheetId],
+        };
+        const fixTypes = buildPreparationReview(dataset).scopedSuggestedFixes.map((fix) => fix.evidenceType).sort();
+        return [
+          ...expect(fixTypes.includes("repeated_header"), "Repeated header evidence should create matching recommendation."),
+          ...expect(fixTypes.includes("sparse_layout_gap"), "Blank separator evidence should create matching recommendation."),
+          ...expect(!fixTypes.includes("side_note_region_candidate"), "Absent side-note evidence should not create a recommendation."),
+        ];
+      }),
+      fixture("finance workbook decisions remain independent per worksheet", () => {
+        let drafts: WorksheetSuggestedFixDecisionDrafts = {};
+        drafts = setWorksheetSuggestedFixDecision(
+          drafts,
+          "finance:worksheet:income",
+          "finance:worksheet:income:section_banner:0",
+          "use_recommendation",
+        );
+        const income = getWorksheetSuggestedFixDecisionDrafts(drafts, "finance:worksheet:income");
+        const balance = getWorksheetSuggestedFixDecisionDrafts(drafts, "finance:worksheet:balance");
+        return [
+          ...expect(
+            getSuggestedFixDecision("finance:worksheet:income:section_banner:0", income) === "use_recommendation",
+            "Income worksheet decision should be stored.",
+          ),
+          ...expect(
+            getSuggestedFixDecision("finance:worksheet:income:section_banner:0", balance) === "unresolved",
+            "Balance worksheet should not inherit income decisions.",
+          ),
+        ];
+      }),
+      fixture("generic messy spreadsheet maps side notes placeholders and banners", () => {
+        const messy = worksheet("messy:worksheet:1", "Sheet 1", [
+          evidence("side_note_region_candidate", { columnRange: [7, 8] }),
+          evidence("serial_only_placeholder_rows", { rowIndexes: [12, 13] }),
+          evidence("section_banner", { rowIndex: 2 }),
+        ]);
+        const dataset = workbookDataset();
+        dataset.workbook_metadata = {
+          ...dataset.workbook_metadata!,
+          worksheets: [messy],
+          worksheetIds: [messy.worksheetId],
+        };
+        const fixes = buildPreparationReview(dataset).scopedSuggestedFixes;
+        return [
+          ...expect(fixes.some((fix) => fix.evidenceType === "side_note_region_candidate"), "Side-note evidence should map."),
+          ...expect(fixes.some((fix) => fix.evidenceType === "serial_only_placeholder_rows"), "Placeholder evidence should map."),
+          ...expect(fixes.some((fix) => fix.evidenceType === "section_banner"), "Section banner evidence should map."),
+        ];
+      }),
+      fixture("entirely blank categorical column does not claim most common value", () => {
+        const blankCategory = typedColumn("response", "categorical", {
+          sample_values: [],
+          top_values: [],
+          unique_count: 0,
+        });
+        const strategies = getColumnMissingValueStrategies(blankCategory);
+        return expect(
+          !strategies.includes("fill_mode"),
+          "Categorical column with no valid non-null values should not offer most-common fill.",
+        );
+      }),
+      fixture("dataset with no preview exclusions is true zero operation", () => {
+        const preview = recipePreview("clean:worksheet:1", "Clean");
+        const fixes = getPreviewSuggestedFixes(preview);
+        const readiness = getStructuralDecisionReadiness(fixes, {}, "clean:worksheet:1", "Clean");
+        return [
+          ...expect(hasCleaningRecipePreviewOperations(preview) === false, "Preview should have no recipe or exclusions."),
+          ...expect(fixes.length === 0, "No preview exclusions should produce no preview recommendations."),
+          ...expect(readiness.canContinueToApply === true, "True zero-operation preview should be ready."),
+        ];
+      }),
+      fixture("worksheet-wide incompatible missing strategies are excluded", () => {
+        const numericStrategies = getWorksheetMissingTypeStrategies("numeric", [
+          typedColumn("amount", "numeric", {
+            numeric_stats: { min: 1, max: 20, mean: 10, median: 9, std: 2 },
+          }),
+        ]);
+        const textStrategies = getWorksheetMissingTypeStrategies("text", [
+          typedColumn("category", "text", { top_values: [{ value: "A", count: 2 }] }),
+        ]);
+        return [
+          ...expect(!numericStrategies.includes("mark_unknown"), "Numeric group should exclude Unknown text fill."),
+          ...expect(!textStrategies.includes("fill_median"), "Text group should exclude median."),
+        ];
+      }),
+      fixture("unnamed columns use neutral copy", () => [
+        ...expect(getColumnDisplayName("column_12") === "Unnamed column 12", "Generated column should use neutral label."),
+        ...expect(getColumnDisplayName("customer_name") === "customer_name", "Trusted header should be preserved."),
+      ]),
+      fixture("production structural helpers do not branch on fixture names", () => {
+        const sourceMarkers = [
+          buildPreparationReview.toString(),
+          getSuggestedFixRecommendationLabel.toString(),
+          getSuggestedFixKeepOriginalLabel.toString(),
+          getColumnMissingValueStrategies.toString(),
+          getWorksheetMissingTypeStrategies.toString(),
+        ].join("\n").toLowerCase();
+        const forbidden = ["managers", "properties", "units", "leases", "tenants", "property management"];
+        return forbidden.flatMap((token) =>
+          sourceMarkers.includes(token) ? [`Production helper references fixture term ${token}.`] : [],
+        );
+      }),
       fixture("existing storage key and scope remain external to structural decisions", () => {
         const sourceMarkers = [
           getSuggestedFixDecision.toString(),

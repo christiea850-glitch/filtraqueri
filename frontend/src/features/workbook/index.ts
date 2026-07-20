@@ -32,6 +32,7 @@ export {
 export type {
   AcceptedRelationshipContract,
   CleanedWorkingCopy,
+  StructuralDecisionChoice,
   WorkbookAnalysisSource,
   WorkbookId,
   WorkbookIngestionProfile,
@@ -43,6 +44,8 @@ export type {
   WorksheetRelationshipCandidate,
   WorksheetRelationshipEvidence,
   WorksheetRelationshipId,
+  WorksheetStructuralDecision,
+  WorksheetStructuralDecisionPlan,
   WorksheetStatus,
   WorksheetTableMapping,
   WorksheetTemplateStructureEvidence,

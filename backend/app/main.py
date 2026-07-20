@@ -22,6 +22,10 @@ from .workbook_contracts import (
 from .workbook_contract_diagnostics import analyze_contract_diagnostics
 from .workbook_ingestion import ingest_workbook
 from .workbook_cleaning_apply import apply_cleaning_recipe_to_working_copy
+from .workbook_cleaning_contract import (
+    WorkbookCleaningApplyRequest,
+    validate_structural_decision_plan_scope,
+)
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_missing_value_apply import apply_missing_value_decisions_to_cleaned_copy
 from .workbook_original_layout import extract_original_workbook_layout
@@ -992,11 +996,6 @@ class ExportRequest(BaseModel):
 
 class WorkbookWorksheetSelectionRequest(BaseModel):
     worksheet_id: str = Field(..., min_length=1)
-
-
-class WorkbookCleaningApplyRequest(BaseModel):
-    row_limit_preview: int = Field(25, ge=1, le=200)
-    confirm_preview_version: str | None = None
 
 
 class WorkbookMissingValueColumnDecision(BaseModel):
@@ -2015,6 +2014,8 @@ def apply_workbook_cleaning_recipe(
             status_code=400,
             detail="Return to the original analysis table before recreating this cleaned working copy",
         )
+
+    validate_structural_decision_plan_scope(request.structural_decision_plan, worksheet_id)
 
     result = apply_cleaning_recipe_to_working_copy(
         workbook_path=uploaded_path,

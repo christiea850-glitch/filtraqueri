@@ -49,7 +49,7 @@ type ApplyState =
   | { status: "success"; result: CleaningRecipeApplyResponse }
   | { status: "error"; message: string };
 
-type RecipePreviewStatus = "idle" | "loading" | "success" | "error";
+export type RecipePreviewStatus = "idle" | "loading" | "ready" | "error";
 
 type ActivationState =
   | { status: "idle" }
@@ -205,6 +205,19 @@ export type StructuralDecisionReadiness = {
   blockingMessage: string | null;
 };
 
+export type StructuralPreviewLifecycleState = {
+  status: RecipePreviewStatus;
+  isPending: boolean;
+  isReady: boolean;
+  isError: boolean;
+};
+
+type StructuralPreviewValidation =
+  | { ok: true; preview: CleaningRecipePreview }
+  | { ok: false; message: string };
+
+const STRUCTURAL_PREVIEW_TIMEOUT_MS = 15000;
+
 export const getSuggestedFixDecision = (
   fixId: string,
   decisions: SuggestedFixDecisionMap,
@@ -266,6 +279,20 @@ export const getStructuralPreviewLoadingReadiness = (
   blockingMessage: `Checking structural recommendations for ${worksheetName}...`,
 });
 
+export const getStructuralPreviewIdleReadiness = (
+  worksheetId: string,
+  worksheetName: string,
+): StructuralDecisionReadiness => ({
+  worksheetId,
+  worksheetName,
+  totalCount: 0,
+  resolvedCount: 0,
+  unresolvedCount: 0,
+  deferredCount: 0,
+  canContinueToApply: false,
+  blockingMessage: `Structural recommendations for ${worksheetName} have not been checked yet.`,
+});
+
 export const getStructuralPreviewErrorReadiness = (
   worksheetId: string,
   worksheetName: string,
@@ -281,6 +308,132 @@ export const getStructuralPreviewErrorReadiness = (
   blockingMessage:
     message || `Structural recommendations for ${worksheetName} could not be checked. Try again.`,
 });
+
+export const getStructuralPreviewLifecycleState = (
+  shouldLoad: boolean,
+  status: RecipePreviewStatus,
+  hasVerifiedPreview: boolean,
+): StructuralPreviewLifecycleState => {
+  if (!shouldLoad) {
+    return {
+      status: "idle",
+      isPending: false,
+      isReady: false,
+      isError: false,
+    };
+  }
+  if (status === "error") {
+    return {
+      status: "error",
+      isPending: false,
+      isReady: false,
+      isError: true,
+    };
+  }
+  if (status === "loading") {
+    return {
+      status: "loading",
+      isPending: true,
+      isReady: false,
+      isError: false,
+    };
+  }
+  if (status === "ready" && hasVerifiedPreview) {
+    return {
+      status: "ready",
+      isPending: false,
+      isReady: true,
+      isError: false,
+    };
+  }
+  if (status === "ready") {
+    return {
+      status: "error",
+      isPending: false,
+      isReady: false,
+      isError: true,
+    };
+  }
+  return {
+    status: "idle",
+    isPending: false,
+    isReady: false,
+    isError: false,
+  };
+};
+
+export const shouldStartStructuralPreviewRequest = (
+  shouldLoad: boolean,
+  status: RecipePreviewStatus,
+  hasVerifiedPreview: boolean,
+): boolean => shouldLoad && status === "idle" && !hasVerifiedPreview;
+
+export const shouldMarkStructuralPreviewVerificationError = (
+  shouldLoad: boolean,
+  status: RecipePreviewStatus,
+  hasVerifiedPreview: boolean,
+): boolean => shouldLoad && status === "ready" && !hasVerifiedPreview;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === "object" && !Array.isArray(value));
+
+export const validateStructuralPreviewResponse = (
+  response: CleaningRecipePreview | null | undefined,
+  worksheetId: string,
+  worksheetName: string,
+): StructuralPreviewValidation => {
+  if (!isRecord(response)) {
+    return {
+      ok: false,
+      message: `We couldn't check structural recommendations for ${worksheetName}. The preview response was empty.`,
+    };
+  }
+  if (typeof response.worksheet_id !== "string" || response.worksheet_id.length === 0) {
+    return {
+      ok: false,
+      message: `We couldn't check structural recommendations for ${worksheetName}. The preview response did not include a worksheet id.`,
+    };
+  }
+  if (response.worksheet_id !== worksheetId) {
+    return {
+      ok: false,
+      message: `We couldn't verify the structural preview for ${worksheetName}. Try again.`,
+    };
+  }
+  if (!Array.isArray(response.recipe)) {
+    return {
+      ok: false,
+      message: `We couldn't check structural recommendations for ${worksheetName}. The preview recipe was invalid.`,
+    };
+  }
+  if (
+    !isRecord(response.excluded) ||
+    typeof response.excluded.repeated_headers !== "number" ||
+    typeof response.excluded.section_banners !== "number" ||
+    typeof response.excluded.date_title_rows !== "number" ||
+    typeof response.excluded.layout_rows !== "number" ||
+    typeof response.excluded.placeholder_rows !== "number" ||
+    typeof response.excluded.side_note_columns !== "number"
+  ) {
+    return {
+      ok: false,
+      message: `We couldn't check structural recommendations for ${worksheetName}. The preview exclusion summary was invalid.`,
+    };
+  }
+  const layoutDetails = response.excluded_details?.layout_rows;
+  if (
+    response.excluded.layout_rows > 0 &&
+    (!layoutDetails ||
+      !Array.isArray(layoutDetails.row_indexes) ||
+      !Array.isArray(layoutDetails.reasons))
+  ) {
+    return {
+      ok: false,
+      message: `Structural preview details are incomplete for ${worksheetName}. Restart the local backend and try again.`,
+    };
+  }
+  return { ok: true, preview: response };
+};
 
 export const areStructuralDecisionReadinessEqual = (
   left: StructuralDecisionReadiness | null,
@@ -569,6 +722,12 @@ const getEvidenceIssueCopy = (
   }
 };
 
+export const getColumnDisplayName = (columnName: string) => {
+  const generatedMatch = columnName.trim().match(/^column_(\d+)(?:_\d+)?$/i);
+  if (!generatedMatch) return columnName;
+  return `Unnamed column ${Number(generatedMatch[1])}`;
+};
+
 const getEvidenceRows = (evidence: WorksheetTemplateStructureEvidence): number[] => {
   const rows = new Set<number>();
   if (typeof evidence.rowIndex === "number") rows.add(evidence.rowIndex);
@@ -720,10 +879,13 @@ export const buildPreparationReview = (dataset: DatasetMetadata): PreparationRev
   }
 
   if (generatedColumns.length > 0) {
+    const firstGeneratedColumn = getColumnDisplayName(generatedColumns[0]);
     issues.push({
       id: "dataset:generated-columns",
       title: "Generated column names detected",
-      detail: `${generatedColumns.length} field${generatedColumns.length === 1 ? "" : "s"} still use names such as ${generatedColumns[0]}.`,
+      detail: `${generatedColumns.length} field${
+        generatedColumns.length === 1 ? "" : "s"
+      } have no detected header, such as ${firstGeneratedColumn}.`,
     });
     visibleSuggestedFixes.set("dataset:generated-columns", {
       id: "dataset:generated-columns",
@@ -798,6 +960,7 @@ export function CleanPrepareReviewPanel({
   const reviewRef = useRef<HTMLDivElement | null>(null);
   const structuralProgressRef = useRef<HTMLDivElement | null>(null);
   const resetStructuralDecisionsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const structuralPreviewRequestIdsRef = useRef<Record<string, number>>({});
   // When embedded, the review is the whole reason the dedicated page exists,
   // so start open.
   const [isOpen, setIsOpen] = useState(embedded);
@@ -811,6 +974,7 @@ export function CleanPrepareReviewPanel({
   const [recipeErrorByWorksheet, setRecipeErrorByWorksheet] = useState<
     Record<string, string | null>
   >({});
+  const [recipeRetryByWorksheet, setRecipeRetryByWorksheet] = useState<Record<string, number>>({});
   const [applyStateByWorksheet, setApplyStateByWorksheet] = useState<
     Record<string, ApplyState>
   >({});
@@ -853,6 +1017,7 @@ export function CleanPrepareReviewPanel({
     selectedWorksheet?.displayName || selectedWorksheet?.sheetName || "this worksheet";
   const selectedWorksheetRecipeStatus = recipeStatusByWorksheet[decisionWorksheetId] || "idle";
   const selectedWorksheetRecipeError = recipeErrorByWorksheet[decisionWorksheetId] || null;
+  const selectedWorksheetRecipeRetry = recipeRetryByWorksheet[decisionWorksheetId] || 0;
   const selectedWorksheetRecipePreview = isCleaningRecipePreviewForWorksheet(
     recipePreviewByWorksheet[decisionWorksheetId] || null,
     decisionWorksheetId,
@@ -865,10 +1030,16 @@ export function CleanPrepareReviewPanel({
       selectedWorksheet &&
       (selectedWorksheet.status === "ready" || selectedWorksheet.status === "empty"),
   );
-  const isStructuralPreviewPending =
+  const structuralPreviewLifecycle = getStructuralPreviewLifecycleState(
+    shouldLoadSelectedWorksheetPreview,
+    selectedWorksheetRecipeStatus,
+    Boolean(selectedWorksheetRecipePreview),
+  );
+  const isStructuralPreviewPending = structuralPreviewLifecycle.isPending;
+  const isStructuralPreviewAwaitingRequest =
     shouldLoadSelectedWorksheetPreview &&
-    !selectedWorksheetRecipePreview &&
-    selectedWorksheetRecipeStatus !== "error";
+    selectedWorksheetRecipeStatus === "idle" &&
+    !selectedWorksheetRecipePreview;
   const previewSuggestedFixes = useMemo(
     () => getPreviewSuggestedFixes(selectedWorksheetRecipePreview),
     [selectedWorksheetRecipePreview],
@@ -895,6 +1066,9 @@ export function CleanPrepareReviewPanel({
   );
   const structuralDecisionReadiness = useMemo(
     () => {
+      if (isStructuralPreviewAwaitingRequest) {
+        return getStructuralPreviewIdleReadiness(decisionWorksheetId, decisionWorksheetName);
+      }
       if (isStructuralPreviewPending) {
         return getStructuralPreviewLoadingReadiness(decisionWorksheetId, decisionWorksheetName);
       }
@@ -916,6 +1090,7 @@ export function CleanPrepareReviewPanel({
       decisionWorksheetId,
       decisionWorksheetName,
       fixDecisionDrafts,
+      isStructuralPreviewAwaitingRequest,
       isStructuralPreviewPending,
       selectedWorksheetRecipeError,
       selectedWorksheetRecipePreview,
@@ -943,6 +1118,7 @@ export function CleanPrepareReviewPanel({
     setRecipePreviewByWorksheet({});
     setRecipeStatusByWorksheet({});
     setRecipeErrorByWorksheet({});
+    setRecipeRetryByWorksheet({});
   }, [dataset.dataset_id]);
   useEffect(() => {
     setIsResetStructuralDecisionsConfirming(false);
@@ -1020,6 +1196,7 @@ export function CleanPrepareReviewPanel({
       numeric: [],
       text: [],
       date: [],
+      boolean: [],
       unknown: [],
     };
     for (const column of missingValueColumns) {
@@ -1030,7 +1207,7 @@ export function CleanPrepareReviewPanel({
 
   const presentMissingTypeGroups = useMemo<WorksheetMissingTypeGroup[]>(
     () =>
-      (["numeric", "text", "date", "unknown"] as WorksheetMissingTypeGroup[]).filter(
+      (["numeric", "text", "date", "boolean", "unknown"] as WorksheetMissingTypeGroup[]).filter(
         (group) => missingValueColumnsByGroup[group].length > 0,
       ),
     [missingValueColumnsByGroup],
@@ -1118,6 +1295,7 @@ export function CleanPrepareReviewPanel({
 
   useEffect(() => {
     let cancelled = false;
+    let timeoutId: number | undefined;
     if (
       !isOpen ||
       !supportsRecipePreview ||
@@ -1126,73 +1304,138 @@ export function CleanPrepareReviewPanel({
     ) {
       return undefined;
     }
-    if (
-      recipePreviewByWorksheet[previewWorksheetId] ||
-      recipeStatusByWorksheet[previewWorksheetId] === "loading"
-    ) {
+    if (!shouldStartStructuralPreviewRequest(
+      true,
+      selectedWorksheetRecipeStatus,
+      Boolean(selectedWorksheetRecipePreview),
+    )) {
       return undefined;
     }
 
-    const requestTimeout = window.setTimeout(() => {
-      setRecipeStatusByWorksheet((current) => ({
-        ...current,
-        [previewWorksheetId]: "loading",
-      }));
-      setRecipeErrorByWorksheet((current) => ({
-        ...current,
-        [previewWorksheetId]: null,
-      }));
-      getCleaningRecipePreview(dataset.dataset_id, previewWorksheetId)
-        .then((response) => {
-          if (cancelled) return;
-          if (response.worksheet_id !== previewWorksheetId) {
-            setRecipeErrorByWorksheet((current) => ({
-              ...current,
-              [previewWorksheetId]: "Selected worksheet preview could not be verified.",
-            }));
-            setRecipeStatusByWorksheet((current) => ({
-              ...current,
-              [previewWorksheetId]: "error",
-            }));
-            return;
-          }
-          setRecipePreviewByWorksheet((current) => ({
-            ...current,
-            [previewWorksheetId]: response,
-          }));
-          setRecipeStatusByWorksheet((current) => ({
-            ...current,
-            [previewWorksheetId]: "success",
-          }));
-        })
-        .catch((error) => {
-          if (cancelled) return;
+    const requestId = (structuralPreviewRequestIdsRef.current[previewWorksheetId] || 0) + 1;
+    structuralPreviewRequestIdsRef.current[previewWorksheetId] = requestId;
+    setRecipeStatusByWorksheet((current) => ({
+      ...current,
+      [previewWorksheetId]: "loading",
+    }));
+    setRecipeErrorByWorksheet((current) => ({
+      ...current,
+      [previewWorksheetId]: null,
+    }));
+
+    const timeoutPromise = new Promise<CleaningRecipePreview>((_, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error(`We couldn't check structural recommendations for ${decisionWorksheetName}. The request timed out.`));
+      }, STRUCTURAL_PREVIEW_TIMEOUT_MS);
+    });
+
+    Promise.race([getCleaningRecipePreview(dataset.dataset_id, previewWorksheetId), timeoutPromise])
+      .then((response) => {
+        if (cancelled) return;
+        if (structuralPreviewRequestIdsRef.current[previewWorksheetId] !== requestId) return;
+        const validation = validateStructuralPreviewResponse(
+          response,
+          previewWorksheetId,
+          decisionWorksheetName,
+        );
+        if (!validation.ok) {
           setRecipeErrorByWorksheet((current) => ({
             ...current,
-            [previewWorksheetId]:
-              error instanceof Error && error.message
-                ? error.message
-                : "Cleaning recipe preview could not be loaded.",
+            [previewWorksheetId]: validation.message,
           }));
+          setRecipePreviewByWorksheet((current) => {
+            const next = { ...current };
+            delete next[previewWorksheetId];
+            return next;
+          });
           setRecipeStatusByWorksheet((current) => ({
             ...current,
             [previewWorksheetId]: "error",
           }));
+          return;
+        }
+        setRecipePreviewByWorksheet((current) => ({
+          ...current,
+          [previewWorksheetId]: validation.preview,
+        }));
+        setRecipeStatusByWorksheet((current) => ({
+          ...current,
+          [previewWorksheetId]: "ready",
+        }));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        if (structuralPreviewRequestIdsRef.current[previewWorksheetId] !== requestId) return;
+        setRecipeErrorByWorksheet((current) => ({
+          ...current,
+          [previewWorksheetId]:
+            error instanceof Error && error.message
+              ? error.message
+              : `We couldn't check structural recommendations for ${decisionWorksheetName}. Try again.`,
+        }));
+        setRecipeStatusByWorksheet((current) => ({
+          ...current,
+          [previewWorksheetId]: "error",
+        }));
+        setRecipePreviewByWorksheet((current) => {
+          const next = { ...current };
+          delete next[previewWorksheetId];
+          return next;
         });
-    }, 0);
+      })
+      .finally(() => {
+        if (timeoutId !== undefined) {
+          window.clearTimeout(timeoutId);
+        }
+      });
 
     return () => {
       cancelled = true;
-      window.clearTimeout(requestTimeout);
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, [
     dataset.dataset_id,
+    decisionWorksheetName,
     isOpen,
     previewWorksheetId,
     previewWorksheetStatus,
-    recipePreviewByWorksheet,
-    recipeStatusByWorksheet,
+    selectedWorksheetRecipePreview,
+    selectedWorksheetRecipeRetry,
     supportsRecipePreview,
+  ]);
+
+  useEffect(() => {
+    if (
+      !previewWorksheetId ||
+      !shouldMarkStructuralPreviewVerificationError(
+        shouldLoadSelectedWorksheetPreview,
+        selectedWorksheetRecipeStatus,
+        Boolean(selectedWorksheetRecipePreview),
+      )
+    ) {
+      return;
+    }
+    setRecipeErrorByWorksheet((current) => ({
+      ...current,
+      [previewWorksheetId]: `We couldn't verify the structural preview for ${decisionWorksheetName}. Try again.`,
+    }));
+    setRecipePreviewByWorksheet((current) => {
+      const next = { ...current };
+      delete next[previewWorksheetId];
+      return next;
+    });
+    setRecipeStatusByWorksheet((current) => ({
+      ...current,
+      [previewWorksheetId]: "error",
+    }));
+  }, [
+    decisionWorksheetName,
+    previewWorksheetId,
+    selectedWorksheetRecipePreview,
+    selectedWorksheetRecipeStatus,
+    shouldLoadSelectedWorksheetPreview,
   ]);
 
   const selectWorksheet = (worksheet: WorksheetMetadata) => {
@@ -1279,7 +1522,7 @@ export function CleanPrepareReviewPanel({
   const hasActionableRecipe =
     selectedWorksheetRecipePreview !== null &&
     selectedWorksheetRecipePreview.recipe.length > 0 &&
-    selectedWorksheetRecipeStatus === "success" &&
+    selectedWorksheetRecipeStatus === "ready" &&
     selectedWorksheet?.status === "ready";
   const hasSelectedWorksheetPreviewOperations = hasCleaningRecipePreviewOperations(
     selectedWorksheetRecipePreview,
@@ -1414,6 +1657,30 @@ export function CleanPrepareReviewPanel({
   const retryApply = () => {
     if (!selectedWorksheet) return;
     updateApplyState(selectedWorksheet.worksheetId, { status: "confirming" });
+  };
+
+  const retryStructuralPreview = () => {
+    if (!selectedWorksheet) return;
+    const worksheetId = selectedWorksheet.worksheetId;
+    structuralPreviewRequestIdsRef.current[worksheetId] =
+      (structuralPreviewRequestIdsRef.current[worksheetId] || 0) + 1;
+    setRecipePreviewByWorksheet((current) => {
+      const next = { ...current };
+      delete next[worksheetId];
+      return next;
+    });
+    setRecipeErrorByWorksheet((current) => ({
+      ...current,
+      [worksheetId]: null,
+    }));
+    setRecipeStatusByWorksheet((current) => ({
+      ...current,
+      [worksheetId]: "idle",
+    }));
+    setRecipeRetryByWorksheet((current) => ({
+      ...current,
+      [worksheetId]: (current[worksheetId] || 0) + 1,
+    }));
   };
 
   const useCleanedCopy = async () => {
@@ -1696,11 +1963,22 @@ export function CleanPrepareReviewPanel({
             )}
             {isStructuralPreviewPending ? (
               <p>{`Checking structural recommendations for ${decisionWorksheetName}...`}</p>
+            ) : isStructuralPreviewAwaitingRequest ? (
+              <p>{`Preparing structural recommendation check for ${decisionWorksheetName}...`}</p>
             ) : selectedWorksheetRecipeStatus === "error" && !selectedWorksheetRecipePreview ? (
-              <p className="clean-prepare-preview-state is-error">
-                {selectedWorksheetRecipeError ||
-                  `Structural recommendations for ${decisionWorksheetName} could not be checked. Try again.`}
-              </p>
+              <div className="clean-prepare-preview-state is-error" role="alert">
+                <p>
+                  {selectedWorksheetRecipeError ||
+                    `Structural recommendations for ${decisionWorksheetName} could not be checked. Try again.`}
+                </p>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={retryStructuralPreview}
+                >
+                  Retry
+                </button>
+              </div>
             ) : visibleStructuralFixes.length > 0 ? (
               <ul className={embedded ? "clean-prepare-decision-rows" : undefined}>
                 {visibleStructuralFixes.map((fix) => {
@@ -1872,7 +2150,7 @@ export function CleanPrepareReviewPanel({
                       getWorksheetMissingTypeDecisionColumn(group),
                     );
                     const groupDecision = missingValueDecisions[groupKey];
-                    const groupStrategies = getWorksheetMissingTypeStrategies(group);
+                    const groupStrategies = getWorksheetMissingTypeStrategies(group, groupColumns);
                     return (
                       <article
                         className="clean-prepare-missing-type-group"
@@ -2028,7 +2306,7 @@ export function CleanPrepareReviewPanel({
                       : 0;
                     return (
                       <li key={column.name}>
-                        <strong>{column.name}</strong>
+                        <strong>{getColumnDisplayName(column.name)}</strong>
                         <span>{column.null_count.toLocaleString()} blanks ({rate.toFixed(1)}%). {rate >= 70 ? "High blank rate: review before filling." : "Review before future cleanup."}</span>
                       </li>
                     );
@@ -2065,6 +2343,7 @@ export function CleanPrepareReviewPanel({
                         ? (column.null_count / decisionRowCount) * 100
                         : 0;
                       const columnStrategies = getColumnMissingValueStrategies(column);
+                      const columnDisplayName = getColumnDisplayName(column.name);
                       const radioGroupName = `clean-prepare-missing-col-${decisionWorksheetId}-${column.name}`;
                       return (
                         <article
@@ -2073,7 +2352,7 @@ export function CleanPrepareReviewPanel({
                         >
                           <div className="clean-prepare-missing-column-head">
                             <div>
-                              <strong>{column.name}</strong>
+                              <strong>{columnDisplayName}</strong>
                               <span>
                                 {column.inferred_type || "unknown type"} ·{" "}
                                 {rate.toFixed(1)}% blank
@@ -2134,7 +2413,7 @@ export function CleanPrepareReviewPanel({
                                         ? "yyyy-mm-dd"
                                         : "Type a value"
                                     }
-                                    aria-label={`Custom missing value for ${column.name}`}
+                                    aria-label={`Custom missing value for ${columnDisplayName}`}
                                     onChange={(event) =>
                                       saveMissingValueDecision(
                                         decisionKey,
@@ -2638,7 +2917,7 @@ export function CleanPrepareReviewPanel({
                     </div>
                   )}
                 </>
-              ) : recipeStatusByWorksheet[decisionWorksheetId] === "success" && !selectedWorksheetRecipePreview ? (
+              ) : recipeStatusByWorksheet[decisionWorksheetId] === "ready" && !selectedWorksheetRecipePreview ? (
                 <p className="clean-prepare-preview-state">
                   Loading the selected worksheet preview...
                 </p>

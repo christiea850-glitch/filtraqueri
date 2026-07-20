@@ -22,6 +22,11 @@ const fixtures = [
     exportName: "runCleanPrepareStructuralDecisionFixtures",
   },
   {
+    label: "Cleaning recipe API contract",
+    modulePath: "/src/services/__tests__/cleaningRecipeApiContract.test.ts",
+    exportName: "runCleaningRecipeApiContractFixtures",
+  },
+  {
     label: "Prepare Data back navigation",
     modulePath: "/src/features/cleanPrepare/__tests__/prepareBackNavigation.test.ts",
     exportName: "runPrepareBackNavigationFixtures",

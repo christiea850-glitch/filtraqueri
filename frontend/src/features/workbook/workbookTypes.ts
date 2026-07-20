@@ -49,6 +49,22 @@ export type WorksheetTemplateStructureEvidenceType =
   | "automatic_blank_row"
   | "clean_table_counter_signal";
 
+export type StructuralDecisionChoice =
+  | "use_recommendation"
+  | "keep_original"
+  | "decide_later";
+
+export type WorksheetStructuralDecision = {
+  recommendationId: string;
+  evidenceType: WorksheetTemplateStructureEvidenceType;
+  decision: StructuralDecisionChoice;
+};
+
+export type WorksheetStructuralDecisionPlan = {
+  worksheetId: WorksheetId;
+  decisions: WorksheetStructuralDecision[];
+};
+
 export type WorksheetTemplateStructureEvidence = {
   type: WorksheetTemplateStructureEvidenceType;
   rowIndex: number | null;

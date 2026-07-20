@@ -38,9 +38,10 @@ export const WORKSHEET_DECISION_COLUMN = "__worksheet__";
 export const WORKSHEET_NUMERIC_DECISION_COLUMN = "__worksheet_numeric__";
 export const WORKSHEET_TEXT_DECISION_COLUMN = "__worksheet_text__";
 export const WORKSHEET_DATE_DECISION_COLUMN = "__worksheet_date__";
+export const WORKSHEET_BOOLEAN_DECISION_COLUMN = "__worksheet_boolean__";
 export const WORKSHEET_UNKNOWN_DECISION_COLUMN = "__worksheet_unknown__";
 
-export type WorksheetMissingTypeGroup = "numeric" | "text" | "date" | "unknown";
+export type WorksheetMissingTypeGroup = "numeric" | "text" | "date" | "boolean" | "unknown";
 
 export const getWorksheetMissingTypeDecisionColumn = (
   group: WorksheetMissingTypeGroup,
@@ -48,20 +49,45 @@ export const getWorksheetMissingTypeDecisionColumn = (
   if (group === "numeric") return WORKSHEET_NUMERIC_DECISION_COLUMN;
   if (group === "text") return WORKSHEET_TEXT_DECISION_COLUMN;
   if (group === "date") return WORKSHEET_DATE_DECISION_COLUMN;
+  if (group === "boolean") return WORKSHEET_BOOLEAN_DECISION_COLUMN;
   return WORKSHEET_UNKNOWN_DECISION_COLUMN;
 };
 
+const hasValidTopValue = (column: SchemaColumn): boolean =>
+  Boolean(
+    column.top_values?.some(
+      (item) => item.value !== null && item.value !== undefined && String(item.value).trim() !== "",
+    ),
+  ) || column.sample_values.some((value) => value !== null && value !== undefined && String(value).trim() !== "");
+
+const hasNumericProfile = (column: SchemaColumn): boolean =>
+  Boolean(column.numeric_stats && Number.isFinite(column.numeric_stats.mean) && Number.isFinite(column.numeric_stats.median));
+
 export const getWorksheetMissingTypeStrategies = (
   group: WorksheetMissingTypeGroup,
+  columns: SchemaColumn[] = [],
 ): MissingValueStrategy[] => {
   if (group === "numeric") {
-    return ["leave_unchanged", "fill_zero", "fill_mean", "fill_median", "fill_custom"];
+    const strategies: MissingValueStrategy[] = ["leave_unchanged", "fill_zero"];
+    if (columns.length === 0 || columns.some(hasNumericProfile)) {
+      strategies.push("fill_mean", "fill_median");
+    }
+    strategies.push("fill_custom");
+    return strategies;
   }
   if (group === "text") {
-    return ["leave_unchanged", "mark_unknown", "fill_mode", "fill_custom"];
+    const strategies: MissingValueStrategy[] = ["leave_unchanged", "mark_unknown"];
+    if (columns.length === 0 || columns.some(hasValidTopValue)) {
+      strategies.push("fill_mode");
+    }
+    strategies.push("fill_custom");
+    return strategies;
   }
   if (group === "date") {
     return ["leave_unchanged", "forward_fill", "custom_date"];
+  }
+  if (group === "boolean") {
+    return ["leave_unchanged", "fill_custom"];
   }
   return ["leave_unchanged", "fill_custom", "decide_later"];
 };
@@ -70,6 +96,7 @@ export const worksheetMissingTypeGroupLabels: Record<WorksheetMissingTypeGroup, 
   numeric: "Numeric blanks",
   text: "Text / categorical blanks",
   date: "Date blanks",
+  boolean: "Boolean blanks",
   unknown: "Other blanks",
 };
 
@@ -78,6 +105,7 @@ export const classifyColumnMissingTypeGroup = (
 ): WorksheetMissingTypeGroup => {
   if (inferredType === "numeric") return "numeric";
   if (inferredType === "date") return "date";
+  if (inferredType === "boolean") return "boolean";
   if (inferredType === "text" || inferredType === "categorical") return "text";
   return "unknown";
 };
@@ -197,13 +225,26 @@ export const getColumnMissingValueStrategies = (
   column: SchemaColumn,
 ): MissingValueStrategy[] => {
   if (column.inferred_type === "numeric") {
-    return ["leave_unchanged", "fill_zero", "fill_mean", "fill_median", "fill_custom"];
+    const strategies: MissingValueStrategy[] = ["leave_unchanged", "fill_zero"];
+    if (hasNumericProfile(column)) {
+      strategies.push("fill_mean", "fill_median");
+    }
+    strategies.push("fill_custom");
+    return strategies;
   }
   if (column.inferred_type === "date") {
     return ["leave_unchanged", "forward_fill", "custom_date"];
   }
   if (column.inferred_type === "text" || column.inferred_type === "categorical") {
-    return ["leave_unchanged", "mark_unknown", "fill_mode", "fill_custom"];
+    const strategies: MissingValueStrategy[] = ["leave_unchanged", "mark_unknown"];
+    if (hasValidTopValue(column)) {
+      strategies.push("fill_mode");
+    }
+    strategies.push("fill_custom");
+    return strategies;
+  }
+  if (column.inferred_type === "boolean") {
+    return ["leave_unchanged", "fill_custom"];
   }
   // Safe generic fallback when the column type is unknown / not inferred.
   return ["leave_unchanged", "fill_custom", "decide_later"];
@@ -211,4 +252,3 @@ export const getColumnMissingValueStrategies = (
 
 export const decisionNeedsCustomValue = (strategy?: MissingValueStrategy) =>
   strategy === "fill_custom" || strategy === "custom_date";
-
