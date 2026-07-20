@@ -889,7 +889,12 @@ def read_workbook_sheets(workbook_zip: zipfile.ZipFile) -> list[dict[str, str]]:
         target = relationships.get(relationship_id or "")
         if not target:
             continue
-        sheet_path = f"xl/{target.lstrip('/')}"
+        normalized_target = target.lstrip("/")
+        sheet_path = (
+            normalized_target
+            if normalized_target.startswith("xl/")
+            else f"xl/{normalized_target}"
+        )
         if not sheet_path.startswith("xl/worksheets/") and "worksheets/" in sheet_path:
             sheet_path = "xl/" + sheet_path.split("xl/", 1)[-1]
         sheets.append({
@@ -1010,7 +1015,22 @@ def profile_table(connection: duckdb.DuckDBPyConnection, table_name: str) -> tup
                 f"SELECT DISTINCT {identifier} FROM {table_identifier} WHERE {identifier} IS NOT NULL LIMIT 12"
             ).fetchall()
         ]
-        inferred_type = "categorical" if unique_count <= 50 and (row_count == 0 or unique_count / row_count < 0.8) else "text"
+        non_null_sample_text = [normalize_cell_text(value) for value in sample_values]
+        non_null_sample_text = [value for value in non_null_sample_text if value]
+        if non_null_sample_text and all(
+            looks_like_numeric_value(value) for value in non_null_sample_text
+        ):
+            inferred_type = "numeric"
+        elif non_null_sample_text and all(
+            looks_like_date_value(value.lower()) for value in non_null_sample_text
+        ):
+            inferred_type = "date"
+        else:
+            inferred_type = (
+                "categorical"
+                if unique_count <= 50 and (row_count == 0 or unique_count / row_count < 0.8)
+                else "text"
+            )
         profiles.append({
             "name": column_name,
             "type": row[2],
