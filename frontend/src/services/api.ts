@@ -200,6 +200,15 @@ export type CleaningRecipePreview = {
     operations?: Record<string, unknown>[];
     has_changes?: boolean;
   };
+  transformation_summary?: {
+    status: string;
+    step_count: number;
+    changed_columns: string[];
+    added_columns: string[];
+    cells_changed: number;
+    operations: Record<string, unknown>[];
+    warnings: string[];
+  };
   preview_row_limit: number;
   message: string;
 };

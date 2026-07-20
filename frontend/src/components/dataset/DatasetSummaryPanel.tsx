@@ -26,6 +26,7 @@ import {
   createEmptyTransformationPipeline,
   createTransformationStep,
   getSupportedTransformationsForColumn,
+  toWorkbookTransformationPlan,
   type TransformationPipeline,
   type TransformationStep,
   type TransformationStepParameters,
@@ -1706,6 +1707,7 @@ function DataCleanPreparePage({
   );
   const currentDatasetSession =
     recentDatasets.find((session) => session.dataset.dataset_id === dataset.dataset_id) || null;
+  const readyTransformationPlan = toWorkbookTransformationPlan(draftPipeline);
   const transformationSampleRows = currentDatasetSession?.previewResult.rows || [];
   const previewCreatedColumns = transformationPreviewResult
     ? getPreviewCreatedColumns(transformationPreviewResult)
@@ -1947,15 +1949,23 @@ function DataCleanPreparePage({
   };
   const activeStepIndex = cleanPrepareSteps.indexOf(step);
   const prepareBackTransition = getPrepareBackTransition(activePrepareTab, step);
+  const transformationApplyBlocked =
+    activePrepareTab === "transformations" && draftPipeline.steps.length > 0 && !readyTransformationPlan;
+  const transformationApplyBlockMessage = transformationApplyBlocked
+    ? "Resolve blocked transformation steps before previewing Apply."
+    : null;
   const structuralApplyBlocked = isStructuralApplyNavigationBlocked(
     activePrepareTab,
     structuralDecisionReadiness,
   );
-  const structuralApplyBlockMessage = getStructuralApplyNavigationBlockMessage(
-    activePrepareTab,
-    step,
-    structuralDecisionReadiness,
-  );
+  const applyStepBlocked = structuralApplyBlocked || transformationApplyBlocked;
+  const structuralApplyBlockMessage =
+    transformationApplyBlockMessage ||
+    getStructuralApplyNavigationBlockMessage(
+      activePrepareTab,
+      step,
+      structuralDecisionReadiness,
+    );
   const structuralApplyBlockMessageId = "prepare-structural-apply-block-message";
   const handlePrepareBack = useCallback(() => {
     invokePrepareBackTransition(prepareBackTransition, {
@@ -1965,8 +1975,9 @@ function DataCleanPreparePage({
     });
   }, [goToDecide, goToReview, onBack, prepareBackTransition]);
   const handleGoToApply = useCallback(() => {
+    if (transformationApplyBlocked) return;
     invokeStructuralApplyNavigation(activePrepareTab, structuralDecisionReadiness, goToApply);
-  }, [activePrepareTab, goToApply, structuralDecisionReadiness]);
+  }, [activePrepareTab, goToApply, structuralDecisionReadiness, transformationApplyBlocked]);
   useEffect(() => {
     if (
       normalizeBlockedApplyStep(activePrepareTab, step, structuralDecisionReadiness) === "decide" &&
@@ -2037,7 +2048,7 @@ function DataCleanPreparePage({
                   : stepItem === "decide"
                     ? goToDecide
                     : handleGoToApply;
-              const isApplyStepBlocked = stepItem === "apply" && structuralApplyBlocked;
+              const isApplyStepBlocked = stepItem === "apply" && applyStepBlocked;
 
               return (
                 <button
@@ -2072,6 +2083,7 @@ function DataCleanPreparePage({
             onContinueInAnalyst={onContinueInAnalyst}
             activeStep={step}
             onStructuralDecisionReadinessChange={handleStructuralDecisionReadinessChange}
+            transformationPlan={readyTransformationPlan}
             embedded
           />
 
@@ -2104,7 +2116,7 @@ function DataCleanPreparePage({
                   type="button"
                   className="primary-button"
                   onClick={handleGoToApply}
-                  disabled={structuralApplyBlocked}
+                  disabled={applyStepBlocked}
                   aria-describedby={
                     structuralApplyBlockMessage ? structuralApplyBlockMessageId : undefined
                   }

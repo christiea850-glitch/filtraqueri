@@ -1,5 +1,5 @@
 import type { SchemaColumn } from "../dataset/datasetTypes";
-import type { WorkbookAnalysisSource } from "../workbook";
+import type { WorkbookAnalysisSource, WorkbookTransformationPlan, SupportedWorkbookTransformationKind, WorkbookTransformationStepParameters } from "../workbook";
 
 export type NumericTransformationKind =
   | "fill_missing_mean"
@@ -201,6 +201,75 @@ const booleanTransformations: BooleanTransformationKind[] = [
   "fill_missing_true",
   "fill_missing_false",
 ];
+
+
+const workbookTransformationKinds: readonly SupportedWorkbookTransformationKind[] = [
+  "trim_whitespace",
+  "lowercase",
+  "uppercase",
+  "cap_outliers_percentile",
+  "log_transform",
+  "z_score_scale",
+  "min_max_scale",
+  "ordinal_encode",
+  "frequency_encode",
+  "extract_year",
+  "extract_month",
+  "extract_quarter",
+  "extract_day_of_week",
+  "days_since",
+  "boolean_to_integer",
+];
+
+export const isWorkbookTransformationKind = (
+  kind: TransformationStepKind,
+): kind is SupportedWorkbookTransformationKind =>
+  workbookTransformationKinds.includes(kind as SupportedWorkbookTransformationKind);
+
+const toWorkbookTransformationStepParameters = (
+  parameters: TransformationStepParameters,
+): WorkbookTransformationStepParameters | null => {
+  if (!isWorkbookTransformationKind(parameters.kind)) return null;
+  if (parameters.kind === "cap_outliers_percentile") {
+    return {
+      kind: parameters.kind,
+      lowerPercentile: parameters.lowerPercentile,
+      upperPercentile: parameters.upperPercentile,
+    };
+  }
+  if (parameters.kind === "ordinal_encode") {
+    return { kind: parameters.kind, order: [...parameters.order] };
+  }
+  if (parameters.kind === "days_since") {
+    return { kind: parameters.kind, anchorDate: parameters.anchorDate };
+  }
+  return { kind: parameters.kind };
+};
+
+export const toWorkbookTransformationPlan = (
+  pipeline: TransformationPipeline,
+): WorkbookTransformationPlan | null => {
+  if (!pipeline.readiness.previewReady || pipeline.steps.length === 0) return null;
+  const steps = pipeline.steps.map((step) => {
+    if (step.status !== "valid" || !isWorkbookTransformationKind(step.kind)) return null;
+    const parameters = toWorkbookTransformationStepParameters(step.parameters);
+    if (!parameters) return null;
+    return {
+      stepId: step.id,
+      order: step.order,
+      kind: step.kind,
+      targetColumn: step.targetColumn,
+      outputColumn: step.outputColumn,
+      parameters,
+    };
+  });
+  if (steps.some((step) => step === null)) return null;
+  return {
+    worksheetId: pipeline.worksheetId,
+    pipelineId: pipeline.id,
+    steps: steps as WorkbookTransformationPlan["steps"],
+  };
+};
 
 const safety: TransformationPipelineSafety = {
   noSqlExecution: true,
