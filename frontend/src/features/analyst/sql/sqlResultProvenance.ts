@@ -18,6 +18,20 @@ const formatRunTimestamp = (value: string) => {
   return `${year}-${month}-${day} ${hour}:${minute} UTC`;
 };
 
+const formatClarificationText = (
+  executedQuestion: NonNullable<SqlPreviewResult["executedQuestion"]>,
+): string | null => {
+  const decision = executedQuestion.clarificationDecision;
+  if (!decision) return null;
+  const grouping =
+    executedQuestion.detectedIntent?.grouping[0] ||
+    executedQuestion.detectedIntent?.entities[0] ||
+    "results";
+  return decision.chosenOptionLabel
+    ? `Clarification: ranked ${grouping} by ${decision.chosenOptionLabel}.`
+    : `Clarification: selected ${decision.chosenOptionId}`;
+};
+
 export type SqlResultProvenanceViewModel = {
   summaryText: string;
   sourceText: string | null;
@@ -59,9 +73,7 @@ export function createSqlResultProvenanceViewModel({
       : `Showing result for SQL run on ${sourceName || "the selected source"}`,
     sourceText: sourceName ? `Source: ${sourceName}` : null,
     ranAtText: executedQuestion.ranAt ? `Ran: ${formatRunTimestamp(executedQuestion.ranAt)}` : null,
-    clarificationText: executedQuestion.clarificationDecision
-      ? `Clarification: selected ${executedQuestion.clarificationDecision.chosenOptionId}`
-      : null,
+    clarificationText: formatClarificationText(executedQuestion),
     driftWarningText: promptChanged || sqlChanged ? SQL_RESULT_DRIFT_WARNING : null,
   };
 }

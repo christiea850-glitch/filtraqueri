@@ -28,6 +28,7 @@ export type BusinessSqlMeasureAmbiguity = {
 export type BusinessSqlMeasureClarificationDecision = {
   ambiguityId: string;
   chosenOptionId: string;
+  chosenOptionLabel?: string;
   presentedOptionIds: string[];
 };
 
@@ -281,7 +282,9 @@ export function resolveBusinessSqlMeasureAmbiguity({
     grouping: [ambiguity.groupingFieldName],
     analysisPath: {
       aggregation:
-        option.measureKind === "average"
+        option.measureKind === "count_entities" || option.measureKind === "count_rows"
+          ? "count"
+          : option.measureKind === "average"
           ? "average"
           : option.measureKind === "minimum"
             ? "minimum"
@@ -301,6 +304,7 @@ export function resolveBusinessSqlMeasureAmbiguity({
     decision: {
       ambiguityId: ambiguity.ambiguityId,
       chosenOptionId: option.optionId,
+      chosenOptionLabel: option.label,
       presentedOptionIds: ambiguity.options.map((candidate) => candidate.optionId),
     },
     option,

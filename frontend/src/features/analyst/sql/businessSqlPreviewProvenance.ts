@@ -1,6 +1,7 @@
 export type BusinessSqlClarificationDecisionProvenance = {
   ambiguityId: string;
   chosenOptionId: string;
+  chosenOptionLabel?: string;
   presentedOptionIds: string[];
 };
 

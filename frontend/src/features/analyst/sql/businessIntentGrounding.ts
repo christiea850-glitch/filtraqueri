@@ -62,7 +62,7 @@ export type BusinessIntent = {
   detectorVersion: "v1";
 };
 
-export type BusinessIntentAggregation = "sum" | "average" | "minimum" | "maximum";
+export type BusinessIntentAggregation = "count" | "sum" | "average" | "minimum" | "maximum";
 
 export type BusinessIntentAnalysisPath = {
   aggregation: BusinessIntentAggregation;

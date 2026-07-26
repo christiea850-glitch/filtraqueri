@@ -468,6 +468,12 @@ const fixtures: Fixture[] = [
   {
     name: "selecting Employee count resolves to existing count behavior descending",
     assert: () => [
+      ...(employeeCountPipeline?.resolution.intent.analysisPath?.aggregation === "count"
+        ? []
+        : ["Expected count-compatible analysisPath aggregation."]),
+      ...(employeeCountPipeline?.resolution.intent.analysisPath?.aggregation === "sum"
+        ? ["Employee count must not resolve internally as sum."]
+        : []),
       ...(employeeCountPipeline?.bridge.plan?.measures.length === 1 &&
       employeeCountPipeline.bridge.plan.measures[0]?.kind === "count_entities"
         ? []
@@ -475,9 +481,35 @@ const fixtures: Fixture[] = [
       ...(employeeCountPipeline?.renderResult.sql?.includes("COUNT(")
         ? []
         : ["Expected existing count SQL expression."]),
+      ...(employeeCountPipeline?.renderResult.sql?.includes("SUM(")
+        ? ["Employee count must not render SUM SQL."]
+        : []),
       ...(employeeCountPipeline?.bridge.plan?.orderBy[0]?.direction === "desc"
         ? []
         : ["Expected descending count sort."]),
+      ...(employeeCountPipeline?.bridge.plan?.rowLimit === null ? [] : ["Expected rowLimit null."]),
+    ],
+  },
+  {
+    name: "clarification decisions preserve friendly selected option labels",
+    assert: () => [
+      ...(totalSalaryPipeline?.resolution.decision.chosenOptionLabel === "Total salary"
+        ? []
+        : ["Expected Total salary decision label."]),
+      ...(averageSalaryPipeline?.resolution.decision.chosenOptionLabel === "Average salary"
+        ? []
+        : ["Expected Average salary decision label."]),
+      ...(employeeCountPipeline?.resolution.decision.chosenOptionLabel === "Employee count"
+        ? []
+        : ["Expected Employee count decision label."]),
+      ...(totalSalaryPipeline &&
+      totalSalaryPipeline.resolution.decision.chosenOptionId === totalSalaryPipeline.option.optionId
+        ? []
+        : ["Expected chosen option id to be preserved."]),
+      ...(totalSalaryPipeline &&
+      totalSalaryPipeline.resolution.decision.presentedOptionIds.includes(totalSalaryPipeline.option.optionId)
+        ? []
+        : ["Expected presented option ids to be preserved."]),
     ],
   },
   {
@@ -514,6 +546,25 @@ const fixtures: Fixture[] = [
         currentTaskPrompt: question,
         currentSqlDraft: sql,
       });
+      const legacyViewModel = createSqlResultProvenanceViewModel({
+        previewResult: {
+          columns: [],
+          rows: [],
+          message: "done",
+          executedQuestion: {
+            ...executedQuestion,
+            clarificationDecision: insertProvenance.clarificationDecision
+              ? {
+                  ambiguityId: insertProvenance.clarificationDecision.ambiguityId,
+                  chosenOptionId: insertProvenance.clarificationDecision.chosenOptionId,
+                  presentedOptionIds: insertProvenance.clarificationDecision.presentedOptionIds,
+                }
+              : undefined,
+          },
+        },
+        currentTaskPrompt: question,
+        currentSqlDraft: sql,
+      });
       return [
         ...(insertProvenance.clarificationDecision?.ambiguityId === ambiguity?.ambiguityId
           ? []
@@ -521,9 +572,18 @@ const fixtures: Fixture[] = [
         ...(executedQuestion.clarificationDecision?.chosenOptionId === totalSalaryPipeline.option.optionId
           ? []
           : ["Expected executed snapshot chosen option id."]),
-        ...(viewModel.clarificationText?.includes(totalSalaryPipeline.option.optionId)
+        ...(insertProvenance.clarificationDecision?.chosenOptionLabel === "Total salary"
           ? []
-          : ["Expected result provenance clarification summary."]),
+          : ["Expected insert provenance friendly option label."]),
+        ...(executedQuestion.clarificationDecision?.chosenOptionLabel === "Total salary"
+          ? []
+          : ["Expected executed snapshot friendly option label."]),
+        ...(viewModel.clarificationText === "Clarification: ranked departments by Total salary."
+          ? []
+          : [`Expected friendly result provenance clarification, received ${viewModel.clarificationText || "none"}.`]),
+        ...(legacyViewModel.clarificationText?.includes(totalSalaryPipeline.option.optionId)
+          ? []
+          : ["Expected legacy clarification provenance fallback to chosen option id."]),
       ];
     },
   },
