@@ -183,6 +183,51 @@ export function runSqlWorkspacePreviewFixtures(): SqlWorkspacePreviewFixtureRepo
     failureReasons: snapshotFailureReasons,
   });
 
+  const clarificationFailureReasons: string[] = [];
+  const clarificationSnapshot = createExecutedQuestionSnapshot({
+    taskPrompt: "",
+    sqlAtRun: "SELECT COUNT(*) FROM orders;",
+    ranAt: "2026-02-03T04:05:06.000Z",
+    sourceLabel: "Orders",
+    sourceTableName: "orders",
+    dataset,
+    clarificationDecision: {
+      ambiguityId: "ambiguity:metric",
+      chosenOptionId: "option:orders",
+      presentedOptionIds: ["option:orders", "option:customers"],
+    },
+  });
+  const legacySnapshot = createExecutedQuestionSnapshot({
+    taskPrompt: "",
+    sqlAtRun: "SELECT COUNT(*) FROM orders;",
+    ranAt: "2026-02-03T04:05:06.000Z",
+    sourceLabel: "Orders",
+    sourceTableName: "orders",
+    dataset,
+  });
+  expect(
+    legacySnapshot.clarificationDecision === undefined,
+    "Expected executed-question clarification decision to remain optional.",
+    clarificationFailureReasons,
+  );
+  expect(
+    clarificationSnapshot.clarificationDecision?.chosenOptionId === "option:orders",
+    "Expected executed-question clarification decision to pass through.",
+    clarificationFailureReasons,
+  );
+  expect(
+    clarificationSnapshot.clarificationDecision?.presentedOptionIds.join(",") ===
+      "option:orders,option:customers",
+    "Expected executed-question presented options to pass through.",
+    clarificationFailureReasons,
+  );
+  fixtures.push({
+    name: "Executed-question snapshot accepts optional clarification decision",
+    ok: clarificationFailureReasons.length === 0,
+    category: null,
+    failureReasons: clarificationFailureReasons,
+  });
+
   const tableFailureReasons: string[] = [];
   const errorExecutedQuestion = createExecutedQuestionSnapshot({
     taskPrompt: "Show missing table",

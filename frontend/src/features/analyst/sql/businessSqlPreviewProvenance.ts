@@ -1,3 +1,9 @@
+export type BusinessSqlClarificationDecisionProvenance = {
+  ambiguityId: string;
+  chosenOptionId: string;
+  presentedOptionIds: string[];
+};
+
 export type BusinessSqlPreviewInsertProvenance = {
   source: "business_sql_preview";
   activeTabId: string;
@@ -15,12 +21,14 @@ export type BusinessSqlPreviewInsertProvenance = {
   noProviderCall: true;
   noNetworkCall: true;
   noAuthRequired: true;
+  clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
 };
 
 export type BusinessSqlPreviewInsertProvenanceInput = {
   activeTabId: string;
   planId: string;
   sqlText: string;
+  clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
 };
 
 const fingerprintSql = (sqlText: string): string => {
@@ -36,6 +44,7 @@ export function createBusinessSqlPreviewInsertProvenance({
   activeTabId,
   planId,
   sqlText,
+  clarificationDecision,
 }: BusinessSqlPreviewInsertProvenanceInput): BusinessSqlPreviewInsertProvenance {
   return {
     source: "business_sql_preview",
@@ -54,6 +63,14 @@ export function createBusinessSqlPreviewInsertProvenance({
     noProviderCall: true,
     noNetworkCall: true,
     noAuthRequired: true,
+    ...(clarificationDecision
+      ? {
+          clarificationDecision: {
+            ...clarificationDecision,
+            presentedOptionIds: [...clarificationDecision.presentedOptionIds],
+          },
+        }
+      : {}),
   };
 }
 

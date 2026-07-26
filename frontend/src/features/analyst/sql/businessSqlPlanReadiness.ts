@@ -1,6 +1,11 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { BusinessSqlPlanSupportLevel } from "./businessSqlQueryPlan";
+import {
+  normalizeMetricAndMeasures,
+  type BusinessSqlSortTarget,
+} from "./businessSqlQueryPlan";
 import type { BusinessSqlQueryPlanJoinResolution } from "./businessSqlQueryPlanJoinResolution";
+import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
 
 export type BusinessSqlPlanReadinessStatus = "ready" | "needs_review" | "blocked";
 
@@ -11,7 +16,9 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "plan_support_needs_review"
   | "metric_missing"
   | "required_entity_missing"
-  | "grouping_missing";
+  | "grouping_missing"
+  | "sort_target_unresolved"
+  | "measure_field_type_incompatible";
 
 export type BusinessSqlRendererEligibility = {
   eligible: boolean;
@@ -40,10 +47,16 @@ const GROUPED_PLAN_KINDS = new Set([
 
 const unique = <T,>(values: readonly T[]): T[] => Array.from(new Set(values));
 
+const isSortTargetUnresolved = (target: BusinessSqlSortTarget): boolean =>
+  target.resolved === false ||
+  (target.kind === "measure" && !target.measureId) ||
+  (target.kind !== "measure" && !target.field);
+
 export function evaluateBusinessSqlPlanReadiness(
   integrated: BusinessSqlQueryPlanJoinResolution,
 ): BusinessSqlPlanReadiness {
   const { plan, joinResolution } = integrated;
+  const normalizedPlan = normalizeMetricAndMeasures(plan);
   const reasonCodes: BusinessSqlPlanReadinessReasonCode[] = [];
   const blockingReasons: string[] = [];
   const reviewReasons: string[] = [];
@@ -61,9 +74,23 @@ export function evaluateBusinessSqlPlanReadiness(
     reviewReasons.push("One or more required relationships need review.");
   }
 
-  if (!plan.metric) {
+  if (!normalizedPlan.metric && normalizedPlan.measures.length === 0) {
     reasonCodes.push("metric_missing");
     reviewReasons.push("The plan does not contain a supported metric.");
+  }
+
+  if ((plan.orderBy || []).some((sort) => isSortTargetUnresolved(sort.target))) {
+    reasonCodes.push("sort_target_unresolved");
+    reviewReasons.push("One or more planned sort targets are unresolved.");
+  }
+
+  if (
+    normalizedPlan.measures.some(
+      (measure) => !evaluateBusinessSqlMeasureCompatibility({ measure }).compatible,
+    )
+  ) {
+    reasonCodes.push("measure_field_type_incompatible");
+    reviewReasons.push("One or more planned measure fields are incompatible with the measure kind.");
   }
 
   if (plan.entities.filter((entity) => entity.required).length === 0) {

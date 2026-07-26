@@ -155,6 +155,40 @@ export const BUSINESS_SQL_PREVIEW_PROVENANCE_FIXTURES: ProvenanceFixture[] = [
     },
   },
   {
+    name: "optional clarification provenance remains backward compatible",
+    assert: () => {
+      const withoutClarification = createBusinessSqlPreviewInsertProvenance({
+        activeTabId: "sql-tab:business-preview",
+        planId: "business-sql-plan:orders-per-customer",
+        sqlText,
+      });
+      const withClarification = createBusinessSqlPreviewInsertProvenance({
+        activeTabId: "sql-tab:business-preview",
+        planId: "business-sql-plan:orders-per-customer",
+        sqlText,
+        clarificationDecision: {
+          ambiguityId: "ambiguity:metric",
+          chosenOptionId: "option:orders",
+          presentedOptionIds: ["option:orders", "option:revenue"],
+        },
+      });
+
+      return [
+        ...(withoutClarification.clarificationDecision === undefined
+          ? []
+          : ["Expected clarification provenance to remain optional."]),
+        ...(withClarification.clarificationDecision?.ambiguityId === "ambiguity:metric"
+          ? []
+          : ["Expected clarification ambiguity id to pass through."]),
+        ...(withClarification.clarificationDecision?.presentedOptionIds.join(",") ===
+        "option:orders,option:revenue"
+          ? []
+          : ["Expected presented clarification options to pass through."]),
+        ...expectSessionScopedSafety(withClarification),
+      ];
+    },
+  },
+  {
     name: "summary is metadata-only and does not imply account persistence",
     assert: () => {
       const summary = summarizeBusinessSqlPreviewInsertProvenance(provenance);

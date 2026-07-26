@@ -12,6 +12,7 @@ import type { SqlExecutionErrorInsight } from "./sqlErrorFormatter";
 import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
 import type { BusinessIntent } from "./businessIntentGrounding";
 import type { SqlBusinessQuestionShape } from "./sqlBusinessQuestionShape";
+import type { BusinessSqlClarificationDecisionProvenance } from "./businessSqlPreviewProvenance";
 
 export type SqlExecutionStatus =
   | "idle"
@@ -45,6 +46,7 @@ export type ExecutedQuestionSnapshot = {
   ranAt: string;
   sourceLabel: string | null;
   sourceTableName: string | null;
+  clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
 };
 
 export type SqlSuggestion = {

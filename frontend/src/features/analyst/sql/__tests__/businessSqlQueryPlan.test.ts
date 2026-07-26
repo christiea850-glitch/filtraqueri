@@ -8,13 +8,21 @@
  */
 
 import {
+  assignBusinessSqlMeasureAliases,
   createBlockedBusinessSqlQueryPlan,
   createEmptyBusinessSqlQueryPlan,
+  createBusinessSqlMeasureId,
+  createBusinessSqlRowLimitId,
+  createBusinessSqlSortId,
   isBusinessSqlQueryPlanRenderable,
   isBusinessSqlQueryPlanSupported,
+  normalizeMetricAndMeasures,
   summarizeBusinessSqlQueryPlan,
+  type BusinessSqlMeasure,
+  type BusinessSqlMeasureKind,
   type BusinessSqlQueryPlan,
 } from "../businessSqlQueryPlan";
+import { evaluateBusinessSqlMeasureCompatibility } from "../businessSqlMeasureCompatibility";
 
 type BusinessSqlQueryPlanFixture = {
   name: string;
@@ -303,6 +311,189 @@ const includesAll = (actual: string[], expected: string[]): boolean =>
   expected.every((value) => actual.includes(value));
 
 export const BUSINESS_SQL_QUERY_PLAN_FIXTURES: BusinessSqlQueryPlanFixture[] = [
+  {
+    name: "metric kind names remain unchanged and new measure kinds are representable",
+    plan: createEmptyBusinessSqlQueryPlan(),
+    assert: () => {
+      const metricKinds = ["count_rows", "count_entities", "count_distinct"] satisfies BusinessSqlMeasureKind[];
+      const measureKinds = ["sum", "average", "minimum", "maximum"] satisfies BusinessSqlMeasureKind[];
+      return [
+        ...(metricKinds.join(",") === "count_rows,count_entities,count_distinct"
+          ? []
+          : ["Expected legacy metric kind names to remain unchanged."]),
+        ...(measureKinds.join(",") === "sum,average,minimum,maximum"
+          ? []
+          : ["Expected new measure kind names to be representable."]),
+      ];
+    },
+  },
+  {
+    name: "metric and measures normalize bidirectionally without discarding multiples",
+    plan: createEmptyBusinessSqlQueryPlan(),
+    assert: () => {
+      const legacyMetric = {
+        kind: "count_entities" as const,
+        entity: "orders",
+        table: "orders",
+        distinct: false,
+        label: "count orders",
+      };
+      const firstMeasure: BusinessSqlMeasure = {
+        measureId: "business-sql-measure:orders-total",
+        kind: "sum",
+        entity: "orders",
+        table: "orders",
+        field: "amount",
+        fieldInferredType: "numeric",
+        distinct: false,
+        label: "Total salary expenditure",
+        sqlAlias: "total_salary_expenditure",
+      };
+      const secondMeasure: BusinessSqlMeasure = {
+        ...firstMeasure,
+        measureId: "business-sql-measure:orders-average",
+        kind: "average",
+        label: "Average tenure",
+        sqlAlias: "average_tenure",
+      };
+      const legacyOnly = normalizeMetricAndMeasures({
+        ...createEmptyBusinessSqlQueryPlan(),
+        metric: legacyMetric,
+      });
+      const measuresOnly = normalizeMetricAndMeasures({
+        ...createEmptyBusinessSqlQueryPlan(),
+        metric: null,
+        measures: [
+          {
+            ...legacyOnly.measures[0],
+            measureId: "business-sql-measure:legacy-first",
+          },
+        ],
+      });
+      const empty = normalizeMetricAndMeasures(createEmptyBusinessSqlQueryPlan());
+      const multiple = normalizeMetricAndMeasures({
+        ...createEmptyBusinessSqlQueryPlan(),
+        metric: legacyMetric,
+        measures: [firstMeasure, secondMeasure],
+      });
+
+      return [
+        ...(legacyOnly.measures.length === 1 && legacyOnly.measures[0]?.kind === "count_entities"
+          ? []
+          : ["Expected legacy metric-only plan to receive one canonical measure."]),
+        ...(measuresOnly.metric?.kind === "count_entities"
+          ? []
+          : ["Expected measures-only plan to receive a compatible legacy metric."]),
+        ...(empty.metric === null && empty.measures.length === 0
+          ? []
+          : ["Expected empty plan normalization to remain safe."]),
+        ...(multiple.measures.length === 2
+          ? []
+          : ["Expected multiple measures to be preserved."]),
+      ];
+    },
+  },
+  {
+    name: "primitive ids are deterministic and independent of labels",
+    plan: createEmptyBusinessSqlQueryPlan(),
+    assert: () => {
+      const labeledSalaryMeasure = {
+        kind: "sum" as const,
+        entity: "employees",
+        table: "employees",
+        field: "salary",
+        distinct: false,
+      };
+      const sort = {
+        target: {
+          kind: "field" as const,
+          entity: "employees",
+          table: "employees",
+          field: "salary",
+        },
+        direction: "desc" as const,
+      };
+      return [
+        ...(createBusinessSqlMeasureId(labeledSalaryMeasure) ===
+        createBusinessSqlMeasureId({ ...labeledSalaryMeasure })
+          ? []
+          : ["Expected measure id to be deterministic."]),
+        ...(createBusinessSqlSortId(sort) === createBusinessSqlSortId({ ...sort })
+          ? []
+          : ["Expected sort id to be deterministic."]),
+        ...(createBusinessSqlRowLimitId({ value: 25 }) === createBusinessSqlRowLimitId({ value: 25 })
+          ? []
+          : ["Expected row-limit id to be deterministic."]),
+      ];
+    },
+  },
+  {
+    name: "SQL aliases are readable and resolve collisions deterministically",
+    plan: createEmptyBusinessSqlQueryPlan(),
+    assert: () => {
+      const aliased = assignBusinessSqlMeasureAliases([
+        {
+          measureId: "m1",
+          kind: "sum",
+          table: "employees",
+          field: "salary",
+          distinct: false,
+          label: "Total salary expenditure",
+          sqlAlias: "",
+        },
+        {
+          measureId: "m2",
+          kind: "sum",
+          table: "contractors",
+          field: "salary",
+          distinct: false,
+          label: "Total salary expenditure",
+          sqlAlias: "",
+        },
+      ]);
+
+      return aliased[0]?.sqlAlias === "total_salary_expenditure" &&
+        aliased[1]?.sqlAlias === "total_salary_expenditure_2"
+        ? []
+        : ["Expected readable aliases with deterministic collision suffixes."];
+    },
+  },
+  {
+    name: "measure type compatibility follows aggregate matrix",
+    plan: createEmptyBusinessSqlQueryPlan(),
+    assert: () => {
+      const measure = (kind: BusinessSqlMeasureKind, fieldInferredType: BusinessSqlMeasure["fieldInferredType"]) => ({
+        measureId: `m:${kind}:${fieldInferredType}`,
+        kind,
+        field: "value",
+        fieldInferredType,
+        distinct: false,
+        label: kind,
+        sqlAlias: kind,
+      });
+
+      return [
+        ...(evaluateBusinessSqlMeasureCompatibility({ measure: measure("count_rows", "text") }).compatible
+          ? []
+          : ["Expected count_rows to preserve current supported behavior."]),
+        ...(evaluateBusinessSqlMeasureCompatibility({ measure: measure("sum", "numeric") }).compatible
+          ? []
+          : ["Expected sum to support numeric fields."]),
+        ...(!evaluateBusinessSqlMeasureCompatibility({ measure: measure("average", "date") }).compatible
+          ? []
+          : ["Expected average to reject date fields."]),
+        ...(evaluateBusinessSqlMeasureCompatibility({ measure: measure("minimum", "date") }).compatible
+          ? []
+          : ["Expected minimum to support date fields."]),
+        ...(evaluateBusinessSqlMeasureCompatibility({ measure: measure("maximum", "numeric") }).compatible
+          ? []
+          : ["Expected maximum to support numeric fields."]),
+        ...(!evaluateBusinessSqlMeasureCompatibility({ measure: measure("maximum", "categorical") }).compatible
+          ? []
+          : ["Expected maximum to reject categorical fields."]),
+      ];
+    },
+  },
   {
     name: "leased units per property is a distinct-unit multi-table grouped plan",
     plan: leasedUnitsPerPropertyPlan,

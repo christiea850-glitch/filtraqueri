@@ -6,7 +6,12 @@ import {
   attachBusinessSqlJoinResolutionToPlan,
   planBusinessSqlQueryRequestWithJoinResolution,
 } from "../businessSqlQueryPlanJoinResolution";
-import { createBlockedBusinessSqlQueryPlan } from "../businessSqlQueryPlan";
+import {
+  createBlockedBusinessSqlQueryPlan,
+  createEmptyBusinessSqlQueryPlan,
+  type BusinessSqlMeasure,
+} from "../businessSqlQueryPlan";
+import { evaluateBusinessSqlRendererCapability } from "../businessSqlRendererCapability";
 
 type Readiness = ReturnType<typeof evaluateBusinessSqlPlanReadiness>;
 type Fixture = {
@@ -45,6 +50,37 @@ const ordersRelationships = [
 ];
 const deterministicFirst = evaluate("Count orders per customer", ordersRelationships);
 const deterministicSecond = evaluate("Count orders per customer", ordersRelationships);
+
+const structurallyValidMultiMeasurePlan = (() => {
+  const firstMeasure: BusinessSqlMeasure = {
+    measureId: "business-sql-measure:orders:amount:sum",
+    kind: "sum",
+    entity: "orders",
+    table: "orders",
+    field: "amount",
+    fieldInferredType: "numeric",
+    distinct: false,
+    label: "Total amount",
+    sqlAlias: "total_amount",
+  };
+  const secondMeasure: BusinessSqlMeasure = {
+    ...firstMeasure,
+    measureId: "business-sql-measure:orders:amount:average",
+    kind: "average",
+    label: "Average amount",
+    sqlAlias: "average_amount",
+  };
+
+  return {
+    ...createEmptyBusinessSqlQueryPlan(),
+    id: "business-sql-plan:multi-measure-contract",
+    status: "resolved" as const,
+    support: "supported" as const,
+    entities: [{ entity: "orders", table: "orders", required: true, role: "source" as const }],
+    metric: null,
+    measures: [firstMeasure, secondMeasure],
+  };
+})();
 
 export const BUSINESS_SQL_PLAN_READINESS_FIXTURES: Fixture[] = [
   {
@@ -133,6 +169,28 @@ export const BUSINESS_SQL_PLAN_READINESS_FIXTURES: Fixture[] = [
       deterministicFirst.summary === deterministicSecond.summary
         ? []
         : ["Expected deterministic readiness summary."],
+  },
+  {
+    name: "multiple measures can be structurally valid while renderer is incapable",
+    readiness: evaluateBusinessSqlPlanReadiness(
+      attachBusinessSqlJoinResolutionToPlan({ plan: structurallyValidMultiMeasurePlan }),
+    ),
+    assert: (readiness) => {
+      const capability = evaluateBusinessSqlRendererCapability(structurallyValidMultiMeasurePlan);
+      return [
+        ...(readiness.status === "ready" &&
+        !readiness.reasonCodes.includes("measure_field_type_incompatible")
+          ? []
+          : ["Expected structurally valid multi-measure readiness."]),
+        ...(capability.status === "incapable" &&
+        capability.reasonCodes.includes("multiple_measures_not_supported")
+          ? []
+          : ["Expected renderer capability to reject multiple measures."]),
+        ...((readiness.reasonCodes as string[]).includes("multiple_measures_not_supported")
+          ? ["Structural readiness must not contain multiple_measures_not_supported."]
+          : []),
+      ];
+    },
   },
 ];
 

@@ -65,6 +65,7 @@ export function createExecutedQuestionSnapshot({
   sourceLabel,
   sourceTableName,
   dataset,
+  clarificationDecision,
 }: {
   taskPrompt: string;
   sqlAtRun: string;
@@ -72,6 +73,7 @@ export function createExecutedQuestionSnapshot({
   sourceLabel: string | null;
   sourceTableName: string | null;
   dataset: DatasetMetadata | null;
+  clarificationDecision?: ExecutedQuestionSnapshot["clarificationDecision"];
 }): ExecutedQuestionSnapshot {
   const trimmedPrompt = taskPrompt.trim();
 
@@ -90,6 +92,14 @@ export function createExecutedQuestionSnapshot({
     ranAt,
     sourceLabel,
     sourceTableName,
+    ...(clarificationDecision
+      ? {
+          clarificationDecision: {
+            ...clarificationDecision,
+            presentedOptionIds: [...clarificationDecision.presentedOptionIds],
+          },
+        }
+      : {}),
   };
 }
 

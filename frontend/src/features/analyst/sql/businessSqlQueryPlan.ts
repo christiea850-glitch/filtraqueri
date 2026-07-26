@@ -1,4 +1,5 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
+import type { SchemaColumn } from "../../dataset/datasetTypes";
 
 export type BusinessSqlPlanId = string;
 
@@ -34,6 +35,12 @@ export type BusinessSqlEntityRef = {
 };
 
 export type BusinessSqlMetricKind = "count_rows" | "count_entities" | "count_distinct";
+export type BusinessSqlMeasureKind =
+  | BusinessSqlMetricKind
+  | "sum"
+  | "average"
+  | "minimum"
+  | "maximum";
 
 export type BusinessSqlMetric = {
   kind: BusinessSqlMetricKind;
@@ -42,6 +49,51 @@ export type BusinessSqlMetric = {
   field?: string;
   distinct: boolean;
   label: string;
+};
+
+export type BusinessSqlMeasure = {
+  measureId: string;
+  kind: BusinessSqlMeasureKind;
+  entity?: string;
+  table?: string;
+  field?: string;
+  fieldInferredType?: SchemaColumn["inferred_type"];
+  distinct: boolean;
+  label: string;
+  sqlAlias: string;
+};
+
+export type BusinessSqlSortTarget =
+  | {
+      kind: "measure";
+      measureId: string;
+      resolved?: boolean;
+    }
+  | {
+      kind: "grouping";
+      entity?: string;
+      table?: string;
+      field?: string;
+      resolved?: boolean;
+    }
+  | {
+      kind: "field";
+      entity?: string;
+      table?: string;
+      field: string;
+      resolved?: boolean;
+    };
+
+export type BusinessSqlSort = {
+  sortId: string;
+  target: BusinessSqlSortTarget;
+  direction: "asc" | "desc";
+  label?: string;
+};
+
+export type BusinessSqlRowLimit = {
+  rowLimitId: string;
+  value: number;
 };
 
 export type BusinessSqlGrouping = {
@@ -143,8 +195,11 @@ export type BusinessSqlQueryPlan = {
   prompt?: string;
   entities: BusinessSqlEntityRef[];
   metric: BusinessSqlMetric | null;
+  measures: BusinessSqlMeasure[];
   groupings: BusinessSqlGrouping[];
   filters: BusinessSqlFilter[];
+  orderBy: BusinessSqlSort[];
+  rowLimit: BusinessSqlRowLimit | null;
   joinPath: BusinessSqlJoinPath;
   assumptions: BusinessSqlPlanAssumption[];
   warnings: BusinessSqlPlanWarning[];
@@ -176,6 +231,146 @@ const createPreview = (
   rendererSummary,
 });
 
+const stablePrimitiveId = (
+  prefix: string,
+  parts: ReadonlyArray<string | number | boolean | null | undefined>,
+): string =>
+  `${prefix}:${parts
+    .map((part) => String(part ?? "").trim().toLowerCase())
+    .join(":")
+    .replace(/[^a-z0-9:_-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")}`;
+
+export const createBusinessSqlMeasureId = (
+  measure: Pick<BusinessSqlMeasure, "kind" | "entity" | "table" | "field" | "distinct">,
+): string =>
+  stablePrimitiveId("business-sql-measure", [
+    measure.kind,
+    measure.entity,
+    measure.table,
+    measure.field,
+    measure.distinct,
+  ]);
+
+export const createBusinessSqlSortId = (
+  sort: Pick<BusinessSqlSort, "target" | "direction">,
+): string => {
+  const target = sort.target;
+  const targetParts =
+    target.kind === "measure"
+      ? [target.kind, target.measureId]
+      : [target.kind, target.entity, target.table, target.field];
+
+  return stablePrimitiveId("business-sql-sort", [...targetParts, sort.direction]);
+};
+
+export const createBusinessSqlRowLimitId = (
+  rowLimit: Pick<BusinessSqlRowLimit, "value">,
+): string => stablePrimitiveId("business-sql-row-limit", [rowLimit.value]);
+
+const slugifySqlAlias = (value: string): string => {
+  const alias = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  return alias || "measure";
+};
+
+export const createBusinessSqlMeasureAlias = (label: string): string =>
+  slugifySqlAlias(label);
+
+export const assignBusinessSqlMeasureAliases = (
+  measures: readonly BusinessSqlMeasure[],
+): BusinessSqlMeasure[] => {
+  const aliasCounts = new Map<string, number>();
+
+  return measures.map((measure) => {
+    const baseAlias = createBusinessSqlMeasureAlias(measure.label);
+    const nextCount = (aliasCounts.get(baseAlias) || 0) + 1;
+    aliasCounts.set(baseAlias, nextCount);
+
+    return {
+      ...measure,
+      sqlAlias: nextCount === 1 ? baseAlias : `${baseAlias}_${nextCount}`,
+    };
+  });
+};
+
+export const metricToBusinessSqlMeasure = (
+  metric: BusinessSqlMetric,
+): BusinessSqlMeasure => {
+  const measure = {
+    measureId: createBusinessSqlMeasureId(metric),
+    kind: metric.kind,
+    entity: metric.entity,
+    table: metric.table,
+    field: metric.field,
+    distinct: metric.distinct,
+    label: metric.label,
+    sqlAlias: createBusinessSqlMeasureAlias(metric.label),
+  };
+
+  return measure;
+};
+
+export const measureToBusinessSqlMetric = (
+  measure: BusinessSqlMeasure,
+): BusinessSqlMetric | null => {
+  if (
+    measure.kind !== "count_rows" &&
+    measure.kind !== "count_entities" &&
+    measure.kind !== "count_distinct"
+  ) {
+    return null;
+  }
+
+  return {
+    kind: measure.kind,
+    entity: measure.entity,
+    table: measure.table,
+    field: measure.field,
+    distinct: measure.distinct,
+    label: measure.label,
+  };
+};
+
+export const normalizeMetricAndMeasures = <
+  T extends {
+    metric?: BusinessSqlMetric | null;
+    measures?: readonly BusinessSqlMeasure[];
+  },
+>(
+  plan: T,
+): Omit<T, "metric" | "measures"> & {
+  metric: BusinessSqlMetric | null;
+  measures: BusinessSqlMeasure[];
+} => {
+  const inputMeasures = plan.measures || [];
+  const measures =
+    inputMeasures.length > 0
+      ? assignBusinessSqlMeasureAliases(
+          inputMeasures.map((measure) => ({
+            ...measure,
+            measureId: measure.measureId || createBusinessSqlMeasureId(measure),
+            sqlAlias: measure.sqlAlias || createBusinessSqlMeasureAlias(measure.label),
+          })),
+        )
+      : plan.metric
+        ? [metricToBusinessSqlMeasure(plan.metric)]
+        : [];
+  const metric = plan.metric || (measures[0] ? measureToBusinessSqlMetric(measures[0]) : null);
+
+  return {
+    ...plan,
+    metric,
+    measures,
+  };
+};
+
 export const createEmptyBusinessSqlQueryPlan = (): BusinessSqlQueryPlan => ({
   id: "business-sql-plan:empty",
   kind: "empty",
@@ -183,8 +378,11 @@ export const createEmptyBusinessSqlQueryPlan = (): BusinessSqlQueryPlan => ({
   support: "needs_review",
   entities: [],
   metric: null,
+  measures: [],
   groupings: [],
   filters: [],
+  orderBy: [],
+  rowLimit: null,
   joinPath: { ...EMPTY_JOIN_PATH, entities: [], edges: [], requirements: [] },
   assumptions: [],
   warnings: [],
