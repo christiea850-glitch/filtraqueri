@@ -4,8 +4,13 @@ import {
 } from "./businessSqlRenderabilityGate";
 import type {
   BusinessSqlJoinEdge,
+  BusinessSqlMeasure,
   BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
+import {
+  normalizeMetricAndMeasures,
+} from "./businessSqlQueryPlan";
+import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
 import type {
   BusinessSqlJoinPathResolution,
   BusinessSqlJoinRequirementResolution,
@@ -22,6 +27,7 @@ export type BusinessSqlRendererReasonCode =
   | "renderer_target_not_duckdb"
   | "join_resolution_unresolved"
   | "relationship_review_required"
+  | "renderer_capability_incapable"
   | "unsupported_plan_shape"
   | "incomplete_plan_metadata"
   | "unsafe_sql";
@@ -64,12 +70,8 @@ const quoteIdentifier = (identifier: string): string =>
 const qualified = (table: string, field: string): string =>
   `${quoteIdentifier(table)}.${quoteIdentifier(field)}`;
 
-const stableAlias = (label: string): string =>
-  label
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "") || "metric";
+const isValidIdentifier = (identifier: string | undefined): identifier is string =>
+  hasText(identifier) && !/[\u0000-\u001f\u007f]/.test(identifier);
 
 const summaryFor = (
   planId: string,
@@ -139,24 +141,41 @@ const rendered = (
   summary: summaryFor(integrated.plan.id, "rendered", "rendered", sql),
 });
 
-const groupingExpression = (plan: BusinessSqlQueryPlan): string | null => {
-  const grouping = plan.groupings[0];
-  if (!grouping || !hasText(grouping.table) || !hasText(grouping.field)) return null;
-  return qualified(grouping.table, grouping.field);
+const groupingExpressions = (plan: BusinessSqlQueryPlan): Array<{
+  expression: string;
+  alias: string;
+  table: string;
+  field: string;
+}> | null => {
+  const expressions = [];
+  for (const grouping of plan.groupings) {
+    if (!isValidIdentifier(grouping.table) || !isValidIdentifier(grouping.field)) return null;
+    expressions.push({
+      expression: qualified(grouping.table, grouping.field),
+      alias: grouping.label || grouping.field,
+      table: grouping.table,
+      field: grouping.field,
+    });
+  }
+  return expressions;
 };
 
-const metricExpression = (plan: BusinessSqlQueryPlan): string | null => {
-  if (!plan.metric) return null;
-  if (plan.metric.kind === "count_distinct") {
-    if (!hasText(plan.metric.table) || !hasText(plan.metric.field)) return null;
-    return `COUNT(DISTINCT ${qualified(plan.metric.table, plan.metric.field)})`;
+const metricExpression = (measure: BusinessSqlMeasure): string | null => {
+  if (measure.kind === "count_distinct") {
+    if (!isValidIdentifier(measure.table) || !isValidIdentifier(measure.field)) return null;
+    return `COUNT(DISTINCT ${qualified(measure.table, measure.field)})`;
   }
-  if (plan.metric.kind === "count_entities" || plan.metric.kind === "count_rows") {
-    if (hasText(plan.metric.table) && hasText(plan.metric.field)) {
-      return `COUNT(${qualified(plan.metric.table, plan.metric.field)})`;
+  if (measure.kind === "count_entities" || measure.kind === "count_rows") {
+    if (isValidIdentifier(measure.table) && isValidIdentifier(measure.field)) {
+      return `COUNT(${qualified(measure.table, measure.field)})`;
     }
     return "COUNT(*)";
   }
+  if (!isValidIdentifier(measure.table) || !isValidIdentifier(measure.field)) return null;
+  if (measure.kind === "sum") return `SUM(${qualified(measure.table, measure.field)})`;
+  if (measure.kind === "average") return `AVG(${qualified(measure.table, measure.field)})`;
+  if (measure.kind === "minimum") return `MIN(${qualified(measure.table, measure.field)})`;
+  if (measure.kind === "maximum") return `MAX(${qualified(measure.table, measure.field)})`;
   return null;
 };
 
@@ -204,25 +223,34 @@ const renderFromAndJoins = (
     .join("\n");
 };
 
-const isKnownRenderableShape = (plan: BusinessSqlQueryPlan): boolean => {
-  const grouping = plan.groupings[0];
-  if (plan.kind === "single_table_count_grouping") {
-    return plan.metric?.entity === "leases" && grouping?.field === "lease_status";
+const renderOrderBy = (
+  plan: BusinessSqlQueryPlan,
+  measure: BusinessSqlMeasure,
+  groupings: NonNullable<ReturnType<typeof groupingExpressions>>,
+): string | null => {
+  const sort = plan.orderBy[0];
+  if (!sort) return `ORDER BY ${quoteIdentifier(measure.sqlAlias)} DESC`;
+  const direction = sort.direction === "asc" ? "ASC" : "DESC";
+  if (sort.target.kind === "measure") {
+    if (sort.target.measureId !== measure.measureId) return null;
+    return `ORDER BY ${quoteIdentifier(measure.sqlAlias)} ${direction}`;
   }
-  if (plan.kind !== "multi_table_count_grouping") return false;
-
-  const path = plan.joinPath.entities.join(" -> ");
-  return (
-    (plan.metric?.entity === "orders" &&
-      grouping?.entity === "customers" &&
-      path === "customers -> orders") ||
-    (plan.metric?.entity === "tickets" &&
-      grouping?.entity === "accounts" &&
-      path === "accounts -> tickets") ||
-    (plan.metric?.entity === "units" &&
-      grouping?.entity === "properties" &&
-      path === "properties -> units -> leases")
+  const sortTarget = sort.target;
+  const grouping = groupings.find(
+    (candidate) =>
+      candidate.table === sortTarget.table &&
+      candidate.field === sortTarget.field,
   );
+  if (!grouping) return null;
+  return `ORDER BY ${quoteIdentifier(grouping.alias)} ${direction}`;
+};
+
+const renderLimit = (plan: BusinessSqlQueryPlan): string | null => {
+  if (!plan.rowLimit) return null;
+  if (!Number.isInteger(plan.rowLimit.value) || plan.rowLimit.value < 1 || plan.rowLimit.value > 10000) {
+    return null;
+  }
+  return `LIMIT ${plan.rowLimit.value}`;
 };
 
 const validateSelectOnlySql = (sql: string): SqlSafetyValidation => {
@@ -330,6 +358,17 @@ export function renderBusinessSqlFromRenderability({
   }
 
   const plan = integrated.plan;
+  const capability = evaluateBusinessSqlRendererCapability(plan);
+  if (!capability.capable) {
+    return refused({
+      integrated,
+      reasonCode: "renderer_capability_incapable",
+      status: "needs_review",
+      reasons: capability.reasonCodes.map((reason) => `Renderer capability is incapable: ${reason}.`),
+      warnings: renderability.warnings,
+    });
+  }
+
   if (plan.renderer.targetDialect !== "duckdb") {
     return refused({
       integrated,
@@ -340,7 +379,9 @@ export function renderBusinessSqlFromRenderability({
     });
   }
 
-  if (!isKnownRenderableShape(plan)) {
+  const normalizedPlan = normalizeMetricAndMeasures(plan);
+  const measure = normalizedPlan.measures[0];
+  if (!measure || normalizedPlan.measures.length !== 1 || plan.kind === "count_distinct_entity") {
     return refused({
       integrated,
       reasonCode: "unsupported_plan_shape",
@@ -350,12 +391,13 @@ export function renderBusinessSqlFromRenderability({
     });
   }
 
-  const grouping = groupingExpression(plan);
-  const metric = metricExpression(plan);
+  const groupings = groupingExpressions(plan);
+  const metric = metricExpression(measure);
   const fromAndJoins = renderFromAndJoins(integrated);
-  const alias = plan.metric ? stableAlias(plan.metric.label) : "metric";
+  const orderBy = groupings ? renderOrderBy(plan, measure, groupings) : null;
+  const limit = renderLimit(plan);
 
-  if (!grouping || !metric || !fromAndJoins) {
+  if (!groupings || groupings.length === 0 || !metric || !fromAndJoins || !orderBy || (plan.rowLimit && !limit)) {
     return refused({
       integrated,
       reasonCode: "incomplete_plan_metadata",
@@ -365,13 +407,19 @@ export function renderBusinessSqlFromRenderability({
     });
   }
 
+  const selectLines = groupings.map(
+    (grouping) => `  ${grouping.expression} AS ${quoteIdentifier(grouping.alias)},`,
+  );
+  const groupBy = `GROUP BY ${groupings.map((grouping) => grouping.expression).join(", ")}`;
+  const tailClauses = [orderBy, limit].filter((clause): clause is string => Boolean(clause));
   const sql = [
     "SELECT",
-    `  ${grouping} AS ${quoteIdentifier(plan.groupings[0]?.label || "grouping")},`,
-    `  ${metric} AS ${quoteIdentifier(alias)}`,
+    ...selectLines,
+    `  ${metric} AS ${quoteIdentifier(measure.sqlAlias)}`,
     fromAndJoins,
-    `GROUP BY ${grouping}`,
-    `ORDER BY ${quoteIdentifier(alias)} DESC;`,
+    groupBy,
+    ...tailClauses.slice(0, -1),
+    `${tailClauses[tailClauses.length - 1]};`,
   ].join("\n");
   const safety = validateSelectOnlySql(sql);
   if (!safety.ok) {

@@ -9,12 +9,22 @@ import type {
 import {
   createBlockedBusinessSqlQueryPlan,
   createEmptyBusinessSqlQueryPlan,
+  createBusinessSqlMeasureId,
+  createBusinessSqlRowLimitId,
+  createBusinessSqlSortId,
+  createBusinessSqlMeasureAlias,
+  measureToBusinessSqlMetric,
   type BusinessSqlEntityRef,
   type BusinessSqlFilter,
   type BusinessSqlGrouping,
   type BusinessSqlJoinEdge,
   type BusinessSqlJoinRequirement,
+  type BusinessSqlMeasure,
+  type BusinessSqlMeasureKind,
   type BusinessSqlMetric,
+  type BusinessSqlRowLimit,
+  type BusinessSqlSort,
+  type BusinessSqlSortTarget,
   type BusinessSqlPlanWarning,
   type BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
@@ -167,51 +177,91 @@ const mapEntities = (proposal: AdaptiveReportProposal): BusinessSqlEntityRef[] =
       role: roleForEntity(entity, proposal),
     }));
 
-const mapMetric = (
+const measureKindForMetric = (
+  metric: ProposedMetric,
+): BusinessSqlMeasureKind | null => {
+  if (
+    metric.kind === "count_rows" ||
+    metric.kind === "count_entities" ||
+    metric.kind === "sum" ||
+    metric.kind === "average" ||
+    metric.kind === "minimum" ||
+    metric.kind === "maximum"
+  ) {
+    return metric.kind;
+  }
+  return null;
+};
+
+const measureLabelForMetric = (metric: ProposedMetric): string => {
+  const column = metric.columnName?.trim().toLowerCase();
+  const columnLabel = column?.replace(/_/g, " ");
+  if (metric.kind === "sum" && column === "salary") return "Total salary expenditure";
+  if (metric.kind === "average" && column === "salary") return "Average salary";
+  if (metric.kind === "minimum" && column === "salary") return "Minimum salary";
+  if (metric.kind === "maximum" && column === "salary") return "Maximum salary";
+  if (metric.kind === "sum" && columnLabel) return `Total ${columnLabel}`;
+  if (metric.kind === "average" && columnLabel) return `Average ${columnLabel}`;
+  if (metric.kind === "minimum" && columnLabel) return `Minimum ${columnLabel}`;
+  if (metric.kind === "maximum" && columnLabel) return `Maximum ${columnLabel}`;
+  return metric.label;
+};
+
+const mapMeasures = (
   proposal: AdaptiveReportProposal,
 ): {
-  metric: BusinessSqlMetric | null;
+  measures: BusinessSqlMeasure[];
+  byMetricId: Map<string, BusinessSqlMeasure>;
   issues: AdaptiveProposalBusinessSqlBridgeIssue[];
 } => {
-  const supportedMetric =
-    proposal.metrics.find((metric) => metric.kind === "count_rows" || metric.kind === "count_entities") ||
-    null;
-  if (!supportedMetric) {
-    const unsupported = proposal.metrics[0];
-    return {
-      metric: null,
-      issues: [
+  const measures: BusinessSqlMeasure[] = [];
+  const byMetricId = new Map<string, BusinessSqlMeasure>();
+  const issues: AdaptiveProposalBusinessSqlBridgeIssue[] = [];
+
+  for (const metric of proposal.metrics) {
+    const kind = measureKindForMetric(metric);
+    if (!kind) {
+      issues.push(
         issue(
-          unsupported ? "unsupported_metric" : "missing_metric",
+          "unsupported_metric",
           "blocking",
-          unsupported
-            ? `Metric ${unsupported.label} is not supported by the deterministic bridge yet.`
-            : "Adaptive proposal does not contain a metric.",
+          `Metric ${metric.label} is not supported by the deterministic bridge yet.`,
         ),
-      ],
+      );
+      continue;
+    }
+
+    const entity = fallbackEntity(proposal.entities, metric);
+    const label = measureLabelForMetric(metric);
+    const measureSeed = {
+      kind,
+      entity: entity?.label,
+      table: metric.tableName || entity?.tableName || undefined,
+      field: metric.columnName || undefined,
+      distinct: false,
     };
+    const measure: BusinessSqlMeasure = {
+      ...measureSeed,
+      measureId: createBusinessSqlMeasureId(measureSeed),
+      fieldInferredType: metric.inferredType,
+      label,
+      sqlAlias: createBusinessSqlMeasureAlias(label),
+    };
+    measures.push(measure);
+    byMetricId.set(metric.id, measure);
+
+    if (metric.confidence !== "high") {
+      issues.push(
+        issue(
+          "low_confidence",
+          "warning",
+          `Metric ${metric.label} requires review before rendering.`,
+        ),
+      );
+    }
   }
 
-  const entity = fallbackEntity(proposal.entities, supportedMetric);
-  return {
-    metric: {
-      kind: supportedMetric.kind === "count_rows" ? "count_rows" : "count_entities",
-      entity: entity?.label,
-      table: supportedMetric.tableName || entity?.tableName || undefined,
-      field: supportedMetric.columnName || undefined,
-      distinct: false,
-      label: supportedMetric.label,
-    },
-    issues: supportedMetric.confidence === "high"
-      ? []
-      : [
-          issue(
-            "low_confidence",
-            "warning",
-            `Metric ${supportedMetric.label} requires review before rendering.`,
-          ),
-        ],
-  };
+  return { measures, byMetricId, issues };
 };
 
 const mapGroupings = (proposal: AdaptiveReportProposal): BusinessSqlGrouping[] =>
@@ -266,6 +316,38 @@ const mapFilters = (
   }
 
   return { filters, issues };
+};
+
+const mapOrderBy = (
+  proposal: AdaptiveReportProposal,
+  measuresByMetricId: ReadonlyMap<string, BusinessSqlMeasure>,
+): BusinessSqlSort[] =>
+  (proposal.sorts || []).map((sort): BusinessSqlSort => {
+    const targetMeasure = sort.target === "metric" ? measuresByMetricId.get(sort.targetId) : null;
+    const grouping = proposal.groupings.find((candidate) => candidate.id === sort.targetId);
+    const target: BusinessSqlSortTarget = targetMeasure
+      ? { kind: "measure", measureId: targetMeasure.measureId, resolved: true }
+      : {
+          kind: "grouping",
+          field: grouping?.columnName || undefined,
+          table: grouping?.tableName || undefined,
+          resolved: false,
+        };
+    return {
+      sortId: createBusinessSqlSortId({ target, direction: sort.direction }),
+      target,
+      direction: sort.direction,
+      label: sort.label,
+    };
+  });
+
+const mapRowLimit = (proposal: AdaptiveReportProposal): BusinessSqlRowLimit | null => {
+  if (!proposal.rowLimit) return null;
+  const rowLimit = { value: proposal.rowLimit.value };
+  return {
+    ...rowLimit,
+    rowLimitId: createBusinessSqlRowLimitId(rowLimit),
+  };
 };
 
 const joinEntityLabel = (
@@ -346,9 +428,9 @@ const planKindFor = (
   groupings: readonly BusinessSqlGrouping[],
   joinPath: BusinessSqlQueryPlan["joinPath"],
 ): BusinessSqlQueryPlan["kind"] => {
-  if (!metric) return "empty";
   if (joinPath.required) return "multi_table_count_grouping";
   if (groupings.length > 0) return "single_table_count_grouping";
+  if (!metric) return "empty";
   return "count_distinct_entity";
 };
 
@@ -463,12 +545,18 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
   }
 
   const entities = mapEntities(proposal);
-  const metricResult = mapMetric(proposal);
-  if (!metricResult.metric) {
-    return blockedResult("Adaptive proposal metric is not supported by the Business SQL bridge.", metricResult.issues);
+  const measureResult = mapMeasures(proposal);
+  if (measureResult.measures.length === 0 || measureResult.issues.some((item) => item.severity === "blocking")) {
+    return blockedResult("Adaptive proposal metric is not supported by the Business SQL bridge.", measureResult.issues);
   }
+  const metricResult = {
+    metric: measureToBusinessSqlMetric(measureResult.measures[0]),
+    issues: measureResult.issues,
+  };
 
   const groupings = mapGroupings(proposal);
+  const orderBy = mapOrderBy(proposal, measureResult.byMetricId);
+  const rowLimit = mapRowLimit(proposal);
   const filterResult = mapFilters(proposal);
   const joinResult = mapJoinNeeds(proposal);
   const confidenceIssues =
@@ -507,8 +595,11 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     prompt: proposal.question,
     entities,
     metric: metricResult.metric,
+    measures: measureResult.measures,
     groupings,
     filters: filterResult.filters,
+    orderBy,
+    rowLimit,
     joinPath: joinResult.joinPath,
     assumptions: proposal.assumptions.map((assumption) => ({ ...assumption })),
     warnings: mapWarnings(proposal, bridgeIssues),

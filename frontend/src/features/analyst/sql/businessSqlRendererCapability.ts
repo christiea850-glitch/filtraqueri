@@ -26,7 +26,7 @@ export function evaluateBusinessSqlRendererCapability(
     reasonCodes.push("multiple_measures_not_supported");
   }
 
-  if (!normalized.metric && normalized.measures.length > 0) {
+  if (normalized.measures.length === 0 && !normalized.metric) {
     reasonCodes.push("unrecognized_plan_shape");
   }
 
@@ -37,4 +37,3 @@ export function evaluateBusinessSqlRendererCapability(
     metadataOnly: true,
   };
 }
-

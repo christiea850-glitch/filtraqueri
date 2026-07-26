@@ -1,8 +1,10 @@
 import type {
-  BusinessSqlMetricKind,
   BusinessSqlQueryPlan,
   BusinessSqlRendererStatus,
 } from "./businessSqlQueryPlan";
+import { normalizeMetricAndMeasures } from "./businessSqlQueryPlan";
+import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
+import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
 
 export type BusinessSqlRenderReadinessStatus =
   | "renderable"
@@ -19,12 +21,6 @@ export type BusinessSqlRenderReadinessResult = {
   warnings: string[];
   planId: string;
 };
-
-const validMetricKinds: BusinessSqlMetricKind[] = [
-  "count_rows",
-  "count_entities",
-  "count_distinct",
-];
 
 const groupingKinds = new Set<BusinessSqlQueryPlan["kind"]>([
   "single_table_count_grouping",
@@ -46,6 +42,8 @@ const readySummary = (status: BusinessSqlRenderReadinessStatus): string => {
 export function evaluateBusinessSqlRenderReadiness(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRenderReadinessResult {
+  const normalizedPlan = normalizeMetricAndMeasures(plan);
+  const rendererCapability = evaluateBusinessSqlRendererCapability(plan);
   const reasons: string[] = [];
   const warnings: string[] = [];
 
@@ -69,17 +67,30 @@ export function evaluateBusinessSqlRenderReadiness(
     reasons.push("Plan has blocking warnings.");
   }
 
-  if (!plan.metric) {
+  if (normalizedPlan.measures.length === 0) {
     reasons.push("Plan must include a metric.");
   } else {
-    if (!validMetricKinds.includes(plan.metric.kind)) {
-      reasons.push("Plan metric kind is not supported for rendering.");
-    }
-    if (!hasText(plan.metric.label)) {
-      reasons.push("Plan metric must include a label.");
-    }
-    if (plan.metric.entity && !hasText(plan.metric.table)) {
-      reasons.push("Plan metric entity must have a table mapping.");
+    for (const measure of normalizedPlan.measures) {
+      const compatibility = evaluateBusinessSqlMeasureCompatibility({ measure });
+      if (!compatibility.compatible) {
+        reasons.push(`Measure ${measure.label || measure.kind} is incompatible with its field type.`);
+      }
+      if (!hasText(measure.label)) {
+        reasons.push("Plan measure must include a label.");
+      }
+      if (!hasText(measure.sqlAlias)) {
+        reasons.push("Plan measure must include a SQL alias.");
+      }
+      if (measure.entity && !hasText(measure.table)) {
+        reasons.push("Plan measure entity must have a table mapping.");
+      }
+      if (
+        measure.kind !== "count_rows" &&
+        measure.kind !== "count_entities" &&
+        !hasText(measure.field)
+      ) {
+        reasons.push(`Measure ${measure.label || measure.kind} must include a field.`);
+      }
     }
   }
 
@@ -141,12 +152,38 @@ export function evaluateBusinessSqlRenderReadiness(
     }
   }
 
+  for (const sort of plan.orderBy || []) {
+    if (sort.target.resolved === false) {
+      reasons.push(`Sort ${sort.label || sort.sortId} target must be resolved before rendering.`);
+    }
+    if (sort.target.kind === "measure") {
+      const measureId = sort.target.measureId;
+      if (!normalizedPlan.measures.some((measure) => measure.measureId === measureId)) {
+        reasons.push(`Sort ${sort.label || sort.sortId} must reference a planned measure.`);
+      }
+    } else if (!hasText(sort.target.field)) {
+      reasons.push(`Sort ${sort.label || sort.sortId} must include a field.`);
+    }
+  }
+
+  if (plan.rowLimit) {
+    if (!Number.isInteger(plan.rowLimit.value) || plan.rowLimit.value < 1 || plan.rowLimit.value > 10000) {
+      reasons.push("Row limit must be a positive integer no greater than 10000.");
+    }
+  }
+
   if (plan.renderer.targetDialect !== "duckdb") {
     reasons.push("Renderer target dialect must remain DuckDB.");
   }
 
   if (plan.renderer.sql) {
     reasons.push("Plan must not contain rendered SQL text before readiness.");
+  }
+
+  if (!rendererCapability.capable) {
+    reasons.push(
+      ...rendererCapability.reasonCodes.map((reason) => `Renderer capability is incapable: ${reason}.`),
+    );
   }
 
   if (plan.renderer.status === "rendered") {

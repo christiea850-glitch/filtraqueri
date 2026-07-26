@@ -43,6 +43,14 @@ export type BusinessIntentFixture = {
   expectedPrimary: BusinessIntentCategory | BusinessIntentCategory[];
   mustNotInclude: BusinessIntentCategory[];
   expectedEntitiesSubset?: string[];
+  expectedMetricsExact?: string[];
+  expectedAnalysisPath?: {
+    aggregation: NonNullable<BusinessIntent["analysisPath"]>["aggregation"];
+    measureField: string;
+    groupingField: string;
+    orderDirection: NonNullable<BusinessIntent["analysisPath"]>["orderDirection"];
+    rowLimit: number | null;
+  };
   expectedTemporal?: boolean;
   description?: string;
 };
@@ -66,6 +74,70 @@ export type BusinessIntentFixtureReport = {
  * one of the existing ones means the detector regressed.
  */
 export const BUSINESS_INTENT_FIXTURES: BusinessIntentFixture[] = [
+  {
+    prompt: "Show the five departments with the highest total salary expenditure.",
+    expectedPrimary: ["top_bottom", "grouping"],
+    mustNotInclude: ["expiration"],
+    expectedEntitiesSubset: ["departments", "employees"],
+    expectedMetricsExact: ["sum_salary"],
+    expectedAnalysisPath: {
+      aggregation: "sum",
+      measureField: "salary",
+      groupingField: "department",
+      orderDirection: "descending",
+      rowLimit: 5,
+    },
+    expectedTemporal: false,
+    description: "PS-1b approved explicit analysis path for salary expenditure by department.",
+  },
+  {
+    prompt: "Show departments with the lowest total cost.",
+    expectedPrimary: ["top_bottom", "grouping"],
+    mustNotInclude: ["expiration"],
+    expectedEntitiesSubset: ["departments"],
+    expectedMetricsExact: ["sum_cost"],
+    expectedAnalysisPath: {
+      aggregation: "sum",
+      measureField: "cost",
+      groupingField: "department",
+      orderDirection: "ascending",
+      rowLimit: null,
+    },
+    expectedTemporal: false,
+    description: "PS-1b generic aggregate path: lowest total cost is SUM(cost) ordered ascending.",
+  },
+  {
+    prompt: "Show departments with the highest total salary.",
+    expectedPrimary: ["top_bottom", "grouping"],
+    mustNotInclude: ["expiration"],
+    expectedEntitiesSubset: ["departments", "employees"],
+    expectedMetricsExact: ["sum_salary"],
+    expectedAnalysisPath: {
+      aggregation: "sum",
+      measureField: "salary",
+      groupingField: "department",
+      orderDirection: "descending",
+      rowLimit: null,
+    },
+    expectedTemporal: false,
+    description: "PS-1b aggregate/order split: highest total salary is SUM(salary), not MAX(salary).",
+  },
+  {
+    prompt: "Show departments with the highest average salary.",
+    expectedPrimary: ["top_bottom", "grouping"],
+    mustNotInclude: ["expiration"],
+    expectedEntitiesSubset: ["departments", "employees"],
+    expectedMetricsExact: ["average_salary"],
+    expectedAnalysisPath: {
+      aggregation: "average",
+      measureField: "salary",
+      groupingField: "department",
+      orderDirection: "descending",
+      rowLimit: null,
+    },
+    expectedTemporal: false,
+    description: "PS-1b generic aggregate path: highest average salary is AVG(salary) ordered descending.",
+  },
   {
     prompt: "find the number of units in properties that are leased to tenants",
     expectedPrimary: "count_grouping",
@@ -217,6 +289,49 @@ export function runBusinessIntentFixtures(): BusinessIntentFixtureReport {
       );
       if (missing.length > 0) {
         failureReasons.push(`missing expected entities: ${missing.join(", ")}`);
+      }
+    }
+
+    if (fixture.expectedMetricsExact) {
+      const actualMetrics = [...detected.metrics].sort();
+      const expectedMetrics = [...fixture.expectedMetricsExact].sort();
+      if (actualMetrics.join(",") !== expectedMetrics.join(",")) {
+        failureReasons.push(
+          `metrics expected exactly ${expectedMetrics.join(",")} but got ${actualMetrics.join(",")}`,
+        );
+      }
+    }
+
+    if (fixture.expectedAnalysisPath) {
+      const actual = detected.analysisPath;
+      if (!actual) {
+        failureReasons.push("missing expected explicit analysis path");
+      } else {
+        if (actual.aggregation !== fixture.expectedAnalysisPath.aggregation) {
+          failureReasons.push(
+            `analysis aggregation expected ${fixture.expectedAnalysisPath.aggregation} but got ${actual.aggregation}`,
+          );
+        }
+        if (actual.measureField !== fixture.expectedAnalysisPath.measureField) {
+          failureReasons.push(
+            `analysis measureField expected ${fixture.expectedAnalysisPath.measureField} but got ${actual.measureField}`,
+          );
+        }
+        if (actual.groupingField !== fixture.expectedAnalysisPath.groupingField) {
+          failureReasons.push(
+            `analysis groupingField expected ${fixture.expectedAnalysisPath.groupingField} but got ${actual.groupingField}`,
+          );
+        }
+        if (actual.orderDirection !== fixture.expectedAnalysisPath.orderDirection) {
+          failureReasons.push(
+            `analysis orderDirection expected ${fixture.expectedAnalysisPath.orderDirection} but got ${actual.orderDirection}`,
+          );
+        }
+        if (actual.rowLimit !== fixture.expectedAnalysisPath.rowLimit) {
+          failureReasons.push(
+            `analysis rowLimit expected ${fixture.expectedAnalysisPath.rowLimit} but got ${actual.rowLimit}`,
+          );
+        }
       }
     }
 

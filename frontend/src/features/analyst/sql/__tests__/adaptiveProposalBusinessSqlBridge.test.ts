@@ -6,11 +6,14 @@
  */
 
 import type { AcceptedRelationshipContract } from "../../../workbook";
+import type { SchemaColumn } from "../../../dataset/datasetTypes";
 import type { AdaptiveReportProposal, ProposedMetric } from "../adaptiveReportProposal";
+import { proposeAdaptiveReport } from "../adaptiveReportProposal";
 import {
   createBusinessSqlPlanFromAdaptiveProposal,
   type AdaptiveProposalBusinessSqlBridgeResult,
 } from "../adaptiveProposalBusinessSqlBridge";
+import { detectBusinessIntent } from "../businessIntentGrounding";
 
 type FixtureResult = {
   name: string;
@@ -106,6 +109,8 @@ const baseProposal = (): AdaptiveReportProposal => ({
       confidence: "high",
     },
   ],
+  sorts: [],
+  rowLimit: null,
   filters: [],
   joinNeeds: [],
   assumptions: [],
@@ -130,6 +135,83 @@ const baseProposal = (): AdaptiveReportProposal => ({
   payloadFingerprint: "adaptive:fingerprint:leases-by-status",
   proposalNarrative: "Count leases grouped by status.",
 });
+
+const column = (
+  name: string,
+  inferred_type: SchemaColumn["inferred_type"],
+): SchemaColumn => ({
+  name,
+  type: inferred_type === "numeric" ? "DOUBLE" : "VARCHAR",
+  inferred_type,
+  null_count: 0,
+  unique_count: inferred_type === "categorical" ? 4 : 10,
+  sample_values: [],
+});
+
+const employeeWorksheet = {
+  worksheetId: "worksheet:employees",
+  displayName: "Employees",
+  sheetName: "Employees",
+  tableName: "employees",
+  schema: [
+    column("employee_id", "text"),
+    column("department", "categorical"),
+    column("salary", "numeric"),
+  ],
+};
+
+const departmentWorksheet = {
+  worksheetId: "worksheet:departments",
+  displayName: "Departments",
+  sheetName: "Departments",
+  tableName: "departments",
+  schema: [
+    column("department", "categorical"),
+    column("cost", "numeric"),
+  ],
+};
+
+const approvedQuestion = "Show the five departments with the highest total salary expenditure.";
+const approvedProposal = proposeAdaptiveReport({
+  prompt: approvedQuestion,
+  detectedIntent: detectBusinessIntent(approvedQuestion),
+  worksheets: [employeeWorksheet],
+  appliedScopeSelections: [
+    {
+      worksheetId: employeeWorksheet.worksheetId,
+      sourceType: "original",
+      tableName: employeeWorksheet.tableName,
+      originalTableName: employeeWorksheet.tableName,
+    },
+  ],
+});
+
+const proposalForQuestion = (
+  prompt: string,
+  worksheet: typeof employeeWorksheet | typeof departmentWorksheet,
+): AdaptiveReportProposal =>
+  proposeAdaptiveReport({
+    prompt,
+    detectedIntent: detectBusinessIntent(prompt),
+    worksheets: [worksheet],
+    appliedScopeSelections: [
+      {
+        worksheetId: worksheet.worksheetId,
+        sourceType: "original",
+        tableName: worksheet.tableName,
+        originalTableName: worksheet.tableName,
+      },
+    ],
+  });
+
+const lowestTotalCostProposal = proposalForQuestion(
+  "Show departments with the lowest total cost.",
+  departmentWorksheet,
+);
+const highestAverageSalaryProposal = proposalForQuestion(
+  "Show departments with the highest average salary.",
+  employeeWorksheet,
+);
 
 const withProposal = (overrides: Partial<AdaptiveReportProposal>): AdaptiveReportProposal => ({
   ...baseProposal(),
@@ -341,8 +423,8 @@ const fixtures: Fixture[] = [
         metrics: [
           {
             ...(baseProposal().metrics[0] as ProposedMetric),
-            kind: "average",
-            label: "average lease value",
+            kind: "metric_column",
+            label: "lease value",
             columnName: "lease_value",
           },
         ],
@@ -355,6 +437,114 @@ const fixtures: Fixture[] = [
         : ["Expected unsupported metric issue."]),
       ...expectNoExecutionSurface(result),
     ],
+  },
+  {
+    name: "approved salary question carries measure sort and row limit into Business SQL plan",
+    result: bridge(approvedProposal),
+    assert: (result) => {
+      const measure = result.plan?.measures[0];
+      const sort = result.plan?.orderBy[0];
+      return [
+        ...(approvedProposal.support === "supported" ? [] : ["Expected approved proposal to be supported."]),
+        ...(approvedProposal.confidence === "high" ? [] : ["Expected approved proposal to be high confidence."]),
+        ...(approvedProposal.metrics.length === 1 ? [] : ["Expected approved question to ground exactly one metric."]),
+        ...(approvedProposal.metrics[0]?.kind === "sum" ? [] : ["Expected approved metric kind to be sum."]),
+        ...(approvedProposal.metrics.some((metric) => metric.kind === "maximum")
+          ? ["Highest should drive ordering, not add a maximum metric."]
+          : []),
+        ...(approvedProposal.detectedIntent.analysisPath?.aggregation === "sum"
+          ? []
+          : ["Expected approved question to ground to sum aggregation."]),
+        ...(approvedProposal.detectedIntent.analysisPath?.measureField === "salary"
+          ? []
+          : ["Expected approved question to ground salary as measure field."]),
+        ...(approvedProposal.detectedIntent.analysisPath?.groupingField === "department"
+          ? []
+          : ["Expected approved question to ground department as grouping field."]),
+        ...(approvedProposal.detectedIntent.analysisPath?.orderDirection === "descending"
+          ? []
+          : ["Expected approved question to ground descending order."]),
+        ...(approvedProposal.detectedIntent.analysisPath?.rowLimit === 5
+          ? []
+          : ["Expected approved question to ground row limit 5."]),
+        ...(result.state === "render_ready_plan" ? [] : ["Expected approved bridge result to be render_ready_plan."]),
+        ...(result.readiness?.status === "renderable" ? [] : ["Expected approved bridge readiness to be renderable."]),
+        ...(result.plan?.support === "supported" ? [] : ["Expected approved plan support to be supported."]),
+        ...(result.plan?.renderer.status === "renderable" ? [] : ["Expected approved renderer status to be renderable."]),
+        ...(result.plan?.measures.length === 1 ? [] : ["Expected approved Business SQL plan to contain exactly one measure."]),
+        ...(measure?.kind === "sum" && measure.field === "salary"
+          ? []
+          : ["Expected one sum salary measure."]),
+        ...(measure?.sqlAlias === "total_salary_expenditure"
+          ? []
+          : ["Expected readable deterministic total_salary_expenditure alias."]),
+        ...(measure?.measureId ? [] : ["Expected stable measure id."]),
+        ...(result.plan?.groupings[0]?.field === "department"
+          ? []
+          : ["Expected department grouping."]),
+        ...(sort?.target.kind === "measure" && sort.target.measureId === measure?.measureId && sort.direction === "desc"
+          ? []
+          : ["Expected descending sort by measure id."]),
+        ...(result.plan?.rowLimit?.value === 5 ? [] : ["Expected row limit 5."]),
+        ...(result.plan?.joinPath.status === "not_required" ? [] : ["Expected existing no-join path to be preserved."]),
+        ...expectNoExecutionSurface(result),
+      ];
+    },
+  },
+  {
+    name: "lowest total cost carries one sum cost measure and ascending sort",
+    result: bridge(lowestTotalCostProposal),
+    assert: (result) => {
+      const measure = result.plan?.measures[0];
+      const sort = result.plan?.orderBy[0];
+      return [
+        ...(lowestTotalCostProposal.support === "supported" ? [] : ["Expected lowest total cost proposal to be supported."]),
+        ...(lowestTotalCostProposal.metrics.length === 1 ? [] : ["Expected lowest total cost to ground exactly one metric."]),
+        ...(lowestTotalCostProposal.metrics[0]?.kind === "sum" ? [] : ["Expected lowest total cost metric kind to be sum."]),
+        ...(lowestTotalCostProposal.metrics.some((metric) => metric.kind === "minimum")
+          ? ["Lowest total cost should order ascending, not add a minimum metric."]
+          : []),
+        ...(result.state === "render_ready_plan" ? [] : ["Expected lowest total cost bridge result to be render_ready_plan."]),
+        ...(result.readiness?.status === "renderable" ? [] : ["Expected lowest total cost bridge readiness to be renderable."]),
+        ...(result.plan?.renderer.status === "renderable" ? [] : ["Expected lowest total cost renderer status to be renderable."]),
+        ...(result.plan?.measures.length === 1 ? [] : ["Expected one Business SQL measure."]),
+        ...(measure?.kind === "sum" && measure.field === "cost"
+          ? []
+          : ["Expected one sum cost measure."]),
+        ...(measure?.sqlAlias === "total_cost" ? [] : ["Expected total_cost SQL alias."]),
+        ...(result.plan?.groupings[0]?.field === "department"
+          ? []
+          : ["Expected department grouping."]),
+        ...(sort?.target.kind === "measure" && sort.target.measureId === measure?.measureId && sort.direction === "asc"
+          ? []
+          : ["Expected ascending sort by sum cost measure id."]),
+        ...(result.plan?.rowLimit === null ? [] : ["Expected no row limit without an explicit limit."]),
+        ...expectNoExecutionSurface(result),
+      ];
+    },
+  },
+  {
+    name: "highest average salary carries one average salary measure and descending sort",
+    result: bridge(highestAverageSalaryProposal),
+    assert: (result) => {
+      const measure = result.plan?.measures[0];
+      const sort = result.plan?.orderBy[0];
+      return [
+        ...(highestAverageSalaryProposal.metrics.length === 1 ? [] : ["Expected highest average salary to ground exactly one metric."]),
+        ...(highestAverageSalaryProposal.metrics[0]?.kind === "average" ? [] : ["Expected average metric kind."]),
+        ...(highestAverageSalaryProposal.metrics.some((metric) => metric.kind === "maximum")
+          ? ["Highest average salary should order descending, not add a maximum metric."]
+          : []),
+        ...(result.state === "render_ready_plan" ? [] : ["Expected highest average salary bridge result to be render_ready_plan."]),
+        ...(measure?.kind === "average" && measure.field === "salary"
+          ? []
+          : ["Expected one average salary measure."]),
+        ...(sort?.target.kind === "measure" && sort.target.measureId === measure?.measureId && sort.direction === "desc"
+          ? []
+          : ["Expected descending sort by average salary measure id."]),
+        ...expectNoExecutionSurface(result),
+      ];
+    },
   },
   {
     name: "verified relationship resolves through accepted contracts",

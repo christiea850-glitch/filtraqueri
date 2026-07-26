@@ -18,7 +18,8 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "required_entity_missing"
   | "grouping_missing"
   | "sort_target_unresolved"
-  | "measure_field_type_incompatible";
+  | "measure_field_type_incompatible"
+  | "row_limit_invalid";
 
 export type BusinessSqlRendererEligibility = {
   eligible: boolean;
@@ -91,6 +92,14 @@ export function evaluateBusinessSqlPlanReadiness(
   ) {
     reasonCodes.push("measure_field_type_incompatible");
     reviewReasons.push("One or more planned measure fields are incompatible with the measure kind.");
+  }
+
+  if (
+    plan.rowLimit &&
+    (!Number.isInteger(plan.rowLimit.value) || plan.rowLimit.value < 1 || plan.rowLimit.value > 10000)
+  ) {
+    reasonCodes.push("row_limit_invalid");
+    reviewReasons.push("The planned row limit is not a safe positive bounded integer.");
   }
 
   if (plan.entities.filter((entity) => entity.required).length === 0) {

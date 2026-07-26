@@ -56,9 +56,20 @@ export type BusinessIntent = {
   entities: string[];
   metrics: string[];
   grouping: string[];
+  analysisPath?: BusinessIntentAnalysisPath | null;
   relationshipPredicate: string | null;
   explicitlyTemporal: boolean;
   detectorVersion: "v1";
+};
+
+export type BusinessIntentAggregation = "sum" | "average" | "minimum" | "maximum";
+
+export type BusinessIntentAnalysisPath = {
+  aggregation: BusinessIntentAggregation;
+  measureField: string;
+  groupingField: string;
+  orderDirection: "ascending" | "descending";
+  rowLimit: number | null;
 };
 
 // --------------------------------------------------------------------------
@@ -329,8 +340,143 @@ const detectEntities = (text: string): string[] => {
       found.add(VERB_TO_ENTITY[token]);
     }
   }
+  if (matches(text, /\b(salary|salaries|payroll|compensation)\b/)) {
+    found.add("employees");
+  }
   return Array.from(found);
 };
+
+const numberWords: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+};
+
+const detectRowLimit = (text: string): number | null => {
+  const digitMatch =
+    text.match(/\b(?:top|bottom)\s+(\d{1,3})\b/) ||
+    text.match(/\b(?:show|list|find|identify)\s+(?:the\s+)?(\d{1,3})\b/);
+  if (digitMatch) return Number(digitMatch[1]);
+
+  const wordAlternation = Object.keys(numberWords).join("|");
+  const wordPattern = new RegExp(
+    `\\b(?:top|bottom)\\s+(${wordAlternation})\\b|\\b(?:show|list|find|identify)\\s+(?:the\\s+)?(${wordAlternation})\\b`,
+  );
+  const wordMatch = text.match(wordPattern);
+  const word = wordMatch?.[1] || wordMatch?.[2];
+  return word ? numberWords[word] : null;
+};
+
+const singularizePhrase = (value: string): string =>
+  value
+    .split(/\s+/g)
+    .map((part) => {
+      if (part.endsWith("ies")) return `${part.slice(0, -3)}y`;
+      if (part.endsWith("ses")) return part.slice(0, -2);
+      if (part.endsWith("s") && part.length > 3) return part.slice(0, -1);
+      return part;
+    })
+    .join(" ");
+
+const trimFieldConcept = (value: string): string => {
+  const stopWords = new Set([
+    "by",
+    "per",
+    "in",
+    "for",
+    "from",
+    "with",
+    "where",
+    "ordered",
+    "sorted",
+  ]);
+  const trailingDescriptors = new Set([
+    "expenditure",
+    "expenditures",
+    "expense",
+    "expenses",
+    "spend",
+    "spending",
+  ]);
+  const words = value
+    .replace(/[_-]+/g, " ")
+    .split(/\s+/g)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  const stopped = words.slice(0, words.findIndex((word) => stopWords.has(word)) >= 0
+    ? words.findIndex((word) => stopWords.has(word))
+    : words.length);
+  while (stopped.length > 1 && trailingDescriptors.has(stopped[stopped.length - 1])) {
+    stopped.pop();
+  }
+  return singularizePhrase(stopped.join(" "));
+};
+
+const explicitAggregationFor = (text: string): BusinessIntentAggregation | null => {
+  if (matches(text, /\b(average|avg|mean)\b/)) return "average";
+  if (matches(text, /\b(total|sum)\b/)) return "sum";
+  if (matches(text, /\b(minimum|min)\b/)) return "minimum";
+  if (matches(text, /\b(maximum|max)\b/)) return "maximum";
+  if (matches(text, /\b(lowest|bottom)\b/)) return "minimum";
+  if (matches(text, /\b(highest|top)\b/)) return "maximum";
+  return null;
+};
+
+const aggregateFieldConceptFor = (text: string): string | null => {
+  const aggregateFieldMatch = text.match(
+    /\b(?:total|sum|average|avg|mean|minimum|min|maximum|max)\s+(?:of\s+)?([a-z_]+(?:[\s_-]+[a-z_]+){0,3})\b/,
+  );
+  const orderedFieldMatch = text.match(
+    /\b(?:highest|top|lowest|bottom)\s+(?:of\s+)?([a-z_]+(?:[\s_-]+[a-z_]+){0,3})\b/,
+  );
+  const field = trimFieldConcept(aggregateFieldMatch?.[1] || orderedFieldMatch?.[1] || "");
+  return field || null;
+};
+
+const groupingFieldConceptFor = (text: string): string | null => {
+  const byMatch = text.match(BY_GROUPING_PATTERN);
+  if (byMatch) return singularizePhrase(byMatch[1]);
+  const perMatch = text.match(PER_GROUPING_PATTERN);
+  if (perMatch) return singularizePhrase(perMatch[1]);
+  if (!TEMPORAL_IN_PATTERN.test(text)) {
+    const inMatch = text.match(GROUPING_IN_PATTERN);
+    if (inMatch && !TIME_UNITS.includes(inMatch[1])) return singularizePhrase(inMatch[1]);
+  }
+  for (const noun of ENTITY_NOUNS) {
+    if (matches(text, new RegExp(`\\b${noun.plural}\\b`))) return noun.token;
+  }
+  return null;
+};
+
+const detectAnalysisPath = (text: string): BusinessIntentAnalysisPath | null => {
+  const aggregation = explicitAggregationFor(text);
+  const measureField = aggregateFieldConceptFor(text);
+  const groupingField = groupingFieldConceptFor(text);
+  if (!aggregation || !measureField || !groupingField) return null;
+
+  const orderDirection =
+    matches(text, /\b(bottom|lowest|minimum|min)\b/) && !matches(text, /\b(highest|maximum|max|top)\b/)
+      ? "ascending"
+      : "descending";
+
+  return {
+    aggregation,
+    measureField,
+    groupingField,
+    orderDirection,
+    rowLimit: detectRowLimit(text),
+  };
+};
+
+const metricNameForAnalysisPath = (analysisPath: BusinessIntentAnalysisPath): string =>
+  `${analysisPath.aggregation}_${analysisPath.measureField.replace(/\s+/g, "_")}`;
 
 const detectMetrics = (text: string, entities: string[]): string[] => {
   const metrics: string[] = [];
@@ -412,6 +558,7 @@ export const EMPTY_BUSINESS_INTENT: BusinessIntent = {
   entities: [],
   metrics: [],
   grouping: [],
+  analysisPath: null,
   relationshipPredicate: null,
   explicitlyTemporal: false,
   detectorVersion: "v1",
@@ -458,6 +605,7 @@ export function fingerprintBusinessIntent(intent: BusinessIntent): string {
     entities: sortedUnique(intent.entities),
     metrics: sortedUnique(intent.metrics),
     grouping: sortedUnique(intent.grouping),
+    analysisPath: intent.analysisPath,
     relationshipPredicate: intent.relationshipPredicate,
     explicitlyTemporal: intent.explicitlyTemporal,
     detectorVersion: intent.detectorVersion,
@@ -549,14 +697,22 @@ export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
   }
 
   const entities = detectEntities(text);
-  const metrics = detectMetrics(text, entities);
-  const grouping = detectGroupingTargets(
+  const analysisPath = detectAnalysisPath(text);
+  const detectedMetrics = detectMetrics(text, entities);
+  const analysisMetric = analysisPath ? metricNameForAnalysisPath(analysisPath) : null;
+  const metrics = analysisMetric
+    ? [analysisMetric]
+    : detectedMetrics;
+  const detectedGrouping = detectGroupingTargets(
     text,
     scores.expiration >= 0.6 ||
       scores.missing_values >= 0.6 ||
       scores.preview >= 0.8 ||
       scores.duplicates >= 0.6,
   );
+  const grouping = analysisPath && !detectedGrouping.includes(analysisPath.groupingField)
+    ? [...detectedGrouping, analysisPath.groupingField]
+    : detectedGrouping;
   const relationshipPredicate = detectRelationshipPredicate(text);
   const explicitlyTemporal = detectExplicitlyTemporal(text);
 
@@ -566,6 +722,7 @@ export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
     entities,
     metrics,
     grouping,
+    analysisPath,
     relationshipPredicate,
     explicitlyTemporal,
     detectorVersion: "v1",

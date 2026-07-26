@@ -40,9 +40,17 @@ export type ProposedEntity = {
 export type ProposedMetric = {
   id: string;
   label: string;
-  kind: "count_rows" | "count_entities" | "sum" | "average" | "metric_column";
+  kind:
+    | "count_rows"
+    | "count_entities"
+    | "sum"
+    | "average"
+    | "minimum"
+    | "maximum"
+    | "metric_column";
   tableName: string | null;
   columnName: string | null;
+  inferredType?: SchemaColumn["inferred_type"];
   synthesized: boolean;
   confidence: "high" | "medium" | "low";
 };
@@ -73,6 +81,21 @@ export type ProposedJoinNeed = {
   status: "verified" | "needs_review" | "missing" | "not_required";
   contractId: string | null;
   reason: string;
+};
+
+export type ProposedSort = {
+  id: string;
+  label: string;
+  target: "metric" | "grouping";
+  targetId: string;
+  direction: "asc" | "desc";
+  confidence: "high" | "medium" | "low";
+};
+
+export type ProposedRowLimit = {
+  id: string;
+  value: number;
+  confidence: "high" | "medium" | "low";
 };
 
 export type ProposedAssumption = {
@@ -110,6 +133,8 @@ export type AdaptiveReportProposal = {
   entities: ProposedEntity[];
   metrics: ProposedMetric[];
   groupings: ProposedGrouping[];
+  sorts?: ProposedSort[];
+  rowLimit?: ProposedRowLimit | null;
   filters: ProposedFilter[];
   joinNeeds: ProposedJoinNeed[];
   assumptions: ProposedAssumption[];
@@ -178,6 +203,8 @@ export const EMPTY_ADAPTIVE_REPORT_PROPOSAL: AdaptiveReportProposal = {
   entities: [],
   metrics: [],
   groupings: [],
+  sorts: [],
+  rowLimit: null,
   filters: [],
   joinNeeds: [],
   assumptions: [],
@@ -421,6 +448,18 @@ const findWorksheetForEntity = (
     if (confidence === "medium" && !best) best = { worksheet, confidence };
   }
 
+  if (!best) {
+    const columnBackedWorksheet = worksheets.find((worksheet) =>
+      worksheet.schema.some((column) => nameScore(entityName, column.name)),
+    );
+    if (columnBackedWorksheet) {
+      const explicitColumnName = columnBackedWorksheet.schema.some(
+        (column) => nameScore(entityName, column.name) === "high",
+      );
+      best = { worksheet: columnBackedWorksheet, confidence: explicitColumnName ? "high" : "medium" };
+    }
+  }
+
   if (best) {
     return {
       id: `entity:${compactId(entityName)}`,
@@ -483,6 +522,8 @@ const findColumn = (
 const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
   const text = normalize(metric);
   if (text.startsWith("avg ") || text.startsWith("average ")) return "average";
+  if (text.startsWith("minimum ") || text.startsWith("min ")) return "minimum";
+  if (text.startsWith("maximum ") || text.startsWith("max ")) return "maximum";
   if (text.startsWith("sum ") || text.startsWith("total ")) return "sum";
   if (text.startsWith("count ")) return "count_entities";
   return "metric_column";
@@ -508,7 +549,7 @@ const proposeMetrics = (
   }
 
   return intent.metrics.map((metric) => {
-    const metricName = metric.replace(/^(count|sum|total|avg|average)_?/, "");
+    const metricName = metric.replace(/^(count|sum|total|avg|average|minimum|min|maximum|max)_?/, "");
     const column = findColumn(metricName, worksheets, semanticColumns, [
       "metric_candidate",
       "amount",
@@ -523,10 +564,43 @@ const proposeMetrics = (
       kind,
       tableName: column?.worksheet.tableName || worksheets[0]?.tableName || null,
       columnName: column?.column.name || (kind === "count_entities" ? null : null),
+      inferredType: column?.column.inferred_type,
       synthesized: kind === "count_entities" && !column,
       confidence: column?.confidence || (kind === "count_entities" ? "medium" : "low"),
     };
   });
+};
+
+const proposeSorts = (
+  intent: BusinessIntent,
+  metrics: readonly ProposedMetric[],
+): ProposedSort[] => {
+  if (!intent.analysisPath) return [];
+  const targetMetric = metrics.find((metric) =>
+    sameName(metric.columnName, intent.analysisPath?.measureField),
+  ) || metrics[0];
+  if (!targetMetric) return [];
+
+  return [
+    {
+      id: `sort:${compactId(targetMetric.id)}:${intent.analysisPath.orderDirection}`,
+      label: `Sort by ${targetMetric.label}`,
+      target: "metric",
+      targetId: targetMetric.id,
+      direction: intent.analysisPath.orderDirection === "ascending" ? "asc" : "desc",
+      confidence: targetMetric.confidence,
+    },
+  ];
+};
+
+const proposeRowLimit = (intent: BusinessIntent): ProposedRowLimit | null => {
+  const value = intent.analysisPath?.rowLimit;
+  if (!value) return null;
+  return {
+    id: `row-limit:${value}`,
+    value,
+    confidence: "high",
+  };
 };
 
 const proposeGroupings = (
@@ -691,7 +765,15 @@ const proposeJoinNeeds = (
   contracts: readonly AcceptedRelationshipContract[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedJoinNeed[] => {
-  const boundEntities = entities.filter((entity) => entity.tableName);
+  const byTable = new Map<string, ProposedEntity>();
+  for (const entity of entities.filter((candidate) => candidate.tableName)) {
+    const key = normalize(entity.tableName || "");
+    const existing = byTable.get(key);
+    if (!existing || existing.confidence !== "high") {
+      byTable.set(key, entity);
+    }
+  }
+  const boundEntities = Array.from(byTable.values());
   if (boundEntities.length <= 1) {
     return [
       {
@@ -920,11 +1002,19 @@ const createFingerprint = ({
   scope,
   entities,
   joinNeeds,
+  metrics,
+  groupings,
+  sorts,
+  rowLimit,
 }: {
   intent: BusinessIntent;
   scope: readonly AnalysisScopeSelection[];
   entities: readonly ProposedEntity[];
   joinNeeds: readonly ProposedJoinNeed[];
+  metrics: readonly ProposedMetric[];
+  groupings: readonly ProposedGrouping[];
+  sorts: readonly ProposedSort[];
+  rowLimit: ProposedRowLimit | null;
 }): string =>
   JSON.stringify({
     version: "adaptive-report-proposal:v1",
@@ -934,12 +1024,17 @@ const createFingerprint = ({
       entities: stableStrings(intent.entities),
       metrics: stableStrings(intent.metrics),
       grouping: stableStrings(intent.grouping),
+      analysisPath: intent.analysisPath,
       relationshipPredicate: intent.relationshipPredicate,
       explicitlyTemporal: intent.explicitlyTemporal,
       detectorVersion: intent.detectorVersion,
     },
     scopeTables: stableStrings(scopeTableNames(scope)),
     entityNames: stableStrings(entities.map((entity) => entity.label)),
+    metricIds: stableStrings(metrics.map((metric) => metric.id)),
+    groupingIds: stableStrings(groupings.map((grouping) => grouping.id)),
+    sortIds: stableStrings(sorts.map((sort) => `${sort.target}:${sort.targetId}:${sort.direction}`)),
+    rowLimit: rowLimit?.value || null,
     relationshipStatuses: joinNeeds
       .map((join) => `${normalize(join.leftEntity)}>${normalize(join.rightEntity)}:${join.status}`)
       .sort(),
@@ -1001,6 +1096,8 @@ export function proposeAdaptiveReport(
       : fallbackEntitiesFromScope(worksheets);
   const metrics = proposeMetrics(detectedIntent, worksheets, semanticColumns);
   const groupings = proposeGroupings(detectedIntent, worksheets, semanticColumns);
+  const sorts = proposeSorts(detectedIntent, metrics);
+  const rowLimit = proposeRowLimit(detectedIntent);
   const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns);
   const joinNeeds = proposeJoinNeeds(
     entities,
@@ -1025,6 +1122,10 @@ export function proposeAdaptiveReport(
     scope: appliedScopeSelections,
     entities,
     joinNeeds,
+    metrics,
+    groupings,
+    sorts,
+    rowLimit,
   });
 
   return {
@@ -1038,6 +1139,8 @@ export function proposeAdaptiveReport(
     entities,
     metrics,
     groupings,
+    sorts,
+    rowLimit,
     filters,
     joinNeeds,
     assumptions,
