@@ -2,6 +2,11 @@ import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import type { DatasetMetadata, SchemaColumn } from "../../dataset/datasetTypes";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { AnalysisScopeSelection } from "../../workbook";
+import { detectBusinessIntent } from "./businessIntentGrounding";
+import {
+  detectBusinessSqlMeasureAmbiguity,
+  type BusinessSqlMeasureAmbiguity,
+} from "./businessSqlMeasureAmbiguity";
 import { createReportOpportunities } from "./reportIntelligencePlanner";
 import {
   classifySqlAdaptiveFits,
@@ -104,6 +109,7 @@ export type SqlAskFiltraQueriSuggestionModel = {
   scopeRecommendations: SqlScopeRecommendation[];
   questionShape: SqlBusinessQuestionShape | null;
   blockedPlan: SqlAskBlockedPlanRecommendation | null;
+  measureAmbiguity: BusinessSqlMeasureAmbiguity | null;
   analyticalStrategies: SqlAnalyticalStrategy[];
   adaptiveFitSummaries: SqlAskAdaptiveFitSummary[];
   adaptedTemplateEvidence: SqlAskAdaptedTemplateEvidence[];
@@ -763,6 +769,28 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
   const templates = createSqlAssistantTemplates(dataset, selectedDialect);
   const recipes = createSqlReportRecipes(dataset, selectedDialect);
   const opportunities = createReportOpportunities(dataset, selectedDialect);
+  const scopedWorksheets = dataset?.workbook_metadata?.worksheets.length
+    ? dataset.workbook_metadata.worksheets
+    : dataset
+      ? [
+          {
+            worksheetId: dataset.dataset_id,
+            displayName: dataset.original_filename,
+            sheetName: dataset.original_filename,
+            tableName: dataset.table_name,
+            schema: dataset.schema,
+          },
+        ]
+      : [];
+  const measureAmbiguity =
+    hasSubmittedAsk && trimmedPrompt
+      ? detectBusinessSqlMeasureAmbiguity({
+          prompt: trimmedPrompt,
+          intent: detectBusinessIntent(trimmedPrompt),
+          worksheets: scopedWorksheets,
+          appliedScopeSelections,
+        })
+      : null;
   const scopeRecommendations =
     hasSubmittedAsk && trimmedPrompt
       ? recommendSqlScope({
@@ -827,24 +855,28 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
         existingRecommendations: recommendations,
       })
     : [];
-  const adaptiveFitSummaries = createSqlAskAdaptiveFitSummaries({
-    prompt: trimmedPrompt,
-    questionShape,
-    recommendations,
-    analyticalStrategies,
-    blockedPlan,
-    dataset,
-  });
-  const adaptedTemplateEvidence = createSqlAskAdaptedTemplateEvidence({
-    prompt: trimmedPrompt,
-    questionShape,
-    recommendations: uniqueRecommendations([...recommendations, ...rawRecommendations]),
-    templateCandidates: templates,
-    dataset,
-    selectedDialect,
-    appliedScopeSelections,
-    blockedPlan,
-  });
+  const adaptiveFitSummaries = measureAmbiguity
+    ? []
+    : createSqlAskAdaptiveFitSummaries({
+        prompt: trimmedPrompt,
+        questionShape,
+        recommendations,
+        analyticalStrategies,
+        blockedPlan,
+        dataset,
+      });
+  const adaptedTemplateEvidence = measureAmbiguity
+    ? []
+    : createSqlAskAdaptedTemplateEvidence({
+        prompt: trimmedPrompt,
+        questionShape,
+        recommendations: uniqueRecommendations([...recommendations, ...rawRecommendations]),
+        templateCandidates: templates,
+        dataset,
+        selectedDialect,
+        appliedScopeSelections,
+        blockedPlan,
+      });
   const recommendedAnalysis = createSqlAskRecommendedAnalysisModel({
     adaptiveFitSummaries,
     analyticalStrategies,
@@ -864,10 +896,13 @@ export const createSqlAskFiltraQueriSuggestionModel = ({
     scopeRecommendations,
     questionShape,
     blockedPlan,
+    measureAmbiguity,
     analyticalStrategies,
     adaptiveFitSummaries,
     adaptedTemplateEvidence,
-    recommendedAnalysis,
+    recommendedAnalysis: measureAmbiguity
+      ? emptyRecommendedAnalysis()
+      : recommendedAnalysis,
     guidanceTitle: guidance.guidanceTitle,
     guidanceCopy: guidance.guidanceCopy,
     noRunQuery: true,

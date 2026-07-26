@@ -56,6 +56,7 @@ import {
 } from "./adaptiveReportProposalUiAdapter";
 import type { AdaptiveReportProposal } from "./adaptiveReportProposal";
 import AdaptiveProposalLlmConsentShell from "./AdaptiveProposalLlmConsentShell";
+import SemanticMeasureClarificationPanel from "./SemanticMeasureClarificationPanel";
 import {
   createAdaptiveProposalLlmConsentShellViewModel,
   type AdaptiveProposalLlmConsentShellViewModel,
@@ -83,12 +84,15 @@ type SqlAssistantPanelProps = {
   requestedMode?: SqlAssistantMode | null;
   allowedModes?: SqlAssistantMode[];
   taskPrompt?: string;
+  activeSqlTabId?: string;
   onTaskPromptChange?: (prompt: string) => void;
   onSelectedScopeChange?: (selections: AnalysisScopeSelection[]) => void;
   onApplyScope?: () => void;
   onReviewRelationships?: (requiredRelationships: string[]) => void;
   relationshipReviewProgressSummary?: string | null;
   appliedScopeLabels?: string[];
+  appliedScopeSelections?: AnalysisScopeSelection[];
+  selectedScopeSelections?: AnalysisScopeSelection[];
   activeTabLabel?: string;
 };
 
@@ -194,6 +198,44 @@ const normalizeFilterValue = (value: string) =>
     .replace(/[^a-z0-9\s]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const compactIdentity = (value: string | null | undefined): string =>
+  (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9:_-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unknown";
+
+export const createMeasureClarificationScopeFingerprint = (
+  selections: readonly AnalysisScopeSelection[],
+): string =>
+  selections
+    .map((selection) =>
+      [
+        compactIdentity(selection.worksheetId),
+        compactIdentity(selection.sourceType),
+        compactIdentity(selection.tableName),
+        compactIdentity(selection.originalTableName),
+        compactIdentity(selection.cleanedTableName),
+      ].join(":"),
+    )
+    .sort()
+    .join("|") || "scope:none";
+
+export const createMeasureClarificationSelectionKey = ({
+  activeSqlTabId,
+  scopeFingerprint,
+  ambiguityId,
+}: {
+  activeSqlTabId: string;
+  scopeFingerprint: string;
+  ambiguityId: string;
+}): string =>
+  [
+    `tab:${compactIdentity(activeSqlTabId)}`,
+    `scope:${scopeFingerprint}`,
+    `ambiguity:${compactIdentity(ambiguityId)}`,
+  ].join("|");
 
 const opportunityDomainLabels: Record<ReportOpportunityDomain, string> = {
   property: "Property",
@@ -626,13 +668,28 @@ function AdaptiveReportProposalCard({
   introCopy = "No static template matched. FiltraQueri generated an adaptive report proposal from your question and dataset metadata.",
   consentShell,
   state,
+  onApplyMeasureClarification,
 }: {
   introCopy?: string;
   consentShell?: AdaptiveProposalLlmConsentShellViewModel | null;
   state: AdaptiveReportProposalFallbackState;
+  onApplyMeasureClarification?: (optionId: string) => void;
 }) {
   const proposal: AdaptiveReportProposal | null = state.proposal;
-  if (!state.shouldShow || !proposal) return null;
+  if (!state.shouldShow) return null;
+
+  if (state.measureAmbiguity && !proposal) {
+    return (
+      <article className="sql-template-recommendation-card sql-adaptive-proposal-card">
+        <SemanticMeasureClarificationPanel
+          ambiguity={state.measureAmbiguity}
+          onApplySelection={(optionId) => onApplyMeasureClarification?.(optionId)}
+        />
+      </article>
+    );
+  }
+
+  if (!proposal) return null;
 
   return (
     <article className="sql-template-recommendation-card sql-adaptive-proposal-card">
@@ -1109,11 +1166,14 @@ function SqlAssistantPanel({
   requestedMode,
   allowedModes,
   taskPrompt = "",
+  activeSqlTabId = "sql-tab:unknown",
   onSelectedScopeChange,
   onApplyScope,
   onReviewRelationships,
   relationshipReviewProgressSummary,
   appliedScopeLabels = [],
+  appliedScopeSelections = [],
+  selectedScopeSelections = [],
 }: SqlAssistantPanelProps) {
   const [assistantMode, setAssistantMode] = useState<SqlAssistantMode>("templates");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1179,6 +1239,22 @@ function SqlAssistantPanel({
     [dataset, selectedDialect],
   );
   const [hasRequestedRecommendation, setHasRequestedRecommendation] = useState(false);
+  const [measureClarificationSelections, setMeasureClarificationSelections] = useState<Record<string, string>>({});
+  const measureClarificationScopeFingerprint = useMemo(
+    () =>
+      [
+        `applied:${createMeasureClarificationScopeFingerprint(appliedScopeSelections)}`,
+        `selected:${createMeasureClarificationScopeFingerprint(selectedScopeSelections)}`,
+      ].join("||"),
+    [appliedScopeSelections, selectedScopeSelections],
+  );
+  const applyMeasureClarification = (key: string | null, optionId: string) => {
+    if (!key) return;
+    setMeasureClarificationSelections((current) => ({
+      ...current,
+      [key]: optionId,
+    }));
+  };
   const recommendations = useMemo(
     () =>
       recommendSqlTemplates({
@@ -1191,17 +1267,41 @@ function SqlAssistantPanel({
       }),
     [appliedScopeLabels, dataset, recipes, reportOpportunities, taskPrompt, templates],
   );
-  const adaptiveProposalFallback = useMemo(
-    () =>
-      createAdaptiveReportProposalFallback({
-        taskPrompt,
-        dataset,
-        selectedDialect,
-        appliedScopeLabels,
-        recommendations,
-      }),
+  const recommendationInputs = useMemo(
+    () => ({
+      taskPrompt,
+      dataset,
+      selectedDialect,
+      appliedScopeLabels,
+      recommendations,
+    }),
     [appliedScopeLabels, dataset, recommendations, selectedDialect, taskPrompt],
   );
+  const unresolvedAdaptiveProposalFallback = useMemo(
+    () => createAdaptiveReportProposalFallback(recommendationInputs),
+    [recommendationInputs],
+  );
+  const selectedMeasureKey = unresolvedAdaptiveProposalFallback.measureAmbiguity
+    ? createMeasureClarificationSelectionKey({
+        activeSqlTabId,
+        scopeFingerprint: measureClarificationScopeFingerprint,
+        ambiguityId: unresolvedAdaptiveProposalFallback.measureAmbiguity.ambiguityId,
+      })
+    : null;
+  const selectedMeasureOptionId =
+    selectedMeasureKey &&
+    unresolvedAdaptiveProposalFallback.measureAmbiguity?.options.some(
+      (option) => option.optionId === measureClarificationSelections[selectedMeasureKey],
+    )
+      ? measureClarificationSelections[selectedMeasureKey]
+      : null;
+  const adaptiveProposalFallback = useMemo(() => {
+    if (!selectedMeasureOptionId) return unresolvedAdaptiveProposalFallback;
+    return createAdaptiveReportProposalFallback({
+      ...recommendationInputs,
+      selectedMeasureOptionId,
+    });
+  }, [recommendationInputs, selectedMeasureOptionId, unresolvedAdaptiveProposalFallback]);
   const adaptiveProposalConsentShell = useMemo(
     () =>
       adaptiveProposalFallback.proposal
@@ -1240,16 +1340,15 @@ function SqlAssistantPanel({
       }),
     [appliedScopeLabels, dataset, recipes, reportOpportunities, taskRequest, templates],
   );
-  const taskAssistAdaptiveProposalFallback = useMemo(
-    () =>
-      createTaskAssistAdaptiveReportProposalFallback({
-        taskPrompt: taskRequest,
-        dataset,
-        selectedDialect,
-        appliedScopeLabels,
-        recommendations: taskAssistRecommendations,
-        generatedDraftCount: generatedDrafts.length,
-      }),
+  const taskAssistInputs = useMemo(
+    () => ({
+      taskPrompt: taskRequest,
+      dataset,
+      selectedDialect,
+      appliedScopeLabels,
+      recommendations: taskAssistRecommendations,
+      generatedDraftCount: generatedDrafts.length,
+    }),
     [
       appliedScopeLabels,
       dataset,
@@ -1259,6 +1358,31 @@ function SqlAssistantPanel({
       taskRequest,
     ],
   );
+  const unresolvedTaskAssistAdaptiveProposalFallback = useMemo(
+    () => createTaskAssistAdaptiveReportProposalFallback(taskAssistInputs),
+    [taskAssistInputs],
+  );
+  const selectedTaskAssistMeasureKey = unresolvedTaskAssistAdaptiveProposalFallback.measureAmbiguity
+    ? createMeasureClarificationSelectionKey({
+        activeSqlTabId,
+        scopeFingerprint: measureClarificationScopeFingerprint,
+        ambiguityId: unresolvedTaskAssistAdaptiveProposalFallback.measureAmbiguity.ambiguityId,
+      })
+    : null;
+  const selectedTaskAssistMeasureOptionId =
+    selectedTaskAssistMeasureKey &&
+    unresolvedTaskAssistAdaptiveProposalFallback.measureAmbiguity?.options.some(
+      (option) => option.optionId === measureClarificationSelections[selectedTaskAssistMeasureKey],
+    )
+      ? measureClarificationSelections[selectedTaskAssistMeasureKey]
+      : null;
+  const taskAssistAdaptiveProposalFallback = useMemo(() => {
+    if (!selectedTaskAssistMeasureOptionId) return unresolvedTaskAssistAdaptiveProposalFallback;
+    return createTaskAssistAdaptiveReportProposalFallback({
+      ...taskAssistInputs,
+      selectedMeasureOptionId: selectedTaskAssistMeasureOptionId,
+    });
+  }, [selectedTaskAssistMeasureOptionId, taskAssistInputs, unresolvedTaskAssistAdaptiveProposalFallback]);
   const taskAssistAdaptiveProposalConsentShell = useMemo(
     () =>
       taskAssistAdaptiveProposalFallback.proposal
@@ -1631,6 +1755,9 @@ function SqlAssistantPanel({
                       introCopy="These syntax helpers do not fully answer the business question. FiltraQueri also sketched a planning outline from your question and dataset metadata."
                       consentShell={adaptiveProposalConsentShell}
                       state={adaptiveProposalFallback}
+                      onApplyMeasureClarification={(optionId) =>
+                        applyMeasureClarification(selectedMeasureKey, optionId)
+                      }
                     />
                   </div>
                 )}
@@ -1645,6 +1772,9 @@ function SqlAssistantPanel({
                   <AdaptiveReportProposalCard
                     consentShell={adaptiveProposalConsentShell}
                     state={adaptiveProposalFallback}
+                    onApplyMeasureClarification={(optionId) =>
+                      applyMeasureClarification(selectedMeasureKey, optionId)
+                    }
                   />
                 </div>
               ) : (
@@ -1830,6 +1960,9 @@ function SqlAssistantPanel({
                 introCopy="No exact task template matched. FiltraQueri generated an adaptive analysis proposal from your question and dataset metadata."
                 consentShell={taskAssistAdaptiveProposalConsentShell}
                 state={taskAssistAdaptiveProposalFallback}
+                onApplyMeasureClarification={(optionId) =>
+                  applyMeasureClarification(selectedTaskAssistMeasureKey, optionId)
+                }
               />
             </div>
           )}

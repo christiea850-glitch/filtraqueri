@@ -10,6 +10,7 @@ import {
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
 import type { BusinessSqlRenderReadinessResult } from "./businessSqlRenderReadiness";
+import type { BusinessSqlMeasureClarificationDecision } from "./businessSqlMeasureAmbiguity";
 import { isBusinessSqlPreviewReadyRenderable } from "./AdaptiveProposalLlmConsentDisclosure";
 import {
   getAdaptiveProposalBusinessSqlPreviewHandoffAction,
@@ -35,6 +36,7 @@ export type BusinessSqlPlanCandidateViewModel = {
   noRunAvailable: true;
   noProviderOrLlmUsed: true;
   plan: BusinessSqlQueryPlan | null;
+  clarificationDecision: BusinessSqlMeasureClarificationDecision | null;
   readiness: BusinessSqlRenderReadinessResult | null;
   bridgeIssues: AdaptiveProposalBusinessSqlBridgeIssue[];
   previewHandoffAction: AdaptiveProposalBusinessSqlPreviewHandoffAction;
@@ -258,6 +260,7 @@ export const createBusinessSqlPlanCandidateViewModel = ({
   if (!shouldShowBusinessSqlPlanCandidate({ fallback, businessSqlRenderPreview, activeSqlDraft })) {
     return null;
   }
+  if (fallback.measureAmbiguity && !fallback.clarificationDecision) return null;
   if (!fallback.proposal) return null;
 
   const result = createBusinessSqlPlanFromAdaptiveProposal({
@@ -284,6 +287,7 @@ export const createBusinessSqlPlanCandidateViewModel = ({
     noRunAvailable: true,
     noProviderOrLlmUsed: true,
     plan: result.plan,
+    clarificationDecision: fallback.clarificationDecision,
     readiness: result.readiness,
     bridgeIssues: [...result.issues],
     previewHandoffAction: getAdaptiveProposalBusinessSqlPreviewHandoffAction({
@@ -293,6 +297,7 @@ export const createBusinessSqlPlanCandidateViewModel = ({
       issues: result.issues,
       activeSqlDraft,
       existingPreview: businessSqlRenderPreview,
+      clarificationDecision: fallback.clarificationDecision,
     }),
     details: detailsFor(result),
     issues: issueMessagesFor(result.state, result.issues),

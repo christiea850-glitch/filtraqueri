@@ -39,6 +39,7 @@ import type {
   SqlQueryDraft,
   SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
+import type { BusinessSqlPreviewInsertProvenance } from "./businessSqlPreviewProvenance";
 import useSqlWorkspaceTabs from "./useSqlWorkspaceTabs";
 
 const createInitialSql = (tableName: string | undefined, dialect: SqlDialectId) => `SELECT *
@@ -84,6 +85,9 @@ function useSqlWorkspace(
   onExecutionResult?: (result: WorkspaceExecutionResult) => void,
   metadata?: SqlWorkspaceMetadataSnapshot,
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void,
+  runtimeContext: {
+    businessSqlPreviewInsertProvenance?: BusinessSqlPreviewInsertProvenance | null;
+  } = {},
 ) {
   const normalizedMetadata = useMemo(
     () => normalizeSqlWorkspaceMetadataSnapshot(metadata),
@@ -544,6 +548,10 @@ function useSqlWorkspace(
       sourceLabel: activeTabSourceContext.sourceLabel,
       sourceTableName: activeTabSourceContext.sourceTableName || activeTabSourceContext.tableName,
       dataset: scopedDatasetForTab,
+      clarificationDecision:
+        runtimeContext.businessSqlPreviewInsertProvenance?.insertedSqlSnapshot === trimmedSql
+          ? runtimeContext.businessSqlPreviewInsertProvenance.clarificationDecision
+          : undefined,
     });
 
     setActiveEditorStatus("running");

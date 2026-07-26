@@ -770,6 +770,7 @@ function SqlEditorPanel({
           activeTabId: sqlTabs.activeTabId,
           planId: effectiveBusinessSqlRenderPreview.planId,
           sqlText: insertResult.nextSqlDraft,
+          clarificationDecision: effectiveBusinessSqlRenderPreview.clarificationDecision,
         }),
       );
       onBusinessSqlPreviewFeedbackChange("inserted");
@@ -817,6 +818,7 @@ function SqlEditorPanel({
       issues: businessSqlPlanCandidate.bridgeIssues,
       activeSqlDraft: editor.value,
       existingPreview: effectiveBusinessSqlRenderPreview || null,
+      clarificationDecision: businessSqlPlanCandidate.clarificationDecision,
     });
 
     if (!handoff.preview) return;

@@ -424,8 +424,6 @@ const explicitAggregationFor = (text: string): BusinessIntentAggregation | null 
   if (matches(text, /\b(total|sum)\b/)) return "sum";
   if (matches(text, /\b(minimum|min)\b/)) return "minimum";
   if (matches(text, /\b(maximum|max)\b/)) return "maximum";
-  if (matches(text, /\b(lowest|bottom)\b/)) return "minimum";
-  if (matches(text, /\b(highest|top)\b/)) return "maximum";
   return null;
 };
 

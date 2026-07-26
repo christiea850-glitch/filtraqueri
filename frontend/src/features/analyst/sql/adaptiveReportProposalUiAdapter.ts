@@ -6,6 +6,12 @@ import {
   type AdaptiveReportProposal,
   type AdaptiveReportProposalRequest,
 } from "./adaptiveReportProposal";
+import {
+  detectBusinessSqlMeasureAmbiguity,
+  resolveBusinessSqlMeasureAmbiguity,
+  type BusinessSqlMeasureAmbiguity,
+  type BusinessSqlMeasureClarificationDecision,
+} from "./businessSqlMeasureAmbiguity";
 import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SqlTemplateRecommendation } from "./sqlTemplateRecommender";
@@ -19,6 +25,7 @@ export type AdaptiveReportProposalFallbackState = {
   shouldShow: boolean;
   reason:
     | "available"
+    | "measure_ambiguity"
     | "has_static_matches"
     | "syntax_helpers_only"
     | "has_ready_preview"
@@ -26,6 +33,8 @@ export type AdaptiveReportProposalFallbackState = {
     | "missing_scope"
     | "missing_metadata";
   proposal: AdaptiveReportProposal | null;
+  measureAmbiguity: BusinessSqlMeasureAmbiguity | null;
+  clarificationDecision: BusinessSqlMeasureClarificationDecision | null;
   insertDisabled: true;
   runDisabled: true;
 };
@@ -36,6 +45,7 @@ export type CreateAdaptiveReportProposalFallbackInput = {
   selectedDialect: SqlDialectId;
   appliedScopeLabels: readonly string[];
   recommendations: readonly SqlTemplateRecommendation[];
+  selectedMeasureOptionId?: string | null;
 };
 
 export type CreateTaskAssistAdaptiveReportProposalFallbackInput = Omit<
@@ -52,6 +62,7 @@ export type CreateBusinessSqlPreviewAdaptiveReportProposalFallbackInput = {
   selectedDialect: SqlDialectId;
   appliedScopeSelections: readonly AnalysisScopeSelection[];
   preview: BusinessSqlRenderPreview | null;
+  selectedMeasureOptionId?: string | null;
 };
 
 const normalize = (value: string): string =>
@@ -149,7 +160,7 @@ const resolveAppliedScopeSelections = (
 
 const resolveWorksheets = (
   dataset: DatasetMetadata,
-): AdaptiveReportProposalRequest["worksheets"] => {
+): NonNullable<AdaptiveReportProposalRequest["worksheets"]> => {
   const workbookWorksheets = dataset.workbook_metadata?.worksheets || [];
   if (workbookWorksheets.length > 0) {
     return workbookWorksheets.map((worksheet) => ({
@@ -178,6 +189,8 @@ const unavailableState = (
   shouldShow: false,
   reason,
   proposal: null,
+  measureAmbiguity: null,
+  clarificationDecision: null,
   insertDisabled: true,
   runDisabled: true,
 });
@@ -188,26 +201,63 @@ const createAvailableState = ({
   selectedDialect,
   appliedScopeSelections,
   reason = "available",
+  selectedMeasureOptionId = null,
 }: {
   taskPrompt: string;
   dataset: DatasetMetadata;
   selectedDialect: SqlDialectId;
   appliedScopeSelections: readonly AnalysisScopeSelection[];
   reason?: Extract<AdaptiveReportProposalFallbackState["reason"], "available" | "syntax_helpers_only">;
+  selectedMeasureOptionId?: string | null;
 }): AdaptiveReportProposalFallbackState => ({
-  shouldShow: true,
-  reason,
-  proposal: proposeAdaptiveReport({
-    prompt: taskPrompt,
-    detectedIntent: detectBusinessIntent(taskPrompt),
-    selectedGuidanceDialect: selectedDialect,
-    appliedScopeSelections,
-    worksheets: resolveWorksheets(dataset),
-    acceptedRelationshipContracts:
-      dataset.workbook_metadata?.acceptedRelationshipContracts || [],
-  }),
-  insertDisabled: true,
-  runDisabled: true,
+  ...(() => {
+    const detectedIntent = detectBusinessIntent(taskPrompt);
+    const worksheets = resolveWorksheets(dataset);
+    const measureAmbiguity = detectBusinessSqlMeasureAmbiguity({
+      prompt: taskPrompt,
+      intent: detectedIntent,
+      worksheets,
+      appliedScopeSelections,
+    });
+    const resolved =
+      measureAmbiguity && selectedMeasureOptionId
+        ? resolveBusinessSqlMeasureAmbiguity({
+            ambiguity: measureAmbiguity,
+            chosenOptionId: selectedMeasureOptionId,
+            originalIntent: detectedIntent,
+          })
+        : null;
+
+    if (measureAmbiguity && !resolved?.resolved) {
+      return {
+        shouldShow: true,
+        reason: "measure_ambiguity" as const,
+        proposal: null,
+        measureAmbiguity,
+        clarificationDecision: null,
+        insertDisabled: true,
+        runDisabled: true,
+      };
+    }
+
+    return {
+      shouldShow: true,
+      reason,
+      proposal: proposeAdaptiveReport({
+        prompt: taskPrompt,
+        detectedIntent: resolved?.resolved ? resolved.intent : detectedIntent,
+        selectedGuidanceDialect: selectedDialect,
+        appliedScopeSelections,
+        worksheets,
+        acceptedRelationshipContracts:
+          dataset.workbook_metadata?.acceptedRelationshipContracts || [],
+      }),
+      measureAmbiguity,
+      clarificationDecision: resolved?.resolved ? resolved.decision : null,
+      insertDisabled: true,
+      runDisabled: true,
+    };
+  })(),
 });
 
 export function createAdaptiveReportProposalFallback({
@@ -216,6 +266,7 @@ export function createAdaptiveReportProposalFallback({
   selectedDialect,
   appliedScopeLabels,
   recommendations,
+  selectedMeasureOptionId = null,
 }: CreateAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
   const recommendationMatchKind = classifyRecommendationMatchKind(recommendations);
   if (recommendationMatchKind === "meaningful_business_match") {
@@ -244,6 +295,7 @@ export function createAdaptiveReportProposalFallback({
     dataset,
     selectedDialect,
     appliedScopeSelections,
+    selectedMeasureOptionId,
     reason:
       recommendationMatchKind === "generic_syntax_helper_match"
         ? "syntax_helpers_only"
@@ -268,6 +320,7 @@ export function createBusinessSqlPreviewAdaptiveReportProposalFallback({
   selectedDialect,
   appliedScopeSelections,
   preview,
+  selectedMeasureOptionId = null,
 }: CreateBusinessSqlPreviewAdaptiveReportProposalFallbackInput): AdaptiveReportProposalFallbackState {
   if (preview?.status === "ready" && preview.sql) {
     return unavailableState("has_ready_preview");
@@ -290,5 +343,6 @@ export function createBusinessSqlPreviewAdaptiveReportProposalFallback({
     dataset,
     selectedDialect,
     appliedScopeSelections,
+    selectedMeasureOptionId,
   });
 }

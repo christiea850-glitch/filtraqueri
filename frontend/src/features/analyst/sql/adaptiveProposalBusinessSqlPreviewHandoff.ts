@@ -8,6 +8,7 @@ import type {
   AdaptiveProposalBusinessSqlBridgeState,
 } from "./adaptiveProposalBusinessSqlBridge";
 import type { BusinessSqlRenderReadinessResult } from "./businessSqlRenderReadiness";
+import type { BusinessSqlMeasureClarificationDecision } from "./businessSqlMeasureAmbiguity";
 
 export type AdaptiveProposalBusinessSqlPreviewHandoffAction = {
   label: "Preview SQL from plan candidate";
@@ -22,6 +23,7 @@ export type AdaptiveProposalBusinessSqlPreviewHandoffInput = {
   issues: readonly AdaptiveProposalBusinessSqlBridgeIssue[];
   activeSqlDraft: string;
   existingPreview: BusinessSqlRenderPreview | null;
+  clarificationDecision?: BusinessSqlMeasureClarificationDecision | null;
 };
 
 export type AdaptiveProposalBusinessSqlPreviewHandoffResult = {
@@ -97,7 +99,9 @@ export function createAdaptiveProposalBusinessSqlPreviewHandoff(
   return {
     preview:
       previewAction.canPreview && input.plan
-        ? createBusinessSqlRenderPreview(input.plan)
+        ? createBusinessSqlRenderPreview(input.plan, {
+            clarificationDecision: input.clarificationDecision || undefined,
+          })
         : null,
     action: previewAction,
     noDirectRendererCallFromUi: true,

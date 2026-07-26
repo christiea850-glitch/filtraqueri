@@ -9,6 +9,8 @@ import {
   createBusinessSqlRenderPreview,
   type BusinessSqlRenderPreview,
 } from "./businessSqlRenderPreview";
+import { detectBusinessIntent } from "./businessIntentGrounding";
+import { detectBusinessSqlMeasureAmbiguity } from "./businessSqlMeasureAmbiguity";
 import type { BusinessSqlMissingRelationship } from "./businessSqlJoinPathResolver";
 import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
 
@@ -26,7 +28,10 @@ export type BusinessSqlRenderPreviewWorkspaceInput = {
   selectedGuidanceDialect: SqlDialectId;
   selectedScopeSelections?: readonly AnalysisScopeSelection[];
   appliedScopeSelections?: readonly AnalysisScopeSelection[];
-  worksheets?: readonly Pick<WorksheetMetadata, "tableName" | "schema">[];
+  worksheets?: readonly Pick<
+    WorksheetMetadata,
+    "worksheetId" | "displayName" | "sheetName" | "tableName" | "schema"
+  >[];
   acceptedRelationshipContracts?: readonly AcceptedRelationshipContract[];
   readyRelationshipContracts?: readonly AcceptedRelationshipContract[];
   missingRelationships?: readonly BusinessSqlMissingRelationship[];
@@ -200,6 +205,37 @@ export function createBusinessSqlRenderPreviewFromWorkspaceContext({
   activeSqlDraft = "",
   activeSqlDraftSource = null,
 }: BusinessSqlRenderPreviewWorkspaceInput): BusinessSqlRenderPreviewWorkspaceResult {
+  const intent = detectBusinessIntent(taskPrompt);
+  const measureAmbiguity = detectBusinessSqlMeasureAmbiguity({
+    prompt: taskPrompt,
+    intent,
+    worksheets,
+    appliedScopeSelections,
+  });
+
+  if (measureAmbiguity) {
+    return {
+      preview: {
+        status: "needs_review",
+        title: "SQL preview needs measure clarification",
+        body: "Choose what the ranking should measure before previewing Business SQL.",
+        sql: null,
+        planId: measureAmbiguity.ambiguityId,
+        rendererTarget: "duckdb",
+        guidanceDialect: selectedGuidanceDialect,
+        reasons: [measureAmbiguity.prompt],
+        warnings: [],
+        actions: {
+          canCopySql: false,
+          canInsertSql: false,
+          canRunSql: false,
+        },
+      },
+      activeSqlDraft,
+      activeSqlDraftSource,
+    };
+  }
+
   const plan = planBusinessSqlQueryRequest({
     prompt: taskPrompt,
     selectedGuidanceDialect,

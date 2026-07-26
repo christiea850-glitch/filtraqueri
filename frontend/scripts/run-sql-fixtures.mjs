@@ -177,6 +177,11 @@ const fixtures = [
     exportName: "runBusinessSqlQueryPlanFixtures",
   },
   {
+    label: "Business SQL measure ambiguity",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlMeasureAmbiguity.test.ts",
+    exportName: "runBusinessSqlMeasureAmbiguityFixtures",
+  },
+  {
     label: "Business SQL query planner",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
     exportName: "runBusinessSqlQueryPlannerFixtures",

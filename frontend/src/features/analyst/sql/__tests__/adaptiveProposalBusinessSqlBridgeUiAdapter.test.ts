@@ -198,6 +198,8 @@ const fallback = (
   shouldShow,
   reason: shouldShow ? "available" : "has_static_matches",
   proposal,
+  measureAmbiguity: null,
+  clarificationDecision: null,
   insertDisabled: true,
   runDisabled: true,
 });

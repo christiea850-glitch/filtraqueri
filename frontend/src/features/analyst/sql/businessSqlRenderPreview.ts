@@ -1,5 +1,6 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
+import type { BusinessSqlClarificationDecisionProvenance } from "./businessSqlPreviewProvenance";
 import { renderBusinessSqlQueryPlan } from "./businessSqlRenderer";
 import {
   createBusinessSqlRendererPreviewUiModel,
@@ -16,6 +17,7 @@ export type BusinessSqlRenderPreview = {
   guidanceDialect?: SqlDialectId;
   reasons: string[];
   warnings: string[];
+  clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
   rendererPreviewUiModel?: BusinessSqlRendererPreviewUiModel;
   actions: {
     canCopySql: boolean;
@@ -42,6 +44,9 @@ const bodyForStatus = (status: BusinessSqlRenderPreview["status"]): string => {
 
 export function createBusinessSqlRenderPreview(
   plan: BusinessSqlQueryPlan,
+  options: {
+    clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
+  } = {},
 ): BusinessSqlRenderPreview {
   const renderResult = renderBusinessSqlQueryPlan(plan);
   const rendererPreviewUiModel = createBusinessSqlRendererPreviewUiModel(renderResult);
@@ -63,6 +68,14 @@ export function createBusinessSqlRenderPreview(
     guidanceDialect: plan.renderer.selectedGuidanceDialect,
     reasons: [...renderResult.reasons],
     warnings: [...renderResult.warnings],
+    ...(options.clarificationDecision
+      ? {
+          clarificationDecision: {
+            ...options.clarificationDecision,
+            presentedOptionIds: [...options.clarificationDecision.presentedOptionIds],
+          },
+        }
+      : {}),
     rendererPreviewUiModel,
     actions: {
       canCopySql: status === "ready" && Boolean(sql),

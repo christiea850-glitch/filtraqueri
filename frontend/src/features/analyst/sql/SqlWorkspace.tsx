@@ -237,6 +237,7 @@ function SqlFocusedResultPreview({
             <p>{provenance.summaryText}</p>
             {provenance.sourceText ? <p>{provenance.sourceText}</p> : null}
             {provenance.ranAtText ? <p>{provenance.ranAtText}</p> : null}
+            {provenance.clarificationText ? <p>{provenance.clarificationText}</p> : null}
             {provenance.driftWarningText ? (
               <p className="sql-result-provenance-warning">{provenance.driftWarningText}</p>
             ) : null}
@@ -772,7 +773,9 @@ function SqlWorkspace({
     deleteDrafts,
     openSqlSourceTab,
     activeTabSourceContext,
-  } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange);
+  } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange, {
+    businessSqlPreviewInsertProvenance,
+  });
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
   // Option C - Drive the command-bar source label from the active SQL tab's
   // resolved context instead of falling back to the global active worksheet.

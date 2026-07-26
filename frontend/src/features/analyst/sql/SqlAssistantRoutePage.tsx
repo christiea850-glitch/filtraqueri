@@ -259,11 +259,14 @@ function SqlAssistantRoutePage({
         requestedMode={kind === "reports" ? "recipes" : requestedMode}
         allowedModes={allowedModes}
         taskPrompt={sqlTabs.taskPrompt}
+        activeSqlTabId={sqlTabs.activeTabId}
         onTaskPromptChange={sqlTabs.onTaskPromptChange}
         onSelectedScopeChange={sqlTabs.onSelectedScopeChange}
         onApplyScope={sqlTabs.onApplyScope}
         onReviewRelationships={reviewWorksheetConnections}
         appliedScopeLabels={appliedScopeLabels}
+        appliedScopeSelections={sqlTabs.appliedScopeSelections}
+        selectedScopeSelections={sqlTabs.selectedScopeSelections}
         activeTabLabel={activeSourceLabel}
       />
     </section>

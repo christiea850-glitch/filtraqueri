@@ -22,6 +22,7 @@ export type SqlResultProvenanceViewModel = {
   summaryText: string;
   sourceText: string | null;
   ranAtText: string | null;
+  clarificationText: string | null;
   driftWarningText: string | null;
 };
 
@@ -41,6 +42,7 @@ export function createSqlResultProvenanceViewModel({
       summaryText: "Showing result from a previous run",
       sourceText: null,
       ranAtText: null,
+      clarificationText: null,
       driftWarningText: null,
     };
   }
@@ -57,6 +59,9 @@ export function createSqlResultProvenanceViewModel({
       : `Showing result for SQL run on ${sourceName || "the selected source"}`,
     sourceText: sourceName ? `Source: ${sourceName}` : null,
     ranAtText: executedQuestion.ranAt ? `Ran: ${formatRunTimestamp(executedQuestion.ranAt)}` : null,
+    clarificationText: executedQuestion.clarificationDecision
+      ? `Clarification: selected ${executedQuestion.clarificationDecision.chosenOptionId}`
+      : null,
     driftWarningText: promptChanged || sqlChanged ? SQL_RESULT_DRIFT_WARNING : null,
   };
 }

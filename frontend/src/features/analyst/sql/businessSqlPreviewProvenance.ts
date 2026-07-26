@@ -99,6 +99,9 @@ export function summarizeBusinessSqlPreviewInsertProvenance(
     `plan=${provenance.planId}`,
     `target=${provenance.rendererTarget}`,
     `fingerprint=${provenance.insertedSqlFingerprint}`,
+    provenance.clarificationDecision
+      ? `clarification=${provenance.clarificationDecision.ambiguityId}:${provenance.clarificationDecision.chosenOptionId}`
+      : "clarification=none",
     "persistence=false",
     "execution=false",
     "auth=false",

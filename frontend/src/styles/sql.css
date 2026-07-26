@@ -1609,6 +1609,45 @@
   overflow-wrap: anywhere;
 }
 
+.semantic-measure-clarification-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.semantic-measure-clarification-panel fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.semantic-measure-clarification-panel legend {
+  margin-bottom: 4px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.semantic-measure-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.semantic-measure-option span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
 .adaptive-proposal-llm-consent-shell {
   display: grid;
   gap: 8px;
