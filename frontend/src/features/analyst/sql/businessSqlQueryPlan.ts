@@ -96,6 +96,27 @@ export type BusinessSqlRowLimit = {
   value: number;
 };
 
+export type BusinessSqlAggregateComparisonOperator =
+  | "greater_than"
+  | "greater_than_or_equal"
+  | "less_than"
+  | "less_than_or_equal"
+  | "equals"
+  | "not_equals";
+
+export type BusinessSqlAggregateComparisonValue = {
+  kind: "number";
+  value: number;
+};
+
+export type BusinessSqlAggregateResultCondition = {
+  conditionId: string;
+  measureId: string;
+  operator: BusinessSqlAggregateComparisonOperator;
+  comparisonValue: BusinessSqlAggregateComparisonValue;
+  label?: string;
+};
+
 export type BusinessSqlGrouping = {
   entity: string;
   table?: string;
@@ -200,6 +221,7 @@ export type BusinessSqlQueryPlan = {
   filters: BusinessSqlFilter[];
   orderBy: BusinessSqlSort[];
   rowLimit: BusinessSqlRowLimit | null;
+  aggregateResultConditions: BusinessSqlAggregateResultCondition[];
   joinPath: BusinessSqlJoinPath;
   assumptions: BusinessSqlPlanAssumption[];
   warnings: BusinessSqlPlanWarning[];
@@ -268,6 +290,19 @@ export const createBusinessSqlSortId = (
 export const createBusinessSqlRowLimitId = (
   rowLimit: Pick<BusinessSqlRowLimit, "value">,
 ): string => stablePrimitiveId("business-sql-row-limit", [rowLimit.value]);
+
+export const createBusinessSqlAggregateResultConditionId = (
+  condition: Pick<
+    BusinessSqlAggregateResultCondition,
+    "measureId" | "operator" | "comparisonValue"
+  >,
+): string =>
+  stablePrimitiveId("business-sql-aggregate-condition", [
+    condition.measureId,
+    condition.operator,
+    condition.comparisonValue.kind,
+    condition.comparisonValue.value,
+  ]);
 
 const slugifySqlAlias = (value: string): string => {
   const alias = value
@@ -383,6 +418,7 @@ export const createEmptyBusinessSqlQueryPlan = (): BusinessSqlQueryPlan => ({
   filters: [],
   orderBy: [],
   rowLimit: null,
+  aggregateResultConditions: [],
   joinPath: { ...EMPTY_JOIN_PATH, entities: [], edges: [], requirements: [] },
   assumptions: [],
   warnings: [],

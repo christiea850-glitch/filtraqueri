@@ -182,6 +182,11 @@ const fixtures = [
     exportName: "runBusinessSqlMeasureAmbiguityFixtures",
   },
   {
+    label: "Business SQL aggregate-result condition",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlAggregateResultCondition.test.ts",
+    exportName: "runBusinessSqlAggregateResultConditionFixtures",
+  },
+  {
     label: "Business SQL query planner",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
     exportName: "runBusinessSqlQueryPlannerFixtures",

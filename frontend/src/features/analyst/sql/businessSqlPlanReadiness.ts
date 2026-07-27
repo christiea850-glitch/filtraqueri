@@ -5,6 +5,10 @@ import {
   type BusinessSqlSortTarget,
 } from "./businessSqlQueryPlan";
 import type { BusinessSqlQueryPlanJoinResolution } from "./businessSqlQueryPlanJoinResolution";
+import {
+  evaluateBusinessSqlAggregateResultConditionCompatibility,
+  type BusinessSqlAggregateResultConditionCompatibilityReason,
+} from "./businessSqlAggregateResultConditionCompatibility";
 import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
 
 export type BusinessSqlPlanReadinessStatus = "ready" | "needs_review" | "blocked";
@@ -19,7 +23,8 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "grouping_missing"
   | "sort_target_unresolved"
   | "measure_field_type_incompatible"
-  | "row_limit_invalid";
+  | "row_limit_invalid"
+  | BusinessSqlAggregateResultConditionCompatibilityReason;
 
 export type BusinessSqlRendererEligibility = {
   eligible: boolean;
@@ -92,6 +97,40 @@ export function evaluateBusinessSqlPlanReadiness(
   ) {
     reasonCodes.push("measure_field_type_incompatible");
     reviewReasons.push("One or more planned measure fields are incompatible with the measure kind.");
+  }
+
+  const aggregateConditionReasonCodes = (plan.aggregateResultConditions || []).flatMap(
+    (condition) =>
+      evaluateBusinessSqlAggregateResultConditionCompatibility({
+        condition,
+        measures: normalizedPlan.measures,
+      }).reasonCodes,
+  );
+
+  if (aggregateConditionReasonCodes.length > 0) {
+    reasonCodes.push(...aggregateConditionReasonCodes);
+
+    if (
+      aggregateConditionReasonCodes.includes("aggregate_condition_measure_unresolved")
+    ) {
+      reviewReasons.push("One or more aggregate-result conditions reference an unresolved measure.");
+    }
+
+    if (
+      aggregateConditionReasonCodes.includes("aggregate_condition_measure_not_aggregate")
+    ) {
+      reviewReasons.push("One or more aggregate-result conditions reference a non-aggregate measure.");
+    }
+
+    if (
+      aggregateConditionReasonCodes.includes("aggregate_condition_operator_unsupported")
+    ) {
+      reviewReasons.push("One or more aggregate-result conditions use an unsupported operator.");
+    }
+
+    if (aggregateConditionReasonCodes.includes("aggregate_condition_value_invalid")) {
+      reviewReasons.push("One or more aggregate-result condition values are invalid.");
+    }
   }
 
   if (
