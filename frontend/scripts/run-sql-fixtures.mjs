@@ -167,6 +167,11 @@ const fixtures = [
     exportName: "runBusinessIntentFixtures",
   },
   {
+    label: "Adaptive report proposal",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveReportProposal.test.ts",
+    exportName: "runAdaptiveReportProposalFixtures",
+  },
+  {
     label: "Semantic hint registry",
     modulePath: "/src/features/analyst/sql/__tests__/semanticHintRegistry.test.ts",
     exportName: "runSemanticHintRegistryFixtures",
@@ -245,6 +250,21 @@ const fixtures = [
     label: "Business SQL renderability gate",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlRenderabilityGate.test.ts",
     exportName: "runBusinessSqlRenderabilityGateFixtures",
+  },
+  {
+    label: "Adaptive proposal Business SQL bridge",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalBusinessSqlBridge.test.ts",
+    exportName: "runAdaptiveProposalBusinessSqlBridgeFixtures",
+  },
+  {
+    label: "Adaptive proposal Business SQL bridge UI adapter",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalBusinessSqlBridgeUiAdapter.test.ts",
+    exportName: "runAdaptiveProposalBusinessSqlBridgeUiAdapterFixtures",
+  },
+  {
+    label: "Adaptive proposal Business SQL preview handoff",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalBusinessSqlPreviewHandoff.test.ts",
+    exportName: "runAdaptiveProposalBusinessSqlPreviewHandoffFixtures",
   },
   {
     label: "Dataset summary result",

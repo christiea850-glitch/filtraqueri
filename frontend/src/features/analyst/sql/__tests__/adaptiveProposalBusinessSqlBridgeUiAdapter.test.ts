@@ -149,6 +149,7 @@ const baseProposal = (): AdaptiveReportProposal => ({
       confidence: "high",
     },
   ],
+  aggregateResultConditions: [],
   filters: [],
   joinNeeds: [],
   assumptions: [

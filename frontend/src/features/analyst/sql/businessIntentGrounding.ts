@@ -174,6 +174,8 @@ const GROUPING_IN_PATTERN = /\bin\s+(?:the\s+)?([a-z_]+)/i;
 
 const BY_GROUPING_PATTERN = /\bby\s+([a-z_]+)/i;
 const PER_GROUPING_PATTERN = /\bper\s+([a-z_]+)/i;
+const AGGREGATE_THRESHOLD_PATTERN =
+  /\b(?:above|over|greater than|more than|at least|no less than|below|under|less than|fewer than|at most|no more than|equal to|equals|not equal to|different from)\s+[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\b/i;
 
 // --------------------------------------------------------------------------
 // Per-category scorers
@@ -393,7 +395,26 @@ const trimFieldConcept = (value: string): string => {
     "for",
     "from",
     "with",
+    "whose",
+    "that",
     "where",
+    "is",
+    "are",
+    "was",
+    "were",
+    "above",
+    "over",
+    "greater",
+    "more",
+    "below",
+    "under",
+    "less",
+    "fewer",
+    "at",
+    "no",
+    "equal",
+    "equals",
+    "different",
     "ordered",
     "sorted",
   ]);
@@ -498,10 +519,15 @@ const detectMetrics = (text: string, entities: string[]): string[] => {
   if (matches(text, /\bheadcount\b/)) metrics.push("count_employees");
   if (matches(text, /\bturnover\b/)) metrics.push("turnover");
   if (matches(text, /\baverage [a-z_]+\b/)) {
-    const avgMatch = text.match(/\baverage\s+([a-z_]+)\b/);
-    if (avgMatch) metrics.push(`avg_${avgMatch[1]}`);
+    const avgField = aggregateFieldConceptFor(text);
+    if (avgField) metrics.push(`average_${avgField.replace(/\s+/g, "_")}`);
   }
-  return metrics;
+  const aggregation = explicitAggregationFor(text);
+  const aggregateField = aggregateFieldConceptFor(text);
+  if (aggregation && aggregateField) {
+    metrics.push(`${aggregation}_${aggregateField.replace(/\s+/g, "_")}`);
+  }
+  return Array.from(new Set(metrics));
 };
 
 const detectGroupingTargets = (text: string, suppress: boolean): string[] => {
@@ -637,6 +663,15 @@ export function detectBusinessIntent(taskPrompt: string): BusinessIntent {
     preview: scorePreview(text),
     unknown: 0,
   };
+
+  const thresholdAggregateField = aggregateFieldConceptFor(text);
+  if (
+    explicitAggregationFor(text) &&
+    thresholdAggregateField &&
+    AGGREGATE_THRESHOLD_PATTERN.test(text)
+  ) {
+    scores.grouping = Math.max(scores.grouping, 0.55);
+  }
 
   // Composite: count_grouping fires when both count and grouping are above
   // their per-component thresholds. We boost above either constituent so the

@@ -9,6 +9,10 @@ import {
   EMPTY_BUSINESS_INTENT,
   type BusinessIntent,
 } from "./businessIntentGrounding";
+import type {
+  BusinessSqlAggregateComparisonOperator,
+  BusinessSqlAggregateComparisonValue,
+} from "./businessSqlQueryPlan";
 import {
   inferSemanticTableHints,
   type SemanticColumnHint,
@@ -43,6 +47,7 @@ export type ProposedMetric = {
   kind:
     | "count_rows"
     | "count_entities"
+    | "count_distinct"
     | "sum"
     | "average"
     | "minimum"
@@ -52,6 +57,16 @@ export type ProposedMetric = {
   columnName: string | null;
   inferredType?: SchemaColumn["inferred_type"];
   synthesized: boolean;
+  confidence: "high" | "medium" | "low";
+};
+
+export type ProposedAggregateResultCondition = {
+  id: string;
+  metricId: string;
+  operator: BusinessSqlAggregateComparisonOperator;
+  comparisonValue: BusinessSqlAggregateComparisonValue;
+  label?: string;
+  evidence?: string;
   confidence: "high" | "medium" | "low";
 };
 
@@ -133,6 +148,7 @@ export type AdaptiveReportProposal = {
   entities: ProposedEntity[];
   metrics: ProposedMetric[];
   groupings: ProposedGrouping[];
+  aggregateResultConditions: ProposedAggregateResultCondition[];
   sorts?: ProposedSort[];
   rowLimit?: ProposedRowLimit | null;
   filters: ProposedFilter[];
@@ -203,6 +219,7 @@ export const EMPTY_ADAPTIVE_REPORT_PROPOSAL: AdaptiveReportProposal = {
   entities: [],
   metrics: [],
   groupings: [],
+  aggregateResultConditions: [],
   sorts: [],
   rowLimit: null,
   filters: [],
@@ -525,16 +542,273 @@ const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
   if (text.startsWith("minimum ") || text.startsWith("min ")) return "minimum";
   if (text.startsWith("maximum ") || text.startsWith("max ")) return "maximum";
   if (text.startsWith("sum ") || text.startsWith("total ")) return "sum";
+  if (text.startsWith("distinct count ") || text.startsWith("count distinct ")) return "count_distinct";
   if (text.startsWith("count ")) return "count_entities";
   return "metric_column";
 };
 
+type AggregateThresholdMatch = {
+  operator: BusinessSqlAggregateComparisonOperator;
+  comparisonValue: BusinessSqlAggregateComparisonValue;
+  evidence: string;
+  trailingConcept: string | null;
+};
+
+const THRESHOLD_PHRASES: ReadonlyArray<{
+  operator: BusinessSqlAggregateComparisonOperator;
+  phrases: readonly string[];
+}> = [
+  { operator: "not_equals", phrases: ["not equal to", "different from"] },
+  { operator: "greater_than_or_equal", phrases: ["at least", "no less than"] },
+  { operator: "less_than_or_equal", phrases: ["at most", "no more than"] },
+  { operator: "greater_than", phrases: ["above", "over", "greater than", "more than"] },
+  { operator: "less_than", phrases: ["below", "under", "less than", "fewer than"] },
+  { operator: "equals", phrases: ["equal to", "equals"] },
+];
+
+const NUMBER_TOKEN = String.raw`([^\s]+)`;
+const escapeRegExp = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const THRESHOLD_PHRASE_OPERATOR_BY_TEXT = new Map(
+  THRESHOLD_PHRASES.flatMap(({ operator, phrases }) =>
+    phrases.map((phrase) => [phrase, operator] as const),
+  ),
+);
+const THRESHOLD_PHRASE_PATTERN = THRESHOLD_PHRASES.flatMap(({ phrases }) => phrases)
+  .sort((left, right) => right.length - left.length || left.localeCompare(right))
+  .map(escapeRegExp)
+  .join("|");
+
+const NUMERIC_THRESHOLD_PATTERN =
+  /^-?(?:(?:\d+)(?:\.\d+)?|(?:\d{1,3})(?:,\d{3})+(?:\.\d+)?)$/;
+const SENTENCE_PUNCTUATION = /^[,.;?]+$/;
+const UNSUPPORTED_NUMERIC_SUFFIXES = new Set([
+  "usd",
+  "dollar",
+  "dollars",
+  "percent",
+  "percentage",
+  "hundred",
+  "hundreds",
+  "thousand",
+  "thousands",
+  "million",
+  "millions",
+  "billion",
+  "billions",
+  "trillion",
+  "trillions",
+  "k",
+  "m",
+  "mm",
+  "bn",
+  "b",
+]);
+const UNSUPPORTED_MEASUREMENT_UNITS = new Set([
+  "second",
+  "seconds",
+  "sec",
+  "secs",
+  "minute",
+  "minutes",
+  "min",
+  "mins",
+  "hour",
+  "hours",
+  "hr",
+  "hrs",
+  "day",
+  "days",
+  "week",
+  "weeks",
+  "month",
+  "months",
+  "year",
+  "years",
+  "mile",
+  "miles",
+  "kilometer",
+  "kilometers",
+  "km",
+  "meter",
+  "meters",
+  "foot",
+  "feet",
+  "ft",
+  "inch",
+  "inches",
+  "kilogram",
+  "kilograms",
+  "kg",
+  "gram",
+  "grams",
+  "g",
+  "pound",
+  "pounds",
+  "lb",
+  "lbs",
+  "liter",
+  "liters",
+  "litre",
+  "litres",
+  "gallon",
+  "gallons",
+]);
+const EXPRESSION_CONTINUATION_PATTERN = /^[+\-*/^%=()]/;
+
+const normalizeThresholdDetectionText = (value: string): string =>
+  value.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, " ").trim();
+
+const trimSentencePunctuation = (value: string): string => {
+  let trimmed = value;
+  while (trimmed.length > 0) {
+    const last = trimmed[trimmed.length - 1];
+    if (!SENTENCE_PUNCTUATION.test(last)) break;
+    const candidate = trimmed.slice(0, -1);
+    if (NUMERIC_THRESHOLD_PATTERN.test(candidate)) return candidate;
+    trimmed = candidate;
+  }
+  return value;
+};
+
+const parseNumericThreshold = (value: string): BusinessSqlAggregateComparisonValue | null => {
+  const token = trimSentencePunctuation(value.trim());
+  if (!NUMERIC_THRESHOLD_PATTERN.test(token)) return null;
+  const parsed = Number(token.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? { kind: "number", value: parsed } : null;
+};
+
+const firstWord = (value: string): string =>
+  value.match(/^[a-z]+/)?.[0] || "";
+
+const wordMatches = (words: ReadonlySet<string>, value: string): boolean => {
+  if (!value) return false;
+  return words.has(value) || words.has(singularize(value));
+};
+
+const isUnsupportedAggregateThresholdUnit = (value: string): boolean =>
+  wordMatches(UNSUPPORTED_MEASUREMENT_UNITS, value);
+
+const hasUnsupportedNumericContinuation = ({
+  text,
+  numericEndIndex,
+  trailingConcept,
+}: {
+  text: string;
+  numericEndIndex: number;
+  trailingConcept: string;
+}): boolean => {
+  const continuation = text.slice(numericEndIndex).trimStart();
+  if (EXPRESSION_CONTINUATION_PATTERN.test(continuation)) return true;
+  const firstContinuationWord = firstWord(continuation);
+  if (isUnsupportedAggregateThresholdUnit(firstContinuationWord)) return true;
+  const firstTrailingWord = trailingConcept.split(/\s+/g).find(Boolean) || "";
+  return wordMatches(UNSUPPORTED_NUMERIC_SUFFIXES, firstContinuationWord) ||
+    wordMatches(UNSUPPORTED_NUMERIC_SUFFIXES, firstTrailingWord);
+};
+
+const trimThresholdConcept = (value: string): string => {
+  const stopWords = new Set([
+    "and",
+    "or",
+    "by",
+    "per",
+    "in",
+    "for",
+    "from",
+    "with",
+    "where",
+    "ordered",
+    "sorted",
+  ]);
+  const words = value
+    .replace(/[_-]+/g, " ")
+    .split(/\s+/g)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  const stopIndex = words.findIndex((word) => stopWords.has(word));
+  const concept = words.slice(0, stopIndex >= 0 ? stopIndex : words.length).join(" ");
+  return singularize(concept);
+};
+
+export const parseAggregateThresholdNumber = (
+  value: string,
+): BusinessSqlAggregateComparisonValue | null => parseNumericThreshold(value);
+
+export const detectAggregateThresholdMatches = (
+  prompt: string,
+): AggregateThresholdMatch[] => {
+  const text = normalizeThresholdDetectionText(prompt);
+  const pattern = new RegExp(
+    String.raw`\b(${THRESHOLD_PHRASE_PATTERN})\s+${NUMBER_TOKEN}(?:\s+(?!(?:and|or|but)\b)([a-z][a-z\s_]{0,40}))?`,
+    "g",
+  );
+  const matchesByEvidence = new Map<string, AggregateThresholdMatch>();
+
+  for (const match of text.matchAll(pattern)) {
+    const phrase = match[1];
+    const numericToken = match[2];
+    const trailingConcept = trimThresholdConcept(match[3] || "");
+    const operator = THRESHOLD_PHRASE_OPERATOR_BY_TEXT.get(phrase);
+    const numericStartInMatch = match[0].indexOf(numericToken);
+    const numericEndIndex = (match.index || 0) + numericStartInMatch + numericToken.length;
+    if (
+      hasUnsupportedNumericContinuation({
+        text,
+        numericEndIndex,
+        trailingConcept,
+      })
+    ) {
+      continue;
+    }
+    const comparisonValue = parseNumericThreshold(numericToken);
+    if (!operator || !comparisonValue) continue;
+    const evidence = `${phrase} ${trimSentencePunctuation(numericToken)}`;
+    matchesByEvidence.set(`${operator}:${evidence}`, {
+      operator,
+      comparisonValue,
+      evidence,
+      trailingConcept: trailingConcept || null,
+    });
+  }
+
+  return Array.from(matchesByEvidence.values());
+};
+
+const thresholdCountMetricName = (
+  matches: readonly AggregateThresholdMatch[],
+  entities: readonly string[],
+): string | null => {
+  if (matches.length !== 1) return null;
+  const concept = matches[0].trailingConcept;
+  if (!concept) return null;
+  const normalizedConcept = normalize(concept);
+  const entityMatch =
+    entities.find((entity) => normalize(entity) === normalizedConcept) ||
+    entities.find((entity) => singularize(entity) === singularize(normalizedConcept));
+  return entityMatch ? `count_${entityMatch.replace(/\s+/g, "_")}` : null;
+};
+
 const proposeMetrics = (
   intent: BusinessIntent,
+  prompt: string,
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedMetric[] => {
   if (intent.metrics.length === 0) {
+    const thresholdMetric = thresholdCountMetricName(
+      detectAggregateThresholdMatches(prompt),
+      intent.entities,
+    );
+    if (thresholdMetric) {
+      return proposeMetrics(
+        { ...intent, metrics: [thresholdMetric] },
+        prompt,
+        worksheets,
+        semanticColumns,
+      );
+    }
+    if (detectAggregateThresholdMatches(prompt).length > 0) return [];
     return [
       {
         id: "metric:count-rows",
@@ -603,12 +877,31 @@ const proposeRowLimit = (intent: BusinessIntent): ProposedRowLimit | null => {
   };
 };
 
+const groupingConceptsFromPromptSubject = (prompt: string): string[] => {
+  const text = normalize(prompt);
+  const subjectMatch = text.match(
+    /\b(?:show|list|find|identify)\s+(?:the\s+)?([a-z][a-z\s_]{0,60}?)\s+(?:whose|with|where|that)\b/,
+  );
+  if (!subjectMatch) return [];
+  const subject = subjectMatch[1]
+    .replace(/\b(rows?|records?)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return subject ? [singularize(subject)] : [];
+};
+
 const proposeGroupings = (
   intent: BusinessIntent,
+  prompt: string,
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
-): ProposedGrouping[] =>
-  intent.grouping.map((grouping) => {
+): ProposedGrouping[] => {
+  const groupingConcepts =
+    intent.grouping.length > 0
+      ? intent.grouping
+      : groupingConceptsFromPromptSubject(prompt);
+
+  return Array.from(new Set(groupingConcepts)).map((grouping) => {
     const column = findColumn(grouping, worksheets, semanticColumns, [
       "grouping_candidate",
       "category",
@@ -624,6 +917,46 @@ const proposeGroupings = (
       confidence: column?.confidence || "low",
     };
   });
+};
+
+const proposeAggregateResultConditions = ({
+  prompt,
+  metrics,
+  groupings,
+}: {
+  prompt: string;
+  metrics: readonly ProposedMetric[];
+  groupings: readonly ProposedGrouping[];
+}): ProposedAggregateResultCondition[] => {
+  const thresholdMatches = detectAggregateThresholdMatches(prompt);
+  if (thresholdMatches.length !== 1) return [];
+  if (metrics.length !== 1 || groupings.length !== 1) return [];
+
+  const metric = metrics[0];
+  const grouping = groupings[0];
+  if (
+    !metric.tableName ||
+    metric.confidence === "low" ||
+    metric.kind === "metric_column" ||
+    !grouping.tableName ||
+    !grouping.columnName
+  ) {
+    return [];
+  }
+
+  const threshold = thresholdMatches[0];
+  return [
+    {
+      id: `aggregate-condition:${compactId(metric.id)}:${threshold.operator}:${threshold.comparisonValue.value}`,
+      metricId: metric.id,
+      operator: threshold.operator,
+      comparisonValue: threshold.comparisonValue,
+      label: `${metric.label} ${threshold.evidence}`,
+      evidence: threshold.evidence,
+      confidence: "high",
+    },
+  ];
+};
 
 const promptHasAny = (prompt: string, terms: readonly string[]): boolean => {
   const text = normalize(prompt);
@@ -832,6 +1165,8 @@ const createMissingRequirements = ({
   entities,
   groupings,
   metrics,
+  aggregateResultConditions,
+  thresholdMatchCount,
   joinNeeds,
 }: {
   prompt: string;
@@ -840,9 +1175,12 @@ const createMissingRequirements = ({
   entities: readonly ProposedEntity[];
   groupings: readonly ProposedGrouping[];
   metrics: readonly ProposedMetric[];
+  aggregateResultConditions: readonly ProposedAggregateResultCondition[];
+  thresholdMatchCount: number;
   joinNeeds: readonly ProposedJoinNeed[];
 }): MissingRequirement[] => {
   const missing: MissingRequirement[] = [];
+  const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
   if (!prompt.trim()) {
     missing.push({
       id: "missing-prompt",
@@ -850,7 +1188,11 @@ const createMissingRequirements = ({
       message: "Describe the business question before proposing a report.",
     });
   }
-  if (intent.primaryIntent === "unknown" && intent.alternates.length === 0) {
+  if (
+    intent.primaryIntent === "unknown" &&
+    intent.alternates.length === 0 &&
+    !hasGroundedAggregateThreshold
+  ) {
     missing.push({
       id: "missing-intent",
       kind: "intent",
@@ -864,7 +1206,9 @@ const createMissingRequirements = ({
       message: "Apply worksheet scope before building an adaptive report proposal.",
     });
   }
-  for (const entity of entities.filter((entity) => !entity.tableName)) {
+  for (const entity of entities.filter(
+    (entity) => !entity.tableName && !hasGroundedAggregateThreshold,
+  )) {
     missing.push({
       id: `missing-entity:${compactId(entity.requestedName)}`,
       kind: "entity",
@@ -883,6 +1227,20 @@ const createMissingRequirements = ({
       id: `missing-metric:${compactId(metric.label)}`,
       kind: "column",
       message: `Could not safely bind metric \`${metric.label}\` to metadata.`,
+    });
+  }
+  if (thresholdMatchCount > 1) {
+    missing.push({
+      id: "unsupported-multiple-aggregate-thresholds",
+      kind: "intent",
+      message: "Only one aggregate-result threshold condition is supported in this slice.",
+    });
+  } else if (thresholdMatchCount === 1 && aggregateResultConditions.length === 0) {
+    missing.push({
+      id: "missing-aggregate-threshold-grounding",
+      kind: "column",
+      message:
+        "Could not safely bind the aggregate-result threshold to one grounded measure and one grounded grouping.",
     });
   }
   for (const join of joinNeeds.filter((join) => join.status === "missing")) {
@@ -1004,6 +1362,7 @@ const createFingerprint = ({
   joinNeeds,
   metrics,
   groupings,
+  aggregateResultConditions,
   sorts,
   rowLimit,
 }: {
@@ -1013,6 +1372,7 @@ const createFingerprint = ({
   joinNeeds: readonly ProposedJoinNeed[];
   metrics: readonly ProposedMetric[];
   groupings: readonly ProposedGrouping[];
+  aggregateResultConditions: readonly ProposedAggregateResultCondition[];
   sorts: readonly ProposedSort[];
   rowLimit: ProposedRowLimit | null;
 }): string =>
@@ -1033,6 +1393,9 @@ const createFingerprint = ({
     entityNames: stableStrings(entities.map((entity) => entity.label)),
     metricIds: stableStrings(metrics.map((metric) => metric.id)),
     groupingIds: stableStrings(groupings.map((grouping) => grouping.id)),
+    aggregateResultConditionIds: stableStrings(
+      aggregateResultConditions.map((condition) => condition.id),
+    ),
     sortIds: stableStrings(sorts.map((sort) => `${sort.target}:${sort.targetId}:${sort.direction}`)),
     rowLimit: rowLimit?.value || null,
     relationshipStatuses: joinNeeds
@@ -1094,8 +1457,13 @@ export function proposeAdaptiveReport(
     requestedEntities.length > 0
       ? requestedEntities.map((entity) => findWorksheetForEntity(entity, worksheets))
       : fallbackEntitiesFromScope(worksheets);
-  const metrics = proposeMetrics(detectedIntent, worksheets, semanticColumns);
-  const groupings = proposeGroupings(detectedIntent, worksheets, semanticColumns);
+  const metrics = proposeMetrics(detectedIntent, prompt, worksheets, semanticColumns);
+  const groupings = proposeGroupings(detectedIntent, prompt, worksheets, semanticColumns);
+  const aggregateResultConditions = proposeAggregateResultConditions({
+    prompt,
+    metrics,
+    groupings,
+  });
   const sorts = proposeSorts(detectedIntent, metrics);
   const rowLimit = proposeRowLimit(detectedIntent);
   const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns);
@@ -1111,6 +1479,8 @@ export function proposeAdaptiveReport(
     entities,
     groupings,
     metrics,
+    aggregateResultConditions,
+    thresholdMatchCount: detectAggregateThresholdMatches(prompt).length,
     joinNeeds,
   });
   const assumptions = createAssumptions(entities, metrics, groupings);
@@ -1124,6 +1494,7 @@ export function proposeAdaptiveReport(
     joinNeeds,
     metrics,
     groupings,
+    aggregateResultConditions,
     sorts,
     rowLimit,
   });
@@ -1139,6 +1510,7 @@ export function proposeAdaptiveReport(
     entities,
     metrics,
     groupings,
+    aggregateResultConditions,
     sorts,
     rowLimit,
     filters,

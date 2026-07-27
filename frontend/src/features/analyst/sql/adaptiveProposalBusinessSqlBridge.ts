@@ -3,6 +3,7 @@ import type { AcceptedRelationshipContract } from "../../workbook";
 import type {
   AdaptiveReportProposal,
   ProposedEntity,
+  ProposedAggregateResultCondition,
   ProposedJoinNeed,
   ProposedMetric,
 } from "./adaptiveReportProposal";
@@ -10,11 +11,13 @@ import {
   createBlockedBusinessSqlQueryPlan,
   createEmptyBusinessSqlQueryPlan,
   createBusinessSqlMeasureId,
+  createBusinessSqlAggregateResultConditionId,
   createBusinessSqlRowLimitId,
   createBusinessSqlSortId,
   createBusinessSqlMeasureAlias,
   measureToBusinessSqlMetric,
   type BusinessSqlEntityRef,
+  type BusinessSqlAggregateResultCondition,
   type BusinessSqlFilter,
   type BusinessSqlGrouping,
   type BusinessSqlJoinEdge,
@@ -52,6 +55,7 @@ export type AdaptiveProposalBusinessSqlBridgeIssue = {
     | "missing_table"
     | "missing_metric"
     | "unsupported_metric"
+    | "unresolved_metric_reference"
     | "missing_relationship"
     | "needs_review_join"
     | "needs_review_filter"
@@ -127,8 +131,17 @@ const hasRendererInvariantViolation = (proposal: AdaptiveReportProposal): boolea
 const hasMissingScope = (proposal: AdaptiveReportProposal): boolean =>
   proposal.missingRequirements.some((requirement) => requirement.kind === "scope");
 
-const requiredEntityTableMissing = (entities: readonly ProposedEntity[]): boolean =>
-  entities.length === 0 || entities.some((entity) => !entity.tableName);
+const requiredEntityTableMissing = (
+  proposal: AdaptiveReportProposal,
+): boolean => {
+  const hasGroundedAggregateThreshold =
+    (proposal.aggregateResultConditions || []).length === 1 &&
+    proposal.metrics.length === 1 &&
+    proposal.groupings.length === 1 &&
+    Boolean(proposal.metrics[0]?.tableName && proposal.groupings[0]?.tableName);
+  if (hasGroundedAggregateThreshold) return false;
+  return proposal.entities.length === 0 || proposal.entities.some((entity) => !entity.tableName);
+};
 
 const entityForTable = (
   entities: readonly ProposedEntity[],
@@ -168,14 +181,34 @@ const roleForEntity = (
 };
 
 const mapEntities = (proposal: AdaptiveReportProposal): BusinessSqlEntityRef[] =>
-  proposal.entities
+  {
+    const mapped = proposal.entities
     .filter((entity) => entity.tableName)
     .map((entity) => ({
       entity: entity.label,
       table: entity.tableName || undefined,
-      required: entity.binding !== "scope_fallback",
+      required:
+        entity.binding !== "scope_fallback" ||
+        (proposal.aggregateResultConditions || []).length > 0,
       role: roleForEntity(entity, proposal),
     }));
+    if (mapped.length > 0 || (proposal.aggregateResultConditions || []).length === 0) {
+      return mapped;
+    }
+    const fallbackTable =
+      proposal.metrics.find((metric) => metric.tableName)?.tableName ||
+      proposal.groupings.find((grouping) => grouping.tableName)?.tableName ||
+      null;
+    if (!fallbackTable) return mapped;
+    return [
+      {
+        entity: fallbackTable,
+        table: fallbackTable,
+        required: true,
+        role: "source",
+      },
+    ];
+  };
 
 const measureKindForMetric = (
   metric: ProposedMetric,
@@ -183,6 +216,7 @@ const measureKindForMetric = (
   if (
     metric.kind === "count_rows" ||
     metric.kind === "count_entities" ||
+    metric.kind === "count_distinct" ||
     metric.kind === "sum" ||
     metric.kind === "average" ||
     metric.kind === "minimum" ||
@@ -348,6 +382,43 @@ const mapRowLimit = (proposal: AdaptiveReportProposal): BusinessSqlRowLimit | nu
     ...rowLimit,
     rowLimitId: createBusinessSqlRowLimitId(rowLimit),
   };
+};
+
+const mapAggregateResultConditions = (
+  conditions: readonly ProposedAggregateResultCondition[],
+  measuresByMetricId: ReadonlyMap<string, BusinessSqlMeasure>,
+): {
+  aggregateResultConditions: BusinessSqlAggregateResultCondition[];
+  issues: AdaptiveProposalBusinessSqlBridgeIssue[];
+} => {
+  const aggregateResultConditions: BusinessSqlAggregateResultCondition[] = [];
+  const issues: AdaptiveProposalBusinessSqlBridgeIssue[] = [];
+
+  for (const condition of conditions) {
+    const measure = measuresByMetricId.get(condition.metricId);
+    if (!measure) {
+      issues.push(
+        issue(
+          "unresolved_metric_reference",
+          "blocking",
+          `Aggregate-result condition ${condition.id} references an unresolved proposed metric.`,
+        ),
+      );
+      continue;
+    }
+    const seed = {
+      measureId: measure.measureId,
+      operator: condition.operator,
+      comparisonValue: condition.comparisonValue,
+    };
+    aggregateResultConditions.push({
+      ...seed,
+      conditionId: createBusinessSqlAggregateResultConditionId(seed),
+      label: condition.label,
+    });
+  }
+
+  return { aggregateResultConditions, issues };
 };
 
 const joinEntityLabel = (
@@ -533,7 +604,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
   if (proposal.entities.length === 0) {
     structuralIssues.push(issue("missing_entity", "blocking", "Adaptive proposal has no entities."));
   }
-  if (requiredEntityTableMissing(proposal.entities)) {
+  if (requiredEntityTableMissing(proposal)) {
     structuralIssues.push(issue("missing_table", "blocking", "One or more proposal entities are missing table bindings."));
   }
   if (proposal.metrics.length === 0) {
@@ -557,10 +628,18 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
   const groupings = mapGroupings(proposal);
   const orderBy = mapOrderBy(proposal, measureResult.byMetricId);
   const rowLimit = mapRowLimit(proposal);
+  const aggregateConditionResult = mapAggregateResultConditions(
+    proposal.aggregateResultConditions || [],
+    measureResult.byMetricId,
+  );
   const filterResult = mapFilters(proposal);
   const joinResult = mapJoinNeeds(proposal);
+  const hasGroundedAggregateThreshold =
+    aggregateConditionResult.aggregateResultConditions.length === 1 &&
+    aggregateConditionResult.issues.length === 0;
   const confidenceIssues =
-    proposal.support === "needs_review" || proposal.confidence !== "high"
+    proposal.support === "needs_review" ||
+    (proposal.confidence !== "high" && !hasGroundedAggregateThreshold)
       ? [
           issue(
             "low_confidence",
@@ -578,6 +657,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     }));
   const bridgeIssues = [
     ...metricResult.issues,
+    ...aggregateConditionResult.issues,
     ...filterResult.issues,
     ...joinResult.issues,
     ...confidenceIssues,
@@ -600,6 +680,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     filters: filterResult.filters,
     orderBy,
     rowLimit,
+    aggregateResultConditions: aggregateConditionResult.aggregateResultConditions,
     joinPath: joinResult.joinPath,
     assumptions: proposal.assumptions.map((assumption) => ({ ...assumption })),
     warnings: mapWarnings(proposal, bridgeIssues),

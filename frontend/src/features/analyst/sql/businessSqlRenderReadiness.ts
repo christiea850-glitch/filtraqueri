@@ -5,6 +5,7 @@ import type {
 import { normalizeMetricAndMeasures } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
+import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "./businessSqlAggregateResultConditionCompatibility";
 
 export type BusinessSqlRenderReadinessStatus =
   | "renderable"
@@ -170,6 +171,22 @@ export function evaluateBusinessSqlRenderReadiness(
     if (!Number.isInteger(plan.rowLimit.value) || plan.rowLimit.value < 1 || plan.rowLimit.value > 10000) {
       reasons.push("Row limit must be a positive integer no greater than 10000.");
     }
+  }
+
+  const aggregateConditionReasonCodes = (normalizedPlan.aggregateResultConditions || []).flatMap(
+    (condition) =>
+      evaluateBusinessSqlAggregateResultConditionCompatibility({
+        condition,
+        measures: normalizedPlan.measures,
+      }).reasonCodes,
+  );
+
+  if (aggregateConditionReasonCodes.length > 0) {
+    reasons.push(
+      ...aggregateConditionReasonCodes.map(
+        (reason) => `Aggregate-result condition is invalid: ${reason}.`,
+      ),
+    );
   }
 
   if (plan.renderer.targetDialect !== "duckdb") {

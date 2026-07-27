@@ -15,6 +15,8 @@ import type { BusinessIntent } from "../businessIntentGrounding";
 import { detectBusinessIntent } from "../businessIntentGrounding";
 import {
   EMPTY_ADAPTIVE_REPORT_PROPOSAL,
+  detectAggregateThresholdMatches,
+  parseAggregateThresholdNumber,
   proposeAdaptiveReport,
   type AdaptiveReportProposal,
   type AdaptiveReportProposalRequest,
@@ -277,6 +279,265 @@ const hasMeaningfulSignal = (proposal: AdaptiveReportProposal): boolean =>
   proposal.detectedIntent.primaryIntent === "risk";
 
 const fixtures: Fixture[] = [
+  {
+    name: "PS-2c aggregate threshold phrases map deterministically to all six operators",
+    request: salesRequest,
+    assert: () => {
+      const cases = [
+        ["above 5", "greater_than"],
+        ["over 5", "greater_than"],
+        ["greater than 5", "greater_than"],
+        ["more than 5", "greater_than"],
+        ["at least 5", "greater_than_or_equal"],
+        ["no less than 5", "greater_than_or_equal"],
+        ["below 5", "less_than"],
+        ["under 5", "less_than"],
+        ["less than 5", "less_than"],
+        ["fewer than 5", "less_than"],
+        ["at most 5", "less_than_or_equal"],
+        ["no more than 5", "less_than_or_equal"],
+        ["equal to 5", "equals"],
+        ["equals 5", "equals"],
+        ["not equal to 5", "not_equals"],
+        ["different from 5", "not_equals"],
+      ] as const;
+      return cases.flatMap(([phrase, operator]) => {
+        const detected = detectAggregateThresholdMatches(`show groups whose metric is ${phrase}`);
+        return detected.length === 1 && detected[0].operator === operator
+          ? []
+          : [`Expected ${phrase} to map to ${operator}.`];
+      });
+    },
+  },
+  {
+    name: "PS-2c numeric aggregate thresholds preserve integers decimals and separators",
+    request: salesRequest,
+    assert: () => {
+      const cases = [
+        ["500000", 500000],
+        ["500,000", 500000],
+        ["10.5", 10.5],
+      ] as const;
+      return cases.flatMap(([raw, expected]) => {
+        const parsed = parseAggregateThresholdNumber(raw);
+        return parsed?.kind === "number" && parsed.value === expected
+          ? []
+          : [`Expected ${raw} to parse as ${expected}.`];
+      });
+    },
+  },
+  {
+    name: "PS-2c full threshold phrase detection validates complete numeric tokens",
+    request: salesRequest,
+    assert: () => {
+      const validCases = [
+        ["above 500000", "greater_than", 500000],
+        ["above 500,000", "greater_than", 500000],
+        ["above 10.5", "greater_than", 10.5],
+        ["above 500,000.25", "greater_than", 500000.25],
+        ["at least 1,000", "greater_than_or_equal", 1000],
+        ["no more than 10.5", "less_than_or_equal", 10.5],
+        ["not equal to 1,250", "not_equals", 1250],
+        ["above 500,000?", "greater_than", 500000],
+        ["above 10.5,", "greater_than", 10.5],
+        ["above 5.", "greater_than", 5],
+        ["above 10.5?", "greater_than", 10.5],
+        ["above 500,000;", "greater_than", 500000],
+        ["more than 10 employees", "greater_than", 10],
+        ["fewer than 5 accounts", "less_than", 5],
+        ["at least 20 orders", "greater_than_or_equal", 20],
+        ["more than 100 customers", "greater_than", 100],
+      ] as const;
+      const invalidCases = [
+        "above 1,23",
+        "above 10.5.5",
+        "above 500,00",
+        "above 1,000,00",
+        "above 5%",
+        "above 10.5%",
+        "above 500k",
+        "above $500",
+        "above 500 USD",
+        "above NaN",
+        "above Infinity",
+        "above -Infinity",
+        "above 5 million",
+        "above 5 millions",
+        "above 2 billion",
+        "above 10 thousand",
+        "above 1m",
+        "above 3bn",
+        "above 5 + 1",
+        "above 10 - 2",
+        "above 4 * 3",
+        "above 20 / 5",
+        "above 2 ^ 3",
+        "above 5 days",
+        "above 10 hours",
+        "above 20 kg",
+        "above 5 miles",
+        "above 3 weeks",
+        "above 50 pounds",
+        "above 5 DAYS",
+        "above 10 hrs",
+        "above 5 km",
+      ];
+      return [
+        ...validCases.flatMap(([phrase, operator, value]) => {
+          const detected = detectAggregateThresholdMatches(
+            `show groups whose metric is ${phrase}`,
+          );
+          return detected.length === 1 &&
+            detected[0].operator === operator &&
+            detected[0].comparisonValue.value === value
+            ? []
+            : [`Expected ${phrase} to map to ${operator} ${value}.`];
+        }),
+        ...invalidCases.flatMap((phrase) => {
+          const detected = detectAggregateThresholdMatches(
+            `show groups whose metric is ${phrase}`,
+          );
+          return detected.length === 0
+            ? []
+            : [`Expected ${phrase} to produce no threshold match.`];
+        }),
+      ];
+    },
+  },
+  {
+    name: "PS-2c ungrounded count-threshold noun does not create a guessed count metric",
+    request: {
+      prompt: "Show departments with more than 10 widgets.",
+      detectedIntent: detectBusinessIntent("Show departments with more than 10 widgets."),
+      appliedScopeSelections: scope("employees"),
+      worksheets: [
+        worksheet("employees", [
+          column("employee_id", "text"),
+          column("department", "categorical"),
+          column("salary", "numeric"),
+        ]),
+      ],
+    },
+    assert: (proposal) => [
+      ...(proposal.metrics.some((metric) => metric.id === "metric:count-widgets")
+        ? ["Ungrounded trailing noun must not create a guessed count_widgets metric."]
+        : []),
+      ...(proposal.aggregateResultConditions.length === 0
+        ? []
+        : ["Ungrounded trailing noun must not create an aggregate-result condition."]),
+      ...(proposal.support !== "supported"
+        ? []
+        : ["Ungrounded trailing noun threshold must not be supported as a renderable proposal."]),
+      ...expectNoExecutableSurface(proposal),
+    ],
+  },
+  {
+    name: "PS-2c invalid numeric aggregate thresholds do not create a condition",
+    request: {
+      prompt: "Show regions whose total revenue is above NaN.",
+      detectedIntent: detectBusinessIntent("Show regions whose total revenue is above NaN."),
+      appliedScopeSelections: scope("sales"),
+      worksheets: [
+        worksheet("sales", [
+          column("region", "categorical"),
+          column("revenue", "numeric"),
+        ]),
+      ],
+    },
+    assert: (proposal) => [
+      ...(proposal.aggregateResultConditions.length === 0
+        ? []
+        : ["Expected invalid numeric threshold not to create a condition."]),
+      ...(proposal.canRenderSql === false && proposal.sql === null
+        ? []
+        : ["Invalid numeric threshold proposal must not expose SQL capability."]),
+      ...expectNoExecutableSurface(proposal),
+    ],
+  },
+  {
+    name: "PS-2c primary revenue question grounds one grouping metric and aggregate condition",
+    request: {
+      prompt: "Show regions whose total revenue is above 500000.",
+      detectedIntent: detectBusinessIntent("Show regions whose total revenue is above 500000."),
+      appliedScopeSelections: scope("sales"),
+      worksheets: [
+        worksheet("sales", [
+          column("region", "categorical"),
+          column("revenue", "numeric"),
+        ]),
+      ],
+    },
+    assert: (proposal) => {
+      const condition = proposal.aggregateResultConditions[0];
+      return [
+        ...(proposal.metrics.length === 1 ? [] : ["Expected one grounded metric."]),
+        ...(proposal.metrics[0]?.kind === "sum" && proposal.metrics[0]?.columnName === "revenue"
+          ? []
+          : ["Expected SUM revenue metric."]),
+        ...(proposal.groupings.length === 1 && proposal.groupings[0]?.columnName === "region"
+          ? []
+          : ["Expected region grouping."]),
+        ...(proposal.aggregateResultConditions.length === 1
+          ? []
+          : ["Expected one aggregate-result condition."]),
+        ...(condition?.metricId === proposal.metrics[0]?.id
+          ? []
+          : ["Expected condition to reference proposed metric id."]),
+        ...(condition?.operator === "greater_than" && condition.comparisonValue.value === 500000
+          ? []
+          : ["Expected greater_than 500000 threshold."]),
+        ...expectNoExecutableSurface(proposal),
+      ];
+    },
+  },
+  {
+    name: "PS-2c raw-field threshold question does not become aggregate-result HAVING proposal",
+    request: {
+      prompt: "Show sales rows where revenue is above 500000.",
+      detectedIntent: detectBusinessIntent("Show sales rows where revenue is above 500000."),
+      appliedScopeSelections: scope("sales"),
+      worksheets: [
+        worksheet("sales", [
+          column("region", "categorical"),
+          column("revenue", "numeric"),
+        ]),
+      ],
+    },
+    assert: (proposal) => [
+      ...(proposal.aggregateResultConditions.length === 0
+        ? []
+        : ["Expected raw-field threshold not to create aggregate-result condition."]),
+      ...(proposal.support !== "supported"
+        ? []
+        : ["Expected raw-field threshold to remain unsupported or review-gated for SQL rendering."]),
+      ...expectNoExecutableSurface(proposal),
+    ],
+  },
+  {
+    name: "PS-2c multiple thresholds are not silently reduced to one condition",
+    request: {
+      prompt: "Show regions whose total revenue is above 500000 and below 900000.",
+      detectedIntent: detectBusinessIntent(
+        "Show regions whose total revenue is above 500000 and below 900000.",
+      ),
+      appliedScopeSelections: scope("sales"),
+      worksheets: [
+        worksheet("sales", [
+          column("region", "categorical"),
+          column("revenue", "numeric"),
+        ]),
+      ],
+    },
+    assert: (proposal) => [
+      ...(proposal.aggregateResultConditions.length === 0
+        ? []
+        : ["Expected multiple thresholds not to produce a partial one-condition proposal."]),
+      ...(proposal.support === "unsupported"
+        ? []
+        : ["Expected multiple thresholds to block through proposal support."]),
+      ...expectNoExecutableSurface(proposal),
+    ],
+  },
   {
     name: "sales customers orders payments adaptive proposal",
     request: salesRequest,

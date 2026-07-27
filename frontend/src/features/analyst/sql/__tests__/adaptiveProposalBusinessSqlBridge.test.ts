@@ -5,7 +5,7 @@
  * calls, backend/API calls, provider calls, LLM calls, or execution behavior.
  */
 
-import type { AcceptedRelationshipContract } from "../../../workbook";
+import type { AcceptedRelationshipContract, WorksheetMetadata } from "../../../workbook";
 import type { SchemaColumn } from "../../../dataset/datasetTypes";
 import type { AdaptiveReportProposal, ProposedMetric } from "../adaptiveReportProposal";
 import { proposeAdaptiveReport } from "../adaptiveReportProposal";
@@ -14,6 +14,7 @@ import {
   type AdaptiveProposalBusinessSqlBridgeResult,
 } from "../adaptiveProposalBusinessSqlBridge";
 import { detectBusinessIntent } from "../businessIntentGrounding";
+import { createBusinessSqlRenderPreview } from "../businessSqlRenderPreview";
 
 type FixtureResult = {
   name: string;
@@ -109,6 +110,7 @@ const baseProposal = (): AdaptiveReportProposal => ({
       confidence: "high",
     },
   ],
+  aggregateResultConditions: [],
   sorts: [],
   rowLimit: null,
   filters: [],
@@ -171,6 +173,39 @@ const departmentWorksheet = {
   ],
 };
 
+const salesWorksheet = {
+  worksheetId: "worksheet:sales",
+  displayName: "Sales",
+  sheetName: "Sales",
+  tableName: "sales",
+  schema: [
+    column("region", "categorical"),
+    column("revenue", "numeric"),
+  ],
+};
+
+const healthcareWorksheet = {
+  worksheetId: "worksheet:stays",
+  displayName: "Stays",
+  sheetName: "Stays",
+  tableName: "stays",
+  schema: [
+    column("hospital_unit", "categorical"),
+    column("length_of_stay", "numeric"),
+  ],
+};
+
+const customerWorksheet = {
+  worksheetId: "worksheet:customers",
+  displayName: "Customers",
+  sheetName: "Customers",
+  tableName: "customers",
+  schema: [
+    column("customer_id", "text"),
+    column("region", "categorical"),
+  ],
+};
+
 const approvedQuestion = "Show the five departments with the highest total salary expenditure.";
 const approvedProposal = proposeAdaptiveReport({
   prompt: approvedQuestion,
@@ -188,7 +223,7 @@ const approvedProposal = proposeAdaptiveReport({
 
 const proposalForQuestion = (
   prompt: string,
-  worksheet: typeof employeeWorksheet | typeof departmentWorksheet,
+  worksheet: Pick<WorksheetMetadata, "worksheetId" | "displayName" | "sheetName" | "tableName" | "schema">,
 ): AdaptiveReportProposal =>
   proposeAdaptiveReport({
     prompt,
@@ -211,6 +246,42 @@ const lowestTotalCostProposal = proposalForQuestion(
 const highestAverageSalaryProposal = proposalForQuestion(
   "Show departments with the highest average salary.",
   employeeWorksheet,
+);
+const revenueThresholdProposal = proposalForQuestion(
+  "Show regions whose total revenue is above 500000.",
+  salesWorksheet,
+);
+const revenueCommaThresholdProposal = proposalForQuestion(
+  "Show regions whose total revenue is above 500,000.",
+  salesWorksheet,
+);
+const salaryThresholdProposal = proposalForQuestion(
+  "Show departments whose total salary is above 500000.",
+  employeeWorksheet,
+);
+const stayThresholdProposal = proposalForQuestion(
+  "Show hospital units whose average length of stay is above 5.",
+  healthcareWorksheet,
+);
+const stayDecimalThresholdProposal = proposalForQuestion(
+  "Show hospital units whose average length of stay is above 10.5.",
+  healthcareWorksheet,
+);
+const countThresholdProposal = proposalForQuestion(
+  "Show departments with more than 10 employees.",
+  employeeWorksheet,
+);
+const customerCountThresholdProposal = proposalForQuestion(
+  "Show regions with more than 100 customers.",
+  customerWorksheet,
+);
+const rawFieldThresholdProposal = proposalForQuestion(
+  "Show sales rows where revenue is above 500000.",
+  salesWorksheet,
+);
+const rawFieldCommaThresholdProposal = proposalForQuestion(
+  "Show sales rows where revenue is above 500,000.",
+  salesWorksheet,
 );
 
 const withProposal = (overrides: Partial<AdaptiveReportProposal>): AdaptiveReportProposal => ({
@@ -543,6 +614,248 @@ const fixtures: Fixture[] = [
           ? []
           : ["Expected descending sort by average salary measure id."]),
         ...expectNoExecutionSurface(result),
+      ];
+    },
+  },
+  {
+    name: "PS-2c primary revenue threshold bridges to stable measureId and deterministic HAVING preview",
+    result: bridge(revenueThresholdProposal),
+    assert: (result) => {
+      const measure = result.plan?.measures[0];
+      const condition = result.plan?.aggregateResultConditions[0];
+      const preview = result.plan ? createBusinessSqlRenderPreview(result.plan) : null;
+      const expectedSql = [
+        "SELECT",
+        '  "sales"."region" AS "region",',
+        '  SUM("sales"."revenue") AS "total_revenue"',
+        'FROM "sales"',
+        'GROUP BY "sales"."region"',
+        'HAVING SUM("sales"."revenue") > 500000',
+        'ORDER BY "total_revenue" DESC;',
+      ].join("\n");
+      return [
+        ...(revenueThresholdProposal.aggregateResultConditions.length === 1
+          ? []
+          : ["Expected proposal to contain one aggregate-result condition."]),
+        ...(result.state === "render_ready_plan" ? [] : ["Expected render-ready bridge result."]),
+        ...(measure?.kind === "sum" && measure.field === "revenue"
+          ? []
+          : ["Expected SUM revenue measure."]),
+        ...(condition?.measureId === measure?.measureId
+          ? []
+          : ["Expected condition to reference final stable measureId."]),
+        ...(condition?.measureId &&
+        condition.measureId !== measure?.sqlAlias &&
+        condition.measureId !== measure?.label &&
+        !condition.measureId.match(/^\d+$/)
+          ? []
+          : ["Condition must not reference alias label or array index."]),
+        ...(condition?.operator === "greater_than" && condition.comparisonValue.value === 500000
+          ? []
+          : ["Expected greater_than 500000 condition."]),
+        ...(preview?.sql === expectedSql ? [] : ["Expected deterministic revenue HAVING SQL."]),
+        ...(preview?.actions.canInsertSql === false && preview.actions.canRunSql === false
+          ? []
+          : ["Preview must remain manual with no insert or run action."]),
+        ...expectNoExecutionSurface(result),
+      ];
+    },
+  },
+  {
+    name: "PS-2c salary healthcare and count questions reuse the same bridge contracts",
+    result: bridge(salaryThresholdProposal),
+    assert: () => {
+      const salary = bridge(salaryThresholdProposal);
+      const stay = bridge(stayThresholdProposal);
+      const count = bridge(countThresholdProposal);
+      const customerCount = bridge(customerCountThresholdProposal);
+      const salarySql = salary.plan ? createBusinessSqlRenderPreview(salary.plan).sql : null;
+      const staySql = stay.plan ? createBusinessSqlRenderPreview(stay.plan).sql : null;
+      const countSql = count.plan ? createBusinessSqlRenderPreview(count.plan).sql : null;
+      const customerCountSql = customerCount.plan ? createBusinessSqlRenderPreview(customerCount.plan).sql : null;
+      const countMeasure = count.plan?.measures[0];
+      const countCondition = count.plan?.aggregateResultConditions[0];
+      const expectedSalarySql = [
+        "SELECT",
+        '  "employees"."department" AS "department",',
+        '  SUM("employees"."salary") AS "total_salary_expenditure"',
+        'FROM "employees"',
+        'GROUP BY "employees"."department"',
+        'HAVING SUM("employees"."salary") > 500000',
+        'ORDER BY "total_salary_expenditure" DESC;',
+      ].join("\n");
+      const expectedStaySql = [
+        "SELECT",
+        '  "stays"."hospital_unit" AS "hospital_unit",',
+        '  AVG("stays"."length_of_stay") AS "average_length_of_stay"',
+        'FROM "stays"',
+        'GROUP BY "stays"."hospital_unit"',
+        'HAVING AVG("stays"."length_of_stay") > 5',
+        'ORDER BY "average_length_of_stay" DESC;',
+      ].join("\n");
+      const expectedCountSql = [
+        "SELECT",
+        '  "employees"."department" AS "department",',
+        '  COUNT("employees"."employee_id") AS "count_employees"',
+        'FROM "employees"',
+        'GROUP BY "employees"."department"',
+        'HAVING COUNT("employees"."employee_id") > 10',
+        'ORDER BY "count_employees" DESC;',
+      ].join("\n");
+      const expectedCustomerCountSql = [
+        "SELECT",
+        '  "customers"."region" AS "region",',
+        '  COUNT("customers"."customer_id") AS "count_customers"',
+        'FROM "customers"',
+        'GROUP BY "customers"."region"',
+        'HAVING COUNT("customers"."customer_id") > 100',
+        'ORDER BY "count_customers" DESC;',
+      ].join("\n");
+      return [
+        ...(salary.plan?.aggregateResultConditions.length === 1 &&
+        stay.plan?.aggregateResultConditions.length === 1 &&
+        count.plan?.aggregateResultConditions.length === 1 &&
+        customerCount.plan?.aggregateResultConditions.length === 1
+          ? []
+          : ["Expected one aggregate-result condition for each cross-domain plan."]),
+        ...(count.plan?.groupings.length === 1 ? [] : ["Expected count flow to contain exactly one grouping."]),
+        ...(count.plan?.measures.length === 1 && countMeasure?.kind === "count_entities"
+          ? []
+          : ["Expected count flow to contain exactly one count measure."]),
+        ...(countCondition?.comparisonValue.value === 10
+          ? []
+          : ["Expected count threshold value 10."]),
+        ...(countCondition?.measureId === countMeasure?.measureId
+          ? []
+          : ["Expected count condition to reference final stable measureId."]),
+        ...(salarySql === expectedSalarySql ? [] : ["Expected deterministic salary HAVING SQL."]),
+        ...(staySql === expectedStaySql ? [] : ["Expected deterministic healthcare AVG HAVING SQL."]),
+        ...(countSql === expectedCountSql ? [] : ["Expected deterministic count HAVING SQL."]),
+        ...(customerCountSql === expectedCustomerCountSql
+          ? []
+          : ["Expected deterministic generic customer count HAVING SQL."]),
+        ...expectNoExecutionSurface(salary),
+        ...expectNoExecutionSurface(stay),
+        ...expectNoExecutionSurface(count),
+        ...expectNoExecutionSurface(customerCount),
+      ];
+    },
+  },
+  {
+    name: "PS-2c comma and decimal thresholds bridge to deterministic HAVING SQL",
+    result: bridge(revenueCommaThresholdProposal),
+    assert: () => {
+      const revenue = bridge(revenueCommaThresholdProposal);
+      const stay = bridge(stayDecimalThresholdProposal);
+      const revenueCondition = revenue.plan?.aggregateResultConditions[0];
+      const stayCondition = stay.plan?.aggregateResultConditions[0];
+      const revenueSql = revenue.plan ? createBusinessSqlRenderPreview(revenue.plan).sql : null;
+      const staySql = stay.plan ? createBusinessSqlRenderPreview(stay.plan).sql : null;
+      return [
+        ...(revenue.state === "render_ready_plan" ? [] : ["Expected comma revenue threshold to be render-ready."]),
+        ...(revenueCondition?.operator === "greater_than" &&
+        revenueCondition.comparisonValue.value === 500000
+          ? []
+          : ["Expected comma revenue threshold value 500000."]),
+        ...(revenueSql?.includes('HAVING SUM("sales"."revenue") > 500000')
+          ? []
+          : ["Expected comma revenue HAVING SQL with normalized number."]),
+        ...(stay.state === "render_ready_plan" ? [] : ["Expected decimal stay threshold to be render-ready."]),
+        ...(stayCondition?.operator === "greater_than" &&
+        stayCondition.comparisonValue.value === 10.5
+          ? []
+          : ["Expected decimal stay threshold value 10.5."]),
+        ...(staySql?.includes('HAVING AVG("stays"."length_of_stay") > 10.5')
+          ? []
+          : ["Expected decimal stay HAVING SQL with decimal value."]),
+        ...expectNoExecutionSurface(revenue),
+        ...expectNoExecutionSurface(stay),
+      ];
+    },
+  },
+  {
+    name: "PS-2c malformed numeric threshold prompts produce no condition or SQL",
+    result: bridge(proposalForQuestion("Show regions whose total revenue is above 1,23.", salesWorksheet)),
+    assert: () => {
+      const malformedCases: Array<
+        [
+          string,
+          Pick<WorksheetMetadata, "worksheetId" | "displayName" | "sheetName" | "tableName" | "schema">,
+        ]
+      > = [
+        ["Show regions whose total revenue is above 1,23.", salesWorksheet],
+        ["Show regions whose total revenue is above 10.5.5.", salesWorksheet],
+        ["Show regions whose total revenue is above 5%.", salesWorksheet],
+        ["Show regions whose total revenue is above 5 million.", salesWorksheet],
+        ["Show regions whose total revenue is above 5 + 1.", salesWorksheet],
+        ["Show regions whose total revenue is above 10 * 2.", salesWorksheet],
+        ["Show regions whose total revenue is above 5 days.", salesWorksheet],
+        ["Show regions whose total revenue is above 10 hours.", salesWorksheet],
+        ["Show hospital units whose average length of stay is above 5 days.", healthcareWorksheet],
+        ["Show regions whose total revenue is above 20 kg.", salesWorksheet],
+      ];
+      return malformedCases.flatMap(([prompt, worksheet]) => {
+        const proposal = proposalForQuestion(prompt, worksheet);
+        const result = bridge(proposal);
+        const preview = result.plan ? createBusinessSqlRenderPreview(result.plan) : null;
+        return [
+          ...(proposal.aggregateResultConditions.length === 0
+            ? []
+            : [`Expected malformed threshold to create no condition: ${prompt}`]),
+          ...(result.state !== "render_ready_plan"
+            ? []
+            : [`Expected malformed threshold not to be render-ready: ${prompt}`]),
+          ...(preview?.sql === null || result.plan === null
+            ? []
+            : [`Expected malformed threshold to produce no SQL: ${prompt}`]),
+          ...expectNoExecutionSurface(result),
+        ];
+      });
+    },
+  },
+  {
+    name: "PS-2c bridge rejects unresolved proposed metric references",
+    result: bridge({
+      ...baseProposal(),
+      aggregateResultConditions: [
+        {
+          id: "aggregate-condition:missing",
+          metricId: "metric:missing",
+          operator: "greater_than",
+          comparisonValue: { kind: "number", value: 5 },
+          confidence: "high",
+        },
+      ],
+    }),
+    assert: (result) => [
+      ...(result.state === "blocked_plan" ? [] : ["Expected unresolved metric reference to block."]),
+      ...(result.issues.some((issue) => issue.code === "unresolved_metric_reference")
+        ? []
+        : ["Expected unresolved_metric_reference issue."]),
+      ...expectNoExecutionSurface(result),
+    ],
+  },
+  {
+    name: "PS-2c threshold with no grounded aggregate measure does not produce SQL",
+    result: bridge(rawFieldThresholdProposal),
+    assert: (result) => {
+      const preview = result.plan ? createBusinessSqlRenderPreview(result.plan) : null;
+      const commaResult = bridge(rawFieldCommaThresholdProposal);
+      const commaPreview = commaResult.plan ? createBusinessSqlRenderPreview(commaResult.plan) : null;
+      return [
+        ...(rawFieldThresholdProposal.aggregateResultConditions.length === 0
+          ? []
+          : ["Expected raw-field threshold proposal to have no aggregate condition."]),
+        ...(result.state !== "render_ready_plan" ? [] : ["Expected raw-field threshold not to be render-ready."]),
+        ...(preview?.sql === null || result.plan === null ? [] : ["Expected no SQL preview for raw-field threshold."]),
+        ...(rawFieldCommaThresholdProposal.aggregateResultConditions.length === 0
+          ? []
+          : ["Expected raw-field comma threshold proposal to have no aggregate condition."]),
+        ...(commaPreview?.sql === null || commaResult.plan === null
+          ? []
+          : ["Expected no SQL preview for raw-field comma threshold."]),
+        ...expectNoExecutionSurface(result),
+        ...expectNoExecutionSurface(commaResult),
       ];
     },
   },
