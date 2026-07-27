@@ -3,6 +3,7 @@ import {
   type BusinessSqlRenderabilityGate,
 } from "./businessSqlRenderabilityGate";
 import type {
+  BusinessSqlAggregateComparisonOperator,
   BusinessSqlJoinEdge,
   BusinessSqlMeasure,
   BusinessSqlQueryPlan,
@@ -253,6 +254,41 @@ const renderLimit = (plan: BusinessSqlQueryPlan): string | null => {
   return `LIMIT ${plan.rowLimit.value}`;
 };
 
+const aggregateComparisonOperatorSql: Record<BusinessSqlAggregateComparisonOperator, string> = {
+  greater_than: ">",
+  greater_than_or_equal: ">=",
+  less_than: "<",
+  less_than_or_equal: "<=",
+  equals: "=",
+  not_equals: "<>",
+};
+
+const renderNumericComparisonValue = (value: number): string | null =>
+  Number.isFinite(value) ? String(value) : null;
+
+const renderHaving = (
+  plan: BusinessSqlQueryPlan,
+  measures: readonly BusinessSqlMeasure[],
+): string | null => {
+  if (plan.aggregateResultConditions.length === 0) return null;
+  if (plan.aggregateResultConditions.length > 1) return null;
+
+  const condition = plan.aggregateResultConditions[0];
+  const measure = measures.find((candidate) => candidate.measureId === condition.measureId);
+  if (!measure) return null;
+
+  const aggregateExpression = metricExpression(measure);
+  const operator = aggregateComparisonOperatorSql[condition.operator];
+  const comparisonValue =
+    condition.comparisonValue.kind === "number"
+      ? renderNumericComparisonValue(condition.comparisonValue.value)
+      : null;
+
+  if (!aggregateExpression || !operator || comparisonValue === null) return null;
+
+  return `HAVING ${aggregateExpression} ${operator} ${comparisonValue}`;
+};
+
 const validateSelectOnlySql = (sql: string): SqlSafetyValidation => {
   const reasons: string[] = [];
   const trimmed = sql.trim();
@@ -396,8 +432,18 @@ export function renderBusinessSqlFromRenderability({
   const fromAndJoins = renderFromAndJoins(integrated);
   const orderBy = groupings ? renderOrderBy(plan, measure, groupings) : null;
   const limit = renderLimit(plan);
+  const having = renderHaving(normalizedPlan, normalizedPlan.measures);
+  const requiresHaving = normalizedPlan.aggregateResultConditions.length > 0;
 
-  if (!groupings || groupings.length === 0 || !metric || !fromAndJoins || !orderBy || (plan.rowLimit && !limit)) {
+  if (
+    !groupings ||
+    groupings.length === 0 ||
+    !metric ||
+    !fromAndJoins ||
+    !orderBy ||
+    (plan.rowLimit && !limit) ||
+    (requiresHaving && !having)
+  ) {
     return refused({
       integrated,
       reasonCode: "incomplete_plan_metadata",
@@ -411,7 +457,7 @@ export function renderBusinessSqlFromRenderability({
     (grouping) => `  ${grouping.expression} AS ${quoteIdentifier(grouping.alias)},`,
   );
   const groupBy = `GROUP BY ${groupings.map((grouping) => grouping.expression).join(", ")}`;
-  const tailClauses = [orderBy, limit].filter((clause): clause is string => Boolean(clause));
+  const tailClauses = [having, orderBy, limit].filter((clause): clause is string => Boolean(clause));
   const sql = [
     "SELECT",
     ...selectLines,
