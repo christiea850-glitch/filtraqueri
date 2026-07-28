@@ -9,6 +9,10 @@ import {
   evaluateBusinessSqlAggregateResultConditionCompatibility,
   type BusinessSqlAggregateResultConditionCompatibilityReason,
 } from "./businessSqlAggregateResultConditionCompatibility";
+import {
+  evaluateBusinessSqlDerivedMeasureCompatibility,
+  type BusinessSqlDerivedMeasureCompatibilityReason,
+} from "./businessSqlDerivedMeasureCompatibility";
 import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
 
 export type BusinessSqlPlanReadinessStatus = "ready" | "needs_review" | "blocked";
@@ -24,6 +28,7 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "sort_target_unresolved"
   | "measure_field_type_incompatible"
   | "row_limit_invalid"
+  | BusinessSqlDerivedMeasureCompatibilityReason
   | BusinessSqlAggregateResultConditionCompatibilityReason;
 
 export type BusinessSqlRendererEligibility = {
@@ -97,6 +102,20 @@ export function evaluateBusinessSqlPlanReadiness(
   ) {
     reasonCodes.push("measure_field_type_incompatible");
     reviewReasons.push("One or more planned measure fields are incompatible with the measure kind.");
+  }
+
+  const derivedMeasureReasonCodes = (plan.derivedMeasures || []).flatMap(
+    (derivedMeasure) =>
+      evaluateBusinessSqlDerivedMeasureCompatibility({
+        derivedMeasure,
+        measures: normalizedPlan.measures,
+        derivedMeasures: plan.derivedMeasures || [],
+      }).reasonCodes,
+  );
+
+  if (derivedMeasureReasonCodes.length > 0) {
+    reasonCodes.push(...derivedMeasureReasonCodes);
+    blockingReasons.push("One or more derived measures are structurally invalid.");
   }
 
   const aggregateConditionReasonCodes = (plan.aggregateResultConditions || []).flatMap(

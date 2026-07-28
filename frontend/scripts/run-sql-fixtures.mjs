@@ -192,6 +192,11 @@ const fixtures = [
     exportName: "runBusinessSqlAggregateResultConditionFixtures",
   },
   {
+    label: "Business SQL derived-measure contract",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlDerivedMeasureContract.test.ts",
+    exportName: "runBusinessSqlDerivedMeasureContractFixtures",
+  },
+  {
     label: "Business SQL query planner",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
     exportName: "runBusinessSqlQueryPlannerFixtures",

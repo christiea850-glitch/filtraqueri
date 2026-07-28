@@ -63,6 +63,26 @@ export type BusinessSqlMeasure = {
   sqlAlias: string;
 };
 
+export type BusinessSqlDerivedMeasureOperator =
+  | "add"
+  | "subtract"
+  | "multiply"
+  | "divide";
+
+export type BusinessSqlDivisionPolicy = {
+  zeroDenominator: "null";
+};
+
+export type BusinessSqlDerivedMeasure = {
+  derivedMeasureId: string;
+  operator: BusinessSqlDerivedMeasureOperator;
+  leftMeasureId: string;
+  rightMeasureId: string;
+  divisionPolicy?: BusinessSqlDivisionPolicy;
+  sqlAlias: string;
+  label?: string;
+};
+
 export type BusinessSqlSortTarget =
   | {
       kind: "measure";
@@ -217,6 +237,7 @@ export type BusinessSqlQueryPlan = {
   entities: BusinessSqlEntityRef[];
   metric: BusinessSqlMetric | null;
   measures: BusinessSqlMeasure[];
+  derivedMeasures: BusinessSqlDerivedMeasure[];
   groupings: BusinessSqlGrouping[];
   filters: BusinessSqlFilter[];
   orderBy: BusinessSqlSort[];
@@ -273,6 +294,21 @@ export const createBusinessSqlMeasureId = (
     measure.table,
     measure.field,
     measure.distinct,
+  ]);
+
+export const createBusinessSqlDerivedMeasureId = (
+  derivedMeasure: Pick<
+    BusinessSqlDerivedMeasure,
+    "operator" | "leftMeasureId" | "rightMeasureId" | "divisionPolicy"
+  >,
+): string =>
+  stablePrimitiveId("business-sql-derived-measure", [
+    derivedMeasure.operator,
+    derivedMeasure.leftMeasureId,
+    derivedMeasure.rightMeasureId,
+    derivedMeasure.operator === "divide"
+      ? derivedMeasure.divisionPolicy?.zeroDenominator
+      : null,
   ]);
 
 export const createBusinessSqlSortId = (
@@ -414,6 +450,7 @@ export const createEmptyBusinessSqlQueryPlan = (): BusinessSqlQueryPlan => ({
   entities: [],
   metric: null,
   measures: [],
+  derivedMeasures: [],
   groupings: [],
   filters: [],
   orderBy: [],

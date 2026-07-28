@@ -6,6 +6,7 @@ import { normalizeMetricAndMeasures } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
 import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "./businessSqlAggregateResultConditionCompatibility";
+import { evaluateBusinessSqlDerivedMeasureCompatibility } from "./businessSqlDerivedMeasureCompatibility";
 
 export type BusinessSqlRenderReadinessStatus =
   | "renderable"
@@ -189,6 +190,23 @@ export function evaluateBusinessSqlRenderReadiness(
     );
   }
 
+  const derivedMeasureReasonCodes = (normalizedPlan.derivedMeasures || []).flatMap(
+    (derivedMeasure) =>
+      evaluateBusinessSqlDerivedMeasureCompatibility({
+        derivedMeasure,
+        measures: normalizedPlan.measures,
+        derivedMeasures: normalizedPlan.derivedMeasures,
+      }).reasonCodes,
+  );
+
+  if (derivedMeasureReasonCodes.length > 0) {
+    reasons.push(
+      ...derivedMeasureReasonCodes.map(
+        (reason) => `Derived measure is invalid: ${reason}.`,
+      ),
+    );
+  }
+
   if (plan.renderer.targetDialect !== "duckdb") {
     reasons.push("Renderer target dialect must remain DuckDB.");
   }
@@ -213,6 +231,7 @@ export function evaluateBusinessSqlRenderReadiness(
     plan.support === "blocked" ||
     plan.status === "blocked" ||
     plan.kind === "blocked" ||
+    derivedMeasureReasonCodes.length > 0 ||
     plan.joinPath.status === "missing" ||
     plan.renderer.status === "blocked" ||
     plan.warnings.some((warning) => warning.severity === "blocking");
