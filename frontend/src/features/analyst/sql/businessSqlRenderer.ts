@@ -4,6 +4,7 @@ import {
 } from "./businessSqlRenderabilityGate";
 import type {
   BusinessSqlAggregateComparisonOperator,
+  BusinessSqlDerivedMeasure,
   BusinessSqlJoinEdge,
   BusinessSqlMeasure,
   BusinessSqlQueryPlan,
@@ -180,6 +181,34 @@ const metricExpression = (measure: BusinessSqlMeasure): string | null => {
   return null;
 };
 
+const measuresById = (measures: readonly BusinessSqlMeasure[]): Map<string, BusinessSqlMeasure> =>
+  new Map(measures.map((measure) => [measure.measureId, measure]));
+
+const derivedMeasureExpression = (
+  derivedMeasure: BusinessSqlDerivedMeasure,
+  measures: readonly BusinessSqlMeasure[],
+): string | null => {
+  if (derivedMeasure.operator !== "subtract") return null;
+  const byId = measuresById(measures);
+  const leftMeasure = byId.get(derivedMeasure.leftMeasureId);
+  const rightMeasure = byId.get(derivedMeasure.rightMeasureId);
+  if (!leftMeasure || !rightMeasure) return null;
+  const leftExpression = metricExpression(leftMeasure);
+  const rightExpression = metricExpression(rightMeasure);
+  if (!leftExpression || !rightExpression) return null;
+  return `(${leftExpression}) - (${rightExpression})`;
+};
+
+const derivedOperandMeasures = (
+  derivedMeasure: BusinessSqlDerivedMeasure,
+  measures: readonly BusinessSqlMeasure[],
+): [BusinessSqlMeasure, BusinessSqlMeasure] | null => {
+  const byId = measuresById(measures);
+  const leftMeasure = byId.get(derivedMeasure.leftMeasureId);
+  const rightMeasure = byId.get(derivedMeasure.rightMeasureId);
+  return leftMeasure && rightMeasure ? [leftMeasure, rightMeasure] : null;
+};
+
 const joinEdgesForRendering = (
   integrated: BusinessSqlQueryPlanJoinResolution,
 ): BusinessSqlJoinEdge[] | null => {
@@ -246,6 +275,28 @@ const renderOrderBy = (
   return `ORDER BY ${quoteIdentifier(grouping.alias)} ${direction}`;
 };
 
+const renderOptionalOrderBy = (
+  plan: BusinessSqlQueryPlan,
+  measures: readonly BusinessSqlMeasure[],
+  groupings: NonNullable<ReturnType<typeof groupingExpressions>>,
+): string | null => {
+  const sort = plan.orderBy[0];
+  if (!sort) return null;
+  const direction = sort.direction === "asc" ? "ASC" : "DESC";
+  if (sort.target.kind === "measure") {
+    const measureId = sort.target.measureId;
+    const measure = measures.find((candidate) => candidate.measureId === measureId);
+    return measure ? `ORDER BY ${quoteIdentifier(measure.sqlAlias)} ${direction}` : null;
+  }
+  const sortTarget = sort.target;
+  const grouping = groupings.find(
+    (candidate) =>
+      candidate.table === sortTarget.table &&
+      candidate.field === sortTarget.field,
+  );
+  return grouping ? `ORDER BY ${quoteIdentifier(grouping.alias)} ${direction}` : null;
+};
+
 const renderLimit = (plan: BusinessSqlQueryPlan): string | null => {
   if (!plan.rowLimit) return null;
   if (!Number.isInteger(plan.rowLimit.value) || plan.rowLimit.value < 1 || plan.rowLimit.value > 10000) {
@@ -287,6 +338,14 @@ const renderHaving = (
   if (!aggregateExpression || !operator || comparisonValue === null) return null;
 
   return `HAVING ${aggregateExpression} ${operator} ${comparisonValue}`;
+};
+
+const appendTerminalClause = (clauses: readonly string[]): string[] => {
+  if (clauses.length === 0) return [];
+  return [
+    ...clauses.slice(0, -1),
+    `${clauses[clauses.length - 1]};`,
+  ];
 };
 
 const validateSelectOnlySql = (sql: string): SqlSafetyValidation => {
@@ -416,8 +475,15 @@ export function renderBusinessSqlFromRenderability({
   }
 
   const normalizedPlan = normalizeMetricAndMeasures(plan);
+  const derivedMeasure = normalizedPlan.derivedMeasures[0] || null;
+  const rendersDerivedSubtract = Boolean(derivedMeasure);
   const measure = normalizedPlan.measures[0];
-  if (!measure || normalizedPlan.measures.length !== 1 || plan.kind === "count_distinct_entity") {
+  if (
+    !measure ||
+    plan.kind === "count_distinct_entity" ||
+    (!rendersDerivedSubtract && normalizedPlan.measures.length !== 1) ||
+    (rendersDerivedSubtract && normalizedPlan.derivedMeasures.length !== 1)
+  ) {
     return refused({
       integrated,
       reasonCode: "unsupported_plan_shape",
@@ -428,19 +494,31 @@ export function renderBusinessSqlFromRenderability({
   }
 
   const groupings = groupingExpressions(plan);
-  const metric = metricExpression(measure);
   const fromAndJoins = renderFromAndJoins(integrated);
-  const orderBy = groupings ? renderOrderBy(plan, measure, groupings) : null;
   const limit = renderLimit(plan);
   const having = renderHaving(normalizedPlan, normalizedPlan.measures);
   const requiresHaving = normalizedPlan.aggregateResultConditions.length > 0;
+  const operandMeasures = derivedMeasure
+    ? derivedOperandMeasures(derivedMeasure, normalizedPlan.measures)
+    : null;
+  const derivedExpression = derivedMeasure
+    ? derivedMeasureExpression(derivedMeasure, normalizedPlan.measures)
+    : null;
+  const baseMetric = !derivedMeasure ? metricExpression(measure) : null;
+  const orderBy = groupings
+    ? derivedMeasure
+      ? renderOptionalOrderBy(plan, normalizedPlan.measures, groupings)
+      : renderOrderBy(plan, measure, groupings)
+    : null;
+  const requiresOrderBy = !derivedMeasure || (plan.orderBy || []).length > 0;
 
   if (
     !groupings ||
     groupings.length === 0 ||
-    !metric ||
     !fromAndJoins ||
-    !orderBy ||
+    (!derivedMeasure && !baseMetric) ||
+    (derivedMeasure && (!operandMeasures || !derivedExpression || !isValidIdentifier(derivedMeasure.sqlAlias))) ||
+    (requiresOrderBy && !orderBy) ||
     (plan.rowLimit && !limit) ||
     (requiresHaving && !having)
   ) {
@@ -458,14 +536,23 @@ export function renderBusinessSqlFromRenderability({
   );
   const groupBy = `GROUP BY ${groupings.map((grouping) => grouping.expression).join(", ")}`;
   const tailClauses = [having, orderBy, limit].filter((clause): clause is string => Boolean(clause));
+  const trailingClauses =
+    tailClauses.length > 0
+      ? [groupBy, ...appendTerminalClause(tailClauses)]
+      : [`${groupBy};`];
+  const measureSelectLines = derivedMeasure && operandMeasures
+    ? [
+        `  ${metricExpression(operandMeasures[0])} AS ${quoteIdentifier(operandMeasures[0].sqlAlias)},`,
+        `  ${metricExpression(operandMeasures[1])} AS ${quoteIdentifier(operandMeasures[1].sqlAlias)},`,
+        `  ${derivedExpression} AS ${quoteIdentifier(derivedMeasure.sqlAlias)}`,
+      ]
+    : [`  ${baseMetric} AS ${quoteIdentifier(measure.sqlAlias)}`];
   const sql = [
     "SELECT",
     ...selectLines,
-    `  ${metric} AS ${quoteIdentifier(measure.sqlAlias)}`,
+    ...measureSelectLines,
     fromAndJoins,
-    groupBy,
-    ...tailClauses.slice(0, -1),
-    `${tailClauses[tailClauses.length - 1]};`,
+    ...trailingClauses,
   ].join("\n");
   const safety = validateSelectOnlySql(sql);
   if (!safety.ok) {

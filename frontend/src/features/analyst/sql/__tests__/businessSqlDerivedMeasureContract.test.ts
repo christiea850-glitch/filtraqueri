@@ -11,6 +11,7 @@ import {
   createBusinessSqlDerivedMeasureId,
   createBusinessSqlMeasureAlias,
   createBusinessSqlMeasureId,
+  createBusinessSqlRowLimitId,
   createEmptyBusinessSqlQueryPlan,
   createBusinessSqlSortId,
   type BusinessSqlDerivedMeasure,
@@ -184,6 +185,139 @@ const existingRenderablePlan = (): BusinessSqlQueryPlan => {
     groupings: [
       { entity: "leases", table: "leases", field: "lease_status", label: "lease_status" },
     ],
+  };
+};
+
+const tableMeasure = ({
+  table,
+  field,
+  label,
+  kind = "sum",
+  fieldInferredType = "numeric",
+}: {
+  table: string;
+  field?: string;
+  label: string;
+  kind?: BusinessSqlMeasure["kind"];
+  fieldInferredType?: BusinessSqlMeasure["fieldInferredType"];
+}): BusinessSqlMeasure => {
+  const seed = {
+    kind,
+    entity: table,
+    table,
+    field,
+    distinct: false,
+  };
+  return {
+    ...seed,
+    measureId: createBusinessSqlMeasureId(seed),
+    fieldInferredType,
+    label,
+    sqlAlias: createBusinessSqlMeasureAlias(label),
+  };
+};
+
+const subtractPlan = ({
+  table = "finance",
+  groupingField = "region",
+  left = tableMeasure({ table, field: "revenue", label: "Total revenue" }),
+  right = tableMeasure({ table, field: "cost", label: "Total cost" }),
+  derivedAlias = "revenue_minus_cost",
+  derivedLabel = "Revenue minus cost",
+  orderByMeasure = null,
+  rowLimit = null,
+  havingMeasure = null,
+  join = false,
+}: {
+  table?: string;
+  groupingField?: string;
+  left?: BusinessSqlMeasure;
+  right?: BusinessSqlMeasure;
+  derivedAlias?: string;
+  derivedLabel?: string;
+  orderByMeasure?: BusinessSqlMeasure | null;
+  rowLimit?: number | null;
+  havingMeasure?: BusinessSqlMeasure | null;
+  join?: boolean;
+} = {}): BusinessSqlQueryPlan => {
+  const derivedMeasure = derived({
+    leftMeasureId: left.measureId,
+    rightMeasureId: right.measureId,
+    sqlAlias: derivedAlias,
+    label: derivedLabel,
+  });
+  const sortTarget = orderByMeasure
+    ? { kind: "measure" as const, measureId: orderByMeasure.measureId, resolved: true }
+    : null;
+  const rowLimitValue = rowLimit ? { value: rowLimit } : null;
+  return {
+    ...createEmptyBusinessSqlQueryPlan(),
+    id: `business-sql-plan:${table}:${derivedAlias}`,
+    kind: "single_table_count_grouping",
+    status: "resolved",
+    support: "supported",
+    prompt: `derived fixture for ${table}`,
+    entities: [
+      { entity: table, table, required: true, role: "source" },
+      ...(join
+        ? [{ entity: "lookup", table: "lookup", required: true, role: "context" as const }]
+        : []),
+    ],
+    metric: null,
+    measures: [left, right],
+    derivedMeasures: [derivedMeasure],
+    groupings: [{ entity: table, table, field: groupingField, label: groupingField }],
+    orderBy: sortTarget
+      ? [
+          {
+            sortId: createBusinessSqlSortId({ target: sortTarget, direction: "asc" }),
+            target: sortTarget,
+            direction: "asc",
+          },
+        ]
+      : [],
+    rowLimit: rowLimitValue
+      ? { ...rowLimitValue, rowLimitId: createBusinessSqlRowLimitId(rowLimitValue) }
+      : null,
+    aggregateResultConditions: havingMeasure
+      ? [
+          {
+            conditionId: "business-sql-aggregate-condition:fixture",
+            measureId: havingMeasure.measureId,
+            operator: "greater_than",
+            comparisonValue: { kind: "number", value: 10 },
+            label: "base measure above 10",
+          },
+        ]
+      : [],
+    joinPath: join
+      ? {
+          required: true,
+          status: "resolved",
+          entities: [table, "lookup"],
+          requirements: [
+            {
+              fromEntity: table,
+              toEntity: "lookup",
+              required: true,
+              relationship: "source has lookup",
+              verified: true,
+            },
+          ],
+          edges: [
+            {
+              fromEntity: table,
+              fromTable: table,
+              fromField: "lookup_id",
+              toEntity: "lookup",
+              toTable: "lookup",
+              toField: "lookup_id",
+              relationship: "source has lookup",
+              verified: true,
+            },
+          ],
+        }
+      : createEmptyBusinessSqlQueryPlan().joinPath,
   };
 };
 
@@ -411,19 +545,40 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "one valid derived measure is structurally ready but renderer incapable",
+    name: "one valid subtract derived measure is structurally ready and renderer capable",
     assert: () => {
       const plan = planWith();
       const readiness = readinessFor(plan);
       const capability = evaluateBusinessSqlRendererCapability(plan);
       return [
         ...(readiness.status === "ready" ? [] : ["Expected structurally ready derived plan."]),
-        ...(capability.status === "incapable" &&
-        capability.reasonCodes.includes("derived_measure_rendering_not_supported") &&
+        ...(capability.status === "capable" &&
         !capability.reasonCodes.includes("multiple_measures_not_supported")
           ? []
-          : ["Expected derived rendering incapability with multiple-measure reason suppressed."]),
+          : ["Expected subtract derived measure to be renderer capable."]),
       ];
+    },
+  },
+  {
+    name: "non-subtract derived operators remain renderer incapable",
+    assert: () => {
+      const operators: BusinessSqlDerivedMeasureOperator[] = ["add", "multiply", "divide"];
+      return operators.flatMap((operator) => {
+        const capability = evaluateBusinessSqlRendererCapability(
+          planWith({
+            derivedMeasures: [
+              derived({
+                operator,
+                divisionPolicy: operator === "divide" ? { zeroDenominator: "null" } : undefined,
+              }),
+            ],
+          }),
+        );
+        return capability.status === "incapable" &&
+          capability.reasonCodes.includes("derived_measure_operator_rendering_not_supported")
+          ? []
+          : [`Expected ${operator} derived measure to remain renderer incapable.`];
+      });
     },
   },
   {
@@ -455,25 +610,212 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "direct rendering and preview of derived measure plan produce no SQL or actions",
+    name: "direct rendering and preview of valid subtract derived measure plan produce SQL without insert or run",
     assert: () => {
       const plan = planWith();
       const rendered = renderBusinessSqlQueryPlan(plan);
       const preview = createBusinessSqlRenderPreview(plan);
       return [
-        ...(!rendered.rendered && rendered.sql === null
+        ...(rendered.rendered && rendered.sql?.includes('AS "derived_measure"')
           ? []
-          : ["Derived measure plan must not render SQL in PS-3a."]),
+          : ["Subtract derived measure plan must render SQL in PS-3b."]),
         ...(rendered.inserted === false && rendered.ranQuery === false
           ? []
-          : ["Derived render refusal must not insert or run."]),
+          : ["Derived render must not insert or run."]),
+        ...(preview.sql &&
+        preview.actions.canCopySql &&
+        !preview.actions.canInsertSql &&
+        !preview.actions.canRunSql
+          ? []
+          : ["Derived measure preview must expose copy-only SQL review actions."]),
+      ];
+    },
+  },
+  {
+    name: "unsupported derived operators produce no SQL and no preview actions",
+    assert: () => {
+      const plan = planWith({
+        derivedMeasures: [derived({ operator: "add", sqlAlias: "add_measure" })],
+      });
+      const rendered = renderBusinessSqlQueryPlan(plan);
+      const preview = createBusinessSqlRenderPreview(plan);
+      return [
+        ...(!rendered.rendered && rendered.sql === null
+          ? []
+          : ["Unsupported derived operator must not render SQL."]),
         ...(preview.sql === null &&
         !preview.actions.canCopySql &&
         !preview.actions.canInsertSql &&
         !preview.actions.canRunSql
           ? []
-          : ["Derived measure preview must expose no SQL copy insert or run action."]),
+          : ["Unsupported derived operator preview must expose no SQL actions."]),
       ];
+    },
+  },
+  {
+    name: "invalid operand and multiple derived requests produce no base-only SQL fallback",
+    assert: () => {
+      const invalidOperandPlan = planWith({
+        derivedMeasures: [derived({ leftMeasureId: "business-sql-measure:missing:left" })],
+      });
+      const multipleDerivedPlan = planWith({
+        derivedMeasures: [derived(), derived({ operator: "subtract", sqlAlias: "other_subtract" })],
+      });
+      const invalidResult = renderBusinessSqlQueryPlan(invalidOperandPlan);
+      const multipleResult = renderBusinessSqlQueryPlan(multipleDerivedPlan);
+      return [
+        ...(!invalidResult.rendered && invalidResult.sql === null
+          ? []
+          : ["Invalid operand derived request must not render base-only SQL."]),
+        ...(!multipleResult.rendered && multipleResult.sql === null
+          ? []
+          : ["Multiple derived request must not render base-only SQL."]),
+      ];
+    },
+  },
+  {
+    name: "deterministic SUM minus SUM derived SQL projects grouping operands and derived measure in order",
+    assert: () => {
+      const result = renderBusinessSqlQueryPlan(subtractPlan());
+      const expectedSql = [
+        "SELECT",
+        '  "finance"."region" AS "region",',
+        '  SUM("finance"."revenue") AS "total_revenue",',
+        '  SUM("finance"."cost") AS "total_cost",',
+        '  (SUM("finance"."revenue")) - (SUM("finance"."cost")) AS "revenue_minus_cost"',
+        'FROM "finance"',
+        'GROUP BY "finance"."region";',
+      ].join("\n");
+      return [
+        ...(result.sql === expectedSql ? [] : ["Expected exact deterministic SUM minus SUM SQL."]),
+        ...(result.sql && result.sql.indexOf('"region"') < result.sql.indexOf('"total_revenue"') &&
+        result.sql.indexOf('"total_revenue"') < result.sql.indexOf('"total_cost"') &&
+        result.sql.indexOf('"total_cost"') < result.sql.indexOf('"revenue_minus_cost"')
+          ? []
+          : ["Expected grouping left operand right operand derived projection order."]),
+        ...(result.sql?.includes('("total_revenue")') || result.sql?.includes("Revenue minus cost")
+          ? ["Derived expression must not use aliases or labels."]
+          : []),
+      ];
+    },
+  },
+  {
+    name: "deterministic AVG minus AVG and COUNT minus COUNT derived SQL use aggregate metadata expressions",
+    assert: () => {
+      const avgLeft = tableMeasure({
+        table: "quality",
+        field: "target_score",
+        label: "Average target score",
+        kind: "average",
+      });
+      const avgRight = tableMeasure({
+        table: "quality",
+        field: "actual_score",
+        label: "Average actual score",
+        kind: "average",
+      });
+      const countLeft = tableMeasure({
+        table: "tickets",
+        field: "opened_ticket_id",
+        label: "Opened tickets",
+        kind: "count_entities",
+        fieldInferredType: "text",
+      });
+      const countRight = tableMeasure({
+        table: "tickets",
+        field: "closed_ticket_id",
+        label: "Closed tickets",
+        kind: "count_entities",
+        fieldInferredType: "text",
+      });
+      const avgSql = renderBusinessSqlQueryPlan(
+        subtractPlan({
+          table: "quality",
+          groupingField: "team",
+          left: avgLeft,
+          right: avgRight,
+          derivedAlias: "score_gap",
+        }),
+      ).sql;
+      const countSql = renderBusinessSqlQueryPlan(
+        subtractPlan({
+          table: "tickets",
+          groupingField: "queue",
+          left: countLeft,
+          right: countRight,
+          derivedAlias: "opened_minus_closed",
+        }),
+      ).sql;
+      return [
+        ...(avgSql?.includes('(AVG("quality"."target_score")) - (AVG("quality"."actual_score")) AS "score_gap"')
+          ? []
+          : ["Expected AVG minus AVG expression from measure metadata."]),
+        ...(countSql?.includes('(COUNT("tickets"."opened_ticket_id")) - (COUNT("tickets"."closed_ticket_id")) AS "opened_minus_closed"')
+          ? []
+          : ["Expected COUNT minus COUNT expression from measure metadata."]),
+      ];
+    },
+  },
+  {
+    name: "subtract derived plans preserve joins base HAVING base ORDER BY and row limit",
+    assert: () => {
+      const left = tableMeasure({ table: "finance", field: "revenue", label: "Total revenue" });
+      const right = tableMeasure({ table: "finance", field: "cost", label: "Total cost" });
+      const plan = subtractPlan({
+        left,
+        right,
+        orderByMeasure: left,
+        rowLimit: 25,
+        havingMeasure: right,
+        join: true,
+      });
+      const result = renderBusinessSqlQueryPlan(plan);
+      return [
+        ...(result.sql?.includes('JOIN "lookup" ON "finance"."lookup_id" = "lookup"."lookup_id"')
+          ? []
+          : ["Expected resolved join to render."]),
+        ...(result.sql?.includes('HAVING SUM("finance"."cost") > 10')
+          ? []
+          : ["Expected base-measure HAVING to remain positioned after GROUP BY."]),
+        ...(result.sql?.includes('ORDER BY "total_revenue" ASC')
+          ? []
+          : ["Expected base-measure ORDER BY to remain unchanged."]),
+        ...(result.sql?.endsWith("LIMIT 25;") ? [] : ["Expected row limit to remain unchanged."]),
+      ];
+    },
+  },
+  {
+    name: "cross-domain subtract proof fixtures use the same renderer path",
+    assert: () => {
+      const cases = [
+        subtractPlan({
+          table: "programs",
+          groupingField: "program",
+          left: tableMeasure({ table: "programs", field: "budget", label: "Total budget" }),
+          right: tableMeasure({ table: "programs", field: "spending", label: "Total spending" }),
+          derivedAlias: "budget_minus_spending",
+        }),
+        subtractPlan({
+          table: "manufacturing",
+          groupingField: "production_line",
+          left: tableMeasure({ table: "manufacturing", field: "units_produced", label: "Total units produced" }),
+          right: tableMeasure({ table: "manufacturing", field: "defective_units", label: "Total defective units" }),
+          derivedAlias: "units_minus_defects",
+        }),
+        subtractPlan({
+          table: "inventory",
+          groupingField: "warehouse",
+          left: tableMeasure({ table: "inventory", field: "units_received", label: "Total units received" }),
+          right: tableMeasure({ table: "inventory", field: "units_shipped", label: "Total units shipped" }),
+          derivedAlias: "received_minus_shipped",
+        }),
+      ];
+      return cases.flatMap((plan) => {
+        const result = renderBusinessSqlQueryPlan(plan);
+        return result.rendered && result.sql?.includes(` AS "${plan.derivedMeasures[0].sqlAlias}"`)
+          ? []
+          : [`Expected subtract rendering for ${plan.id}.`];
+      });
     },
   },
   {

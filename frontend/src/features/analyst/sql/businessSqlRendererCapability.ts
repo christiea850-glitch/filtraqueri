@@ -9,7 +9,7 @@ export type BusinessSqlRendererCapabilityStatus = "capable" | "incapable";
 export type BusinessSqlRendererIncapabilityReason =
   | "multiple_measures_not_supported"
   | "aggregate_condition_multiple_not_supported"
-  | "derived_measure_rendering_not_supported"
+  | "derived_measure_operator_rendering_not_supported"
   | "derived_measures_multiple_not_supported"
   | "derived_measure_operand_mismatch"
   | "unrecognized_plan_shape";
@@ -49,7 +49,9 @@ export function evaluateBusinessSqlRendererCapability(
       Array.from(operandIds).every((measureId) => baseMeasureIds.has(measureId));
 
     if (compatibility.compatible && operandsExactlyMatchBaseMeasures) {
-      reasonCodes.push("derived_measure_rendering_not_supported");
+      if (derivedMeasure.operator !== "subtract") {
+        reasonCodes.push("derived_measure_operator_rendering_not_supported");
+      }
     } else {
       reasonCodes.push("derived_measure_operand_mismatch");
     }
