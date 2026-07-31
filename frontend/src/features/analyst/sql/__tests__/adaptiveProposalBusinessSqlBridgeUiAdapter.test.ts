@@ -140,6 +140,7 @@ const baseProposal = (): AdaptiveReportProposal => ({
       confidence: "high",
     },
   ],
+  derivedMeasures: [],
   groupings: [
     {
       id: "grouping:lease-status",

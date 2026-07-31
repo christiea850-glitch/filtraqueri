@@ -13,6 +13,7 @@ import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlAggregateComparisonValue,
 } from "./businessSqlQueryPlan";
+import { createBusinessSqlMeasureAlias } from "./businessSqlQueryPlan";
 import {
   inferSemanticTableHints,
   type SemanticColumnHint,
@@ -65,6 +66,17 @@ export type ProposedAggregateResultCondition = {
   metricId: string;
   operator: BusinessSqlAggregateComparisonOperator;
   comparisonValue: BusinessSqlAggregateComparisonValue;
+  label?: string;
+  evidence?: string;
+  confidence: "high" | "medium" | "low";
+};
+
+export type ProposedDerivedMeasure = {
+  id: string;
+  operator: "subtract";
+  leftMetricId: string;
+  rightMetricId: string;
+  sqlAlias: string;
   label?: string;
   evidence?: string;
   confidence: "high" | "medium" | "low";
@@ -147,6 +159,7 @@ export type AdaptiveReportProposal = {
   detectedIntent: BusinessIntent;
   entities: ProposedEntity[];
   metrics: ProposedMetric[];
+  derivedMeasures: ProposedDerivedMeasure[];
   groupings: ProposedGrouping[];
   aggregateResultConditions: ProposedAggregateResultCondition[];
   sorts?: ProposedSort[];
@@ -218,6 +231,7 @@ export const EMPTY_ADAPTIVE_REPORT_PROPOSAL: AdaptiveReportProposal = {
   detectedIntent: EMPTY_BUSINESS_INTENT,
   entities: [],
   metrics: [],
+  derivedMeasures: [],
   groupings: [],
   aggregateResultConditions: [],
   sorts: [],
@@ -536,6 +550,19 @@ const findColumn = (
   );
 };
 
+const findColumnByName = (
+  columnName: string,
+  worksheets: readonly WorksheetInput[],
+): BoundColumn | null => {
+  let best: BoundColumn | null = null;
+  for (const item of allColumns(worksheets)) {
+    const confidence = nameScore(columnName, item.column.name);
+    if (confidence === "high") return { ...item, confidence };
+    if (confidence === "medium" && !best) best = { ...item, confidence };
+  }
+  return best;
+};
+
 const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
   const text = normalize(metric);
   if (text.startsWith("avg ") || text.startsWith("average ")) return "average";
@@ -545,6 +572,72 @@ const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
   if (text.startsWith("distinct count ") || text.startsWith("count distinct ")) return "count_distinct";
   if (text.startsWith("count ")) return "count_entities";
   return "metric_column";
+};
+
+const createProposedDerivedMeasureId = ({
+  operator,
+  leftMetricId,
+  rightMetricId,
+}: Pick<ProposedDerivedMeasure, "operator" | "leftMetricId" | "rightMetricId">): string =>
+  `derived-measure:${operator}:${compactId(leftMetricId)}:${compactId(rightMetricId)}`;
+
+type ExplicitSubtractionFormula =
+  | {
+      status: "none";
+    }
+  | {
+      status: "unsupported";
+      reason: "multiple_subtractions" | "missing_left_operand" | "missing_right_operand";
+    }
+  | {
+      status: "detected";
+      leftPhrase: string;
+      rightPhrase: string;
+      groupingPhrase: string | null;
+      evidence: string;
+    };
+
+const INTRODUCTORY_FORMULA_WORDS =
+  /^(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:show(?:\s+me)?|display|calculate|find|identify|list)(?:\s+(?:the\s+)?)?/;
+
+const trimFormulaOperand = (value: string): string =>
+  normalize(value)
+    .replace(INTRODUCTORY_FORMULA_WORDS, "")
+    .replace(/^(?:the\s+)?/, "")
+    .replace(/\b(?:for|in)\s+each\b/g, " by ")
+    .trim();
+
+export const detectExplicitSubtractionFormula = (
+  prompt: string,
+): ExplicitSubtractionFormula => {
+  const text = normalize(prompt);
+  const matches = [...text.matchAll(/\bminus\b/g)];
+  if (matches.length === 0) return { status: "none" };
+  if (matches.length > 1) {
+    return { status: "unsupported", reason: "multiple_subtractions" };
+  }
+
+  const minusIndex = matches[0].index || 0;
+  const left = trimFormulaOperand(text.slice(0, minusIndex));
+  const rightAndGrouping = text.slice(minusIndex + "minus".length).trim();
+  const groupingMatch = rightAndGrouping.match(/\bby\s+(.+)$/);
+  const right = trimFormulaOperand(
+    groupingMatch
+      ? rightAndGrouping.slice(0, groupingMatch.index).trim()
+      : rightAndGrouping,
+  );
+  const groupingPhrase = groupingMatch ? trimFormulaOperand(groupingMatch[1]) : null;
+
+  if (!left) return { status: "unsupported", reason: "missing_left_operand" };
+  if (!right) return { status: "unsupported", reason: "missing_right_operand" };
+
+  return {
+    status: "detected",
+    leftPhrase: left,
+    rightPhrase: right,
+    groupingPhrase: groupingPhrase || null,
+    evidence: `${left} minus ${right}`,
+  };
 };
 
 type AggregateThresholdMatch = {
@@ -789,12 +882,57 @@ const thresholdCountMetricName = (
   return entityMatch ? `count_${entityMatch.replace(/\s+/g, "_")}` : null;
 };
 
+const proposedMetricFromPhrase = (
+  phrase: string,
+  worksheets: readonly WorksheetInput[],
+  semanticColumns: readonly SemanticColumnHint[],
+  strictNameMatch = false,
+): ProposedMetric => {
+  const metricName = phrase.replace(/^(count|sum|total|avg|average|minimum|min|maximum|max)_?/, "");
+  const kind = inferMetricKind(phrase);
+  const column = strictNameMatch
+    ? findColumnByName(metricName, worksheets)
+    : findColumn(metricName, worksheets, semanticColumns, [
+        "metric_candidate",
+        "amount",
+        "quantity",
+        "countable_entity",
+        "identifier",
+      ]);
+  const isSupportedExplicitMeasure =
+    kind !== "metric_column" && (kind === "count_entities" || Boolean(column));
+
+  return {
+    id: `metric:${compactId(phrase)}`,
+    label: phrase,
+    kind,
+    tableName: isSupportedExplicitMeasure
+      ? column?.worksheet.tableName || worksheets[0]?.tableName || null
+      : column?.worksheet.tableName || null,
+    columnName: column?.column.name || null,
+    inferredType: column?.column.inferred_type,
+    synthesized: kind === "count_entities" && !column,
+    confidence: isSupportedExplicitMeasure
+      ? column?.confidence || (kind === "count_entities" ? "medium" : "low")
+      : "low",
+  };
+};
+
 const proposeMetrics = (
   intent: BusinessIntent,
   prompt: string,
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedMetric[] => {
+  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
+  if (explicitSubtraction.status === "detected") {
+    return [
+      proposedMetricFromPhrase(explicitSubtraction.leftPhrase, worksheets, semanticColumns, true),
+      proposedMetricFromPhrase(explicitSubtraction.rightPhrase, worksheets, semanticColumns, true),
+    ];
+  }
+  if (explicitSubtraction.status === "unsupported") return [];
+
   if (intent.metrics.length === 0) {
     const thresholdMetric = thresholdCountMetricName(
       detectAggregateThresholdMatches(prompt),
@@ -822,27 +960,9 @@ const proposeMetrics = (
     ];
   }
 
-  return intent.metrics.map((metric) => {
-    const metricName = metric.replace(/^(count|sum|total|avg|average|minimum|min|maximum|max)_?/, "");
-    const column = findColumn(metricName, worksheets, semanticColumns, [
-      "metric_candidate",
-      "amount",
-      "quantity",
-      "countable_entity",
-      "identifier",
-    ]);
-    const kind = inferMetricKind(metric.replace(/_/g, " "));
-    return {
-      id: `metric:${compactId(metric)}`,
-      label: metric.replace(/_/g, " "),
-      kind,
-      tableName: column?.worksheet.tableName || worksheets[0]?.tableName || null,
-      columnName: column?.column.name || (kind === "count_entities" ? null : null),
-      inferredType: column?.column.inferred_type,
-      synthesized: kind === "count_entities" && !column,
-      confidence: column?.confidence || (kind === "count_entities" ? "medium" : "low"),
-    };
-  });
+  return intent.metrics.map((metric) =>
+    proposedMetricFromPhrase(metric.replace(/_/g, " "), worksheets, semanticColumns),
+  );
 };
 
 const proposeSorts = (
@@ -896,19 +1016,25 @@ const proposeGroupings = (
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedGrouping[] => {
+  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
   const groupingConcepts =
-    intent.grouping.length > 0
+    explicitSubtraction.status === "detected" && explicitSubtraction.groupingPhrase
+      ? [explicitSubtraction.groupingPhrase]
+      : intent.grouping.length > 0
       ? intent.grouping
       : groupingConceptsFromPromptSubject(prompt);
+  const strictFormulaGrouping = explicitSubtraction.status === "detected";
 
   return Array.from(new Set(groupingConcepts)).map((grouping) => {
-    const column = findColumn(grouping, worksheets, semanticColumns, [
-      "grouping_candidate",
-      "category",
-      "name",
-      "foreign_key",
-      "identifier",
-    ]);
+    const column = strictFormulaGrouping
+      ? findColumnByName(grouping, worksheets)
+      : findColumn(grouping, worksheets, semanticColumns, [
+          "grouping_candidate",
+          "category",
+          "name",
+          "foreign_key",
+          "identifier",
+        ]);
     return {
       id: `grouping:${compactId(grouping)}`,
       label: grouping,
@@ -917,6 +1043,45 @@ const proposeGroupings = (
       confidence: column?.confidence || "low",
     };
   });
+};
+
+const proposeDerivedMeasures = (
+  prompt: string,
+  metrics: readonly ProposedMetric[],
+): ProposedDerivedMeasure[] => {
+  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
+  if (explicitSubtraction.status !== "detected") return [];
+  if (metrics.length !== 2) return [];
+
+  const [leftMetric, rightMetric] = metrics;
+  const operandsAreGrounded = [leftMetric, rightMetric].every(
+    (metric) =>
+      metric.kind !== "metric_column" &&
+      metric.confidence !== "low" &&
+      metric.tableName &&
+      (metric.kind === "count_entities" || metric.columnName),
+  );
+  if (!operandsAreGrounded) return [];
+
+  const seed = {
+    operator: "subtract" as const,
+    leftMetricId: leftMetric.id,
+    rightMetricId: rightMetric.id,
+  };
+  const label = `${leftMetric.label} minus ${rightMetric.label}`;
+  return [
+    {
+      ...seed,
+      id: createProposedDerivedMeasureId(seed),
+      sqlAlias: createBusinessSqlMeasureAlias(label),
+      label,
+      evidence: explicitSubtraction.evidence,
+      confidence:
+        leftMetric.confidence === "high" && rightMetric.confidence === "high"
+          ? "high"
+          : "medium",
+    },
+  ];
 };
 
 const proposeAggregateResultConditions = ({
@@ -1165,6 +1330,7 @@ const createMissingRequirements = ({
   entities,
   groupings,
   metrics,
+  derivedMeasures,
   aggregateResultConditions,
   thresholdMatchCount,
   joinNeeds,
@@ -1175,12 +1341,16 @@ const createMissingRequirements = ({
   entities: readonly ProposedEntity[];
   groupings: readonly ProposedGrouping[];
   metrics: readonly ProposedMetric[];
+  derivedMeasures: readonly ProposedDerivedMeasure[];
   aggregateResultConditions: readonly ProposedAggregateResultCondition[];
   thresholdMatchCount: number;
   joinNeeds: readonly ProposedJoinNeed[];
 }): MissingRequirement[] => {
   const missing: MissingRequirement[] = [];
   const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
+  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
+  const hasDetectedSubtraction = explicitSubtraction.status === "detected";
+  const hasGroundedDerivedSubtraction = derivedMeasures.length === 1;
   if (!prompt.trim()) {
     missing.push({
       id: "missing-prompt",
@@ -1191,7 +1361,8 @@ const createMissingRequirements = ({
   if (
     intent.primaryIntent === "unknown" &&
     intent.alternates.length === 0 &&
-    !hasGroundedAggregateThreshold
+    !hasGroundedAggregateThreshold &&
+    !hasGroundedDerivedSubtraction
   ) {
     missing.push({
       id: "missing-intent",
@@ -1207,7 +1378,7 @@ const createMissingRequirements = ({
     });
   }
   for (const entity of entities.filter(
-    (entity) => !entity.tableName && !hasGroundedAggregateThreshold,
+    (entity) => !entity.tableName && !hasGroundedAggregateThreshold && !hasGroundedDerivedSubtraction,
   )) {
     missing.push({
       id: `missing-entity:${compactId(entity.requestedName)}`,
@@ -1227,6 +1398,37 @@ const createMissingRequirements = ({
       id: `missing-metric:${compactId(metric.label)}`,
       kind: "column",
       message: `Could not safely bind metric \`${metric.label}\` to metadata.`,
+    });
+  }
+  if (explicitSubtraction.status === "unsupported") {
+    missing.push({
+      id:
+        explicitSubtraction.reason === "multiple_subtractions"
+          ? "unsupported-multiple-derived-subtractions"
+          : `missing-derived-${explicitSubtraction.reason.replace(/_/g, "-")}`,
+      kind: "intent",
+      message:
+        explicitSubtraction.reason === "multiple_subtractions"
+          ? "Only one explicit X minus Y formula is supported in this slice."
+          : "Could not safely identify both operands for the explicit subtraction formula.",
+    });
+  } else if (hasDetectedSubtraction && !hasGroundedDerivedSubtraction) {
+    missing.push({
+      id: "missing-derived-subtraction-grounding",
+      kind: "column",
+      message:
+        "Could not safely bind the explicit subtraction formula to two grounded compatible base measures.",
+    });
+  }
+  if (
+    hasDetectedSubtraction &&
+    explicitSubtraction.groupingPhrase &&
+    groupings.length === 0
+  ) {
+    missing.push({
+      id: "missing-derived-subtraction-grouping",
+      kind: "column",
+      message: "Could not safely bind the grouping for the explicit subtraction formula.",
     });
   }
   if (thresholdMatchCount > 1) {
@@ -1340,11 +1542,13 @@ const computeConfidence = (
   entities: readonly ProposedEntity[],
   metrics: readonly ProposedMetric[],
   groupings: readonly ProposedGrouping[],
+  derivedMeasures: readonly ProposedDerivedMeasure[] = [],
 ): AdaptiveReportProposal["confidence"] => {
   const values = [
     ...entities.map((entity) => entity.confidence),
     ...metrics.map((metric) => metric.confidence),
     ...groupings.map((grouping) => grouping.confidence),
+    ...derivedMeasures.map((derivedMeasure) => derivedMeasure.confidence),
   ];
   if (values.length === 0) return "low";
   if (values.every((value) => value === "high")) return "high";
@@ -1361,6 +1565,7 @@ const createFingerprint = ({
   entities,
   joinNeeds,
   metrics,
+  derivedMeasures,
   groupings,
   aggregateResultConditions,
   sorts,
@@ -1371,6 +1576,7 @@ const createFingerprint = ({
   entities: readonly ProposedEntity[];
   joinNeeds: readonly ProposedJoinNeed[];
   metrics: readonly ProposedMetric[];
+  derivedMeasures: readonly ProposedDerivedMeasure[];
   groupings: readonly ProposedGrouping[];
   aggregateResultConditions: readonly ProposedAggregateResultCondition[];
   sorts: readonly ProposedSort[];
@@ -1392,6 +1598,7 @@ const createFingerprint = ({
     scopeTables: stableStrings(scopeTableNames(scope)),
     entityNames: stableStrings(entities.map((entity) => entity.label)),
     metricIds: stableStrings(metrics.map((metric) => metric.id)),
+    derivedMeasureIds: stableStrings(derivedMeasures.map((derivedMeasure) => derivedMeasure.id)),
     groupingIds: stableStrings(groupings.map((grouping) => grouping.id)),
     aggregateResultConditionIds: stableStrings(
       aggregateResultConditions.map((condition) => condition.id),
@@ -1458,13 +1665,14 @@ export function proposeAdaptiveReport(
       ? requestedEntities.map((entity) => findWorksheetForEntity(entity, worksheets))
       : fallbackEntitiesFromScope(worksheets);
   const metrics = proposeMetrics(detectedIntent, prompt, worksheets, semanticColumns);
+  const derivedMeasures = proposeDerivedMeasures(prompt, metrics);
   const groupings = proposeGroupings(detectedIntent, prompt, worksheets, semanticColumns);
   const aggregateResultConditions = proposeAggregateResultConditions({
     prompt,
     metrics,
     groupings,
   });
-  const sorts = proposeSorts(detectedIntent, metrics);
+  const sorts = derivedMeasures.length > 0 ? [] : proposeSorts(detectedIntent, metrics);
   const rowLimit = proposeRowLimit(detectedIntent);
   const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns);
   const joinNeeds = proposeJoinNeeds(
@@ -1479,6 +1687,7 @@ export function proposeAdaptiveReport(
     entities,
     groupings,
     metrics,
+    derivedMeasures,
     aggregateResultConditions,
     thresholdMatchCount: detectAggregateThresholdMatches(prompt).length,
     joinNeeds,
@@ -1486,13 +1695,14 @@ export function proposeAdaptiveReport(
   const assumptions = createAssumptions(entities, metrics, groupings);
   const warnings = createWarnings(filters, joinNeeds, request.selectedGuidanceDialect);
   const support = computeSupport({ missingRequirements, filters, joinNeeds });
-  const confidence = computeConfidence(entities, metrics, groupings);
+  const confidence = computeConfidence(entities, metrics, groupings, derivedMeasures);
   const payloadFingerprint = createFingerprint({
     intent: detectedIntent,
     scope: appliedScopeSelections,
     entities,
     joinNeeds,
     metrics,
+    derivedMeasures,
     groupings,
     aggregateResultConditions,
     sorts,
@@ -1509,6 +1719,7 @@ export function proposeAdaptiveReport(
     detectedIntent,
     entities,
     metrics,
+    derivedMeasures,
     groupings,
     aggregateResultConditions,
     sorts,
