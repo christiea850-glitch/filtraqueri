@@ -188,7 +188,14 @@ const derivedMeasureExpression = (
   derivedMeasure: BusinessSqlDerivedMeasure,
   measures: readonly BusinessSqlMeasure[],
 ): string | null => {
-  if (derivedMeasure.operator !== "subtract" && derivedMeasure.operator !== "divide") return null;
+  if (
+    derivedMeasure.operator !== "add" &&
+    derivedMeasure.operator !== "subtract" &&
+    derivedMeasure.operator !== "multiply" &&
+    derivedMeasure.operator !== "divide"
+  ) {
+    return null;
+  }
   const byId = measuresById(measures);
   const leftMeasure = byId.get(derivedMeasure.leftMeasureId);
   const rightMeasure = byId.get(derivedMeasure.rightMeasureId);
@@ -204,6 +211,12 @@ const derivedMeasureExpression = (
       `    ELSE (${leftExpression}) / (${rightExpression})`,
       "  END",
     ].join("\n");
+  }
+  if (derivedMeasure.operator === "add") {
+    return `(${leftExpression}) + (${rightExpression})`;
+  }
+  if (derivedMeasure.operator === "multiply") {
+    return `(${leftExpression}) * (${rightExpression})`;
   }
   return `(${leftExpression}) - (${rightExpression})`;
 };

@@ -21,6 +21,13 @@ export type BusinessSqlRendererCapability = {
   metadataOnly: true;
 };
 
+const RENDERABLE_DERIVED_MEASURE_OPERATORS = new Set([
+  "add",
+  "subtract",
+  "multiply",
+  "divide",
+]);
+
 export function evaluateBusinessSqlRendererCapability(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRendererCapability {
@@ -48,10 +55,10 @@ export function evaluateBusinessSqlRendererCapability(
       baseMeasureIds.size === 2 &&
       Array.from(operandIds).every((measureId) => baseMeasureIds.has(measureId));
 
-    if (compatibility.compatible && operandsExactlyMatchBaseMeasures) {
-      if (derivedMeasure.operator !== "subtract" && derivedMeasure.operator !== "divide") {
-        reasonCodes.push("derived_measure_operator_rendering_not_supported");
-      }
+    if (!RENDERABLE_DERIVED_MEASURE_OPERATORS.has(derivedMeasure.operator)) {
+      reasonCodes.push("derived_measure_operator_rendering_not_supported");
+    } else if (compatibility.compatible && operandsExactlyMatchBaseMeasures) {
+      // Supported in the deterministic renderer.
     } else {
       reasonCodes.push("derived_measure_operand_mismatch");
     }
