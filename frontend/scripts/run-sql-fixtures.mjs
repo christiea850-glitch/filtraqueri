@@ -172,6 +172,51 @@ const fixtures = [
     exportName: "runAdaptiveReportProposalFixtures",
   },
   {
+    label: "Adaptive report proposal UI adapter",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveReportProposalUiAdapter.test.ts",
+    exportName: "runAdaptiveReportProposalUiAdapterFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM payload builder",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmPayloadBuilder.test.ts",
+    exportName: "runAdaptiveProposalLlmPayloadBuilderFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM provider gate",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmProviderGate.test.ts",
+    exportName: "runAdaptiveProposalLlmProviderGateFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM consent",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmConsent.test.ts",
+    exportName: "runAdaptiveProposalLlmConsentFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM consent shell",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmConsentShell.test.ts",
+    exportName: "runAdaptiveProposalLlmConsentShellFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM consent disclosure",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmConsentDisclosure.test.ts",
+    exportName: "runAdaptiveProposalLlmConsentDisclosureFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM audit snapshot",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmAuditSnapshot.test.ts",
+    exportName: "runAdaptiveProposalLlmAuditSnapshotFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM validator",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmValidator.test.ts",
+    exportName: "runAdaptiveProposalLlmValidatorFixtures",
+  },
+  {
+    label: "Adaptive proposal LLM refinement",
+    modulePath: "/src/features/analyst/sql/__tests__/adaptiveProposalLlmRefinement.test.ts",
+    exportName: "runAdaptiveProposalLlmRefinementFixtures",
+  },
+  {
     label: "Semantic hint registry",
     modulePath: "/src/features/analyst/sql/__tests__/semanticHintRegistry.test.ts",
     exportName: "runSemanticHintRegistryFixtures",
