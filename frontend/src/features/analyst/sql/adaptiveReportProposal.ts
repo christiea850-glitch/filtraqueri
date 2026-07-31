@@ -73,7 +73,7 @@ export type ProposedAggregateResultCondition = {
 
 export type ProposedDerivedMeasure = {
   id: string;
-  operator: "subtract" | "divide";
+  operator: "subtract" | "divide" | "add" | "multiply";
   leftMetricId: string;
   rightMetricId: string;
   divisionPolicy?: {
@@ -632,6 +632,55 @@ type ExplicitDivisionFormula =
       evidence: string;
     };
 
+type ExplicitAddMultiplyFormula =
+  | {
+      status: "none";
+    }
+  | {
+      status: "unsupported";
+      reason:
+        | "multiple_additions"
+        | "multiple_multiplications"
+        | "mixed_formulas"
+        | "missing_left_operand"
+        | "missing_right_operand";
+    }
+  | {
+      status: "detected";
+      leftPhrase: string;
+      rightPhrase: string;
+      groupingPhrase: string | null;
+      evidence: string;
+    };
+
+type ExplicitFormulaOperator = ProposedDerivedMeasure["operator"];
+
+type ExplicitDerivedFormula =
+  | {
+      status: "none";
+    }
+  | {
+      status: "unsupported";
+      operator: ExplicitFormulaOperator | "mixed";
+      reason:
+        | "multiple_subtractions"
+        | "multiple_divisions"
+        | "multiple_additions"
+        | "multiple_multiplications"
+        | "mixed_formulas"
+        | "missing_left_operand"
+        | "missing_right_operand";
+    }
+  | {
+      status: "detected";
+      operator: ExplicitFormulaOperator;
+      leftPhrase: string;
+      rightPhrase: string;
+      groupingPhrase: string | null;
+      evidence: string;
+      phrase: string;
+    };
+
 const INTRODUCTORY_FORMULA_WORDS =
   /^(?:please\s+)?(?:(?:can|could)\s+you\s+)?(?:show(?:\s+me)?|display|calculate|find|identify|list)(?:\s+(?:the\s+)?)?/;
 
@@ -642,19 +691,46 @@ const trimFormulaOperand = (value: string): string =>
     .replace(/\b(?:for|in)\s+each\b/g, " by ")
     .trim();
 
-export const detectExplicitSubtractionFormula = (
+const FORMULA_OPERATORS: ReadonlyArray<{
+  operator: ExplicitFormulaOperator;
+  phrase: string;
+  pattern: RegExp;
+  multipleReason: Extract<ExplicitDerivedFormula, { status: "unsupported" }>["reason"];
+}> = [
+  { operator: "subtract", phrase: "minus", pattern: /\bminus\b/g, multipleReason: "multiple_subtractions" },
+  { operator: "divide", phrase: "divided by", pattern: /\bdivided\s+by\b/g, multipleReason: "multiple_divisions" },
+  { operator: "add", phrase: "plus", pattern: /\bplus\b/g, multipleReason: "multiple_additions" },
+  { operator: "multiply", phrase: "multiplied by", pattern: /\bmultiplied\s+by\b/g, multipleReason: "multiple_multiplications" },
+];
+
+const explicitFormulaMatches = (text: string) =>
+  FORMULA_OPERATORS.flatMap((definition) =>
+    [...text.matchAll(definition.pattern)].map((match) => ({
+      ...definition,
+      index: match.index || 0,
+      text: match[0],
+    })),
+  ).sort((left, right) => left.index - right.index || left.phrase.localeCompare(right.phrase));
+
+const detectExplicitDerivedFormulaForOperator = (
   prompt: string,
-): ExplicitSubtractionFormula => {
+  operator: ExplicitFormulaOperator,
+): ExplicitDerivedFormula => {
   const text = normalize(prompt);
-  const matches = [...text.matchAll(/\bminus\b/g)];
-  if (matches.length === 0) return { status: "none" };
-  if (matches.length > 1) {
-    return { status: "unsupported", reason: "multiple_subtractions" };
+  const matches = explicitFormulaMatches(text);
+  const operatorMatches = matches.filter((match) => match.operator === operator);
+  const definition = FORMULA_OPERATORS.find((item) => item.operator === operator)!;
+  if (operatorMatches.length === 0) return { status: "none" };
+  if (operatorMatches.length > 1) {
+    return { status: "unsupported", operator, reason: definition.multipleReason };
+  }
+  if (matches.some((match) => match.operator !== operator)) {
+    return { status: "unsupported", operator: "mixed", reason: "mixed_formulas" };
   }
 
-  const minusIndex = matches[0].index || 0;
-  const left = trimFormulaOperand(text.slice(0, minusIndex));
-  const rightAndGrouping = text.slice(minusIndex + "minus".length).trim();
+  const match = operatorMatches[0];
+  const left = trimFormulaOperand(text.slice(0, match.index));
+  const rightAndGrouping = text.slice(match.index + match.text.length).trim();
   const groupingMatch = rightAndGrouping.match(/\bby\s+(.+)$/);
   const right = trimFormulaOperand(
     groupingMatch
@@ -663,52 +739,110 @@ export const detectExplicitSubtractionFormula = (
   );
   const groupingPhrase = groupingMatch ? trimFormulaOperand(groupingMatch[1]) : null;
 
-  if (!left) return { status: "unsupported", reason: "missing_left_operand" };
-  if (!right) return { status: "unsupported", reason: "missing_right_operand" };
+  if (!left) return { status: "unsupported", operator, reason: "missing_left_operand" };
+  if (!right) return { status: "unsupported", operator, reason: "missing_right_operand" };
 
   return {
     status: "detected",
+    operator,
     leftPhrase: left,
     rightPhrase: right,
     groupingPhrase: groupingPhrase || null,
-    evidence: `${left} minus ${right}`,
+    evidence: `${left} ${definition.phrase} ${right}`,
+    phrase: definition.phrase,
   };
+};
+
+const detectSelectedExplicitDerivedFormula = (prompt: string): ExplicitDerivedFormula => {
+  const text = normalize(prompt);
+  const matches = explicitFormulaMatches(text);
+  if (matches.length === 0) return { status: "none" };
+  const operators = Array.from(new Set(matches.map((match) => match.operator)));
+  if (operators.length > 1) {
+    return { status: "unsupported", operator: "mixed", reason: "mixed_formulas" };
+  }
+  return detectExplicitDerivedFormulaForOperator(prompt, operators[0]);
+};
+
+export const detectExplicitSubtractionFormula = (
+  prompt: string,
+): ExplicitSubtractionFormula => {
+  const formula = detectExplicitDerivedFormulaForOperator(prompt, "subtract");
+  if (formula.status === "none") return formula;
+  if (formula.status === "unsupported") {
+    return {
+      status: "unsupported",
+      reason:
+        formula.reason === "mixed_formulas"
+          ? "multiple_subtractions"
+          : formula.reason as Extract<ExplicitSubtractionFormula, { status: "unsupported" }>["reason"],
+    };
+  }
+  const { leftPhrase, rightPhrase, groupingPhrase, evidence } = formula;
+  return { status: "detected", leftPhrase, rightPhrase, groupingPhrase, evidence };
 };
 
 export const detectExplicitDivisionFormula = (
   prompt: string,
 ): ExplicitDivisionFormula => {
-  const text = normalize(prompt);
-  const matches = [...text.matchAll(/\bdivided\s+by\b/g)];
-  if (matches.length === 0) return { status: "none" };
-  if (matches.length > 1) {
-    return { status: "unsupported", reason: "multiple_divisions" };
+  const formula = detectExplicitDerivedFormulaForOperator(prompt, "divide");
+  if (formula.status === "none") return formula;
+  if (formula.status === "unsupported") {
+    return {
+      status: "unsupported",
+      reason:
+        formula.reason === "multiple_divisions" ||
+        formula.reason === "mixed_formulas" ||
+        formula.reason === "missing_left_operand" ||
+        formula.reason === "missing_right_operand"
+          ? formula.reason
+          : "mixed_formulas",
+    };
   }
-  if (/\bminus\b/.test(text)) {
-    return { status: "unsupported", reason: "mixed_formulas" };
+  const { leftPhrase, rightPhrase, groupingPhrase, evidence } = formula;
+  return { status: "detected", leftPhrase, rightPhrase, groupingPhrase, evidence };
+};
+
+export const detectExplicitAdditionFormula = (
+  prompt: string,
+): ExplicitAddMultiplyFormula => {
+  const formula = detectExplicitDerivedFormulaForOperator(prompt, "add");
+  if (formula.status === "none") return formula;
+  if (formula.status === "unsupported") {
+    return {
+      status: "unsupported",
+      reason:
+        formula.reason === "multiple_additions" ||
+        formula.reason === "mixed_formulas" ||
+        formula.reason === "missing_left_operand" ||
+        formula.reason === "missing_right_operand"
+          ? formula.reason
+          : "mixed_formulas",
+    };
   }
+  const { leftPhrase, rightPhrase, groupingPhrase, evidence } = formula;
+  return { status: "detected", leftPhrase, rightPhrase, groupingPhrase, evidence };
+};
 
-  const dividedByIndex = matches[0].index || 0;
-  const left = trimFormulaOperand(text.slice(0, dividedByIndex));
-  const rightAndGrouping = text.slice(dividedByIndex + matches[0][0].length).trim();
-  const groupingMatch = rightAndGrouping.match(/\bby\s+(.+)$/);
-  const right = trimFormulaOperand(
-    groupingMatch
-      ? rightAndGrouping.slice(0, groupingMatch.index).trim()
-      : rightAndGrouping,
-  );
-  const groupingPhrase = groupingMatch ? trimFormulaOperand(groupingMatch[1]) : null;
-
-  if (!left) return { status: "unsupported", reason: "missing_left_operand" };
-  if (!right) return { status: "unsupported", reason: "missing_right_operand" };
-
-  return {
-    status: "detected",
-    leftPhrase: left,
-    rightPhrase: right,
-    groupingPhrase: groupingPhrase || null,
-    evidence: `${left} divided by ${right}`,
-  };
+export const detectExplicitMultiplicationFormula = (
+  prompt: string,
+): ExplicitAddMultiplyFormula => {
+  const formula = detectExplicitDerivedFormulaForOperator(prompt, "multiply");
+  if (formula.status === "none") return formula;
+  if (formula.status === "unsupported") {
+    return {
+      status: "unsupported",
+      reason:
+        formula.reason === "multiple_multiplications" ||
+        formula.reason === "mixed_formulas" ||
+        formula.reason === "missing_left_operand" ||
+        formula.reason === "missing_right_operand"
+          ? formula.reason
+          : "mixed_formulas",
+    };
+  }
+  const { leftPhrase, rightPhrase, groupingPhrase, evidence } = formula;
+  return { status: "detected", leftPhrase, rightPhrase, groupingPhrase, evidence };
 };
 
 type AggregateThresholdMatch = {
@@ -1007,34 +1141,27 @@ const proposeMetrics = (
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedMetric[] => {
-  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
-  const explicitDivision = detectExplicitDivisionFormula(prompt);
-  if (explicitDivision.status === "detected") {
+  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
+  if (explicitFormula.status === "detected") {
+    const requireGroundedCount = explicitFormula.operator !== "subtract";
     return [
       proposedMetricFromPhrase(
-        explicitDivision.leftPhrase,
+        explicitFormula.leftPhrase,
         worksheets,
         semanticColumns,
         true,
-        true,
+        requireGroundedCount,
       ),
       proposedMetricFromPhrase(
-        explicitDivision.rightPhrase,
+        explicitFormula.rightPhrase,
         worksheets,
         semanticColumns,
         true,
-        true,
+        requireGroundedCount,
       ),
     ];
   }
-  if (explicitDivision.status === "unsupported") return [];
-  if (explicitSubtraction.status === "detected") {
-    return [
-      proposedMetricFromPhrase(explicitSubtraction.leftPhrase, worksheets, semanticColumns, true),
-      proposedMetricFromPhrase(explicitSubtraction.rightPhrase, worksheets, semanticColumns, true),
-    ];
-  }
-  if (explicitSubtraction.status === "unsupported") return [];
+  if (explicitFormula.status === "unsupported") return [];
 
   if (intent.metrics.length === 0) {
     const thresholdMetric = thresholdCountMetricName(
@@ -1119,18 +1246,14 @@ const proposeGroupings = (
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedGrouping[] => {
-  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
-  const explicitDivision = detectExplicitDivisionFormula(prompt);
+  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
   const groupingConcepts =
-    explicitDivision.status === "detected" && explicitDivision.groupingPhrase
-      ? [explicitDivision.groupingPhrase]
-      : explicitSubtraction.status === "detected" && explicitSubtraction.groupingPhrase
-      ? [explicitSubtraction.groupingPhrase]
+    explicitFormula.status === "detected" && explicitFormula.groupingPhrase
+      ? [explicitFormula.groupingPhrase]
       : intent.grouping.length > 0
       ? intent.grouping
       : groupingConceptsFromPromptSubject(prompt);
-  const strictFormulaGrouping =
-    explicitSubtraction.status === "detected" || explicitDivision.status === "detected";
+  const strictFormulaGrouping = explicitFormula.status === "detected";
 
   return Array.from(new Set(groupingConcepts)).map((grouping) => {
     const column = strictFormulaGrouping
@@ -1156,15 +1279,8 @@ const proposeDerivedMeasures = (
   prompt: string,
   metrics: readonly ProposedMetric[],
 ): ProposedDerivedMeasure[] => {
-  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
-  const explicitDivision = detectExplicitDivisionFormula(prompt);
-  const explicitFormula =
-    explicitDivision.status === "detected"
-      ? explicitDivision
-      : explicitSubtraction.status === "detected"
-      ? explicitSubtraction
-      : null;
-  if (!explicitFormula) return [];
+  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
+  if (explicitFormula.status !== "detected") return [];
   if (metrics.length !== 2) return [];
 
   const [leftMetric, rightMetric] = metrics;
@@ -1178,17 +1294,14 @@ const proposeDerivedMeasures = (
   if (!operandsAreGrounded) return [];
 
   const seed = {
-    operator: explicitDivision.status === "detected" ? "divide" as const : "subtract" as const,
+    operator: explicitFormula.operator,
     leftMetricId: leftMetric.id,
     rightMetricId: rightMetric.id,
-    ...(explicitDivision.status === "detected"
+    ...(explicitFormula.operator === "divide"
       ? { divisionPolicy: { zeroDenominator: "null" as const } }
       : {}),
   };
-  const label =
-    explicitDivision.status === "detected"
-      ? `${leftMetric.label} divided by ${rightMetric.label}`
-      : `${leftMetric.label} minus ${rightMetric.label}`;
+  const label = `${leftMetric.label} ${explicitFormula.phrase} ${rightMetric.label}`;
   return [
     {
       ...seed,
@@ -1468,10 +1581,7 @@ const createMissingRequirements = ({
 }): MissingRequirement[] => {
   const missing: MissingRequirement[] = [];
   const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
-  const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
-  const explicitDivision = detectExplicitDivisionFormula(prompt);
-  const hasDetectedSubtraction = explicitSubtraction.status === "detected";
-  const hasDetectedDivision = explicitDivision.status === "detected";
+  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
   const hasGroundedDerivedFormula = derivedMeasures.length === 1;
   if (!prompt.trim()) {
     missing.push({
@@ -1522,70 +1632,80 @@ const createMissingRequirements = ({
       message: `Could not safely bind metric \`${metric.label}\` to metadata.`,
     });
   }
-  if (explicitSubtraction.status === "unsupported") {
+  if (explicitFormula.status === "unsupported") {
+    const operatorName =
+      explicitFormula.operator === "subtract"
+        ? "subtraction"
+        : explicitFormula.operator === "divide"
+        ? "division"
+        : explicitFormula.operator === "add"
+        ? "addition"
+        : explicitFormula.operator === "multiply"
+        ? "multiplication"
+        : "mixed";
+    const multipleMessage =
+      explicitFormula.reason === "multiple_subtractions"
+        ? "Only one explicit X minus Y formula is supported in this slice."
+        : explicitFormula.reason === "multiple_divisions"
+        ? "Only one explicit X divided by Y formula is supported in this slice."
+        : explicitFormula.reason === "multiple_additions"
+        ? "Only one explicit X plus Y formula is supported in this slice."
+        : explicitFormula.reason === "multiple_multiplications"
+        ? "Only one explicit X multiplied by Y formula is supported in this slice."
+        : null;
     missing.push({
       id:
-        explicitSubtraction.reason === "multiple_subtractions"
+        explicitFormula.reason === "multiple_subtractions"
           ? "unsupported-multiple-derived-subtractions"
-          : `missing-derived-${explicitSubtraction.reason.replace(/_/g, "-")}`,
-      kind: "intent",
-      message:
-        explicitSubtraction.reason === "multiple_subtractions"
-          ? "Only one explicit X minus Y formula is supported in this slice."
-          : "Could not safely identify both operands for the explicit subtraction formula.",
-    });
-  } else if (hasDetectedSubtraction && !hasGroundedDerivedFormula) {
-    missing.push({
-      id: "missing-derived-subtraction-grounding",
-      kind: "column",
-      message:
-        "Could not safely bind the explicit subtraction formula to two grounded compatible base measures.",
-    });
-  }
-  if (explicitDivision.status === "unsupported") {
-    missing.push({
-      id:
-        explicitDivision.reason === "multiple_divisions"
+          : explicitFormula.reason === "multiple_divisions"
           ? "unsupported-multiple-derived-divisions"
-          : explicitDivision.reason === "mixed_formulas"
+          : explicitFormula.reason === "multiple_additions"
+          ? "unsupported-multiple-derived-additions"
+          : explicitFormula.reason === "multiple_multiplications"
+          ? "unsupported-multiple-derived-multiplications"
+          : explicitFormula.reason === "mixed_formulas"
           ? "unsupported-mixed-derived-formulas"
-          : `missing-derived-division-${explicitDivision.reason.replace(/_/g, "-")}`,
+          : `missing-derived-${operatorName}-${explicitFormula.reason.replace(/_/g, "-")}`,
       kind: "intent",
       message:
-        explicitDivision.reason === "multiple_divisions"
-          ? "Only one explicit X divided by Y formula is supported in this slice."
-          : explicitDivision.reason === "mixed_formulas"
-          ? "Mixed subtraction and division formulas are not supported in this slice."
-          : "Could not safely identify both operands for the explicit division formula.",
+        multipleMessage ||
+        (explicitFormula.reason === "mixed_formulas"
+          ? "Mixed derived-measure formulas are not supported in this slice."
+          : `Could not safely identify both operands for the explicit ${operatorName} formula.`),
     });
-  } else if (hasDetectedDivision && !hasGroundedDerivedFormula) {
+  } else if (explicitFormula.status === "detected" && !hasGroundedDerivedFormula) {
+    const operatorName =
+      explicitFormula.operator === "subtract"
+        ? "subtraction"
+        : explicitFormula.operator === "divide"
+        ? "division"
+        : explicitFormula.operator === "add"
+        ? "addition"
+        : "multiplication";
     missing.push({
-      id: "missing-derived-division-grounding",
+      id: `missing-derived-${operatorName}-grounding`,
       kind: "column",
       message:
-        "Could not safely bind the explicit division formula to two grounded compatible base measures.",
+        `Could not safely bind the explicit ${operatorName} formula to two grounded compatible base measures.`,
     });
   }
   if (
-    hasDetectedSubtraction &&
-    explicitSubtraction.groupingPhrase &&
+    explicitFormula.status === "detected" &&
+    explicitFormula.groupingPhrase &&
     groupings.length === 0
   ) {
+    const operatorName =
+      explicitFormula.operator === "subtract"
+        ? "subtraction"
+        : explicitFormula.operator === "divide"
+        ? "division"
+        : explicitFormula.operator === "add"
+        ? "addition"
+        : "multiplication";
     missing.push({
-      id: "missing-derived-subtraction-grouping",
+      id: `missing-derived-${operatorName}-grouping`,
       kind: "column",
-      message: "Could not safely bind the grouping for the explicit subtraction formula.",
-    });
-  }
-  if (
-    hasDetectedDivision &&
-    explicitDivision.groupingPhrase &&
-    groupings.length === 0
-  ) {
-    missing.push({
-      id: "missing-derived-division-grouping",
-      kind: "column",
-      message: "Could not safely bind the grouping for the explicit division formula.",
+      message: `Could not safely bind the grouping for the explicit ${operatorName} formula.`,
     });
   }
   if (thresholdMatchCount > 1) {

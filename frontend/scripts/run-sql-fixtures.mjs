@@ -207,6 +207,11 @@ const fixtures = [
     exportName: "runExplicitDivisionGroundingFixtures",
   },
   {
+    label: "Explicit add and multiply grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/explicitAddMultiplyGrounding.test.ts",
+    exportName: "runExplicitAddMultiplyGroundingFixtures",
+  },
+  {
     label: "Business SQL query planner",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
     exportName: "runBusinessSqlQueryPlannerFixtures",
