@@ -188,7 +188,7 @@ const derivedMeasureExpression = (
   derivedMeasure: BusinessSqlDerivedMeasure,
   measures: readonly BusinessSqlMeasure[],
 ): string | null => {
-  if (derivedMeasure.operator !== "subtract") return null;
+  if (derivedMeasure.operator !== "subtract" && derivedMeasure.operator !== "divide") return null;
   const byId = measuresById(measures);
   const leftMeasure = byId.get(derivedMeasure.leftMeasureId);
   const rightMeasure = byId.get(derivedMeasure.rightMeasureId);
@@ -196,6 +196,15 @@ const derivedMeasureExpression = (
   const leftExpression = metricExpression(leftMeasure);
   const rightExpression = metricExpression(rightMeasure);
   if (!leftExpression || !rightExpression) return null;
+  if (derivedMeasure.operator === "divide") {
+    if (derivedMeasure.divisionPolicy?.zeroDenominator !== "null") return null;
+    return [
+      "CASE",
+      `    WHEN (${rightExpression}) = 0 THEN NULL`,
+      `    ELSE (${leftExpression}) / (${rightExpression})`,
+      "  END",
+    ].join("\n");
+  }
   return `(${leftExpression}) - (${rightExpression})`;
 };
 
@@ -476,13 +485,13 @@ export function renderBusinessSqlFromRenderability({
 
   const normalizedPlan = normalizeMetricAndMeasures(plan);
   const derivedMeasure = normalizedPlan.derivedMeasures[0] || null;
-  const rendersDerivedSubtract = Boolean(derivedMeasure);
+  const rendersDerivedMeasure = Boolean(derivedMeasure);
   const measure = normalizedPlan.measures[0];
   if (
     !measure ||
     plan.kind === "count_distinct_entity" ||
-    (!rendersDerivedSubtract && normalizedPlan.measures.length !== 1) ||
-    (rendersDerivedSubtract && normalizedPlan.derivedMeasures.length !== 1)
+    (!rendersDerivedMeasure && normalizedPlan.measures.length !== 1) ||
+    (rendersDerivedMeasure && normalizedPlan.derivedMeasures.length !== 1)
   ) {
     return refused({
       integrated,

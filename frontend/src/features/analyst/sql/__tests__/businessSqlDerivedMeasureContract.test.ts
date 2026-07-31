@@ -224,6 +224,8 @@ const subtractPlan = ({
   right = tableMeasure({ table, field: "cost", label: "Total cost" }),
   derivedAlias = "revenue_minus_cost",
   derivedLabel = "Revenue minus cost",
+  derivedOperator = "subtract",
+  divisionPolicy,
   orderByMeasure = null,
   rowLimit = null,
   havingMeasure = null,
@@ -235,14 +237,18 @@ const subtractPlan = ({
   right?: BusinessSqlMeasure;
   derivedAlias?: string;
   derivedLabel?: string;
+  derivedOperator?: BusinessSqlDerivedMeasureOperator;
+  divisionPolicy?: BusinessSqlDerivedMeasure["divisionPolicy"];
   orderByMeasure?: BusinessSqlMeasure | null;
   rowLimit?: number | null;
   havingMeasure?: BusinessSqlMeasure | null;
   join?: boolean;
 } = {}): BusinessSqlQueryPlan => {
   const derivedMeasure = derived({
+    operator: derivedOperator,
     leftMeasureId: left.measureId,
     rightMeasureId: right.measureId,
+    divisionPolicy,
     sqlAlias: derivedAlias,
     label: derivedLabel,
   });
@@ -560,18 +566,37 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "non-subtract derived operators remain renderer incapable",
+    name: "one valid divide derived measure is structurally ready and renderer capable",
     assert: () => {
-      const operators: BusinessSqlDerivedMeasureOperator[] = ["add", "multiply", "divide"];
+      const plan = planWith({
+        measures: [leftMeasure, countMeasure],
+        derivedMeasures: [
+          derived({
+            operator: "divide",
+            rightMeasureId: countMeasure.measureId,
+            divisionPolicy: { zeroDenominator: "null" },
+          }),
+        ],
+      });
+      const readiness = readinessFor(plan);
+      const capability = evaluateBusinessSqlRendererCapability(plan);
+      return [
+        ...(readiness.status === "ready" ? [] : ["Expected structurally ready divide plan."]),
+        ...(capability.status === "capable" &&
+        !capability.reasonCodes.includes("derived_measure_operator_rendering_not_supported")
+          ? []
+          : ["Expected null-on-zero divide derived measure to be renderer capable."]),
+      ];
+    },
+  },
+  {
+    name: "add and multiply derived operators remain renderer incapable",
+    assert: () => {
+      const operators: BusinessSqlDerivedMeasureOperator[] = ["add", "multiply"];
       return operators.flatMap((operator) => {
         const capability = evaluateBusinessSqlRendererCapability(
           planWith({
-            derivedMeasures: [
-              derived({
-                operator,
-                divisionPolicy: operator === "divide" ? { zeroDenominator: "null" } : undefined,
-              }),
-            ],
+            derivedMeasures: [derived({ operator })],
           }),
         );
         return capability.status === "incapable" &&
@@ -632,6 +657,51 @@ const fixtures: Fixture[] = [
     },
   },
   {
+    name: "direct rendering and preview of valid divide derived measure plan produce SQL without insert or run",
+    assert: () => {
+      const left = tableMeasure({ table: "orders", field: "revenue", label: "Total revenue" });
+      const right = tableMeasure({
+        table: "orders",
+        field: "order_id",
+        label: "Order count",
+        kind: "count_entities",
+        fieldInferredType: "text",
+      });
+      const plan = subtractPlan({
+        table: "orders",
+        groupingField: "channel",
+        left,
+        right,
+        derivedAlias: "revenue_per_order",
+        derivedLabel: "Revenue per order",
+        derivedOperator: "divide",
+        divisionPolicy: { zeroDenominator: "null" },
+      });
+      const rendered = renderBusinessSqlQueryPlan(plan);
+      const preview = createBusinessSqlRenderPreview(plan);
+      return [
+        ...(rendered.rendered && rendered.sql?.includes('AS "revenue_per_order"')
+          ? []
+          : ["Divide derived measure plan must render SQL in PS-3d."]),
+        ...(rendered.sql?.includes("WHEN (COUNT(") && rendered.sql.includes("THEN NULL")
+          ? []
+          : ["Divide rendering must guard zero denominators with NULL policy."]),
+        ...(rendered.sql?.includes('(SUM("orders"."revenue")) / (COUNT("orders"."order_id"))')
+          ? []
+          : ["Divide rendering must use aggregate measure expressions."]),
+        ...(rendered.inserted === false && rendered.ranQuery === false
+          ? []
+          : ["Derived divide render must not insert or run."]),
+        ...(preview.sql &&
+        preview.actions.canCopySql &&
+        !preview.actions.canInsertSql &&
+        !preview.actions.canRunSql
+          ? []
+          : ["Derived divide preview must expose copy-only SQL review actions."]),
+      ];
+    },
+  },
+  {
     name: "unsupported derived operators produce no SQL and no preview actions",
     assert: () => {
       const plan = planWith({
@@ -649,6 +719,29 @@ const fixtures: Fixture[] = [
         !preview.actions.canRunSql
           ? []
           : ["Unsupported derived operator preview must expose no SQL actions."]),
+      ];
+    },
+  },
+  {
+    name: "divide without policy produces no SQL and no preview actions",
+    assert: () => {
+      const plan = subtractPlan({
+        derivedOperator: "divide",
+        divisionPolicy: undefined,
+        derivedAlias: "unsafe_divide",
+      });
+      const rendered = renderBusinessSqlQueryPlan(plan);
+      const preview = createBusinessSqlRenderPreview(plan);
+      return [
+        ...(!rendered.rendered && rendered.sql === null
+          ? []
+          : ["Divide without policy must not render SQL."]),
+        ...(preview.sql === null &&
+        !preview.actions.canCopySql &&
+        !preview.actions.canInsertSql &&
+        !preview.actions.canRunSql
+          ? []
+          : ["Divide without policy preview must expose no SQL actions."]),
       ];
     },
   },
@@ -695,6 +788,56 @@ const fixtures: Fixture[] = [
           : ["Expected grouping left operand right operand derived projection order."]),
         ...(result.sql?.includes('("total_revenue")') || result.sql?.includes("Revenue minus cost")
           ? ["Derived expression must not use aliases or labels."]
+          : []),
+      ];
+    },
+  },
+  {
+    name: "deterministic SUM divided by COUNT derived SQL projects grouping operands and guarded derived measure in order",
+    assert: () => {
+      const left = tableMeasure({ table: "orders", field: "revenue", label: "Total revenue" });
+      const right = tableMeasure({
+        table: "orders",
+        field: "order_id",
+        label: "Order count",
+        kind: "count_entities",
+        fieldInferredType: "text",
+      });
+      const result = renderBusinessSqlQueryPlan(
+        subtractPlan({
+          table: "orders",
+          groupingField: "channel",
+          left,
+          right,
+          derivedAlias: "revenue_per_order",
+          derivedLabel: "Revenue per order",
+          derivedOperator: "divide",
+          divisionPolicy: { zeroDenominator: "null" },
+        }),
+      );
+      const expectedSql = [
+        "SELECT",
+        '  "orders"."channel" AS "channel",',
+        '  SUM("orders"."revenue") AS "total_revenue",',
+        '  COUNT("orders"."order_id") AS "order_count",',
+        "  CASE",
+        '    WHEN (COUNT("orders"."order_id")) = 0 THEN NULL',
+        '    ELSE (SUM("orders"."revenue")) / (COUNT("orders"."order_id"))',
+        '  END AS "revenue_per_order"',
+        'FROM "orders"',
+        'GROUP BY "orders"."channel";',
+      ].join("\n");
+      return [
+        ...(result.sql === expectedSql
+          ? []
+          : ["Expected exact deterministic SUM divided by COUNT SQL."]),
+        ...(result.sql && result.sql.indexOf('"channel"') < result.sql.indexOf('"total_revenue"') &&
+        result.sql.indexOf('"total_revenue"') < result.sql.indexOf('"order_count"') &&
+        result.sql.indexOf('"order_count"') < result.sql.indexOf('"revenue_per_order"')
+          ? []
+          : ["Expected grouping numerator denominator derived projection order."]),
+        ...(result.sql?.includes('("revenue_per_order")') || result.sql?.includes("Revenue per order")
+          ? ["Derived division expression must not use aliases or labels."]
           : []),
       ];
     },
@@ -815,6 +958,74 @@ const fixtures: Fixture[] = [
         return result.rendered && result.sql?.includes(` AS "${plan.derivedMeasures[0].sqlAlias}"`)
           ? []
           : [`Expected subtract rendering for ${plan.id}.`];
+      });
+    },
+  },
+  {
+    name: "cross-domain divide proof fixtures use the same renderer path",
+    assert: () => {
+      const cases = [
+        subtractPlan({
+          table: "orders",
+          groupingField: "channel",
+          left: tableMeasure({ table: "orders", field: "revenue", label: "Total revenue" }),
+          right: tableMeasure({
+            table: "orders",
+            field: "order_id",
+            label: "Order count",
+            kind: "count_entities",
+            fieldInferredType: "text",
+          }),
+          derivedAlias: "revenue_per_order",
+          derivedOperator: "divide",
+          divisionPolicy: { zeroDenominator: "null" },
+        }),
+        subtractPlan({
+          table: "manufacturing",
+          groupingField: "production_line",
+          left: tableMeasure({ table: "manufacturing", field: "units_produced", label: "Total units produced" }),
+          right: tableMeasure({
+            table: "manufacturing",
+            field: "labor_hours",
+            label: "Total labor hours",
+          }),
+          derivedAlias: "units_per_labor_hour",
+          derivedOperator: "divide",
+          divisionPolicy: { zeroDenominator: "null" },
+        }),
+        subtractPlan({
+          table: "utilities",
+          groupingField: "site",
+          left: tableMeasure({ table: "utilities", field: "kilowatt_hours", label: "Total kilowatt hours" }),
+          right: tableMeasure({ table: "utilities", field: "operating_days", label: "Total operating days" }),
+          derivedAlias: "kwh_per_day",
+          derivedOperator: "divide",
+          divisionPolicy: { zeroDenominator: "null" },
+        }),
+        subtractPlan({
+          table: "projects",
+          groupingField: "portfolio",
+          left: tableMeasure({ table: "projects", field: "budget", label: "Total budget" }),
+          right: tableMeasure({
+            table: "projects",
+            field: "project_id",
+            label: "Project count",
+            kind: "count_entities",
+            fieldInferredType: "text",
+          }),
+          derivedAlias: "budget_per_project",
+          derivedOperator: "divide",
+          divisionPolicy: { zeroDenominator: "null" },
+        }),
+      ];
+      return cases.flatMap((plan) => {
+        const result = renderBusinessSqlQueryPlan(plan);
+        return result.rendered &&
+          result.sql?.includes("CASE") &&
+          result.sql.includes("THEN NULL") &&
+          result.sql.includes(` AS "${plan.derivedMeasures[0].sqlAlias}"`)
+          ? []
+          : [`Expected guarded divide rendering for ${plan.id}.`];
       });
     },
   },

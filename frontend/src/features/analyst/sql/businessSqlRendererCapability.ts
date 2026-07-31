@@ -49,7 +49,7 @@ export function evaluateBusinessSqlRendererCapability(
       Array.from(operandIds).every((measureId) => baseMeasureIds.has(measureId));
 
     if (compatibility.compatible && operandsExactlyMatchBaseMeasures) {
-      if (derivedMeasure.operator !== "subtract") {
+      if (derivedMeasure.operator !== "subtract" && derivedMeasure.operator !== "divide") {
         reasonCodes.push("derived_measure_operator_rendering_not_supported");
       }
     } else {
