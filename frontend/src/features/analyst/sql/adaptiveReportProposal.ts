@@ -73,9 +73,12 @@ export type ProposedAggregateResultCondition = {
 
 export type ProposedDerivedMeasure = {
   id: string;
-  operator: "subtract";
+  operator: "subtract" | "divide";
   leftMetricId: string;
   rightMetricId: string;
+  divisionPolicy?: {
+    zeroDenominator: "null";
+  };
   sqlAlias: string;
   label?: string;
   evidence?: string;
@@ -570,7 +573,7 @@ const inferMetricKind = (metric: string): ProposedMetric["kind"] => {
   if (text.startsWith("maximum ") || text.startsWith("max ")) return "maximum";
   if (text.startsWith("sum ") || text.startsWith("total ")) return "sum";
   if (text.startsWith("distinct count ") || text.startsWith("count distinct ")) return "count_distinct";
-  if (text.startsWith("count ")) return "count_entities";
+  if (text.startsWith("count ") || text.endsWith(" count")) return "count_entities";
   return "metric_column";
 };
 
@@ -578,8 +581,20 @@ const createProposedDerivedMeasureId = ({
   operator,
   leftMetricId,
   rightMetricId,
-}: Pick<ProposedDerivedMeasure, "operator" | "leftMetricId" | "rightMetricId">): string =>
-  `derived-measure:${operator}:${compactId(leftMetricId)}:${compactId(rightMetricId)}`;
+  divisionPolicy,
+}: Pick<
+  ProposedDerivedMeasure,
+  "operator" | "leftMetricId" | "rightMetricId" | "divisionPolicy"
+>): string =>
+  [
+    "derived-measure",
+    operator,
+    compactId(leftMetricId),
+    compactId(rightMetricId),
+    operator === "divide" ? divisionPolicy?.zeroDenominator || "missing-policy" : null,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(":");
 
 type ExplicitSubtractionFormula =
   | {
@@ -588,6 +603,26 @@ type ExplicitSubtractionFormula =
   | {
       status: "unsupported";
       reason: "multiple_subtractions" | "missing_left_operand" | "missing_right_operand";
+    }
+  | {
+      status: "detected";
+      leftPhrase: string;
+      rightPhrase: string;
+      groupingPhrase: string | null;
+      evidence: string;
+    };
+
+type ExplicitDivisionFormula =
+  | {
+      status: "none";
+    }
+  | {
+      status: "unsupported";
+      reason:
+        | "multiple_divisions"
+        | "mixed_formulas"
+        | "missing_left_operand"
+        | "missing_right_operand";
     }
   | {
       status: "detected";
@@ -637,6 +672,42 @@ export const detectExplicitSubtractionFormula = (
     rightPhrase: right,
     groupingPhrase: groupingPhrase || null,
     evidence: `${left} minus ${right}`,
+  };
+};
+
+export const detectExplicitDivisionFormula = (
+  prompt: string,
+): ExplicitDivisionFormula => {
+  const text = normalize(prompt);
+  const matches = [...text.matchAll(/\bdivided\s+by\b/g)];
+  if (matches.length === 0) return { status: "none" };
+  if (matches.length > 1) {
+    return { status: "unsupported", reason: "multiple_divisions" };
+  }
+  if (/\bminus\b/.test(text)) {
+    return { status: "unsupported", reason: "mixed_formulas" };
+  }
+
+  const dividedByIndex = matches[0].index || 0;
+  const left = trimFormulaOperand(text.slice(0, dividedByIndex));
+  const rightAndGrouping = text.slice(dividedByIndex + matches[0][0].length).trim();
+  const groupingMatch = rightAndGrouping.match(/\bby\s+(.+)$/);
+  const right = trimFormulaOperand(
+    groupingMatch
+      ? rightAndGrouping.slice(0, groupingMatch.index).trim()
+      : rightAndGrouping,
+  );
+  const groupingPhrase = groupingMatch ? trimFormulaOperand(groupingMatch[1]) : null;
+
+  if (!left) return { status: "unsupported", reason: "missing_left_operand" };
+  if (!right) return { status: "unsupported", reason: "missing_right_operand" };
+
+  return {
+    status: "detected",
+    leftPhrase: left,
+    rightPhrase: right,
+    groupingPhrase: groupingPhrase || null,
+    evidence: `${left} divided by ${right}`,
   };
 };
 
@@ -887,8 +958,13 @@ const proposedMetricFromPhrase = (
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
   strictNameMatch = false,
+  requireGroundedCount = false,
 ): ProposedMetric => {
-  const metricName = phrase.replace(/^(count|sum|total|avg|average|minimum|min|maximum|max)_?/, "");
+  const normalizedPhrase = normalize(phrase);
+  const suffixCountMatch = normalizedPhrase.match(/^(.+?)\s+count$/);
+  const metricName = suffixCountMatch
+    ? suffixCountMatch[1]
+    : phrase.replace(/^(count|sum|total|avg|average|minimum|min|maximum|max)_?/, "");
   const kind = inferMetricKind(phrase);
   const column = strictNameMatch
     ? findColumnByName(metricName, worksheets)
@@ -899,8 +975,15 @@ const proposedMetricFromPhrase = (
         "countable_entity",
         "identifier",
       ]);
+  const countIdentifierConfidence =
+    suffixCountMatch &&
+    column &&
+    normalize(column.column.name) === `${singularize(metricName)} id`
+      ? "high"
+      : column?.confidence;
   const isSupportedExplicitMeasure =
-    kind !== "metric_column" && (kind === "count_entities" || Boolean(column));
+    kind !== "metric_column" &&
+    (kind === "count_entities" ? !requireGroundedCount || Boolean(column) : Boolean(column));
 
   return {
     id: `metric:${compactId(phrase)}`,
@@ -913,7 +996,7 @@ const proposedMetricFromPhrase = (
     inferredType: column?.column.inferred_type,
     synthesized: kind === "count_entities" && !column,
     confidence: isSupportedExplicitMeasure
-      ? column?.confidence || (kind === "count_entities" ? "medium" : "low")
+      ? countIdentifierConfidence || (kind === "count_entities" ? "medium" : "low")
       : "low",
   };
 };
@@ -925,6 +1008,26 @@ const proposeMetrics = (
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedMetric[] => {
   const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
+  const explicitDivision = detectExplicitDivisionFormula(prompt);
+  if (explicitDivision.status === "detected") {
+    return [
+      proposedMetricFromPhrase(
+        explicitDivision.leftPhrase,
+        worksheets,
+        semanticColumns,
+        true,
+        true,
+      ),
+      proposedMetricFromPhrase(
+        explicitDivision.rightPhrase,
+        worksheets,
+        semanticColumns,
+        true,
+        true,
+      ),
+    ];
+  }
+  if (explicitDivision.status === "unsupported") return [];
   if (explicitSubtraction.status === "detected") {
     return [
       proposedMetricFromPhrase(explicitSubtraction.leftPhrase, worksheets, semanticColumns, true),
@@ -1017,13 +1120,17 @@ const proposeGroupings = (
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedGrouping[] => {
   const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
+  const explicitDivision = detectExplicitDivisionFormula(prompt);
   const groupingConcepts =
-    explicitSubtraction.status === "detected" && explicitSubtraction.groupingPhrase
+    explicitDivision.status === "detected" && explicitDivision.groupingPhrase
+      ? [explicitDivision.groupingPhrase]
+      : explicitSubtraction.status === "detected" && explicitSubtraction.groupingPhrase
       ? [explicitSubtraction.groupingPhrase]
       : intent.grouping.length > 0
       ? intent.grouping
       : groupingConceptsFromPromptSubject(prompt);
-  const strictFormulaGrouping = explicitSubtraction.status === "detected";
+  const strictFormulaGrouping =
+    explicitSubtraction.status === "detected" || explicitDivision.status === "detected";
 
   return Array.from(new Set(groupingConcepts)).map((grouping) => {
     const column = strictFormulaGrouping
@@ -1050,7 +1157,14 @@ const proposeDerivedMeasures = (
   metrics: readonly ProposedMetric[],
 ): ProposedDerivedMeasure[] => {
   const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
-  if (explicitSubtraction.status !== "detected") return [];
+  const explicitDivision = detectExplicitDivisionFormula(prompt);
+  const explicitFormula =
+    explicitDivision.status === "detected"
+      ? explicitDivision
+      : explicitSubtraction.status === "detected"
+      ? explicitSubtraction
+      : null;
+  if (!explicitFormula) return [];
   if (metrics.length !== 2) return [];
 
   const [leftMetric, rightMetric] = metrics;
@@ -1064,18 +1178,24 @@ const proposeDerivedMeasures = (
   if (!operandsAreGrounded) return [];
 
   const seed = {
-    operator: "subtract" as const,
+    operator: explicitDivision.status === "detected" ? "divide" as const : "subtract" as const,
     leftMetricId: leftMetric.id,
     rightMetricId: rightMetric.id,
+    ...(explicitDivision.status === "detected"
+      ? { divisionPolicy: { zeroDenominator: "null" as const } }
+      : {}),
   };
-  const label = `${leftMetric.label} minus ${rightMetric.label}`;
+  const label =
+    explicitDivision.status === "detected"
+      ? `${leftMetric.label} divided by ${rightMetric.label}`
+      : `${leftMetric.label} minus ${rightMetric.label}`;
   return [
     {
       ...seed,
       id: createProposedDerivedMeasureId(seed),
       sqlAlias: createBusinessSqlMeasureAlias(label),
       label,
-      evidence: explicitSubtraction.evidence,
+      evidence: explicitFormula.evidence,
       confidence:
         leftMetric.confidence === "high" && rightMetric.confidence === "high"
           ? "high"
@@ -1349,8 +1469,10 @@ const createMissingRequirements = ({
   const missing: MissingRequirement[] = [];
   const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
   const explicitSubtraction = detectExplicitSubtractionFormula(prompt);
+  const explicitDivision = detectExplicitDivisionFormula(prompt);
   const hasDetectedSubtraction = explicitSubtraction.status === "detected";
-  const hasGroundedDerivedSubtraction = derivedMeasures.length === 1;
+  const hasDetectedDivision = explicitDivision.status === "detected";
+  const hasGroundedDerivedFormula = derivedMeasures.length === 1;
   if (!prompt.trim()) {
     missing.push({
       id: "missing-prompt",
@@ -1362,7 +1484,7 @@ const createMissingRequirements = ({
     intent.primaryIntent === "unknown" &&
     intent.alternates.length === 0 &&
     !hasGroundedAggregateThreshold &&
-    !hasGroundedDerivedSubtraction
+    !hasGroundedDerivedFormula
   ) {
     missing.push({
       id: "missing-intent",
@@ -1378,7 +1500,7 @@ const createMissingRequirements = ({
     });
   }
   for (const entity of entities.filter(
-    (entity) => !entity.tableName && !hasGroundedAggregateThreshold && !hasGroundedDerivedSubtraction,
+    (entity) => !entity.tableName && !hasGroundedAggregateThreshold && !hasGroundedDerivedFormula,
   )) {
     missing.push({
       id: `missing-entity:${compactId(entity.requestedName)}`,
@@ -1412,12 +1534,36 @@ const createMissingRequirements = ({
           ? "Only one explicit X minus Y formula is supported in this slice."
           : "Could not safely identify both operands for the explicit subtraction formula.",
     });
-  } else if (hasDetectedSubtraction && !hasGroundedDerivedSubtraction) {
+  } else if (hasDetectedSubtraction && !hasGroundedDerivedFormula) {
     missing.push({
       id: "missing-derived-subtraction-grounding",
       kind: "column",
       message:
         "Could not safely bind the explicit subtraction formula to two grounded compatible base measures.",
+    });
+  }
+  if (explicitDivision.status === "unsupported") {
+    missing.push({
+      id:
+        explicitDivision.reason === "multiple_divisions"
+          ? "unsupported-multiple-derived-divisions"
+          : explicitDivision.reason === "mixed_formulas"
+          ? "unsupported-mixed-derived-formulas"
+          : `missing-derived-division-${explicitDivision.reason.replace(/_/g, "-")}`,
+      kind: "intent",
+      message:
+        explicitDivision.reason === "multiple_divisions"
+          ? "Only one explicit X divided by Y formula is supported in this slice."
+          : explicitDivision.reason === "mixed_formulas"
+          ? "Mixed subtraction and division formulas are not supported in this slice."
+          : "Could not safely identify both operands for the explicit division formula.",
+    });
+  } else if (hasDetectedDivision && !hasGroundedDerivedFormula) {
+    missing.push({
+      id: "missing-derived-division-grounding",
+      kind: "column",
+      message:
+        "Could not safely bind the explicit division formula to two grounded compatible base measures.",
     });
   }
   if (
@@ -1429,6 +1575,17 @@ const createMissingRequirements = ({
       id: "missing-derived-subtraction-grouping",
       kind: "column",
       message: "Could not safely bind the grouping for the explicit subtraction formula.",
+    });
+  }
+  if (
+    hasDetectedDivision &&
+    explicitDivision.groupingPhrase &&
+    groupings.length === 0
+  ) {
+    missing.push({
+      id: "missing-derived-division-grouping",
+      kind: "column",
+      message: "Could not safely bind the grouping for the explicit division formula.",
     });
   }
   if (thresholdMatchCount > 1) {

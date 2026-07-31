@@ -202,6 +202,11 @@ const fixtures = [
     exportName: "runExplicitSubtractionGroundingFixtures",
   },
   {
+    label: "Explicit division grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/explicitDivisionGrounding.test.ts",
+    exportName: "runExplicitDivisionGroundingFixtures",
+  },
+  {
     label: "Business SQL query planner",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
     exportName: "runBusinessSqlQueryPlannerFixtures",

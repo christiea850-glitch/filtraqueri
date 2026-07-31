@@ -142,12 +142,12 @@ const requiredEntityTableMissing = (
     proposal.metrics.length === 1 &&
     proposal.groupings.length === 1 &&
     Boolean(proposal.metrics[0]?.tableName && proposal.groupings[0]?.tableName);
-  const hasGroundedDerivedSubtraction =
+  const hasGroundedDerivedMeasure =
     (proposal.derivedMeasures || []).length === 1 &&
     proposal.metrics.length === 2 &&
     proposal.groupings.length <= 1 &&
     proposal.metrics.every((metric) => metric.tableName);
-  if (hasGroundedAggregateThreshold || hasGroundedDerivedSubtraction) return false;
+  if (hasGroundedAggregateThreshold || hasGroundedDerivedMeasure) return false;
   return proposal.entities.length === 0 || proposal.entities.some((entity) => !entity.tableName);
 };
 
@@ -463,6 +463,7 @@ const mapDerivedMeasures = (
       operator: proposed.operator,
       leftMeasureId: leftMeasure.measureId,
       rightMeasureId: rightMeasure.measureId,
+      divisionPolicy: proposed.divisionPolicy,
     };
     derivedMeasures.push({
       ...seed,
@@ -695,14 +696,14 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
   const hasGroundedAggregateThreshold =
     aggregateConditionResult.aggregateResultConditions.length === 1 &&
     aggregateConditionResult.issues.length === 0;
-  const hasGroundedDerivedSubtraction =
+  const hasGroundedDerivedMeasure =
     derivedMeasureResult.derivedMeasures.length === 1 &&
     derivedMeasureResult.issues.length === 0;
   const confidenceIssues =
     proposal.support === "needs_review" ||
     (proposal.confidence !== "high" &&
       !hasGroundedAggregateThreshold &&
-      !hasGroundedDerivedSubtraction)
+      !hasGroundedDerivedMeasure)
       ? [
           issue(
             "low_confidence",
