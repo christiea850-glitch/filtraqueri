@@ -1,4 +1,5 @@
 import {
+  getBusinessSqlAggregateResultConditionTarget,
   normalizeMetricAndMeasures,
   type BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
@@ -9,8 +10,11 @@ export type BusinessSqlRendererCapabilityStatus = "capable" | "incapable";
 export type BusinessSqlRendererIncapabilityReason =
   | "multiple_measures_not_supported"
   | "aggregate_condition_multiple_not_supported"
+  | "derived_measure_order_by_rendering_not_supported"
+  | "derived_measure_aggregate_condition_rendering_not_supported"
   | "derived_measure_operator_rendering_not_supported"
   | "derived_measures_multiple_not_supported"
+  | "derived_measure_division_policy_missing"
   | "derived_measure_operand_mismatch"
   | "unrecognized_plan_shape";
 
@@ -59,6 +63,8 @@ export function evaluateBusinessSqlRendererCapability(
       reasonCodes.push("derived_measure_operator_rendering_not_supported");
     } else if (compatibility.compatible && operandsExactlyMatchBaseMeasures) {
       // Supported in the deterministic renderer.
+    } else if (compatibility.reasonCodes.includes("derived_measure_division_policy_missing")) {
+      reasonCodes.push("derived_measure_division_policy_missing");
     } else {
       reasonCodes.push("derived_measure_operand_mismatch");
     }
@@ -72,6 +78,19 @@ export function evaluateBusinessSqlRendererCapability(
 
   if (aggregateResultConditionCount > 1) {
     reasonCodes.push("aggregate_condition_multiple_not_supported");
+  }
+
+  if ((normalized.orderBy || []).some((sort) => sort.target.kind === "derived_measure")) {
+    reasonCodes.push("derived_measure_order_by_rendering_not_supported");
+  }
+
+  if (
+    (normalized.aggregateResultConditions || []).some(
+      (condition) =>
+        getBusinessSqlAggregateResultConditionTarget(condition)?.kind === "derived_measure",
+    )
+  ) {
+    reasonCodes.push("derived_measure_aggregate_condition_rendering_not_supported");
   }
 
   if (normalized.measures.length === 0 && !normalized.metric) {

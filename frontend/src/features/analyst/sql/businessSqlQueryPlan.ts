@@ -102,6 +102,13 @@ export type BusinessSqlSortTarget =
       table?: string;
       field: string;
       resolved?: boolean;
+    }
+  | {
+      kind: "derived_measure";
+      derivedMeasureId: string;
+      resolved?: boolean;
+      sqlAlias?: string;
+      label?: string;
     };
 
 export type BusinessSqlSort = {
@@ -129,12 +136,23 @@ export type BusinessSqlAggregateComparisonValue = {
   value: number;
 };
 
+export type BusinessSqlAggregateResultConditionTarget =
+  | {
+      kind: "measure";
+      measureId: string;
+    }
+  | {
+      kind: "derived_measure";
+      derivedMeasureId: string;
+    };
+
 export type BusinessSqlAggregateResultCondition = {
   conditionId: string;
-  measureId: string;
   operator: BusinessSqlAggregateComparisonOperator;
   comparisonValue: BusinessSqlAggregateComparisonValue;
   label?: string;
+  measureId?: string;
+  target?: BusinessSqlAggregateResultConditionTarget;
 };
 
 export type BusinessSqlGrouping = {
@@ -318,7 +336,9 @@ export const createBusinessSqlSortId = (
   const targetParts =
     target.kind === "measure"
       ? [target.kind, target.measureId]
-      : [target.kind, target.entity, target.table, target.field];
+      : target.kind === "derived_measure"
+        ? [target.kind, target.derivedMeasureId]
+        : [target.kind, target.entity, target.table, target.field];
 
   return stablePrimitiveId("business-sql-sort", [...targetParts, sort.direction]);
 };
@@ -330,15 +350,54 @@ export const createBusinessSqlRowLimitId = (
 export const createBusinessSqlAggregateResultConditionId = (
   condition: Pick<
     BusinessSqlAggregateResultCondition,
-    "measureId" | "operator" | "comparisonValue"
+    "operator" | "comparisonValue" | "target" | "measureId"
   >,
 ): string =>
   stablePrimitiveId("business-sql-aggregate-condition", [
-    condition.measureId,
+    ...businessSqlAggregateResultConditionTargetIdentity(condition),
     condition.operator,
     condition.comparisonValue.kind,
     condition.comparisonValue.value,
   ]);
+
+export const getBusinessSqlAggregateResultConditionTarget = (
+  condition: {
+    target?: {
+      kind?: string;
+      measureId?: string;
+      derivedMeasureId?: string;
+    } | null;
+    measureId?: string;
+  },
+): BusinessSqlAggregateResultConditionTarget | null => {
+  if (condition.target?.kind === "measure" && condition.target.measureId) {
+    return { kind: "measure", measureId: condition.target.measureId };
+  }
+  if (condition.target?.kind === "derived_measure" && condition.target.derivedMeasureId) {
+    return { kind: "derived_measure", derivedMeasureId: condition.target.derivedMeasureId };
+  }
+  if (condition.measureId) {
+    return { kind: "measure", measureId: condition.measureId };
+  }
+  return null;
+};
+
+export const businessSqlAggregateResultConditionTargetIdentity = (
+  condition: {
+    target?: {
+      kind?: string;
+      measureId?: string;
+      derivedMeasureId?: string;
+    } | null;
+    measureId?: string;
+  },
+): string[] => {
+  const target = getBusinessSqlAggregateResultConditionTarget(condition);
+  if (!target) return ["invalid"];
+  return target.kind === "derived_measure"
+    ? [target.kind, target.derivedMeasureId]
+    : [target.kind, target.measureId];
+};
 
 const slugifySqlAlias = (value: string): string => {
   const alias = value

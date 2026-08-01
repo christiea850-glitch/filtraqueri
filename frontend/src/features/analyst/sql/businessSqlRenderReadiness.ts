@@ -163,6 +163,16 @@ export function evaluateBusinessSqlRenderReadiness(
       if (!normalizedPlan.measures.some((measure) => measure.measureId === measureId)) {
         reasons.push(`Sort ${sort.label || sort.sortId} must reference a planned measure.`);
       }
+    } else if (sort.target.kind === "derived_measure") {
+      const derivedMeasureId = sort.target.derivedMeasureId;
+      const matchingDerivedMeasures = normalizedPlan.derivedMeasures.filter(
+        (derivedMeasure) => derivedMeasure.derivedMeasureId === derivedMeasureId,
+      );
+      if (!derivedMeasureId || matchingDerivedMeasures.length === 0) {
+        reasons.push(`Sort ${sort.label || sort.sortId} must reference a planned derived measure.`);
+      } else if (matchingDerivedMeasures.length > 1) {
+        reasons.push(`Sort ${sort.label || sort.sortId} references an ambiguous derived measure.`);
+      }
     } else if (!hasText(sort.target.field)) {
       reasons.push(`Sort ${sort.label || sort.sortId} must include a field.`);
     }
@@ -179,6 +189,7 @@ export function evaluateBusinessSqlRenderReadiness(
       evaluateBusinessSqlAggregateResultConditionCompatibility({
         condition,
         measures: normalizedPlan.measures,
+        derivedMeasures: normalizedPlan.derivedMeasures,
       }).reasonCodes,
   );
 

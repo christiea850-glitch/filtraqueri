@@ -1,13 +1,20 @@
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlAggregateResultCondition,
+  BusinessSqlDerivedMeasure,
   BusinessSqlMeasure,
   BusinessSqlMeasureKind,
 } from "./businessSqlQueryPlan";
+import {
+  getBusinessSqlAggregateResultConditionTarget,
+} from "./businessSqlQueryPlan";
+import { evaluateBusinessSqlDerivedMeasureCompatibility } from "./businessSqlDerivedMeasureCompatibility";
 
 export type BusinessSqlAggregateResultConditionCompatibilityReason =
   | "aggregate_condition_measure_unresolved"
+  | "aggregate_condition_derived_measure_unresolved"
   | "aggregate_condition_measure_not_aggregate"
+  | "aggregate_condition_target_invalid"
   | "aggregate_condition_operator_unsupported"
   | "aggregate_condition_value_invalid";
 
@@ -18,6 +25,11 @@ export type BusinessSqlAggregateResultConditionCompatibility = {
 
 type AggregateResultConditionLike = {
   measureId?: string;
+  target?: {
+    kind?: string;
+    measureId?: string;
+    derivedMeasureId?: string;
+  } | null;
   operator?: string;
   comparisonValue?: {
     kind?: string;
@@ -63,17 +75,49 @@ const isSupportedComparisonValue = (
 export function evaluateBusinessSqlAggregateResultConditionCompatibility({
   condition,
   measures,
+  derivedMeasures = [],
 }: {
   condition: AggregateResultConditionLike | BusinessSqlAggregateResultCondition;
-  measures: readonly Pick<BusinessSqlMeasure, "measureId" | "kind">[];
+  measures: readonly Pick<BusinessSqlMeasure, "measureId" | "kind" | "fieldInferredType">[];
+  derivedMeasures?: readonly BusinessSqlDerivedMeasure[];
 }): BusinessSqlAggregateResultConditionCompatibility {
   const reasonCodes: BusinessSqlAggregateResultConditionCompatibilityReason[] = [];
-  const measure = measures.find((candidate) => candidate.measureId === condition.measureId);
+  const hasLegacyMeasureId = Boolean(condition.measureId);
+  const hasTarget = Boolean(condition.target);
+  const target = getBusinessSqlAggregateResultConditionTarget(condition);
 
-  if (!measure) {
-    reasonCodes.push("aggregate_condition_measure_unresolved");
-  } else if (!isBusinessSqlAggregateCompatibleMeasureKind(measure.kind)) {
-    reasonCodes.push("aggregate_condition_measure_not_aggregate");
+  if (
+    !target ||
+    (hasLegacyMeasureId && hasTarget) ||
+    (target.kind === "measure" && !target.measureId) ||
+    (target.kind === "derived_measure" && !target.derivedMeasureId) ||
+    (target.kind !== "measure" && target.kind !== "derived_measure")
+  ) {
+    reasonCodes.push("aggregate_condition_target_invalid");
+  } else if (target.kind === "measure") {
+    const measure = measures.find((candidate) => candidate.measureId === target.measureId);
+
+    if (!measure) {
+      reasonCodes.push("aggregate_condition_measure_unresolved");
+    } else if (!isBusinessSqlAggregateCompatibleMeasureKind(measure.kind)) {
+      reasonCodes.push("aggregate_condition_measure_not_aggregate");
+    }
+  } else {
+    const matchingDerivedMeasures = derivedMeasures.filter(
+      (candidate) => candidate.derivedMeasureId === target.derivedMeasureId,
+    );
+    if (matchingDerivedMeasures.length !== 1) {
+      reasonCodes.push("aggregate_condition_derived_measure_unresolved");
+    } else {
+      const derivedCompatibility = evaluateBusinessSqlDerivedMeasureCompatibility({
+        derivedMeasure: matchingDerivedMeasures[0],
+        measures,
+        derivedMeasures,
+      });
+      if (!derivedCompatibility.compatible) {
+        reasonCodes.push("aggregate_condition_derived_measure_unresolved");
+      }
+    }
   }
 
   if (!isBusinessSqlAggregateComparisonOperator(condition.operator)) {
@@ -86,6 +130,6 @@ export function evaluateBusinessSqlAggregateResultConditionCompatibility({
 
   return {
     compatible: reasonCodes.length === 0,
-    reasonCodes,
+    reasonCodes: Array.from(new Set(reasonCodes)),
   };
 }

@@ -10,6 +10,7 @@ import type {
   BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
 import {
+  getBusinessSqlAggregateResultConditionTarget,
   normalizeMetricAndMeasures,
 } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
@@ -287,6 +288,7 @@ const renderOrderBy = (
     if (sort.target.measureId !== measure.measureId) return null;
     return `ORDER BY ${quoteIdentifier(measure.sqlAlias)} ${direction}`;
   }
+  if (sort.target.kind === "derived_measure") return null;
   const sortTarget = sort.target;
   const grouping = groupings.find(
     (candidate) =>
@@ -310,6 +312,7 @@ const renderOptionalOrderBy = (
     const measure = measures.find((candidate) => candidate.measureId === measureId);
     return measure ? `ORDER BY ${quoteIdentifier(measure.sqlAlias)} ${direction}` : null;
   }
+  if (sort.target.kind === "derived_measure") return null;
   const sortTarget = sort.target;
   const grouping = groupings.find(
     (candidate) =>
@@ -347,7 +350,9 @@ const renderHaving = (
   if (plan.aggregateResultConditions.length > 1) return null;
 
   const condition = plan.aggregateResultConditions[0];
-  const measure = measures.find((candidate) => candidate.measureId === condition.measureId);
+  const target = getBusinessSqlAggregateResultConditionTarget(condition);
+  if (target?.kind !== "measure") return null;
+  const measure = measures.find((candidate) => candidate.measureId === target.measureId);
   if (!measure) return null;
 
   const aggregateExpression = metricExpression(measure);

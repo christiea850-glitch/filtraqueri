@@ -26,6 +26,8 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "required_entity_missing"
   | "grouping_missing"
   | "sort_target_unresolved"
+  | "derived_sort_target_unresolved"
+  | "derived_sort_target_ambiguous"
   | "measure_field_type_incompatible"
   | "row_limit_invalid"
   | BusinessSqlDerivedMeasureCompatibilityReason
@@ -61,7 +63,24 @@ const unique = <T,>(values: readonly T[]): T[] => Array.from(new Set(values));
 const isSortTargetUnresolved = (target: BusinessSqlSortTarget): boolean =>
   target.resolved === false ||
   (target.kind === "measure" && !target.measureId) ||
-  (target.kind !== "measure" && !target.field);
+  (target.kind === "derived_measure" && !target.derivedMeasureId) ||
+  (target.kind !== "measure" && target.kind !== "derived_measure" && !target.field);
+
+const derivedSortTargetReasonCodes = (
+  target: BusinessSqlSortTarget,
+  derivedMeasures: readonly { derivedMeasureId: string }[],
+): Array<"derived_sort_target_unresolved" | "derived_sort_target_ambiguous"> => {
+  if (target.kind !== "derived_measure") return [];
+  if (target.resolved === false || !target.derivedMeasureId) {
+    return ["derived_sort_target_unresolved"];
+  }
+  const matchingCount = derivedMeasures.filter(
+    (derivedMeasure) => derivedMeasure.derivedMeasureId === target.derivedMeasureId,
+  ).length;
+  if (matchingCount === 0) return ["derived_sort_target_unresolved"];
+  if (matchingCount > 1) return ["derived_sort_target_ambiguous"];
+  return [];
+};
 
 export function evaluateBusinessSqlPlanReadiness(
   integrated: BusinessSqlQueryPlanJoinResolution,
@@ -90,9 +109,21 @@ export function evaluateBusinessSqlPlanReadiness(
     reviewReasons.push("The plan does not contain a supported metric.");
   }
 
-  if ((plan.orderBy || []).some((sort) => isSortTargetUnresolved(sort.target))) {
+  if (
+    (plan.orderBy || []).some(
+      (sort) => sort.target.kind !== "derived_measure" && isSortTargetUnresolved(sort.target),
+    )
+  ) {
     reasonCodes.push("sort_target_unresolved");
     reviewReasons.push("One or more planned sort targets are unresolved.");
+  }
+
+  const derivedSortReasonCodes = (plan.orderBy || []).flatMap((sort) =>
+    derivedSortTargetReasonCodes(sort.target, normalizedPlan.derivedMeasures || []),
+  );
+  if (derivedSortReasonCodes.length > 0) {
+    reasonCodes.push(...derivedSortReasonCodes);
+    reviewReasons.push("One or more planned derived-measure sort targets are unresolved.");
   }
 
   if (
@@ -123,6 +154,7 @@ export function evaluateBusinessSqlPlanReadiness(
       evaluateBusinessSqlAggregateResultConditionCompatibility({
         condition,
         measures: normalizedPlan.measures,
+        derivedMeasures: normalizedPlan.derivedMeasures,
       }).reasonCodes,
   );
 
@@ -133,6 +165,18 @@ export function evaluateBusinessSqlPlanReadiness(
       aggregateConditionReasonCodes.includes("aggregate_condition_measure_unresolved")
     ) {
       reviewReasons.push("One or more aggregate-result conditions reference an unresolved measure.");
+    }
+
+    if (
+      aggregateConditionReasonCodes.includes("aggregate_condition_derived_measure_unresolved")
+    ) {
+      reviewReasons.push("One or more aggregate-result conditions reference an unresolved derived measure.");
+    }
+
+    if (
+      aggregateConditionReasonCodes.includes("aggregate_condition_target_invalid")
+    ) {
+      reviewReasons.push("One or more aggregate-result conditions have an invalid target.");
     }
 
     if (
