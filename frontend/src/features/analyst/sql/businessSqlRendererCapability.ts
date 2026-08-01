@@ -4,6 +4,7 @@ import {
   type BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlDerivedMeasureCompatibility } from "./businessSqlDerivedMeasureCompatibility";
+import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "./businessSqlAggregateResultConditionCompatibility";
 
 export type BusinessSqlRendererCapabilityStatus = "capable" | "incapable";
 
@@ -97,13 +98,17 @@ export function evaluateBusinessSqlRendererCapability(
     }
   }
 
-  if (
-    (normalized.aggregateResultConditions || []).some(
-      (condition) =>
-        getBusinessSqlAggregateResultConditionTarget(condition)?.kind === "derived_measure",
-    )
-  ) {
-    reasonCodes.push("derived_measure_aggregate_condition_rendering_not_supported");
+  for (const condition of normalized.aggregateResultConditions || []) {
+    const target = getBusinessSqlAggregateResultConditionTarget(condition);
+    if (target?.kind !== "derived_measure") continue;
+    const compatibility = evaluateBusinessSqlAggregateResultConditionCompatibility({
+      condition,
+      measures: normalized.measures,
+      derivedMeasures,
+    });
+    if (!compatibility.compatible) {
+      reasonCodes.push("derived_measure_aggregate_condition_rendering_not_supported");
+    }
   }
 
   if (normalized.measures.length === 0 && !normalized.metric) {

@@ -357,17 +357,27 @@ const renderNumericComparisonValue = (value: number): string | null =>
 const renderHaving = (
   plan: BusinessSqlQueryPlan,
   measures: readonly BusinessSqlMeasure[],
+  derivedMeasures: readonly BusinessSqlDerivedMeasure[],
 ): string | null => {
   if (plan.aggregateResultConditions.length === 0) return null;
   if (plan.aggregateResultConditions.length > 1) return null;
 
   const condition = plan.aggregateResultConditions[0];
   const target = getBusinessSqlAggregateResultConditionTarget(condition);
-  if (target?.kind !== "measure") return null;
-  const measure = measures.find((candidate) => candidate.measureId === target.measureId);
-  if (!measure) return null;
-
-  const aggregateExpression = metricExpression(measure);
+  if (!target) return null;
+  const aggregateExpression = (() => {
+    if (target.kind === "measure") {
+      const measure = measures.find((candidate) => candidate.measureId === target.measureId);
+      return measure ? metricExpression(measure) : null;
+    }
+    const matchingDerivedMeasures = derivedMeasures.filter(
+      (candidate) => candidate.derivedMeasureId === target.derivedMeasureId,
+    );
+    const derivedMeasure = matchingDerivedMeasures.length === 1
+      ? matchingDerivedMeasures[0]
+      : null;
+    return derivedMeasure ? derivedMeasureExpression(derivedMeasure, measures) : null;
+  })();
   const operator = aggregateComparisonOperatorSql[condition.operator];
   const comparisonValue =
     condition.comparisonValue.kind === "number"
@@ -535,7 +545,11 @@ export function renderBusinessSqlFromRenderability({
   const groupings = groupingExpressions(plan);
   const fromAndJoins = renderFromAndJoins(integrated);
   const limit = renderLimit(plan);
-  const having = renderHaving(normalizedPlan, normalizedPlan.measures);
+  const having = renderHaving(
+    normalizedPlan,
+    normalizedPlan.measures,
+    normalizedPlan.derivedMeasures,
+  );
   const requiresHaving = normalizedPlan.aggregateResultConditions.length > 0;
   const operandMeasures = derivedMeasure
     ? derivedOperandMeasures(derivedMeasure, normalizedPlan.measures)

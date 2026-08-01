@@ -1,4 +1,4 @@
-/** PS-4b - derived-measure ORDER BY rendering fixtures. */
+/** PS-4c - derived-measure ORDER BY and HAVING rendering fixtures. */
 
 import {
   attachBusinessSqlJoinResolutionToPlan,
@@ -163,9 +163,10 @@ const primaryDerivedSortMeasure = derivedFor({
 
 const derivedConditionFor = (
   overrides: Partial<BusinessSqlAggregateResultCondition> = {},
+  derived: BusinessSqlDerivedMeasure = derivedMeasure,
 ): BusinessSqlAggregateResultCondition => {
   const seed = {
-    target: { kind: "derived_measure" as const, derivedMeasureId: derivedMeasure.derivedMeasureId },
+    target: { kind: "derived_measure" as const, derivedMeasureId: derived.derivedMeasureId },
     operator: "greater_than" as const,
     comparisonValue: { kind: "number" as const, value: 10 },
     ...overrides,
@@ -219,6 +220,38 @@ const withDerivedSort = ({
   };
 };
 
+const withDerivedHaving = ({
+  derived = primaryDerivedSortMeasure,
+  condition = derivedConditionFor({
+    comparisonValue: { kind: "number", value: 100000 },
+  }, derived),
+  plan = basePlan(),
+}: {
+  derived?: BusinessSqlDerivedMeasure;
+  condition?: BusinessSqlAggregateResultCondition;
+  plan?: BusinessSqlQueryPlan;
+} = {}): BusinessSqlQueryPlan => ({
+  ...plan,
+  derivedMeasures: [derived],
+  aggregateResultConditions: [condition],
+});
+
+const derivedExpressionSql = (
+  operator: BusinessSqlDerivedMeasure["operator"] = "subtract",
+): string =>
+  operator === "add"
+    ? '(SUM("finance"."revenue")) + (SUM("finance"."cost"))'
+    : operator === "multiply"
+      ? '(SUM("finance"."revenue")) * (SUM("finance"."cost"))'
+      : operator === "divide"
+        ? [
+            "CASE",
+            '    WHEN (SUM("finance"."cost")) = 0 THEN NULL',
+            '    ELSE (SUM("finance"."revenue")) / (SUM("finance"."cost"))',
+            "  END",
+          ].join("\n")
+        : '(SUM("finance"."revenue")) - (SUM("finance"."cost"))';
+
 const expectedDerivedSql = ({
   operator = "subtract",
   alias = "revenue_minus_cost",
@@ -228,19 +261,7 @@ const expectedDerivedSql = ({
   alias?: string;
   direction?: "ASC" | "DESC";
 } = {}): string => {
-  const expression =
-    operator === "add"
-      ? '(SUM("finance"."revenue")) + (SUM("finance"."cost"))'
-      : operator === "multiply"
-        ? '(SUM("finance"."revenue")) * (SUM("finance"."cost"))'
-        : operator === "divide"
-          ? [
-              "CASE",
-              '    WHEN (SUM("finance"."cost")) = 0 THEN NULL',
-              '    ELSE (SUM("finance"."revenue")) / (SUM("finance"."cost"))',
-              "  END",
-            ].join("\n")
-          : '(SUM("finance"."revenue")) - (SUM("finance"."cost"))';
+  const expression = derivedExpressionSql(operator);
   return [
     "SELECT",
     '  "finance"."region" AS "region",',
@@ -250,6 +271,39 @@ const expectedDerivedSql = ({
     'FROM "finance"',
     'GROUP BY "finance"."region"',
     `ORDER BY "${alias}" ${direction};`,
+  ].join("\n");
+};
+
+const expectedDerivedHavingSql = ({
+  operator = "subtract",
+  alias = "revenue_minus_cost",
+  comparisonOperator = ">",
+  comparisonValue = "100000",
+  orderBy = false,
+  limit,
+}: {
+  operator?: BusinessSqlDerivedMeasure["operator"];
+  alias?: string;
+  comparisonOperator?: string;
+  comparisonValue?: string;
+  orderBy?: boolean;
+  limit?: number;
+} = {}): string => {
+  const clauses = [
+    "SELECT",
+    '  "finance"."region" AS "region",',
+    '  SUM("finance"."revenue") AS "total_revenue",',
+    '  SUM("finance"."cost") AS "total_cost",',
+    `  ${derivedExpressionSql(operator)} AS "${alias}"`,
+    'FROM "finance"',
+    'GROUP BY "finance"."region"',
+    `HAVING ${derivedExpressionSql(operator)} ${comparisonOperator} ${comparisonValue}`,
+    ...(orderBy ? [`ORDER BY "${alias}" DESC`] : []),
+    ...(limit ? [`LIMIT ${limit}`] : []),
+  ];
+  return [
+    ...clauses.slice(0, -1),
+    `${clauses[clauses.length - 1]};`,
   ].join("\n");
 };
 
@@ -426,12 +480,9 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "valid derived aggregate condition is structurally ready but renderer-incapable",
+    name: "valid derived aggregate condition is structurally ready, renderer-capable, and preview-safe",
     assert: () => {
-      const plan = {
-        ...basePlan(),
-        aggregateResultConditions: [derivedConditionFor()],
-      };
+      const plan = withDerivedHaving();
       const compatibility = evaluateBusinessSqlAggregateResultConditionCompatibility({
         condition: plan.aggregateResultConditions[0],
         measures: plan.measures,
@@ -441,60 +492,184 @@ const fixtures: Fixture[] = [
       const capability = evaluateBusinessSqlRendererCapability(plan);
       const rendered = renderBusinessSqlQueryPlan(plan);
       const preview = createBusinessSqlRenderPreview(plan);
+      const expectedSql = expectedDerivedHavingSql();
       return [
         ...(compatibility.compatible ? [] : ["Expected derived aggregate condition compatibility."]),
         ...(readiness.status === "ready" ? [] : ["Expected valid derived aggregate condition to be structurally ready."]),
-        ...(capability.status === "incapable" &&
-        capability.reasonCodes.includes("derived_measure_aggregate_condition_rendering_not_supported")
+        ...(capability.status === "capable" &&
+        !capability.reasonCodes.includes("derived_measure_aggregate_condition_rendering_not_supported")
           ? []
-          : ["Expected derived aggregate condition renderer incapability reason."]),
-        ...(!rendered.rendered && rendered.sql === null
+          : ["Expected valid derived aggregate condition renderer capability."]),
+        ...(rendered.sql === expectedSql ? [] : ["Expected exact subtract-derived HAVING SQL."]),
+        ...(rendered.sql?.includes('HAVING (SUM("finance"."revenue")) - (SUM("finance"."cost")) > 100000')
           ? []
-          : ["Derived aggregate condition must not render SQL."]),
-        ...(preview.sql === null &&
-        !preview.actions.canCopySql &&
+          : ["Expected derived HAVING to regenerate arithmetic expression."]),
+        ...(rendered.sql && !rendered.sql.includes('HAVING "revenue_minus_cost"')
+          ? []
+          : ["Derived HAVING must not use the derived sqlAlias."]),
+        ...(rendered.inserted === false && rendered.ranQuery === false
+          ? []
+          : ["Derived HAVING render must remain manual."]),
+        ...(preview.sql === expectedSql &&
+        preview.actions.canCopySql &&
         !preview.actions.canInsertSql &&
         !preview.actions.canRunSql
           ? []
-          : ["Derived aggregate condition preview must expose no SQL actions."]),
+          : ["Valid derived HAVING preview must expose only copy action."]),
       ];
     },
   },
   {
-    name: "valid derived ORDER BY plus derived aggregate condition remains no-SQL",
+    name: "derived HAVING renders through the same generic path across operators",
     assert: () => {
+      const cases = [
+        {
+          derived: derivedFor({ operator: "add", sqlAlias: "revenue_plus_cost" }),
+          operator: "add" as const,
+          comparisonOperator: ">=",
+          conditionOperator: "greater_than_or_equal" as const,
+          value: 500,
+        },
+        {
+          derived: derivedFor({ operator: "subtract", sqlAlias: "revenue_minus_cost" }),
+          operator: "subtract" as const,
+          comparisonOperator: ">",
+          conditionOperator: "greater_than" as const,
+          value: 100000,
+        },
+        {
+          derived: derivedFor({ operator: "multiply", sqlAlias: "revenue_times_cost" }),
+          operator: "multiply" as const,
+          comparisonOperator: "<",
+          conditionOperator: "less_than" as const,
+          value: 10000,
+        },
+        {
+          derived: derivedFor({ operator: "divide", sqlAlias: "revenue_divided_by_cost" }),
+          operator: "divide" as const,
+          comparisonOperator: ">",
+          conditionOperator: "greater_than" as const,
+          value: 100,
+        },
+      ];
+      return cases.flatMap(({ derived, operator, comparisonOperator, conditionOperator, value }) => {
+        const condition = derivedConditionFor({
+          operator: conditionOperator,
+          comparisonValue: { kind: "number", value },
+        }, derived);
+        const plan = withDerivedHaving({ derived, condition });
+        const capability = evaluateBusinessSqlRendererCapability(plan);
+        const rendered = renderBusinessSqlQueryPlan(plan);
+        const expected = expectedDerivedHavingSql({
+          operator,
+          alias: derived.sqlAlias,
+          comparisonOperator,
+          comparisonValue: String(value),
+        });
+        return [
+          ...(capability.capable ? [] : [`Expected ${operator} derived HAVING to be renderer-capable.`]),
+          ...(rendered.sql === expected ? [] : [`Expected exact ${operator} derived HAVING SQL.`]),
+          ...(rendered.sql?.includes(`HAVING ${derivedExpressionSql(operator)} ${comparisonOperator} ${value}`)
+            ? []
+            : [`Expected ${operator} HAVING expression rendering.`]),
+          ...(operator !== "divide" || (rendered.sql?.match(/\bCASE\b/g) || []).length === 2
+            ? []
+            : ["Expected guarded divide CASE in SELECT and HAVING."]),
+          ...(operator !== "divide" || !rendered.sql?.includes("HAVING (SUM")
+            ? []
+            : ["Expected no unguarded divide HAVING SQL."]),
+        ];
+      });
+    },
+  },
+  {
+    name: "derived aggregate condition metadata is ignored in favor of stable derivedMeasureId",
+    assert: () => {
+      const condition = derivedConditionFor({
+        label: "Misleading condition label",
+      }, primaryDerivedSortMeasure);
+      const relabeledCondition = derivedConditionFor({
+        label: "Another misleading label",
+        conditionId: undefined,
+      }, primaryDerivedSortMeasure);
+      const rendered = renderBusinessSqlQueryPlan(withDerivedHaving({ condition }));
+      const relabeled = renderBusinessSqlQueryPlan(withDerivedHaving({ condition: relabeledCondition }));
+      return [
+        ...(condition.conditionId === relabeledCondition.conditionId
+          ? []
+          : ["Derived condition identity must ignore label changes."]),
+        ...(rendered.sql?.includes('HAVING (SUM("finance"."revenue")) - (SUM("finance"."cost")) > 10')
+          ? []
+          : ["Expected derivedMeasureId to control HAVING expression resolution."]),
+        ...(!rendered.sql?.includes("Misleading condition label")
+          ? []
+          : ["Derived HAVING must ignore condition label."]),
+        ...(rendered.sql === relabeled.sql
+          ? []
+          : ["Changing condition label must not change SQL semantics."]),
+      ];
+    },
+  },
+  {
+    name: "all derived HAVING comparison operators and finite thresholds render safely",
+    assert: () => {
+      const operators = [
+        { conditionOperator: "greater_than" as const, sqlOperator: ">", value: 1 },
+        { conditionOperator: "greater_than_or_equal" as const, sqlOperator: ">=", value: 2.5 },
+        { conditionOperator: "less_than" as const, sqlOperator: "<", value: 3 },
+        { conditionOperator: "less_than_or_equal" as const, sqlOperator: "<=", value: 4.75 },
+        { conditionOperator: "equals" as const, sqlOperator: "=", value: 5 },
+        { conditionOperator: "not_equals" as const, sqlOperator: "<>", value: 6.25 },
+      ];
+      return operators.flatMap(({ conditionOperator, sqlOperator, value }) => {
+        const condition = derivedConditionFor({
+          operator: conditionOperator,
+          comparisonValue: { kind: "number", value },
+        }, primaryDerivedSortMeasure);
+        const rendered = renderBusinessSqlQueryPlan(withDerivedHaving({ condition }));
+        return rendered.sql?.includes(`HAVING ${derivedExpressionSql("subtract")} ${sqlOperator} ${value};`)
+          ? []
+          : [`Expected derived HAVING operator ${conditionOperator} to render as ${sqlOperator}.`];
+      });
+    },
+  },
+  {
+    name: "valid derived HAVING plus derived ORDER BY and limit renders all clauses",
+    assert: () => {
+      const condition = derivedConditionFor({
+        comparisonValue: { kind: "number", value: 100000 },
+      }, primaryDerivedSortMeasure);
       const plan = withDerivedSort({
+        derived: primaryDerivedSortMeasure,
         plan: {
           ...basePlan(),
-          aggregateResultConditions: [derivedConditionFor()],
+          derivedMeasures: [primaryDerivedSortMeasure],
+          aggregateResultConditions: [condition],
+          rowLimit: { rowLimitId: "business-sql-row-limit:25", value: 25 },
         },
       });
-      const readiness = readinessFor(plan);
       const capability = evaluateBusinessSqlRendererCapability(plan);
       const rendered = renderBusinessSqlQueryPlan(plan);
-      const preview = createBusinessSqlRenderPreview(plan);
+      const expectedSql = expectedDerivedHavingSql({
+        orderBy: true,
+        limit: 25,
+      });
       return [
-        ...(readiness.status === "ready" ? [] : ["Expected combined valid targets to be structurally ready."]),
-        ...(capability.status === "incapable" &&
-        capability.reasonCodes.includes("derived_measure_aggregate_condition_rendering_not_supported")
+        ...(capability.capable ? [] : ["Expected combined derived HAVING and ORDER BY to be renderer-capable."]),
+        ...(rendered.sql === expectedSql ? [] : ["Expected combined derived HAVING, ORDER BY, and LIMIT SQL."]),
+        ...(Boolean(rendered.sql?.includes(`GROUP BY "finance"."region"\nHAVING ${derivedExpressionSql("subtract")} > 100000\nORDER BY "revenue_minus_cost" DESC\nLIMIT 25;`))
           ? []
-          : ["Expected derived HAVING guard to remain the renderer blocker."]),
-        ...(!rendered.rendered && rendered.sql === null
+          : ["Expected HAVING before ORDER BY and ORDER BY before LIMIT."]),
+        ...(rendered.sql && !rendered.sql.split("ORDER BY")[1]?.includes("SUM(")
           ? []
-          : ["Derived HAVING intent must not be silently dropped to render ORDER BY."]),
-        ...(preview.sql === null &&
-        !preview.actions.canCopySql &&
-        !preview.actions.canInsertSql &&
-        !preview.actions.canRunSql
-          ? []
-          : ["Unsupported combined derived plan must expose no preview actions."]),
+          : ["Combined ORDER BY must use only the derived alias."]),
       ];
     },
   },
   {
     name: "invalid derived aggregate condition targets and values block readiness",
     assert: () => {
-      const missing = readinessFor({
+      const missingPlan = {
         ...basePlan(),
         aggregateResultConditions: [
           derivedConditionFor({
@@ -504,24 +679,24 @@ const fixtures: Fixture[] = [
             },
           }),
         ],
-      });
-      const invalidValue = readinessFor({
+      };
+      const invalidValuePlan = {
         ...basePlan(),
         aggregateResultConditions: [
           derivedConditionFor({
             comparisonValue: { kind: "number", value: Number.POSITIVE_INFINITY },
           }),
         ],
-      });
-      const invalidOperator = readinessFor({
+      };
+      const invalidOperatorPlan = {
         ...basePlan(),
         aggregateResultConditions: [
           derivedConditionFor({
             operator: "contains" as BusinessSqlAggregateResultCondition["operator"],
           }),
         ],
-      });
-      const bothTargets = readinessFor({
+      };
+      const bothTargetsPlan = {
         ...basePlan(),
         aggregateResultConditions: [
           {
@@ -529,8 +704,8 @@ const fixtures: Fixture[] = [
             measureId: leftMeasure.measureId,
           } as BusinessSqlAggregateResultCondition,
         ],
-      });
-      const neitherTarget = readinessFor({
+      };
+      const neitherTargetPlan = {
         ...basePlan(),
         aggregateResultConditions: [
           {
@@ -539,7 +714,35 @@ const fixtures: Fixture[] = [
             comparisonValue: { kind: "number", value: 10 },
           } as BusinessSqlAggregateResultCondition,
         ],
-      });
+      };
+      const duplicatePlan = {
+        ...basePlan(),
+        derivedMeasures: [derivedMeasure, { ...derivedMeasure }],
+        aggregateResultConditions: [derivedConditionFor()],
+      };
+      const multipleConditionsPlan = {
+        ...basePlan(),
+        aggregateResultConditions: [
+          conditionFor(),
+          derivedConditionFor({}, primaryDerivedSortMeasure),
+        ],
+      };
+      const missing = readinessFor(missingPlan);
+      const invalidValue = readinessFor(invalidValuePlan);
+      const invalidOperator = readinessFor(invalidOperatorPlan);
+      const bothTargets = readinessFor(bothTargetsPlan);
+      const neitherTarget = readinessFor(neitherTargetPlan);
+      const duplicate = readinessFor(duplicatePlan);
+      const multipleCapability = evaluateBusinessSqlRendererCapability(multipleConditionsPlan);
+      const invalidRenderResults = [
+        renderBusinessSqlQueryPlan(missingPlan),
+        renderBusinessSqlQueryPlan(invalidValuePlan),
+        renderBusinessSqlQueryPlan(invalidOperatorPlan),
+        renderBusinessSqlQueryPlan(bothTargetsPlan),
+        renderBusinessSqlQueryPlan(neitherTargetPlan),
+        renderBusinessSqlQueryPlan(duplicatePlan),
+        renderBusinessSqlQueryPlan(multipleConditionsPlan),
+      ];
       return [
         ...(missing.reasonCodes.includes("aggregate_condition_derived_measure_unresolved")
           ? []
@@ -556,6 +759,15 @@ const fixtures: Fixture[] = [
         ...(neitherTarget.reasonCodes.includes("aggregate_condition_target_invalid")
           ? []
           : ["Expected neither-target malformed aggregate condition reason."]),
+        ...(duplicate.reasonCodes.includes("aggregate_condition_derived_measure_unresolved")
+          ? []
+          : ["Expected duplicate derived aggregate condition target to block readiness."]),
+        ...(multipleCapability.reasonCodes.includes("aggregate_condition_multiple_not_supported")
+          ? []
+          : ["Expected multiple aggregate conditions to remain renderer-incapable."]),
+        ...(invalidRenderResults.every((result) => !result.rendered && result.sql === null)
+          ? []
+          : ["Invalid derived aggregate condition plans must produce no SQL."]),
       ];
     },
   },
@@ -686,7 +898,7 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "invalid derived sort rendering never falls back to unsorted SQL",
+    name: "invalid derived sort and HAVING rendering never fall back to partial SQL",
     assert: () => {
       const invalidOperandPlan = withDerivedSort({
         derived: {
@@ -702,8 +914,24 @@ const fixtures: Fixture[] = [
           derivedMeasureId: "business-sql-derived-measure:unsupported-operator",
         },
       });
+      const invalidHavingOperandPlan = withDerivedHaving({
+        derived: {
+          ...primaryDerivedSortMeasure,
+          leftMeasureId: "business-sql-measure:missing:left",
+          derivedMeasureId: "business-sql-derived-measure:invalid-having-operand",
+        },
+      });
+      const unsupportedHavingOperatorPlan = withDerivedHaving({
+        derived: {
+          ...primaryDerivedSortMeasure,
+          operator: "modulo" as BusinessSqlDerivedMeasure["operator"],
+          derivedMeasureId: "business-sql-derived-measure:unsupported-having-operator",
+        },
+      });
       const invalidOperand = renderBusinessSqlQueryPlan(invalidOperandPlan);
       const unsupportedOperator = renderBusinessSqlQueryPlan(unsupportedOperatorPlan);
+      const invalidHavingOperand = renderBusinessSqlQueryPlan(invalidHavingOperandPlan);
+      const unsupportedHavingOperator = renderBusinessSqlQueryPlan(unsupportedHavingOperatorPlan);
       return [
         ...(!invalidOperand.rendered && invalidOperand.sql === null
           ? []
@@ -711,16 +939,27 @@ const fixtures: Fixture[] = [
         ...(!unsupportedOperator.rendered && unsupportedOperator.sql === null
           ? []
           : ["Unsupported derived operator must produce no SQL."]),
+        ...(!invalidHavingOperand.rendered && invalidHavingOperand.sql === null
+          ? []
+          : ["Invalid derived HAVING operand composition must produce no SQL."]),
+        ...(!unsupportedHavingOperator.rendered && unsupportedHavingOperator.sql === null
+          ? []
+          : ["Unsupported derived HAVING operator must produce no SQL."]),
       ];
     },
   },
   {
-    name: "joins and grouping remain unchanged with derived ORDER BY",
+    name: "joins and grouping remain unchanged with derived HAVING and ORDER BY",
     assert: () => {
+      const condition = derivedConditionFor({
+        comparisonValue: { kind: "number", value: 100000 },
+      }, primaryDerivedSortMeasure);
       const joinedPlan = withDerivedSort({
+        derived: primaryDerivedSortMeasure,
         plan: {
           ...basePlan(),
           id: "business-sql-plan:joined-derived-sort",
+          aggregateResultConditions: [condition],
           entities: [
             sourceEntity,
             {
@@ -758,9 +997,9 @@ const fixtures: Fixture[] = [
       });
       const sql = renderBusinessSqlQueryPlan(joinedPlan).sql;
       return [
-        ...(Boolean(sql?.includes('FROM "finance"\nJOIN "regions" ON "finance"."region_id" = "regions"."id"\nGROUP BY "finance"."region"\nORDER BY "revenue_minus_cost" DESC;'))
+        ...(Boolean(sql?.includes(`FROM "finance"\nJOIN "regions" ON "finance"."region_id" = "regions"."id"\nGROUP BY "finance"."region"\nHAVING ${derivedExpressionSql("subtract")} > 100000\nORDER BY "revenue_minus_cost" DESC;`))
           ? []
-          : ["Expected joins and grouping to remain unchanged before derived ORDER BY."]),
+          : ["Expected joins and grouping to remain unchanged before derived HAVING and ORDER BY."]),
       ];
     },
   },
