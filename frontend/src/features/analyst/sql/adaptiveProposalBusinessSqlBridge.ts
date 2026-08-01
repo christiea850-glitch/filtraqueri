@@ -59,6 +59,7 @@ export type AdaptiveProposalBusinessSqlBridgeIssue = {
     | "missing_metric"
     | "unsupported_metric"
     | "unresolved_metric_reference"
+    | "unresolved_derived_measure_reference"
     | "missing_relationship"
     | "needs_review_join"
     | "needs_review_filter"
@@ -368,25 +369,52 @@ const mapFilters = (
 const mapOrderBy = (
   proposal: AdaptiveReportProposal,
   measuresByMetricId: ReadonlyMap<string, BusinessSqlMeasure>,
-): BusinessSqlSort[] =>
-  (proposal.sorts || []).map((sort): BusinessSqlSort => {
+  derivedMeasureIdsByProposedId: ReadonlyMap<string, string>,
+): {
+  orderBy: BusinessSqlSort[];
+  issues: AdaptiveProposalBusinessSqlBridgeIssue[];
+} => {
+  const orderBy: BusinessSqlSort[] = [];
+  const issues: AdaptiveProposalBusinessSqlBridgeIssue[] = [];
+
+  for (const sort of proposal.sorts || []) {
     const targetMeasure = sort.target === "metric" ? measuresByMetricId.get(sort.targetId) : null;
-    const grouping = proposal.groupings.find((candidate) => candidate.id === sort.targetId);
+    const grouping = sort.target === "grouping"
+      ? proposal.groupings.find((candidate) => candidate.id === sort.targetId)
+      : null;
+    const derivedMeasureId = sort.target === "derived_measure"
+      ? derivedMeasureIdsByProposedId.get(sort.targetId)
+      : null;
+    if (sort.target === "derived_measure" && !derivedMeasureId) {
+      issues.push(
+        issue(
+          "unresolved_derived_measure_reference",
+          "blocking",
+          `Sort ${sort.id} references an unresolved proposed derived measure.`,
+        ),
+      );
+      continue;
+    }
     const target: BusinessSqlSortTarget = targetMeasure
       ? { kind: "measure", measureId: targetMeasure.measureId, resolved: true }
+      : derivedMeasureId
+      ? { kind: "derived_measure", derivedMeasureId, resolved: true }
       : {
           kind: "grouping",
           field: grouping?.columnName || undefined,
           table: grouping?.tableName || undefined,
-          resolved: false,
+          resolved: Boolean(grouping?.columnName && grouping?.tableName),
         };
-    return {
+    orderBy.push({
       sortId: createBusinessSqlSortId({ target, direction: sort.direction }),
       target,
       direction: sort.direction,
       label: sort.label,
-    };
-  });
+    });
+  }
+
+  return { orderBy, issues };
+};
 
 const mapRowLimit = (proposal: AdaptiveReportProposal): BusinessSqlRowLimit | null => {
   if (!proposal.rowLimit) return null;
@@ -400,6 +428,7 @@ const mapRowLimit = (proposal: AdaptiveReportProposal): BusinessSqlRowLimit | nu
 const mapAggregateResultConditions = (
   conditions: readonly ProposedAggregateResultCondition[],
   measuresByMetricId: ReadonlyMap<string, BusinessSqlMeasure>,
+  derivedMeasureIdsByProposedId: ReadonlyMap<string, string>,
 ): {
   aggregateResultConditions: BusinessSqlAggregateResultCondition[];
   issues: AdaptiveProposalBusinessSqlBridgeIssue[];
@@ -408,7 +437,34 @@ const mapAggregateResultConditions = (
   const issues: AdaptiveProposalBusinessSqlBridgeIssue[] = [];
 
   for (const condition of conditions) {
-    const measure = measuresByMetricId.get(condition.metricId);
+    const target = condition.target;
+    if (target?.kind === "derived_measure") {
+      const derivedMeasureId = derivedMeasureIdsByProposedId.get(target.derivedMeasureId);
+      if (!derivedMeasureId) {
+        issues.push(
+          issue(
+            "unresolved_derived_measure_reference",
+            "blocking",
+            `Aggregate-result condition ${condition.id} references an unresolved proposed derived measure.`,
+          ),
+        );
+        continue;
+      }
+      const seed = {
+        target: { kind: "derived_measure" as const, derivedMeasureId },
+        operator: condition.operator,
+        comparisonValue: condition.comparisonValue,
+      };
+      aggregateResultConditions.push({
+        ...seed,
+        conditionId: createBusinessSqlAggregateResultConditionId(seed),
+        label: condition.label,
+      });
+      continue;
+    }
+
+    const metricId = target?.kind === "metric" ? target.metricId : condition.metricId;
+    const measure = metricId ? measuresByMetricId.get(metricId) : null;
     if (!measure) {
       issues.push(
         issue(
@@ -439,9 +495,11 @@ const mapDerivedMeasures = (
   measuresByMetricId: ReadonlyMap<string, BusinessSqlMeasure>,
 ): {
   derivedMeasures: BusinessSqlDerivedMeasure[];
+  byProposedDerivedMeasureId: Map<string, string>;
   issues: AdaptiveProposalBusinessSqlBridgeIssue[];
 } => {
   const derivedMeasures: BusinessSqlDerivedMeasure[] = [];
+  const byProposedDerivedMeasureId = new Map<string, string>();
   const issues: AdaptiveProposalBusinessSqlBridgeIssue[] = [];
 
   for (const proposed of proposedDerivedMeasures) {
@@ -465,15 +523,17 @@ const mapDerivedMeasures = (
       rightMeasureId: rightMeasure.measureId,
       divisionPolicy: proposed.divisionPolicy,
     };
-    derivedMeasures.push({
+    const derivedMeasure = {
       ...seed,
       derivedMeasureId: createBusinessSqlDerivedMeasureId(seed),
       sqlAlias: proposed.sqlAlias,
       label: proposed.label,
-    });
+    };
+    derivedMeasures.push(derivedMeasure);
+    byProposedDerivedMeasureId.set(proposed.id, derivedMeasure.derivedMeasureId);
   }
 
-  return { derivedMeasures, issues };
+  return { derivedMeasures, byProposedDerivedMeasureId, issues };
 };
 
 const joinEntityLabel = (
@@ -681,15 +741,20 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
   };
 
   const groupings = mapGroupings(proposal);
-  const orderBy = mapOrderBy(proposal, measureResult.byMetricId);
+  const derivedMeasureResult = mapDerivedMeasures(
+    proposal.derivedMeasures || [],
+    measureResult.byMetricId,
+  );
+  const orderByResult = mapOrderBy(
+    proposal,
+    measureResult.byMetricId,
+    derivedMeasureResult.byProposedDerivedMeasureId,
+  );
   const rowLimit = mapRowLimit(proposal);
   const aggregateConditionResult = mapAggregateResultConditions(
     proposal.aggregateResultConditions || [],
     measureResult.byMetricId,
-  );
-  const derivedMeasureResult = mapDerivedMeasures(
-    proposal.derivedMeasures || [],
-    measureResult.byMetricId,
+    derivedMeasureResult.byProposedDerivedMeasureId,
   );
   const filterResult = mapFilters(proposal);
   const joinResult = mapJoinNeeds(proposal);
@@ -723,6 +788,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     ...metricResult.issues,
     ...aggregateConditionResult.issues,
     ...derivedMeasureResult.issues,
+    ...orderByResult.issues,
     ...filterResult.issues,
     ...joinResult.issues,
     ...confidenceIssues,
@@ -744,7 +810,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     derivedMeasures: derivedMeasureResult.derivedMeasures,
     groupings,
     filters: filterResult.filters,
-    orderBy,
+    orderBy: orderByResult.orderBy,
     rowLimit,
     aggregateResultConditions: aggregateConditionResult.aggregateResultConditions,
     joinPath: joinResult.joinPath,

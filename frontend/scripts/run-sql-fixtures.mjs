@@ -262,6 +262,11 @@ const fixtures = [
     exportName: "runExplicitAddMultiplyGroundingFixtures",
   },
   {
+    label: "Explicit derived-measure target grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/explicitDerivedMeasureTargetsGrounding.test.ts",
+    exportName: "runExplicitDerivedMeasureTargetsGroundingFixtures",
+  },
+  {
     label: "Business SQL query planner",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlQueryPlanner.test.ts",
     exportName: "runBusinessSqlQueryPlannerFixtures",

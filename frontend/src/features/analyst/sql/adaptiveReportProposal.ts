@@ -63,7 +63,16 @@ export type ProposedMetric = {
 
 export type ProposedAggregateResultCondition = {
   id: string;
-  metricId: string;
+  metricId?: string;
+  target?:
+    | {
+        kind: "metric";
+        metricId: string;
+      }
+    | {
+        kind: "derived_measure";
+        derivedMeasureId: string;
+      };
   operator: BusinessSqlAggregateComparisonOperator;
   comparisonValue: BusinessSqlAggregateComparisonValue;
   label?: string;
@@ -116,7 +125,7 @@ export type ProposedJoinNeed = {
 export type ProposedSort = {
   id: string;
   label: string;
-  target: "metric" | "grouping";
+  target: "metric" | "grouping" | "derived_measure";
   targetId: string;
   direction: "asc" | "desc";
   confidence: "high" | "medium" | "low";
@@ -852,6 +861,34 @@ type AggregateThresholdMatch = {
   trailingConcept: string | null;
 };
 
+type DerivedRankingShell =
+  | { status: "none" }
+  | {
+      status: "unsupported";
+      reason: "missing_direction" | "ambiguous_direction" | "formula_not_detected" | "formula_unsupported";
+      groupingPhrase?: string;
+    }
+  | {
+      status: "detected";
+      groupingPhrase: string;
+      direction: "asc" | "desc";
+      formula: Extract<ExplicitDerivedFormula, { status: "detected" }>;
+    };
+
+type DerivedThresholdShell =
+  | { status: "none" }
+  | {
+      status: "unsupported";
+      reason: "missing_threshold" | "multiple_thresholds" | "formula_not_detected" | "formula_unsupported";
+      groupingPhrase?: string;
+    }
+  | {
+      status: "detected";
+      groupingPhrase: string;
+      threshold: AggregateThresholdMatch;
+      formula: Extract<ExplicitDerivedFormula, { status: "detected" }>;
+    };
+
 const THRESHOLD_PHRASES: ReadonlyArray<{
   operator: BusinessSqlAggregateComparisonOperator;
   phrases: readonly string[];
@@ -1073,6 +1110,116 @@ export const detectAggregateThresholdMatches = (
   return Array.from(matchesByEvidence.values());
 };
 
+const directionWords = (value: string): string[] =>
+  Array.from(value.matchAll(/\b(?:ascending|descending)\b/g)).map((match) => match[0]);
+
+const directionFromWord = (value: string): ProposedSort["direction"] =>
+  value === "ascending" ? "asc" : "desc";
+
+export const detectDerivedRankingShell = (prompt: string): DerivedRankingShell => {
+  const text = normalize(prompt);
+  const rankPrefix = text.match(/^rank\s+(.+?)\s+by\s+(.+)$/);
+  const showRanked = text.match(/^show\s+(.+?)\s+ranked\s+by\s+(.+)$/);
+  const match = rankPrefix || showRanked;
+  if (!match) return { status: "none" };
+
+  const groupingPhrase = trimFormulaOperand(match[1]);
+  const rankedBody = match[2].trim();
+  const directions = directionWords(rankedBody);
+  if (directions.length === 0) return { status: "unsupported", reason: "missing_direction", groupingPhrase };
+  if (directions.length > 1) return { status: "unsupported", reason: "ambiguous_direction", groupingPhrase };
+
+  const directionMatch = rankedBody.match(/\b(ascending|descending)\b\s*$/);
+  if (!directionMatch) return { status: "unsupported", reason: "ambiguous_direction", groupingPhrase };
+
+  const formulaText = rankedBody.slice(0, directionMatch.index).trim();
+  const formula = detectSelectedExplicitDerivedFormula(formulaText);
+  if (formula.status === "none") return { status: "unsupported", reason: "formula_not_detected", groupingPhrase };
+  if (formula.status === "unsupported") return { status: "unsupported", reason: "formula_unsupported", groupingPhrase };
+
+  return {
+    status: "detected",
+    groupingPhrase,
+    direction: directionFromWord(directionMatch[1]),
+    formula: {
+      ...formula,
+      groupingPhrase,
+    },
+  };
+};
+
+const thresholdEvidenceIndex = (
+  text: string,
+  threshold: AggregateThresholdMatch,
+): number => {
+  const evidence = threshold.evidence.toLowerCase();
+  const isEvidence = text.indexOf(evidence);
+  if (isEvidence >= 0) return isEvidence;
+  return -1;
+};
+
+const formulaTextBeforeThreshold = (
+  body: string,
+  threshold: AggregateThresholdMatch,
+): string | null => {
+  const index = thresholdEvidenceIndex(body, threshold);
+  if (index < 0) return null;
+  return body
+    .slice(0, index)
+    .replace(/\b(?:is|are)\s*$/g, "")
+    .trim();
+};
+
+export const detectDerivedThresholdShell = (prompt: string): DerivedThresholdShell => {
+  const text = normalizeThresholdDetectionText(prompt);
+  if (/\bwhere\b.+\brank(?:ed)?\s+by\b|\brank(?:ed)?\s+by\b.+\bwhere\b/.test(text)) {
+    return { status: "unsupported", reason: "multiple_thresholds" };
+  }
+  const match = text.match(/^show\s+(.+?)\s+where\s+(.+)$/);
+  if (!match) return { status: "none" };
+
+  const groupingPhrase = trimFormulaOperand(match[1]);
+  const body = match[2].trim();
+  const thresholds = detectAggregateThresholdMatches(body);
+  if (thresholds.length === 0) return { status: "unsupported", reason: "missing_threshold", groupingPhrase };
+  if (thresholds.length > 1) return { status: "unsupported", reason: "multiple_thresholds", groupingPhrase };
+
+  const formulaText = formulaTextBeforeThreshold(body, thresholds[0]);
+  if (!formulaText) return { status: "unsupported", reason: "formula_not_detected", groupingPhrase };
+  const formula = detectSelectedExplicitDerivedFormula(formulaText);
+  if (formula.status === "none") return { status: "unsupported", reason: "formula_not_detected", groupingPhrase };
+  if (formula.status === "unsupported") return { status: "unsupported", reason: "formula_unsupported", groupingPhrase };
+
+  return {
+    status: "detected",
+    groupingPhrase,
+    threshold: thresholds[0],
+    formula: {
+      ...formula,
+      groupingPhrase,
+    },
+  };
+};
+
+const selectedExplicitDerivedFormulaForProposal = (prompt: string): ExplicitDerivedFormula => {
+  const ranking = detectDerivedRankingShell(prompt);
+  if (ranking.status === "detected") return ranking.formula;
+  if (ranking.status === "unsupported") {
+    return { status: "unsupported", operator: "mixed", reason: "mixed_formulas" };
+  }
+  const threshold = detectDerivedThresholdShell(prompt);
+  if (threshold.status === "detected") return threshold.formula;
+  if (
+    threshold.status === "unsupported" &&
+    (threshold.reason === "multiple_thresholds" ||
+      threshold.reason === "formula_unsupported" ||
+      explicitFormulaMatches(normalize(prompt)).length > 0)
+  ) {
+    return { status: "unsupported", operator: "mixed", reason: "mixed_formulas" };
+  }
+  return detectSelectedExplicitDerivedFormula(prompt);
+};
+
 const thresholdCountMetricName = (
   matches: readonly AggregateThresholdMatch[],
   entities: readonly string[],
@@ -1141,7 +1288,7 @@ const proposeMetrics = (
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedMetric[] => {
-  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
+  const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
   if (explicitFormula.status === "detected") {
     const requireGroundedCount = explicitFormula.operator !== "subtract";
     return [
@@ -1217,6 +1364,29 @@ const proposeSorts = (
   ];
 };
 
+const proposeDerivedSorts = (
+  prompt: string,
+  derivedMeasures: readonly ProposedDerivedMeasure[],
+  groupings: readonly ProposedGrouping[],
+): ProposedSort[] => {
+  const ranking = detectDerivedRankingShell(prompt);
+  if (ranking.status !== "detected") return [];
+  if (derivedMeasures.length !== 1 || groupings.length !== 1) return [];
+  const derivedMeasure = derivedMeasures[0];
+  const grouping = groupings[0];
+  if (!grouping.tableName || !grouping.columnName) return [];
+  return [
+    {
+      id: `sort:derived-measure:${compactId(derivedMeasure.id)}:${ranking.direction}`,
+      label: `Sort by ${derivedMeasure.label || derivedMeasure.sqlAlias}`,
+      target: "derived_measure",
+      targetId: derivedMeasure.id,
+      direction: ranking.direction,
+      confidence: derivedMeasure.confidence,
+    },
+  ];
+};
+
 const proposeRowLimit = (intent: BusinessIntent): ProposedRowLimit | null => {
   const value = intent.analysisPath?.rowLimit;
   if (!value) return null;
@@ -1246,7 +1416,7 @@ const proposeGroupings = (
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
 ): ProposedGrouping[] => {
-  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
+  const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
   const groupingConcepts =
     explicitFormula.status === "detected" && explicitFormula.groupingPhrase
       ? [explicitFormula.groupingPhrase]
@@ -1279,7 +1449,7 @@ const proposeDerivedMeasures = (
   prompt: string,
   metrics: readonly ProposedMetric[],
 ): ProposedDerivedMeasure[] => {
-  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
+  const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
   if (explicitFormula.status !== "detected") return [];
   if (metrics.length !== 2) return [];
 
@@ -1321,11 +1491,37 @@ const proposeAggregateResultConditions = ({
   prompt,
   metrics,
   groupings,
+  derivedMeasures,
 }: {
   prompt: string;
   metrics: readonly ProposedMetric[];
   groupings: readonly ProposedGrouping[];
+  derivedMeasures: readonly ProposedDerivedMeasure[];
 }): ProposedAggregateResultCondition[] => {
+  const derivedThreshold = detectDerivedThresholdShell(prompt);
+  if (derivedThreshold.status === "detected") {
+    if (derivedMeasures.length !== 1 || groupings.length !== 1) return [];
+    const derivedMeasure = derivedMeasures[0];
+    const grouping = groupings[0];
+    if (!grouping.tableName || !grouping.columnName) return [];
+    const threshold = derivedThreshold.threshold;
+    return [
+      {
+        id: `aggregate-condition:derived-measure:${compactId(derivedMeasure.id)}:${threshold.operator}:${threshold.comparisonValue.value}`,
+        target: {
+          kind: "derived_measure",
+          derivedMeasureId: derivedMeasure.id,
+        },
+        operator: threshold.operator,
+        comparisonValue: threshold.comparisonValue,
+        label: `${derivedMeasure.label || derivedMeasure.sqlAlias} ${threshold.evidence}`,
+        evidence: threshold.evidence,
+        confidence: "high",
+      },
+    ];
+  }
+  if (derivedMeasures.length > 0) return [];
+
   const thresholdMatches = detectAggregateThresholdMatches(prompt);
   if (thresholdMatches.length !== 1) return [];
   if (metrics.length !== 1 || groupings.length !== 1) return [];
@@ -1347,6 +1543,7 @@ const proposeAggregateResultConditions = ({
     {
       id: `aggregate-condition:${compactId(metric.id)}:${threshold.operator}:${threshold.comparisonValue.value}`,
       metricId: metric.id,
+      target: { kind: "metric", metricId: metric.id },
       operator: threshold.operator,
       comparisonValue: threshold.comparisonValue,
       label: `${metric.label} ${threshold.evidence}`,
@@ -1581,7 +1778,9 @@ const createMissingRequirements = ({
 }): MissingRequirement[] => {
   const missing: MissingRequirement[] = [];
   const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
-  const explicitFormula = detectSelectedExplicitDerivedFormula(prompt);
+  const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
+  const rankingShell = detectDerivedRankingShell(prompt);
+  const thresholdShell = detectDerivedThresholdShell(prompt);
   const hasGroundedDerivedFormula = derivedMeasures.length === 1;
   if (!prompt.trim()) {
     missing.push({
@@ -1687,6 +1886,40 @@ const createMissingRequirements = ({
       kind: "column",
       message:
         `Could not safely bind the explicit ${operatorName} formula to two grounded compatible base measures.`,
+    });
+  }
+  if (rankingShell.status === "unsupported") {
+    missing.push({
+      id:
+        rankingShell.reason === "missing_direction"
+          ? "missing-derived-ranking-direction"
+          : rankingShell.reason === "ambiguous_direction"
+          ? "ambiguous-derived-ranking-direction"
+          : "missing-derived-ranking-grounding",
+      kind: "intent",
+      message:
+        rankingShell.reason === "missing_direction"
+          ? "Derived-measure ranking requires an explicit ascending or descending direction."
+          : rankingShell.reason === "ambiguous_direction"
+          ? "Derived-measure ranking direction is ambiguous."
+          : "Could not safely ground the explicit derived-measure ranking target.",
+    });
+  }
+  if (thresholdShell.status === "unsupported") {
+    missing.push({
+      id:
+        thresholdShell.reason === "missing_threshold"
+          ? "missing-derived-aggregate-threshold"
+          : thresholdShell.reason === "multiple_thresholds"
+          ? "unsupported-derived-ranking-threshold-composition"
+          : "missing-derived-aggregate-threshold-grounding",
+      kind: "intent",
+      message:
+        thresholdShell.reason === "missing_threshold"
+          ? "Derived aggregate-result conditions require one explicit numeric threshold."
+          : thresholdShell.reason === "multiple_thresholds"
+          ? "Combined or multiple derived ranking and threshold requests are not supported in this slice."
+          : "Could not safely ground the explicit derived aggregate-result condition target.",
     });
   }
   if (
@@ -1948,8 +2181,10 @@ export function proposeAdaptiveReport(
     prompt,
     metrics,
     groupings,
+    derivedMeasures,
   });
-  const sorts = derivedMeasures.length > 0 ? [] : proposeSorts(detectedIntent, metrics);
+  const derivedSorts = proposeDerivedSorts(prompt, derivedMeasures, groupings);
+  const sorts = derivedMeasures.length > 0 ? derivedSorts : proposeSorts(detectedIntent, metrics);
   const rowLimit = proposeRowLimit(detectedIntent);
   const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns);
   const joinNeeds = proposeJoinNeeds(
