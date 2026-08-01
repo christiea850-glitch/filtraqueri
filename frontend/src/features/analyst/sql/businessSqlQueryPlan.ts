@@ -191,7 +191,13 @@ export type BusinessSqlFilterOperator =
 export type BusinessSqlFilterComparisonValue =
   | { kind: "number"; value: number }
   | { kind: "string"; value: string }
-  | { kind: "boolean"; value: boolean };
+  | { kind: "boolean"; value: boolean }
+  | {
+      kind: "set";
+      valueKind: "number" | "string" | "boolean";
+      values: readonly (number | string | boolean)[];
+      value?: never;
+    };
 
 export type BusinessSqlFilterTarget =
   | {
@@ -388,6 +394,27 @@ export const createBusinessSqlFilterId = (
         field: filter.field,
       };
   const comparisonValue = filter.comparisonValue;
+  const comparisonIdentity =
+    comparisonValue?.kind === "set"
+      ? [
+          comparisonValue.valueKind,
+          ...Array.from(
+            new Set(
+              comparisonValue.values
+                .filter((value) => {
+                  if (comparisonValue.valueKind === "number") return typeof value === "number" && Number.isFinite(value);
+                  if (comparisonValue.valueKind === "string") return typeof value === "string";
+                  return typeof value === "boolean";
+                })
+                .map((value) => `${comparisonValue.valueKind}:${String(value).trim().toLowerCase()}`),
+            ),
+          ).sort(),
+        ].join("|")
+      : comparisonValue?.kind === "number" ||
+        comparisonValue?.kind === "string" ||
+        comparisonValue?.kind === "boolean"
+      ? String(comparisonValue.value)
+      : null;
   return stablePrimitiveId("business-sql-filter", [
     target.kind,
     target.entity,
@@ -395,11 +422,7 @@ export const createBusinessSqlFilterId = (
     target.field,
     filter.operator,
     comparisonValue?.kind,
-    comparisonValue?.kind === "number" ||
-    comparisonValue?.kind === "string" ||
-    comparisonValue?.kind === "boolean"
-      ? String(comparisonValue.value)
-      : null,
+    comparisonIdentity,
   ]);
 };
 

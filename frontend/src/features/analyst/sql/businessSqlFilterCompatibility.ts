@@ -40,6 +40,8 @@ const SUPPORTED_ROW_FILTER_OPERATORS: readonly BusinessSqlFilterOperator[] = [
   "contains",
   "starts_with",
   "ends_with",
+  "in",
+  "not_in",
   "is_null",
   "is_not_null",
 ];
@@ -60,6 +62,11 @@ const TEXT_OPERATORS = new Set<BusinessSqlFilterOperator>([
   "contains",
   "starts_with",
   "ends_with",
+]);
+
+const SET_OPERATORS = new Set<BusinessSqlFilterOperator>([
+  "in",
+  "not_in",
 ]);
 
 export const isBusinessSqlRowFilterOperator = (
@@ -148,6 +155,25 @@ const valueIsValid = (value: BusinessSqlFilterComparisonValue | undefined): bool
   if (value.kind === "number") return Number.isFinite(value.value);
   if (value.kind === "string") return hasText(value.value) && !/[\u0000-\u001f\u007f]/.test(value.value);
   if (value.kind === "boolean") return typeof value.value === "boolean";
+  if (value.kind === "set") {
+    if (
+      value.valueKind !== "number" &&
+      value.valueKind !== "string" &&
+      value.valueKind !== "boolean"
+    ) {
+      return false;
+    }
+    if (!Array.isArray(value.values) || value.values.length === 0) return false;
+    return value.values.every((member) => {
+      if (value.valueKind === "number") return typeof member === "number" && Number.isFinite(member);
+      if (value.valueKind === "string") {
+        return typeof member === "string" &&
+          hasText(member) &&
+          !/[\u0000-\u001f\u007f]/.test(member);
+      }
+      return typeof member === "boolean";
+    });
+  }
   return false;
 };
 
@@ -160,6 +186,14 @@ const valueCompatibleWithType = ({
   value: BusinessSqlFilterComparisonValue;
   fieldType: SchemaColumn["inferred_type"] | undefined;
 }): boolean => {
+  if (SET_OPERATORS.has(operator)) {
+    if (value.kind !== "set") return false;
+    if (value.valueKind === "number") return isNumericField(fieldType);
+    if (value.valueKind === "string") return isTextField(fieldType);
+    if (value.valueKind === "boolean") return isBooleanField(fieldType);
+    return false;
+  }
+  if (value.kind === "set") return false;
   if (ORDERED_OPERATORS.has(operator)) {
     return isNumericField(fieldType) && value.kind === "number";
   }
@@ -222,6 +256,8 @@ export function evaluateBusinessSqlFilterCompatibility({
     const value = comparisonValueFor(filter);
     if (NULLARY_OPERATORS.has(filter.operator)) {
       if (value) reasonCodes.push("row_filter_value_not_allowed");
+    } else if (SET_OPERATORS.has(filter.operator) && !value) {
+      reasonCodes.push("row_filter_value_missing");
     } else if (!value) {
       reasonCodes.push("row_filter_value_missing");
     } else {

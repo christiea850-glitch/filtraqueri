@@ -257,6 +257,11 @@ const fixtures = [
     exportName: "runBusinessSqlRowFilterContractFixtures",
   },
   {
+    label: "Business SQL set-filter contract",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlSetFilterContract.test.ts",
+    exportName: "runBusinessSqlSetFilterContractFixtures",
+  },
+  {
     label: "Explicit row-filter grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitRowFilterGrounding.test.ts",
     exportName: "runExplicitRowFilterGroundingFixtures",
