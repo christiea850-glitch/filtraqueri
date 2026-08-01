@@ -17,6 +17,8 @@ export type BusinessSqlRendererIncapabilityReason =
   | "derived_measures_multiple_not_supported"
   | "derived_measure_division_policy_missing"
   | "derived_measure_operand_mismatch"
+  | "row_filter_rendering_not_supported"
+  | "multiple_row_filters_not_supported"
   | "unrecognized_plan_shape";
 
 export type BusinessSqlRendererCapability = {
@@ -79,9 +81,16 @@ export function evaluateBusinessSqlRendererCapability(
   }
 
   const aggregateResultConditionCount = (normalized.aggregateResultConditions || []).length;
+  const rowFilterCount = (normalized.filters || []).length;
 
   if (aggregateResultConditionCount > 1) {
     reasonCodes.push("aggregate_condition_multiple_not_supported");
+  }
+
+  if (rowFilterCount > 1) {
+    reasonCodes.push("multiple_row_filters_not_supported");
+  } else if (rowFilterCount === 1) {
+    reasonCodes.push("row_filter_rendering_not_supported");
   }
 
   for (const sort of normalized.orderBy || []) {

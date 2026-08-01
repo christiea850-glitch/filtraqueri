@@ -693,17 +693,15 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
     ],
   },
   {
-    name: "leased units per property with resolved joins renders deterministic DuckDB SELECT",
+    name: "leased units per property with row filter refuses until WHERE rendering is supported",
     integrated: leasedUnitsPerProperty,
-    assert: (result, integrated) => [
-      ...expectRendered(result, [
-        '"properties"."property_id" AS "property"',
-        'COUNT(DISTINCT "units"."unit_id") AS "count_distinct_units"',
-        'FROM "properties"',
-        'JOIN "units" ON "properties"."property_id" = "units"."property_id"',
-        'JOIN "leases" ON "units"."unit_id" = "leases"."unit_id"',
-      ]),
-      ...assertNoPromptText(result, integrated.plan.prompt || ""),
+    assert: (result) => [
+      ...expectRefused(result, "renderer_capability_incapable"),
+      ...(evaluateBusinessSqlRendererCapability(leasedUnitsPerProperty.plan).reasonCodes.includes(
+        "row_filter_rendering_not_supported",
+      )
+        ? []
+        : ["Expected row filter rendering capability guard."]),
     ],
   },
   {

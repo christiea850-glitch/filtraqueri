@@ -170,24 +170,53 @@ export type BusinessSqlFilterKind =
   | "relationship_predicate"
   | "custom";
 
+export type BusinessSqlFilterOperator =
+  | "equals"
+  | "not_equals"
+  | "greater_than"
+  | "greater_than_or_equal"
+  | "less_than"
+  | "less_than_or_equal"
+  | "contains"
+  | "starts_with"
+  | "ends_with"
+  | "in"
+  | "not_in"
+  | "before"
+  | "after"
+  | "between"
+  | "is_null"
+  | "is_not_null";
+
+export type BusinessSqlFilterComparisonValue =
+  | { kind: "number"; value: number }
+  | { kind: "string"; value: string }
+  | { kind: "boolean"; value: boolean };
+
+export type BusinessSqlFilterTarget =
+  | {
+      kind: "field";
+      entity?: string;
+      table?: string;
+      field?: string;
+      fieldInferredType?: SchemaColumn["inferred_type"];
+      resolved?: boolean;
+    };
+
 export type BusinessSqlFilter = {
+  filterId?: string;
   kind: BusinessSqlFilterKind;
+  target?: BusinessSqlFilterTarget;
   entity?: string;
   table?: string;
   field?: string;
-  operator?:
-    | "equals"
-    | "not_equals"
-    | "in"
-    | "not_in"
-    | "before"
-    | "after"
-    | "between"
-    | "is_null"
-    | "is_not_null";
+  fieldInferredType?: SchemaColumn["inferred_type"];
+  operator?: BusinessSqlFilterOperator;
+  comparisonValue?: BusinessSqlFilterComparisonValue;
   value?: string | string[];
   predicate?: string;
   label: string;
+  evidence?: string;
 };
 
 export type BusinessSqlJoinRequirement = {
@@ -346,6 +375,33 @@ export const createBusinessSqlSortId = (
 export const createBusinessSqlRowLimitId = (
   rowLimit: Pick<BusinessSqlRowLimit, "value">,
 ): string => stablePrimitiveId("business-sql-row-limit", [rowLimit.value]);
+
+export const createBusinessSqlFilterId = (
+  filter: Pick<BusinessSqlFilter, "target" | "entity" | "table" | "field" | "operator" | "comparisonValue">,
+): string => {
+  const target = filter.target?.kind === "field"
+    ? filter.target
+    : {
+        kind: "field" as const,
+        entity: filter.entity,
+        table: filter.table,
+        field: filter.field,
+      };
+  const comparisonValue = filter.comparisonValue;
+  return stablePrimitiveId("business-sql-filter", [
+    target.kind,
+    target.entity,
+    target.table,
+    target.field,
+    filter.operator,
+    comparisonValue?.kind,
+    comparisonValue?.kind === "number" ||
+    comparisonValue?.kind === "string" ||
+    comparisonValue?.kind === "boolean"
+      ? String(comparisonValue.value)
+      : null,
+  ]);
+};
 
 export const createBusinessSqlAggregateResultConditionId = (
   condition: Pick<

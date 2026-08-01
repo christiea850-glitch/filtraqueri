@@ -524,6 +524,15 @@ export function renderBusinessSqlFromRenderability({
   }
 
   const normalizedPlan = normalizeMetricAndMeasures(plan);
+  if ((normalizedPlan.filters || []).length > 0) {
+    return refused({
+      integrated,
+      reasonCode: "incomplete_plan_metadata",
+      status: "needs_review",
+      reasons: ["Plan contains row-level filters, but WHERE rendering is not supported yet."],
+      warnings: renderability.warnings,
+    });
+  }
   const derivedMeasure = normalizedPlan.derivedMeasures[0] || null;
   const rendersDerivedMeasure = Boolean(derivedMeasure);
   const measure = normalizedPlan.measures[0];

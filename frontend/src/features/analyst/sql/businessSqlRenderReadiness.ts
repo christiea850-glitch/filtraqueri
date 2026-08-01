@@ -7,6 +7,7 @@ import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCom
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
 import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "./businessSqlAggregateResultConditionCompatibility";
 import { evaluateBusinessSqlDerivedMeasureCompatibility } from "./businessSqlDerivedMeasureCompatibility";
+import { evaluateBusinessSqlFilterCompatibility } from "./businessSqlFilterCompatibility";
 
 export type BusinessSqlRenderReadinessStatus =
   | "renderable"
@@ -184,6 +185,16 @@ export function evaluateBusinessSqlRenderReadiness(
     }
   }
 
+  const filterReasonCodes = (normalizedPlan.filters || []).flatMap(
+    (filter) => evaluateBusinessSqlFilterCompatibility({ filter }).reasonCodes,
+  );
+
+  if (filterReasonCodes.length > 0) {
+    reasons.push(
+      ...filterReasonCodes.map((reason) => `Row-level filter is invalid: ${reason}.`),
+    );
+  }
+
   const aggregateConditionReasonCodes = (normalizedPlan.aggregateResultConditions || []).flatMap(
     (condition) =>
       evaluateBusinessSqlAggregateResultConditionCompatibility({
@@ -243,6 +254,7 @@ export function evaluateBusinessSqlRenderReadiness(
     plan.status === "blocked" ||
     plan.kind === "blocked" ||
     derivedMeasureReasonCodes.length > 0 ||
+    filterReasonCodes.length > 0 ||
     plan.joinPath.status === "missing" ||
     plan.renderer.status === "blocked" ||
     plan.warnings.some((warning) => warning.severity === "blocking");

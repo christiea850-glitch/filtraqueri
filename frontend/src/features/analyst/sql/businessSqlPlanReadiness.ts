@@ -14,6 +14,10 @@ import {
   type BusinessSqlDerivedMeasureCompatibilityReason,
 } from "./businessSqlDerivedMeasureCompatibility";
 import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
+import {
+  evaluateBusinessSqlFilterCompatibility,
+  type BusinessSqlFilterCompatibilityReason,
+} from "./businessSqlFilterCompatibility";
 
 export type BusinessSqlPlanReadinessStatus = "ready" | "needs_review" | "blocked";
 
@@ -31,7 +35,8 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "measure_field_type_incompatible"
   | "row_limit_invalid"
   | BusinessSqlDerivedMeasureCompatibilityReason
-  | BusinessSqlAggregateResultConditionCompatibilityReason;
+  | BusinessSqlAggregateResultConditionCompatibilityReason
+  | BusinessSqlFilterCompatibilityReason;
 
 export type BusinessSqlRendererEligibility = {
   eligible: boolean;
@@ -194,6 +199,15 @@ export function evaluateBusinessSqlPlanReadiness(
     if (aggregateConditionReasonCodes.includes("aggregate_condition_value_invalid")) {
       reviewReasons.push("One or more aggregate-result condition values are invalid.");
     }
+  }
+
+  const filterReasonCodes = (plan.filters || []).flatMap((filter) =>
+    evaluateBusinessSqlFilterCompatibility({ filter }).reasonCodes,
+  );
+
+  if (filterReasonCodes.length > 0) {
+    reasonCodes.push(...filterReasonCodes);
+    blockingReasons.push("One or more row-level filters are structurally invalid.");
   }
 
   if (

@@ -247,6 +247,11 @@ const fixtures = [
     exportName: "runBusinessSqlDerivedMeasureTargetsFixtures",
   },
   {
+    label: "Business SQL row-filter contract",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlRowFilterContract.test.ts",
+    exportName: "runBusinessSqlRowFilterContractFixtures",
+  },
+  {
     label: "Explicit subtraction grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitSubtractionGrounding.test.ts",
     exportName: "runExplicitSubtractionGroundingFixtures",
