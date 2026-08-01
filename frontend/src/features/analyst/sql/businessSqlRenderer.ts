@@ -400,6 +400,23 @@ const renderSqlSetLiteral = (
   return literals.length > 0 ? `(${literals.join(", ")})` : null;
 };
 
+const renderSqlRangeLiteral = (
+  value: BusinessSqlFilterComparisonValue,
+): { lower: string; upper: string } | null => {
+  if (value.kind !== "range") return null;
+  if (
+    value.valueKind !== "number" ||
+    value.lowerInclusive !== true ||
+    value.upperInclusive !== true ||
+    value.lower > value.upper
+  ) {
+    return null;
+  }
+  const lower = renderNumericComparisonValue(value.lower);
+  const upper = renderNumericComparisonValue(value.upper);
+  return lower !== null && upper !== null ? { lower, upper } : null;
+};
+
 const rowFilterComparisonOperatorSql: Partial<Record<BusinessSqlFilterOperator, string>> = {
   equals: "=",
   not_equals: "<>",
@@ -443,7 +460,12 @@ const renderWhere = (
   if (filter.operator === "is_null") return `WHERE ${fieldExpression} IS NULL`;
   if (filter.operator === "is_not_null") return `WHERE ${fieldExpression} IS NOT NULL`;
   if (!filter.comparisonValue) return null;
-  if (filter.operator === "between" || filter.comparisonValue.kind === "range") return null;
+  if (filter.operator === "between") {
+    const literal = renderSqlRangeLiteral(filter.comparisonValue);
+    if (!literal) return null;
+    return `WHERE ${fieldExpression} BETWEEN ${literal.lower} AND ${literal.upper}`;
+  }
+  if (filter.comparisonValue.kind === "range") return null;
   if (filter.operator === "in" || filter.operator === "not_in") {
     const literal = renderSqlSetLiteral(filter.comparisonValue);
     if (!literal) return null;

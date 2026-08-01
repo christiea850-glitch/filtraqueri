@@ -1,4 +1,4 @@
-/** PS-6c - canonical numeric BETWEEN row-filter contract fixtures. */
+/** PS-6 - canonical numeric BETWEEN row-filter contract and rendering fixtures. */
 
 import {
   createBusinessSqlDerivedMeasureId,
@@ -219,24 +219,43 @@ const readinessFor = (plan: BusinessSqlQueryPlan) =>
 const compatibilityFor = (filter: BusinessSqlFilter) =>
   evaluateBusinessSqlFilterCompatibility({ filter });
 
-const noSqlAndNoActions = (plan: BusinessSqlQueryPlan): boolean => {
-  const rendered = renderBusinessSqlQueryPlan(plan);
-  const preview = createBusinessSqlRenderPreview(plan);
-  return !rendered.rendered &&
-    rendered.sql === null &&
-    rendered.inserted === false &&
-    rendered.ranQuery === false &&
-    preview.sql === null &&
-    !preview.actions.canCopySql &&
-    !preview.actions.canInsertSql &&
-    !preview.actions.canRunSql;
-};
-
 const expectedScalarSql = [
   "SELECT",
   '  "orders"."order_id" AS "order_id"',
   'FROM "orders"',
   'WHERE "orders"."order_amount" > 1000;',
+].join("\n");
+
+const expectedRangeSql = [
+  "SELECT",
+  '  "orders"."order_id" AS "order_id"',
+  'FROM "orders"',
+  'WHERE "orders"."order_amount" BETWEEN 100 AND 500;',
+].join("\n");
+
+const expectedDecimalRangeSql = [
+  "SELECT",
+  '  "orders"."order_id" AS "order_id"',
+  'FROM "orders"',
+  'WHERE "orders"."order_amount" BETWEEN 1.5 AND 10.25;',
+].join("\n");
+
+const expectedNegativeRangeSql = [
+  "SELECT",
+  '  "orders"."order_id" AS "order_id"',
+  'FROM "orders"',
+  'WHERE "orders"."order_amount" BETWEEN -10 AND -1;',
+].join("\n");
+
+const expectedJoinedRangeSql = [
+  "SELECT",
+  '  "orders"."region" AS "region",',
+  '  SUM("orders"."revenue") AS "total_revenue"',
+  'FROM "orders"',
+  'JOIN "customers" ON "orders"."customer_id" = "customers"."customer_id"',
+  'WHERE "customers"."order_amount" BETWEEN 100 AND 500',
+  'GROUP BY "orders"."region"',
+  'ORDER BY "total_revenue" DESC;',
 ].join("\n");
 
 const expectedTextInSql = [
@@ -271,6 +290,15 @@ const expectedEmptyUnsortedSql = [
 ].join("\n");
 
 const validRangeFilter = () => filterFor();
+
+const rendersRangeSql = (plan: BusinessSqlQueryPlan): boolean => {
+  const result = renderBusinessSqlQueryPlan(plan);
+  return result.rendered &&
+    typeof result.sql === "string" &&
+    result.sql.includes(" BETWEEN ") &&
+    result.inserted === false &&
+    result.ranQuery === false;
+};
 
 const withoutFieldType = (): BusinessSqlFilter => {
   const filter = filterFor();
@@ -314,35 +342,64 @@ const fixtures: Fixture[] = [
   { name: "date field rejects numeric range", assert: () => compatibilityFor(filterFor({ field: "created_at", fieldInferredType: "date" })).reasonCodes.includes("row_filter_type_incompatible") ? [] : ["Expected date rejection."] },
   { name: "unknown field type rejects numeric range", assert: () => compatibilityFor(withoutFieldType()).reasonCodes.includes("row_filter_type_incompatible") ? [] : ["Expected unknown rejection."] },
   { name: "valid BETWEEN is structurally ready", assert: () => readinessFor(basePlan(validRangeFilter())).status === "ready" ? [] : ["Expected ready range plan."] },
-  { name: "valid BETWEEN is renderer-incapable with precise reason", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter())).reasonCodes.includes("row_filter_range_rendering_not_supported") ? [] : ["Expected range rendering limitation."] },
+  { name: "valid BETWEEN is renderer-capable", assert: () => {
+    const capability = evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter()));
+    return capability.capable && !capability.reasonCodes.includes("row_filter_range_rendering_not_supported") ? [] : ["Expected range renderer capability."];
+  } },
   { name: "invalid range is structurally blocked", assert: () => readinessFor(basePlan(filterFor({ comparisonValue: rangeValue(10, 1) }))).status === "blocked" ? [] : ["Expected invalid range blocked."] },
   { name: "multiple filters remain incapable", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected multiple filter refusal."] },
-  { name: "renderer emits no BETWEEN SQL", assert: () => {
+  { name: "renderer emits deterministic BETWEEN SQL", assert: () => {
     const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(validRangeFilter()));
-    return !result.sql && !String(result.sql || "").includes("BETWEEN") ? [] : ["Expected no BETWEEN SQL."];
+    return result.sql === expectedRangeSql && result.rendered ? [] : ["Expected exact BETWEEN SQL."];
   } },
-  { name: "preview exposes no actions", assert: () => {
+  { name: "preview exposes SQL behind manual insert and run gates", assert: () => {
     const preview = createBusinessSqlRenderPreview(fieldProjectionPlan(validRangeFilter()));
-    return !preview.sql && !preview.actions.canCopySql && !preview.actions.canInsertSql && !preview.actions.canRunSql ? [] : ["Expected preview no actions."];
+    return preview.sql === expectedRangeSql &&
+      preview.actions.canCopySql &&
+      !preview.actions.canInsertSql &&
+      !preview.actions.canRunSql
+      ? []
+      : ["Expected preview SQL with manual gates."];
   } },
-  { name: "BETWEEN plus grouping emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(validRangeFilter())) ? [] : ["Expected grouping no SQL."] },
-  { name: "BETWEEN plus HAVING emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(validRangeFilter(), { aggregateResultConditions: [{ conditionId: "range-having", measureId: revenueMeasure.measureId, operator: "greater_than", comparisonValue: { kind: "number", value: 10 } }] })) ? [] : ["Expected HAVING no SQL."] },
-  { name: "BETWEEN plus derived HAVING emits no partial SQL", assert: () => noSqlAndNoActions(derivedConditionPlan(validRangeFilter())) ? [] : ["Expected derived HAVING no SQL."] },
-  { name: "BETWEEN plus ORDER BY emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(validRangeFilter(), { orderBy: [defaultSort()] })) ? [] : ["Expected ORDER BY no SQL."] },
-  { name: "BETWEEN plus rowLimit emits no partial SQL", assert: () => {
+  { name: "BETWEEN renders with negative and decimal endpoints", assert: () => [
+    ...(renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor({ comparisonValue: rangeValue(1.5, 10.25) }))).sql === expectedDecimalRangeSql ? [] : ["Expected decimal BETWEEN SQL."]),
+    ...(renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor({ comparisonValue: rangeValue(-10, -1) }))).sql === expectedNegativeRangeSql ? [] : ["Expected negative BETWEEN SQL."]),
+  ] },
+  { name: "malformed BETWEEN still emits no SQL or actions", assert: () => {
+    const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor({ comparisonValue: rangeValue(500, 100) })));
+    const preview = createBusinessSqlRenderPreview(fieldProjectionPlan(filterFor({ comparisonValue: rangeValue(500, 100) })));
+    return !result.rendered &&
+      result.sql === null &&
+      result.inserted === false &&
+      result.ranQuery === false &&
+      preview.sql === null &&
+      !preview.actions.canCopySql &&
+      !preview.actions.canInsertSql &&
+      !preview.actions.canRunSql
+      ? []
+      : ["Expected malformed BETWEEN refusal."];
+  } },
+  { name: "BETWEEN plus grouping renders complete SQL", assert: () => rendersRangeSql(basePlan(validRangeFilter())) ? [] : ["Expected grouping BETWEEN SQL."] },
+  { name: "BETWEEN plus HAVING renders complete SQL", assert: () => rendersRangeSql(basePlan(validRangeFilter(), { aggregateResultConditions: [{ conditionId: "range-having", measureId: revenueMeasure.measureId, operator: "greater_than", comparisonValue: { kind: "number", value: 10 } }] })) ? [] : ["Expected HAVING BETWEEN SQL."] },
+  { name: "BETWEEN plus derived HAVING renders complete SQL", assert: () => rendersRangeSql(derivedConditionPlan(validRangeFilter())) ? [] : ["Expected derived HAVING BETWEEN SQL."] },
+  { name: "BETWEEN plus ORDER BY renders complete SQL", assert: () => rendersRangeSql(basePlan(validRangeFilter(), { orderBy: [defaultSort()] })) ? [] : ["Expected ORDER BY BETWEEN SQL."] },
+  { name: "BETWEEN plus rowLimit renders complete SQL", assert: () => {
     const rowLimit = { value: 5 };
-    return noSqlAndNoActions(basePlan(validRangeFilter(), { rowLimit: { ...rowLimit, rowLimitId: createBusinessSqlRowLimitId(rowLimit) } })) ? [] : ["Expected row limit no SQL."];
+    return rendersRangeSql(basePlan(validRangeFilter(), { rowLimit: { ...rowLimit, rowLimitId: createBusinessSqlRowLimitId(rowLimit) } })) ? [] : ["Expected row limit BETWEEN SQL."];
   } },
-  { name: "BETWEEN plus resolved join emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ table: "customers", entity: "customers" }), {
-    entities: [sourceEntity, { entity: "customers", table: "customers", required: true, role: "filter_subject" }],
-    joinPath: {
-      required: true,
-      status: "resolved",
-      entities: ["orders", "customers"],
-      requirements: [{ fromEntity: "orders", toEntity: "customers", required: true, relationship: "orders customer", verified: true }],
-      edges: [{ fromEntity: "orders", fromTable: "orders", fromField: "customer_id", toEntity: "customers", toTable: "customers", toField: "customer_id", relationship: "orders customer", verified: true }],
-    },
-  })) ? [] : ["Expected joined range no SQL."] },
+  { name: "BETWEEN plus resolved join renders complete SQL", assert: () => {
+    const plan = basePlan(filterFor({ table: "customers", entity: "customers" }), {
+      entities: [sourceEntity, { entity: "customers", table: "customers", required: true, role: "filter_subject" }],
+      joinPath: {
+        required: true,
+        status: "resolved",
+        entities: ["orders", "customers"],
+        requirements: [{ fromEntity: "orders", toEntity: "customers", required: true, relationship: "orders customer", verified: true }],
+        edges: [{ fromEntity: "orders", fromTable: "orders", fromField: "customer_id", toEntity: "customers", toTable: "customers", toField: "customer_id", relationship: "orders customer", verified: true }],
+      },
+    });
+    return renderBusinessSqlQueryPlan(plan).sql === expectedJoinedRangeSql ? [] : ["Expected joined BETWEEN SQL."];
+  } },
   { name: "identical ranges share filterId", assert: () => filterFor({ comparisonValue: rangeValue(1, 10) }).filterId === filterFor({ comparisonValue: rangeValue(1, 10) }).filterId ? [] : ["Expected identical range IDs."] },
   { name: "changing lower changes filterId", assert: () => filterFor({ comparisonValue: rangeValue(1, 10) }).filterId !== filterFor({ comparisonValue: rangeValue(2, 10) }).filterId ? [] : ["Expected lower to change ID."] },
   { name: "changing upper changes filterId", assert: () => filterFor({ comparisonValue: rangeValue(1, 10) }).filterId !== filterFor({ comparisonValue: rangeValue(1, 11) }).filterId ? [] : ["Expected upper to change ID."] },
