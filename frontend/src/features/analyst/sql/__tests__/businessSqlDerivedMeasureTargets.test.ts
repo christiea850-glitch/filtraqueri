@@ -798,7 +798,16 @@ const fixtures: Fixture[] = [
       const havingPlan = {
         ...orderPlan,
         id: "business-sql-plan:base-having",
-        orderBy: [],
+        orderBy: [
+          {
+            sortId: createBusinessSqlSortId({
+              target: { kind: "measure", measureId: leftMeasure.measureId, resolved: true },
+              direction: "desc",
+            }),
+            target: { kind: "measure" as const, measureId: leftMeasure.measureId, resolved: true },
+            direction: "desc" as const,
+          },
+        ],
         aggregateResultConditions: [conditionFor()],
       };
       const expectedOrderSql = [

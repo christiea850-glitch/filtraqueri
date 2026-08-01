@@ -7,10 +7,14 @@ import type {
 } from "../../workbook";
 import {
   createEmptyBusinessSqlQueryPlan,
+  createBusinessSqlMeasureId,
+  createBusinessSqlSortId,
   type BusinessSqlJoinEdge,
   type BusinessSqlJoinRequirement,
+  type BusinessSqlMetric,
   type BusinessSqlPlanSupportLevel,
   type BusinessSqlQueryPlan,
+  type BusinessSqlSort,
 } from "./businessSqlQueryPlan";
 import {
   resolveBusinessSqlJoinPath,
@@ -120,6 +124,26 @@ const joinEdge = (
   verified: false,
 });
 
+const DEFAULT_AGGREGATE_SORT_ASSUMPTION =
+  "Results are ordered by the primary measure in descending order by default.";
+
+const defaultSortForMetric = (metric: BusinessSqlMetric): BusinessSqlSort => {
+  const measureId = createBusinessSqlMeasureId({
+    kind: metric.kind,
+    entity: metric.entity,
+    table: metric.table,
+    field: metric.field,
+    distinct: metric.distinct,
+  });
+  const target = { kind: "measure" as const, measureId, resolved: true };
+  return {
+    sortId: createBusinessSqlSortId({ target, direction: "desc" }),
+    target,
+    direction: "desc",
+    label: `Sort by ${metric.label}`,
+  };
+};
+
 const unsupportedPlan = (
   prompt: string,
   selectedGuidanceDialect: SqlDialectId | undefined,
@@ -152,39 +176,50 @@ const unsupportedPlan = (
 const leasesByStatusPlan = (
   prompt: string,
   selectedGuidanceDialect: SqlDialectId | undefined,
-): BusinessSqlQueryPlan => ({
-  ...createEmptyBusinessSqlQueryPlan(),
-  id: "business-sql-plan:leases-by-status",
-  kind: "single_table_count_grouping",
-  status: "resolved",
-  support: "supported",
-  prompt,
-  entities: [{ entity: "leases", table: "leases", required: true, role: "source" }],
-  metric: {
+): BusinessSqlQueryPlan => {
+  const metric: BusinessSqlMetric = {
     kind: "count_entities",
     entity: "leases",
     table: "leases",
     distinct: false,
     label: "count leases",
-  },
-  groupings: [
-    {
-      entity: "leases",
-      table: "leases",
-      field: "lease_status",
-      label: "lease_status",
+  };
+  return {
+    ...createEmptyBusinessSqlQueryPlan(),
+    id: "business-sql-plan:leases-by-status",
+    kind: "single_table_count_grouping",
+    status: "resolved",
+    support: "supported",
+    prompt,
+    entities: [{ entity: "leases", table: "leases", required: true, role: "source" }],
+    metric,
+    groupings: [
+      {
+        entity: "leases",
+        table: "leases",
+        field: "lease_status",
+        label: "lease_status",
+      },
+    ],
+    orderBy: [defaultSortForMetric(metric)],
+    assumptions: [
+      {
+        id: "assumption:default-aggregate-ordering",
+        label: "Default aggregate ordering",
+        detail: DEFAULT_AGGREGATE_SORT_ASSUMPTION,
+      },
+    ],
+    renderer: rendererFor(selectedGuidanceDialect, "supported"),
+    preview: {
+      title: "Leases by status",
+      metricSummary: "Count lease records.",
+      groupingSummary: "Grouped by lease_status.",
+      filterSummary: "No active/current filter is implied.",
+      joinSummary: "No join path required.",
+      rendererSummary: "SQL has not been rendered.",
     },
-  ],
-  renderer: rendererFor(selectedGuidanceDialect, "supported"),
-  preview: {
-    title: "Leases by status",
-    metricSummary: "Count lease records.",
-    groupingSummary: "Grouped by lease_status.",
-    filterSummary: "No active/current filter is implied.",
-    joinSummary: "No join path required.",
-    rendererSummary: "SQL has not been rendered.",
-  },
-});
+  };
+};
 
 const ordersPerCustomerPlan = (
   prompt: string,

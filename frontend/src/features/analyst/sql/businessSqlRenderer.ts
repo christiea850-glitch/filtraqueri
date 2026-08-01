@@ -286,7 +286,7 @@ const renderOrderBy = (
   groupings: NonNullable<ReturnType<typeof groupingExpressions>>,
 ): string | null => {
   const sort = plan.orderBy[0];
-  if (!sort) return `ORDER BY ${quoteIdentifier(measure.sqlAlias)} DESC`;
+  if (!sort) return null;
   const direction = sort.direction === "asc" ? "ASC" : "DESC";
   if (sort.target.kind === "measure") {
     if (sort.target.measureId !== measure.measureId) return null;
@@ -656,7 +656,7 @@ export function renderBusinessSqlFromRenderability({
         )
       : renderOrderBy(plan, measure, groupings)
     : null;
-  const requiresOrderBy = !fieldProjectionOnly && (!derivedMeasure || (plan.orderBy || []).length > 0);
+  const requiresOrderBy = !fieldProjectionOnly && (plan.orderBy || []).length > 0;
 
   if (
     !groupings ||

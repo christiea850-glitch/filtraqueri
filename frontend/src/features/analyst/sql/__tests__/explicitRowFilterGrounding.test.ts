@@ -15,6 +15,7 @@ import {
   createBusinessSqlFilterId,
   createBusinessSqlMeasureAlias,
   createBusinessSqlMeasureId,
+  createBusinessSqlSortId,
   type BusinessSqlFilter,
 } from "../businessSqlQueryPlan";
 import { createBusinessSqlRenderPreview } from "../businessSqlRenderPreview";
@@ -445,6 +446,7 @@ const fixtures: Fixture[] = [
         field: "revenue",
         distinct: false,
       };
+      const measureId = createBusinessSqlMeasureId(measureSeed);
       const plan = {
         ...createEmptyBusinessSqlQueryPlan(),
         id: "business-sql-plan:ps-5c-unfiltered-byte-identity",
@@ -454,12 +456,22 @@ const fixtures: Fixture[] = [
         entities: [{ entity: "sales", table: "sales", required: true, role: "source" as const }],
         measures: [{
           ...measureSeed,
-          measureId: createBusinessSqlMeasureId(measureSeed),
+          measureId,
           fieldInferredType: "numeric" as const,
           label: "Total revenue",
           sqlAlias: createBusinessSqlMeasureAlias("Total revenue"),
         }],
         groupings: [{ entity: "sales", table: "sales", field: "region", label: "region" }],
+        orderBy: [
+          {
+            sortId: createBusinessSqlSortId({
+              target: { kind: "measure", measureId, resolved: true },
+              direction: "desc",
+            }),
+            target: { kind: "measure" as const, measureId, resolved: true },
+            direction: "desc" as const,
+          },
+        ],
       };
       const expected = [
         "SELECT",

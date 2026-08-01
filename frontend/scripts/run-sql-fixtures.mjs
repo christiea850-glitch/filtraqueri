@@ -247,6 +247,11 @@ const fixtures = [
     exportName: "runBusinessSqlDerivedMeasureTargetsFixtures",
   },
   {
+    label: "Business SQL default aggregate ordering",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlDefaultAggregateOrdering.test.ts",
+    exportName: "runBusinessSqlDefaultAggregateOrderingFixtures",
+  },
+  {
     label: "Business SQL row-filter contract",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlRowFilterContract.test.ts",
     exportName: "runBusinessSqlRowFilterContractFixtures",

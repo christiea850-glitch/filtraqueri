@@ -207,6 +207,19 @@ const hasCanonicalFieldProjection = (proposal: AdaptiveReportProposal): boolean 
 const hasCanonicalRowFilter = (proposal: AdaptiveReportProposal): boolean =>
   proposal.filters.some(isCanonicalProposedFilter);
 
+const hasDefaultAggregateOrderingAssumption = (proposal: AdaptiveReportProposal): boolean =>
+  proposal.assumptions.some((assumption) =>
+    assumption.detail === "Results are ordered by the primary measure in descending order by default.",
+  );
+
+const hasDefaultSortedGroundedAggregate = (proposal: AdaptiveReportProposal): boolean =>
+  hasDefaultAggregateOrderingAssumption(proposal) &&
+  proposal.metrics.length === 1 &&
+  proposal.metrics[0].confidence === "high" &&
+  Boolean(proposal.metrics[0].tableName) &&
+  proposal.groupings.length > 0 &&
+  proposal.groupings.every((grouping) => grouping.confidence === "high" && grouping.tableName);
+
 const mapEntities = (proposal: AdaptiveReportProposal): BusinessSqlEntityRef[] =>
   {
     const mapped = proposal.entities
@@ -218,7 +231,8 @@ const mapEntities = (proposal: AdaptiveReportProposal): BusinessSqlEntityRef[] =
         entity.binding !== "scope_fallback" ||
         (proposal.aggregateResultConditions || []).length > 0 ||
         (proposal.derivedMeasures || []).length > 0 ||
-        hasCanonicalRowFilter(proposal),
+        hasCanonicalRowFilter(proposal) ||
+        hasDefaultSortedGroundedAggregate(proposal),
       role: roleForEntity(entity, proposal),
     }));
     if (
@@ -466,6 +480,16 @@ const mapOrderBy = (
           "unresolved_derived_measure_reference",
           "blocking",
           `Sort ${sort.id} references an unresolved proposed derived measure.`,
+        ),
+      );
+      continue;
+    }
+    if (sort.target === "metric" && !targetMeasure) {
+      issues.push(
+        issue(
+          "unresolved_metric_reference",
+          "blocking",
+          `Sort ${sort.id} references an unresolved proposed metric.`,
         ),
       );
       continue;
@@ -848,7 +872,8 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     (proposal.confidence !== "high" &&
       !hasGroundedAggregateThreshold &&
       !hasGroundedDerivedMeasure &&
-      !hasCanonicalRowFilter(proposal))
+      !hasCanonicalRowFilter(proposal) &&
+      !hasDefaultSortedGroundedAggregate(proposal))
       ? [
           issue(
             "low_confidence",

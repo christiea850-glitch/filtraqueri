@@ -185,6 +185,24 @@ const existingRenderablePlan = (): BusinessSqlQueryPlan => {
     groupings: [
       { entity: "leases", table: "leases", field: "lease_status", label: "lease_status" },
     ],
+    orderBy: [
+      {
+        sortId: createBusinessSqlSortId({
+          target: {
+            kind: "measure",
+            measureId: "business-sql-measure:count_entities:leases:leases::false",
+            resolved: true,
+          },
+          direction: "desc",
+        }),
+        target: {
+          kind: "measure",
+          measureId: "business-sql-measure:count_entities:leases:leases::false",
+          resolved: true,
+        },
+        direction: "desc",
+      },
+    ],
   };
 };
 

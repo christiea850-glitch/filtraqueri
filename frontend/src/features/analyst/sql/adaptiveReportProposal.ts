@@ -1087,6 +1087,11 @@ export const parseAggregateThresholdNumber = (
   value: string,
 ): BusinessSqlAggregateComparisonValue | null => parseNumericThreshold(value);
 
+const hasThresholdOperatorPhrase = (prompt: string): boolean =>
+  new RegExp(String.raw`\b(?:${THRESHOLD_PHRASE_PATTERN})\b`, "i").test(
+    normalizeThresholdDetectionText(prompt),
+  );
+
 type RowFilterShell =
   | { status: "none" }
   | { status: "unsupported"; reason: string; baseQuestion?: string; predicate?: string }
@@ -1188,6 +1193,9 @@ const detectRowFilterShell = (prompt: string): RowFilterShell => {
   const valueText = predicate.slice(match.index + match.text.length).trim();
   if (!fieldPhrase) {
     return { status: "unsupported", reason: "missing_field", baseQuestion, predicate };
+  }
+  if (/\b(?:minus|plus|divided\s+by|multiplied\s+by)\b/i.test(fieldPhrase)) {
+    return { status: "unsupported", reason: "formula_field_phrase", baseQuestion, predicate };
   }
   if (match.nullary && trimNaturalLanguageValuePunctuation(valueText)) {
     return { status: "unsupported", reason: "unexpected_nullary_value", baseQuestion, predicate };
@@ -1524,9 +1532,14 @@ const proposeMetrics = (
 
 const proposeSorts = (
   intent: BusinessIntent,
+  prompt: string,
   metrics: readonly ProposedMetric[],
 ): ProposedSort[] => {
   if (!intent.analysisPath) return [];
+  const text = normalize(prompt);
+  const hasExplicitSortLanguage =
+    /\b(?:top|bottom|highest|lowest|ascending|descending|rank(?:ed)?|sort(?:ed)?|order(?:ed)?)\b/.test(text);
+  if (!hasExplicitSortLanguage) return [];
   const targetMetric = metrics.find((metric) =>
     sameName(metric.columnName, intent.analysisPath?.measureField),
   ) || metrics[0];
@@ -1540,6 +1553,49 @@ const proposeSorts = (
       targetId: targetMetric.id,
       direction: intent.analysisPath.orderDirection === "ascending" ? "asc" : "desc",
       confidence: targetMetric.confidence,
+    },
+  ];
+};
+
+const DEFAULT_AGGREGATE_SORT_ASSUMPTION =
+  "Results are ordered by the primary measure in descending order by default.";
+
+const defaultAggregateSortFor = ({
+  metrics,
+  groupings,
+  derivedMeasures,
+  sorts,
+  prompt,
+  aggregateResultConditions,
+}: {
+  metrics: readonly ProposedMetric[];
+  groupings: readonly ProposedGrouping[];
+  derivedMeasures: readonly ProposedDerivedMeasure[];
+  sorts: readonly ProposedSort[];
+  prompt: string;
+  aggregateResultConditions: readonly ProposedAggregateResultCondition[];
+}): ProposedSort[] => {
+  if (sorts.length > 0) return [...sorts];
+  if (aggregateResultConditions.length === 0 && hasThresholdOperatorPhrase(prompt)) return [...sorts];
+  if (metrics.length !== 1) return [...sorts];
+  if (groupings.length === 0) return [...sorts];
+  if (derivedMeasures.length > 0) return [...sorts];
+  const metric = metrics[0];
+  if (
+    metric.kind === "metric_column" ||
+    !metric.tableName ||
+    metric.confidence === "low"
+  ) {
+    return [...sorts];
+  }
+  return [
+    {
+      id: `sort:${compactId(metric.id)}:desc`,
+      label: `Sort by ${metric.label}`,
+      target: "metric",
+      targetId: metric.id,
+      direction: "desc",
+      confidence: "low",
     },
   ];
 };
@@ -1880,12 +1936,15 @@ const proposeFilters = (
 ): ProposedFilter[] => {
   const filters: ProposedFilter[] = [];
   const rowFilterShell = detectRowFilterShell(prompt);
+  const hasDerivedThresholdShell = detectDerivedThresholdShell(prompt).status === "detected";
+  const hasAggregateThresholdShell =
+    aggregateResultConditions.length > 0 ||
+    /\bwhere\b\s+(?:total|sum|average|avg|minimum|min|maximum|max|count)\b/i.test(prompt);
   const legacyPrompt = rowFilterShell.status === "detected" ? rowFilterShell.baseQuestion : prompt;
-  if (rowFilterShell.status === "unsupported") {
+  if (rowFilterShell.status === "unsupported" && !hasDerivedThresholdShell && !hasAggregateThresholdShell) {
     filters.push(unsupportedRowFilter(rowFilterShell));
   } else if (rowFilterShell.status === "detected") {
-    const hasDerivedThreshold = detectDerivedThresholdShell(prompt).status === "detected";
-    if (!hasDerivedThreshold && aggregateResultConditions.length === 0) {
+    if (!hasDerivedThresholdShell && aggregateResultConditions.length === 0 && !hasAggregateThresholdShell) {
       filters.push(proposedCanonicalRowFilter(rowFilterShell, worksheets));
     }
   }
@@ -2290,6 +2349,7 @@ const createAssumptions = (
   entities: readonly ProposedEntity[],
   metrics: readonly ProposedMetric[],
   groupings: readonly ProposedGrouping[],
+  sorts: readonly ProposedSort[] = [],
 ): ProposedAssumption[] => {
   const assumptions: ProposedAssumption[] = [];
   for (const entity of entities.filter((entity) => entity.confidence !== "high")) {
@@ -2311,6 +2371,13 @@ const createAssumptions = (
       id: `assumption:grouping:${compactId(grouping.label)}`,
       label: "Grouping binding",
       detail: `Grouping \`${grouping.label}\` needs review against available columns.`,
+    });
+  }
+  if (sorts.some((sort) => sort.confidence === "low" && sort.target === "metric")) {
+    assumptions.push({
+      id: "assumption:default-aggregate-ordering",
+      label: "Default aggregate ordering",
+      detail: DEFAULT_AGGREGATE_SORT_ASSUMPTION,
     });
   }
   return assumptions;
@@ -2523,7 +2590,19 @@ export function proposeAdaptiveReport(
     derivedMeasures,
   });
   const derivedSorts = proposeDerivedSorts(planningPrompt, derivedMeasures, groupings);
-  const sorts = derivedMeasures.length > 0 ? derivedSorts : proposeSorts(detectedIntent, metrics);
+  const explicitSorts = derivedMeasures.length > 0
+    ? derivedSorts
+    : proposeSorts(detectedIntent, planningPrompt, metrics);
+  const sorts = derivedMeasures.length > 0
+    ? explicitSorts
+    : defaultAggregateSortFor({
+        metrics,
+        groupings,
+        derivedMeasures,
+        sorts: explicitSorts,
+        prompt: planningPrompt,
+        aggregateResultConditions,
+      });
   const rowLimit = proposeRowLimit(detectedIntent);
   const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns, aggregateResultConditions);
   const joinNeeds = proposeJoinNeeds(
@@ -2546,7 +2625,7 @@ export function proposeAdaptiveReport(
     filters,
     joinNeeds,
   });
-  const assumptions = createAssumptions(entities, metrics, groupings);
+  const assumptions = createAssumptions(entities, metrics, groupings, sorts);
   const warnings = createWarnings(filters, joinNeeds, request.selectedGuidanceDialect);
   const support = computeSupport({ missingRequirements, filters, joinNeeds });
   const confidence = computeConfidence(entities, metrics, groupings, derivedMeasures);

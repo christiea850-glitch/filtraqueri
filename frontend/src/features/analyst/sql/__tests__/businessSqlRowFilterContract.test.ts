@@ -143,6 +143,17 @@ const basePlan = (): BusinessSqlQueryPlan => ({
   metric: null,
   measures: [amountMeasure],
   groupings: [grouping],
+  orderBy: [
+    {
+      sortId: createBusinessSqlSortId({
+        target: { kind: "measure", measureId: amountMeasure.measureId, resolved: true },
+        direction: "desc",
+      }),
+      target: { kind: "measure", measureId: amountMeasure.measureId, resolved: true },
+      direction: "desc",
+      label: "Sort by Total amount",
+    },
+  ],
 });
 
 const derivedMeasure = (): BusinessSqlDerivedMeasure => {
