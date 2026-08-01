@@ -12,6 +12,8 @@ import {
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlAggregateComparisonValue,
+  BusinessSqlFilterComparisonValue,
+  BusinessSqlFilterOperator,
 } from "./businessSqlQueryPlan";
 import { createBusinessSqlMeasureAlias } from "./businessSqlQueryPlan";
 import {
@@ -107,8 +109,20 @@ export type ProposedFilter = {
   label: string;
   tableName: string | null;
   columnName: string | null;
-  semantics: "resolved" | "needs_review";
+  semantics: "resolved" | "needs_review" | "canonical";
   reason: string;
+  executable?: true;
+  target?: {
+    kind: "field";
+    entity?: string;
+    table: string;
+    field: string;
+    fieldInferredType?: SchemaColumn["inferred_type"];
+    resolved: boolean;
+  };
+  operator?: BusinessSqlFilterOperator;
+  comparisonValue?: BusinessSqlFilterComparisonValue;
+  evidence?: string;
 };
 
 export type ProposedJoinNeed = {
@@ -1006,6 +1020,9 @@ const trimSentencePunctuation = (value: string): string => {
   return value;
 };
 
+const trimNaturalLanguageValuePunctuation = (value: string): string =>
+  value.trim().replace(/[,.?;]+$/g, "").trim();
+
 const parseNumericThreshold = (value: string): BusinessSqlAggregateComparisonValue | null => {
   const token = trimSentencePunctuation(value.trim());
   if (!NUMERIC_THRESHOLD_PATTERN.test(token)) return null;
@@ -1069,6 +1086,167 @@ const trimThresholdConcept = (value: string): string => {
 export const parseAggregateThresholdNumber = (
   value: string,
 ): BusinessSqlAggregateComparisonValue | null => parseNumericThreshold(value);
+
+type RowFilterShell =
+  | { status: "none" }
+  | { status: "unsupported"; reason: string; baseQuestion?: string; predicate?: string }
+  | {
+      status: "detected";
+      baseQuestion: string;
+      predicate: string;
+      fieldPhrase: string;
+      operator: BusinessSqlFilterOperator;
+      valueText: string;
+      evidence: string;
+    };
+
+type RowFilterOperatorPhrase = {
+  operator: BusinessSqlFilterOperator;
+  phrase: string;
+  nullary?: true;
+};
+
+const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
+  { operator: "not_equals", phrase: "is not equal to" },
+  { operator: "not_equals", phrase: "does not equal" },
+  { operator: "greater_than_or_equal", phrase: "no less than" },
+  { operator: "less_than_or_equal", phrase: "no more than" },
+  { operator: "is_not_null", phrase: "is not null", nullary: true },
+  { operator: "greater_than_or_equal", phrase: "at least" },
+  { operator: "less_than_or_equal", phrase: "at most" },
+  { operator: "greater_than", phrase: "greater than" },
+  { operator: "greater_than", phrase: "more than" },
+  { operator: "less_than", phrase: "less than" },
+  { operator: "less_than", phrase: "fewer than" },
+  { operator: "starts_with", phrase: "starts with" },
+  { operator: "ends_with", phrase: "ends with" },
+  { operator: "equals", phrase: "is equal to" },
+  { operator: "equals", phrase: "equals" },
+  { operator: "greater_than", phrase: "above" },
+  { operator: "less_than", phrase: "below" },
+  { operator: "contains", phrase: "contains" },
+  { operator: "is_null", phrase: "is null", nullary: true },
+] satisfies readonly RowFilterOperatorPhrase[])
+  .slice()
+  .sort((left, right) => right.phrase.length - left.phrase.length || left.phrase.localeCompare(right.phrase));
+
+const maskQuotedNaturalLanguageStrings = (value: string): string =>
+  value.replace(/"[^"\u0000-\u001f\u007f]*"|'[^'\u0000-\u001f\u007f]*'/g, (match) =>
+    " ".repeat(match.length),
+  );
+
+const standaloneWhereMatches = (value: string): RegExpMatchArray[] =>
+  [...value.matchAll(/\bwhere\b/gi)];
+
+const detectRowFilterShell = (prompt: string): RowFilterShell => {
+  const whereMatches = standaloneWhereMatches(prompt);
+  if (whereMatches.length === 0) return { status: "none" };
+  if (whereMatches.length > 1) return { status: "unsupported", reason: "multiple_where_clauses" };
+  const whereIndex = whereMatches[0].index || 0;
+  const baseQuestion = prompt.slice(0, whereIndex).trim();
+  const predicate = prompt.slice(whereIndex + whereMatches[0][0].length).trim();
+  if (!baseQuestion || !predicate) {
+    return { status: "unsupported", reason: "missing_where_clause_part", baseQuestion, predicate };
+  }
+
+  const masked = maskQuotedNaturalLanguageStrings(predicate);
+  if (/;|--|\/\*|\*\/|[()]/.test(masked)) {
+    return { status: "unsupported", reason: "raw_predicate_text", baseQuestion, predicate };
+  }
+  if (/\b(?:and|or)\b/i.test(masked)) {
+    return { status: "unsupported", reason: "multiple_predicates", baseQuestion, predicate };
+  }
+
+  const rawMatches = ROW_FILTER_OPERATOR_PHRASES.flatMap((definition) => {
+    const pattern = new RegExp(`\\b${escapeRegExp(definition.phrase)}\\b`, "gi");
+    return [...masked.matchAll(pattern)].map((match) => ({
+      ...definition,
+      index: match.index || 0,
+      endIndex: (match.index || 0) + match[0].length,
+      text: match[0],
+    }));
+  }).sort((left, right) => right.text.length - left.text.length || left.index - right.index);
+  const occupied: Array<{ start: number; end: number }> = [];
+  const matches = rawMatches
+    .filter((match) => {
+      const overlaps = occupied.some((span) => match.index < span.end && match.endIndex > span.start);
+      if (overlaps) return false;
+      occupied.push({ start: match.index, end: match.endIndex });
+      return true;
+    })
+    .sort((left, right) => left.index - right.index || right.phrase.length - left.phrase.length);
+
+  if (matches.length === 0) {
+    return { status: "unsupported", reason: "missing_operator", baseQuestion, predicate };
+  }
+  if (matches.length > 1) {
+    return { status: "unsupported", reason: "multiple_operator_matches", baseQuestion, predicate };
+  }
+
+  const match = matches[0];
+  const fieldPhrase = predicate.slice(0, match.index).trim();
+  const valueText = predicate.slice(match.index + match.text.length).trim();
+  if (!fieldPhrase) {
+    return { status: "unsupported", reason: "missing_field", baseQuestion, predicate };
+  }
+  if (match.nullary && trimNaturalLanguageValuePunctuation(valueText)) {
+    return { status: "unsupported", reason: "unexpected_nullary_value", baseQuestion, predicate };
+  }
+  if (!match.nullary && !trimNaturalLanguageValuePunctuation(valueText)) {
+    return { status: "unsupported", reason: "missing_value", baseQuestion, predicate };
+  }
+
+  return {
+    status: "detected",
+    baseQuestion,
+    predicate,
+    fieldPhrase,
+    operator: match.operator,
+    valueText,
+    evidence: predicate,
+  };
+};
+
+const textType = (value: SchemaColumn["inferred_type"] | undefined): boolean =>
+  value === "text" || value === "categorical";
+
+const parseNaturalLanguageStringValue = (value: string): BusinessSqlFilterComparisonValue | null => {
+  const trimmed = trimNaturalLanguageValuePunctuation(value);
+  const doubleQuoted = trimmed.match(/^"([^"\u0000-\u001f\u007f]*)"$/);
+  if (doubleQuoted) return { kind: "string", value: doubleQuoted[1] };
+  const singleQuoted = trimmed.match(/^'([^'\u0000-\u001f\u007f]*)'$/);
+  if (singleQuoted) return { kind: "string", value: singleQuoted[1] };
+  if (/^[A-Za-z0-9_-]+$/.test(trimmed)) return { kind: "string", value: trimmed };
+  return null;
+};
+
+const parseRowFilterComparisonValue = (
+  shell: Extract<RowFilterShell, { status: "detected" }>,
+  fieldType: SchemaColumn["inferred_type"] | undefined,
+): BusinessSqlFilterComparisonValue | undefined | null => {
+  if (shell.operator === "is_null" || shell.operator === "is_not_null") return undefined;
+  if (
+    shell.operator === "greater_than" ||
+    shell.operator === "greater_than_or_equal" ||
+    shell.operator === "less_than" ||
+    shell.operator === "less_than_or_equal"
+  ) {
+    if (fieldType !== "numeric") return null;
+    return parseNumericThreshold(shell.valueText);
+  }
+  if (shell.operator === "contains" || shell.operator === "starts_with" || shell.operator === "ends_with") {
+    return textType(fieldType) ? parseNaturalLanguageStringValue(shell.valueText) : null;
+  }
+  if (fieldType === "boolean") {
+    const value = trimNaturalLanguageValuePunctuation(shell.valueText).toLowerCase();
+    if (value === "true") return { kind: "boolean", value: true };
+    if (value === "false") return { kind: "boolean", value: false };
+    return null;
+  }
+  if (textType(fieldType)) return parseNaturalLanguageStringValue(shell.valueText);
+  if (fieldType === "numeric") return parseNumericThreshold(shell.valueText);
+  return null;
+};
 
 export const detectAggregateThresholdMatches = (
   prompt: string,
@@ -1287,6 +1465,7 @@ const proposeMetrics = (
   prompt: string,
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
+  rowFilterShell: RowFilterShell = { status: "none" },
 ): ProposedMetric[] => {
   const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
   if (explicitFormula.status === "detected") {
@@ -1311,6 +1490,7 @@ const proposeMetrics = (
   if (explicitFormula.status === "unsupported") return [];
 
   if (intent.metrics.length === 0) {
+    if (simpleProjectionFieldPhrase(rowFilterShell)) return [];
     const thresholdMetric = thresholdCountMetricName(
       detectAggregateThresholdMatches(prompt),
       intent.entities,
@@ -1415,13 +1595,17 @@ const proposeGroupings = (
   prompt: string,
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
+  rowFilterShell: RowFilterShell = { status: "none" },
 ): ProposedGrouping[] => {
   const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
+  const simpleProjection = simpleProjectionFieldPhrase(rowFilterShell);
   const groupingConcepts =
     explicitFormula.status === "detected" && explicitFormula.groupingPhrase
       ? [explicitFormula.groupingPhrase]
       : intent.grouping.length > 0
       ? intent.grouping
+      : simpleProjection
+      ? [simpleProjection]
       : groupingConceptsFromPromptSubject(prompt);
   const strictFormulaGrouping = explicitFormula.status === "detected";
 
@@ -1569,13 +1753,142 @@ const firstColumnByKind = (
       }
     : null;
 
+const matchingRowFilterFields = (
+  fieldPhrase: string,
+  worksheets: readonly WorksheetInput[],
+): BoundColumn[] => {
+  const normalizedFieldPhrase = normalize(fieldPhrase).replace(/\b(?:is|are)\s*$/g, "").trim();
+  return allColumns(worksheets)
+  .map((item) => ({ item, confidence: nameScore(normalizedFieldPhrase, item.column.name) }))
+  .filter((candidate): candidate is { item: { worksheet: WorksheetInput; column: SchemaColumn }; confidence: "high" | "medium" } =>
+    Boolean(candidate.confidence),
+  )
+  .filter((candidate) => candidate.confidence === "high")
+  .map((candidate) => ({ ...candidate.item, confidence: candidate.confidence }));
+};
+
+const valueIdentity = (value: BusinessSqlFilterComparisonValue | undefined): string =>
+  value ? `${value.kind}:${String(value.value)}` : "nullary";
+
+export const createProposedRowFilterId = ({
+  target,
+  operator,
+  comparisonValue,
+}: Pick<ProposedFilter, "target" | "operator" | "comparisonValue">): string =>
+  [
+    "filter",
+    "canonical",
+    compactId(target?.entity || ""),
+    compactId(target?.table || ""),
+    compactId(target?.field || ""),
+    operator || "missing-operator",
+    compactId(valueIdentity(comparisonValue)),
+  ].join(":");
+
+const unsupportedRowFilter = (
+  shell: Extract<RowFilterShell, { status: "unsupported" }>,
+): ProposedFilter => ({
+  id: `filter:row-filter:${compactId(shell.reason)}`,
+  label: "Row-filter semantics",
+  tableName: null,
+  columnName: null,
+  semantics: "needs_review",
+  reason: `Explicit row-filter clause is unsupported: ${shell.reason}.`,
+  evidence: shell.predicate,
+});
+
+const proposedCanonicalRowFilter = (
+  shell: Extract<RowFilterShell, { status: "detected" }>,
+  worksheets: readonly WorksheetInput[],
+): ProposedFilter => {
+  const matches = matchingRowFilterFields(shell.fieldPhrase, worksheets);
+  if (matches.length !== 1) {
+    return {
+      id: `filter:row-filter:${matches.length === 0 ? "missing-field" : "ambiguous-field"}`,
+      label: "Row-filter semantics",
+      tableName: null,
+      columnName: null,
+      semantics: "needs_review",
+      reason: matches.length === 0
+        ? "Could not bind the row-filter field to exactly one applied-scope column."
+        : "The row-filter field matches more than one applied-scope column.",
+      evidence: shell.evidence,
+    };
+  }
+  const bound = matches[0];
+  const comparisonValue = parseRowFilterComparisonValue(shell, bound.column.inferred_type);
+  if (comparisonValue === null) {
+    return {
+      id: "filter:row-filter:incompatible-value",
+      label: "Row-filter semantics",
+      tableName: bound.worksheet.tableName,
+      columnName: bound.column.name,
+      semantics: "needs_review",
+      reason: "Row-filter operator, value, and field type are not compatible.",
+      evidence: shell.evidence,
+    };
+  }
+  const target = {
+    kind: "field" as const,
+    entity: bound.worksheet.tableName,
+    table: bound.worksheet.tableName,
+    field: bound.column.name,
+    fieldInferredType: bound.column.inferred_type,
+    resolved: true,
+  };
+  const seed = {
+    target,
+    operator: shell.operator,
+    comparisonValue,
+  };
+  return {
+    id: createProposedRowFilterId(seed),
+    label: `${bound.column.name} ${shell.evidence}`,
+    tableName: bound.worksheet.tableName,
+    columnName: bound.column.name,
+    semantics: "canonical",
+    executable: true,
+    reason: "Explicit row-level predicate grounded to one applied-scope field.",
+    target,
+    operator: shell.operator,
+    comparisonValue,
+    evidence: shell.evidence,
+  };
+};
+
+const simpleProjectionFieldPhrase = (rowFilterShell: RowFilterShell): string | null => {
+  if (rowFilterShell.status !== "detected") return null;
+  const text = normalize(rowFilterShell.baseQuestion);
+  const match = text.match(/^(?:show|list|find|identify)\s+(.+)$/);
+  if (!match) return null;
+  const phrase = match[1].trim();
+  if (
+    !phrase ||
+    /\b(?:by|per|total|sum|average|avg|minimum|min|maximum|max|count|highest|lowest|top|bottom)\b/.test(phrase)
+  ) {
+    return null;
+  }
+  return phrase;
+};
+
 const proposeFilters = (
   prompt: string,
   intent: BusinessIntent,
   worksheets: readonly WorksheetInput[],
   semanticColumns: readonly SemanticColumnHint[],
+  aggregateResultConditions: readonly ProposedAggregateResultCondition[] = [],
 ): ProposedFilter[] => {
   const filters: ProposedFilter[] = [];
+  const rowFilterShell = detectRowFilterShell(prompt);
+  const legacyPrompt = rowFilterShell.status === "detected" ? rowFilterShell.baseQuestion : prompt;
+  if (rowFilterShell.status === "unsupported") {
+    filters.push(unsupportedRowFilter(rowFilterShell));
+  } else if (rowFilterShell.status === "detected") {
+    const hasDerivedThreshold = detectDerivedThresholdShell(prompt).status === "detected";
+    if (!hasDerivedThreshold && aggregateResultConditions.length === 0) {
+      filters.push(proposedCanonicalRowFilter(rowFilterShell, worksheets));
+    }
+  }
   const statusColumn = findColumn("status", worksheets, semanticColumns, [
     "status",
   ]);
@@ -1587,7 +1900,7 @@ const proposeFilters = (
       roles: ["date"],
     }) || firstColumnByKind(worksheets, "date");
 
-  if (promptHasAny(prompt, ["status", "active", "inactive", "open", "closed", "current"])) {
+  if (promptHasAny(legacyPrompt, ["status", "active", "inactive", "open", "closed", "current"])) {
     filters.push({
       id: "filter:status-semantics",
       label: "Status/current semantics",
@@ -1600,7 +1913,7 @@ const proposeFilters = (
 
   if (
     intent.explicitlyTemporal ||
-    promptHasAny(prompt, [
+    promptHasAny(legacyPrompt, [
       "expired",
       "expires",
       "overdue",
@@ -1623,7 +1936,7 @@ const proposeFilters = (
     });
   }
 
-  if (promptHasAny(prompt, ["unresolved", "low stock", "selling fast", "fast selling", "high turnover"])) {
+  if (promptHasAny(legacyPrompt, ["unresolved", "low stock", "selling fast", "fast selling", "high turnover"])) {
     const conditionColumn = findSemanticColumn({
       prompt,
       worksheets,
@@ -1763,6 +2076,7 @@ const createMissingRequirements = ({
   derivedMeasures,
   aggregateResultConditions,
   thresholdMatchCount,
+  filters,
   joinNeeds,
 }: {
   prompt: string;
@@ -1774,10 +2088,12 @@ const createMissingRequirements = ({
   derivedMeasures: readonly ProposedDerivedMeasure[];
   aggregateResultConditions: readonly ProposedAggregateResultCondition[];
   thresholdMatchCount: number;
+  filters: readonly ProposedFilter[];
   joinNeeds: readonly ProposedJoinNeed[];
 }): MissingRequirement[] => {
   const missing: MissingRequirement[] = [];
   const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
+  const hasCanonicalRowFilter = filters.some((filter) => filter.semantics === "canonical");
   const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
   const rankingShell = detectDerivedRankingShell(prompt);
   const thresholdShell = detectDerivedThresholdShell(prompt);
@@ -1793,7 +2109,8 @@ const createMissingRequirements = ({
     intent.primaryIntent === "unknown" &&
     intent.alternates.length === 0 &&
     !hasGroundedAggregateThreshold &&
-    !hasGroundedDerivedFormula
+    !hasGroundedDerivedFormula &&
+    !(hasCanonicalRowFilter && groupings.length > 0)
   ) {
     missing.push({
       id: "missing-intent",
@@ -1905,7 +2222,11 @@ const createMissingRequirements = ({
           : "Could not safely ground the explicit derived-measure ranking target.",
     });
   }
-  if (thresholdShell.status === "unsupported") {
+  if (
+    thresholdShell.status === "unsupported" &&
+    !hasCanonicalRowFilter &&
+    !hasGroundedAggregateThreshold
+  ) {
     missing.push({
       id:
         thresholdShell.reason === "missing_threshold"
@@ -2080,6 +2401,7 @@ const createFingerprint = ({
   aggregateResultConditions,
   sorts,
   rowLimit,
+  filters,
 }: {
   intent: BusinessIntent;
   scope: readonly AnalysisScopeSelection[];
@@ -2091,6 +2413,7 @@ const createFingerprint = ({
   aggregateResultConditions: readonly ProposedAggregateResultCondition[];
   sorts: readonly ProposedSort[];
   rowLimit: ProposedRowLimit | null;
+  filters: readonly ProposedFilter[];
 }): string =>
   JSON.stringify({
     version: "adaptive-report-proposal:v1",
@@ -2113,6 +2436,7 @@ const createFingerprint = ({
     aggregateResultConditionIds: stableStrings(
       aggregateResultConditions.map((condition) => condition.id),
     ),
+    filterIds: stableStrings(filters.map((filter) => filter.id)),
     sortIds: stableStrings(sorts.map((sort) => `${sort.target}:${sort.targetId}:${sort.direction}`)),
     rowLimit: rowLimit?.value || null,
     relationshipStatuses: joinNeeds
@@ -2169,24 +2493,39 @@ export function proposeAdaptiveReport(
     ...(request.semanticHints || []),
     ...semanticHintsForProposal(semanticColumns),
   ]);
+  const rowFilterShell = detectRowFilterShell(prompt);
   const requestedEntities = detectedIntent.entities.length > 0 ? detectedIntent.entities : [];
   const entities =
     requestedEntities.length > 0
       ? requestedEntities.map((entity) => findWorksheetForEntity(entity, worksheets))
       : fallbackEntitiesFromScope(worksheets);
-  const metrics = proposeMetrics(detectedIntent, prompt, worksheets, semanticColumns);
-  const derivedMeasures = proposeDerivedMeasures(prompt, metrics);
-  const groupings = proposeGroupings(detectedIntent, prompt, worksheets, semanticColumns);
-  const aggregateResultConditions = proposeAggregateResultConditions({
+  const fullPromptMetrics = proposeMetrics(detectedIntent, prompt, worksheets, semanticColumns);
+  const fullPromptDerivedMeasures = proposeDerivedMeasures(prompt, fullPromptMetrics);
+  const fullPromptGroupings = proposeGroupings(detectedIntent, prompt, worksheets, semanticColumns);
+  const fullPromptAggregateResultConditions = proposeAggregateResultConditions({
     prompt,
+    metrics: fullPromptMetrics,
+    groupings: fullPromptGroupings,
+    derivedMeasures: fullPromptDerivedMeasures,
+  });
+  const useRowFilterBasePrompt =
+    rowFilterShell.status === "detected" &&
+    fullPromptAggregateResultConditions.length === 0 &&
+    detectDerivedThresholdShell(prompt).status !== "detected";
+  const planningPrompt = useRowFilterBasePrompt ? rowFilterShell.baseQuestion : prompt;
+  const metrics = proposeMetrics(detectedIntent, planningPrompt, worksheets, semanticColumns, rowFilterShell);
+  const derivedMeasures = proposeDerivedMeasures(planningPrompt, metrics);
+  const groupings = proposeGroupings(detectedIntent, planningPrompt, worksheets, semanticColumns, rowFilterShell);
+  const aggregateResultConditions = proposeAggregateResultConditions({
+    prompt: planningPrompt,
     metrics,
     groupings,
     derivedMeasures,
   });
-  const derivedSorts = proposeDerivedSorts(prompt, derivedMeasures, groupings);
+  const derivedSorts = proposeDerivedSorts(planningPrompt, derivedMeasures, groupings);
   const sorts = derivedMeasures.length > 0 ? derivedSorts : proposeSorts(detectedIntent, metrics);
   const rowLimit = proposeRowLimit(detectedIntent);
-  const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns);
+  const filters = proposeFilters(prompt, detectedIntent, worksheets, semanticColumns, aggregateResultConditions);
   const joinNeeds = proposeJoinNeeds(
     entities,
     request.acceptedRelationshipContracts || [],
@@ -2201,7 +2540,10 @@ export function proposeAdaptiveReport(
     metrics,
     derivedMeasures,
     aggregateResultConditions,
-    thresholdMatchCount: detectAggregateThresholdMatches(prompt).length,
+    thresholdMatchCount: filters.some((filter) => filter.semantics === "canonical")
+      ? 0
+      : detectAggregateThresholdMatches(planningPrompt).length,
+    filters,
     joinNeeds,
   });
   const assumptions = createAssumptions(entities, metrics, groupings);
@@ -2219,6 +2561,7 @@ export function proposeAdaptiveReport(
     aggregateResultConditions,
     sorts,
     rowLimit,
+    filters,
   });
 
   return {

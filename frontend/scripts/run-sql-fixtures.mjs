@@ -252,6 +252,11 @@ const fixtures = [
     exportName: "runBusinessSqlRowFilterContractFixtures",
   },
   {
+    label: "Explicit row-filter grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/explicitRowFilterGrounding.test.ts",
+    exportName: "runExplicitRowFilterGroundingFixtures",
+  },
+  {
     label: "Explicit subtraction grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitSubtractionGrounding.test.ts",
     exportName: "runExplicitSubtractionGroundingFixtures",

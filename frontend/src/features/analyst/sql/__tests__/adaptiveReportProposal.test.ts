@@ -491,7 +491,7 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "PS-2c raw-field threshold question does not become aggregate-result HAVING proposal",
+    name: "PS-5c raw-field threshold question becomes a canonical row-filter proposal",
     request: {
       prompt: "Show sales rows where revenue is above 500000.",
       detectedIntent: detectBusinessIntent("Show sales rows where revenue is above 500000."),
@@ -507,9 +507,16 @@ const fixtures: Fixture[] = [
       ...(proposal.aggregateResultConditions.length === 0
         ? []
         : ["Expected raw-field threshold not to create aggregate-result condition."]),
-      ...(proposal.support !== "supported"
+      ...(proposal.support === "supported"
         ? []
-        : ["Expected raw-field threshold to remain unsupported or review-gated for SQL rendering."]),
+        : ["Expected raw-field threshold row filter to be supported."]),
+      ...(proposal.filters.length === 1 &&
+      proposal.filters[0].semantics === "canonical" &&
+      proposal.filters[0].operator === "greater_than" &&
+      proposal.filters[0].comparisonValue?.kind === "number" &&
+      proposal.filters[0].comparisonValue.value === 500000
+        ? []
+        : ["Expected one canonical numeric row filter."]),
       ...expectNoExecutableSurface(proposal),
     ],
   },

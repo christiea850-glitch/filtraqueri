@@ -5,6 +5,7 @@ import type {
   ProposedEntity,
   ProposedAggregateResultCondition,
   ProposedDerivedMeasure,
+  ProposedFilter,
   ProposedJoinNeed,
   ProposedMetric,
 } from "./adaptiveReportProposal";
@@ -16,6 +17,7 @@ import {
   createBusinessSqlAggregateResultConditionId,
   createBusinessSqlRowLimitId,
   createBusinessSqlSortId,
+  createBusinessSqlFilterId,
   createBusinessSqlMeasureAlias,
   measureToBusinessSqlMetric,
   type BusinessSqlEntityRef,
@@ -34,6 +36,7 @@ import {
   type BusinessSqlPlanWarning,
   type BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
+import { evaluateBusinessSqlFilterCompatibility } from "./businessSqlFilterCompatibility";
 import { resolveBusinessSqlJoinPath } from "./businessSqlJoinPathResolver";
 import {
   applyBusinessSqlRenderReadiness,
@@ -63,6 +66,8 @@ export type AdaptiveProposalBusinessSqlBridgeIssue = {
     | "missing_relationship"
     | "needs_review_join"
     | "needs_review_filter"
+    | "invalid_canonical_filter"
+    | "unresolved_filter_reference"
     | "low_confidence"
     | "readiness_not_renderable";
   severity: "info" | "warning" | "blocking";
@@ -189,6 +194,19 @@ const roleForEntity = (
   return "source";
 };
 
+const isCanonicalProposedFilter = (
+  filter: ProposedFilter,
+): boolean => filter.semantics === "canonical" && filter.executable === true;
+
+const hasCanonicalFieldProjection = (proposal: AdaptiveReportProposal): boolean =>
+  proposal.metrics.length === 0 &&
+  proposal.groupings.length > 0 &&
+  proposal.filters.length === 1 &&
+  isCanonicalProposedFilter(proposal.filters[0]);
+
+const hasCanonicalRowFilter = (proposal: AdaptiveReportProposal): boolean =>
+  proposal.filters.some(isCanonicalProposedFilter);
+
 const mapEntities = (proposal: AdaptiveReportProposal): BusinessSqlEntityRef[] =>
   {
     const mapped = proposal.entities
@@ -199,7 +217,8 @@ const mapEntities = (proposal: AdaptiveReportProposal): BusinessSqlEntityRef[] =
       required:
         entity.binding !== "scope_fallback" ||
         (proposal.aggregateResultConditions || []).length > 0 ||
-        (proposal.derivedMeasures || []).length > 0,
+        (proposal.derivedMeasures || []).length > 0 ||
+        hasCanonicalRowFilter(proposal),
       role: roleForEntity(entity, proposal),
     }));
     if (
@@ -335,6 +354,62 @@ const mapFilters = (
   const issues: AdaptiveProposalBusinessSqlBridgeIssue[] = [];
 
   for (const filter of proposal.filters) {
+    if (isCanonicalProposedFilter(filter)) {
+      const target = filter.target;
+      if (
+        target?.kind !== "field" ||
+        target.resolved !== true ||
+        !target.table ||
+        !target.field ||
+        !filter.operator
+      ) {
+        issues.push(
+          issue(
+            "unresolved_filter_reference",
+            "blocking",
+            `Canonical filter ${filter.id} does not contain one resolved field target.`,
+          ),
+        );
+        continue;
+      }
+      const entity = entityForTable(proposal.entities, target.table);
+      const seed: BusinessSqlFilter = {
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: target.entity || entity?.label || target.table,
+          table: target.table,
+          field: target.field,
+          fieldInferredType: target.fieldInferredType,
+          resolved: true,
+        },
+        entity: target.entity || entity?.label || target.table,
+        table: target.table,
+        field: target.field,
+        fieldInferredType: target.fieldInferredType,
+        operator: filter.operator,
+        ...(filter.comparisonValue ? { comparisonValue: filter.comparisonValue } : {}),
+        label: filter.label,
+        evidence: filter.evidence,
+      };
+      const compatibility = evaluateBusinessSqlFilterCompatibility({ filter: seed });
+      if (!compatibility.compatible) {
+        issues.push(
+          issue(
+            "invalid_canonical_filter",
+            "blocking",
+            `Canonical filter ${filter.id} is incompatible: ${compatibility.reasonCodes.join(", ")}.`,
+          ),
+        );
+        continue;
+      }
+      filters.push({
+        ...seed,
+        filterId: createBusinessSqlFilterId(seed),
+      });
+      continue;
+    }
+
     const label = filter.label;
     const text = `${label} ${filter.reason}`.toLowerCase();
     const entity = entityForTable(proposal.entities, filter.tableName);
@@ -722,7 +797,8 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
   if (requiredEntityTableMissing(proposal)) {
     structuralIssues.push(issue("missing_table", "blocking", "One or more proposal entities are missing table bindings."));
   }
-  if (proposal.metrics.length === 0) {
+  const canonicalFieldProjection = hasCanonicalFieldProjection(proposal);
+  if (proposal.metrics.length === 0 && !canonicalFieldProjection) {
     structuralIssues.push(issue("missing_metric", "blocking", "Adaptive proposal has no metric."));
   }
 
@@ -732,11 +808,14 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
 
   const entities = mapEntities(proposal);
   const measureResult = mapMeasures(proposal);
-  if (measureResult.measures.length === 0 || measureResult.issues.some((item) => item.severity === "blocking")) {
+  if (
+    (!canonicalFieldProjection && measureResult.measures.length === 0) ||
+    measureResult.issues.some((item) => item.severity === "blocking")
+  ) {
     return blockedResult("Adaptive proposal metric is not supported by the Business SQL bridge.", measureResult.issues);
   }
   const metricResult = {
-    metric: measureToBusinessSqlMetric(measureResult.measures[0]),
+    metric: measureResult.measures[0] ? measureToBusinessSqlMetric(measureResult.measures[0]) : null,
     issues: measureResult.issues,
   };
 
@@ -768,7 +847,8 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     proposal.support === "needs_review" ||
     (proposal.confidence !== "high" &&
       !hasGroundedAggregateThreshold &&
-      !hasGroundedDerivedMeasure)
+      !hasGroundedDerivedMeasure &&
+      !hasCanonicalRowFilter(proposal))
       ? [
           issue(
             "low_confidence",

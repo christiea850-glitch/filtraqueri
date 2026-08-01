@@ -837,7 +837,7 @@ const fixtures: Fixture[] = [
     ],
   },
   {
-    name: "PS-2c threshold with no grounded aggregate measure does not produce SQL",
+    name: "PS-5c raw-field threshold bridges to deterministic WHERE without aggregate HAVING",
     result: bridge(rawFieldThresholdProposal),
     assert: (result) => {
       const preview = result.plan ? createBusinessSqlRenderPreview(result.plan) : null;
@@ -847,14 +847,21 @@ const fixtures: Fixture[] = [
         ...(rawFieldThresholdProposal.aggregateResultConditions.length === 0
           ? []
           : ["Expected raw-field threshold proposal to have no aggregate condition."]),
-        ...(result.state !== "render_ready_plan" ? [] : ["Expected raw-field threshold not to be render-ready."]),
-        ...(preview?.sql === null || result.plan === null ? [] : ["Expected no SQL preview for raw-field threshold."]),
+        ...(rawFieldThresholdProposal.filters[0]?.semantics === "canonical"
+          ? []
+          : ["Expected raw-field threshold proposal to have a canonical row filter."]),
+        ...(result.state === "render_ready_plan" ? [] : ["Expected raw-field threshold to be render-ready."]),
+        ...(preview?.sql?.includes('WHERE "sales"."revenue" > 500000') &&
+        !preview.sql.includes("HAVING")
+          ? []
+          : ["Expected raw-field threshold WHERE SQL without HAVING."]),
         ...(rawFieldCommaThresholdProposal.aggregateResultConditions.length === 0
           ? []
           : ["Expected raw-field comma threshold proposal to have no aggregate condition."]),
-        ...(commaPreview?.sql === null || commaResult.plan === null
+        ...(commaPreview?.sql?.includes('WHERE "sales"."revenue" > 500000') &&
+        !commaPreview.sql.includes("HAVING")
           ? []
-          : ["Expected no SQL preview for raw-field comma threshold."]),
+          : ["Expected raw-field comma threshold WHERE SQL without HAVING."]),
         ...expectNoExecutionSurface(result),
         ...expectNoExecutionSurface(commaResult),
       ];
