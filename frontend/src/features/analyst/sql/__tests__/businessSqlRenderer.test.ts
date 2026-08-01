@@ -698,10 +698,10 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
     assert: (result) => [
       ...expectRefused(result, "renderer_capability_incapable"),
       ...(evaluateBusinessSqlRendererCapability(leasedUnitsPerProperty.plan).reasonCodes.includes(
-        "row_filter_rendering_not_supported",
+        "row_filter_legacy_semantics_not_renderable",
       )
         ? []
-        : ["Expected row filter rendering capability guard."]),
+        : ["Expected legacy row filter rendering capability guard."]),
     ],
   },
   {

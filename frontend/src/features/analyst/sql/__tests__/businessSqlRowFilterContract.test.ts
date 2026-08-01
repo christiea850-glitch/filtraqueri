@@ -1,4 +1,4 @@
-/** PS-5a - row-level filter contract and premature-rendering safety fixtures. */
+/** PS-5b - single row-level WHERE rendering fixtures. */
 
 import {
   attachBusinessSqlJoinResolutionToPlan,
@@ -102,6 +102,8 @@ const filterFor = (options: Partial<BusinessSqlFilter> & {
 } = {}): BusinessSqlFilter => {
   const field = options.field || "status";
   const fieldInferredType = options.fieldInferredType || "categorical";
+  const entity = options.entity || "operations";
+  const table = options.table || "operations";
   const operator = options.operator || "equals";
   const comparisonValue = Object.prototype.hasOwnProperty.call(options, "comparisonValue")
     ? options.comparisonValue
@@ -111,14 +113,14 @@ const filterFor = (options: Partial<BusinessSqlFilter> & {
     kind: "custom",
     target: options.target || {
       kind: "field",
-      entity: "operations",
-      table: "operations",
+      entity,
+      table,
       field,
       fieldInferredType,
       resolved: true,
     },
-    entity: "operations",
-    table: "operations",
+    entity,
+    table,
     field,
     fieldInferredType,
     operator,
@@ -197,6 +199,43 @@ const expectedNoFilterSql = [
   'FROM "operations"',
   'GROUP BY "operations"."region"',
   'ORDER BY "total_amount" DESC;',
+].join("\n");
+
+const primaryFieldProjectionPlan = (): BusinessSqlQueryPlan => {
+  const filter = filterFor({
+    target: {
+      kind: "field",
+      entity: "orders",
+      table: "orders",
+      field: "order_amount",
+      fieldInferredType: "numeric",
+      resolved: true,
+    },
+    entity: "orders",
+    table: "orders",
+    field: "order_amount",
+    fieldInferredType: "numeric",
+    operator: "greater_than",
+    comparisonValue: { kind: "number", value: 1000 },
+    label: "Order amount over 1000",
+  });
+  return {
+    ...createEmptyBusinessSqlQueryPlan(),
+    id: "business-sql-plan:primary-row-filter",
+    kind: "empty",
+    status: "resolved",
+    support: "supported",
+    entities: [{ entity: "orders", table: "orders", required: true, role: "source" }],
+    groupings: [{ entity: "orders", table: "orders", field: "order_id", label: "order_id" }],
+    filters: [filter],
+  };
+};
+
+const expectedPrimaryWhereSql = [
+  "SELECT",
+  '  "orders"."order_id" AS "order_id"',
+  'FROM "orders"',
+  'WHERE "orders"."order_amount" > 1000;',
 ].join("\n");
 
 const fixtures: Fixture[] = [
@@ -335,6 +374,20 @@ const fixtures: Fixture[] = [
         availableFields,
         scopeResolved: false,
       });
+      const conflict = evaluateBusinessSqlFilterCompatibility({
+        filter: filterFor({
+          target: {
+            kind: "field",
+            entity: "operations",
+            table: "operations",
+            field: "status",
+            fieldInferredType: "categorical",
+            resolved: true,
+          },
+          table: "other_table",
+        }),
+        availableFields,
+      });
       const invalidPlanReadiness = readinessFor(planWithFilters([filterFor({ operator: "equals", comparisonValue: undefined })]));
       return [
         ...(unresolved.reasonCodes.includes("row_filter_target_unresolved") ? [] : ["Expected unresolved target reason."]),
@@ -342,6 +395,7 @@ const fixtures: Fixture[] = [
         ...(aggregateTarget.reasonCodes.includes("row_filter_target_invalid") ? [] : ["Expected aggregate row-filter target rejection."]),
         ...(derivedTarget.reasonCodes.includes("row_filter_target_invalid") ? [] : ["Expected derived row-filter target rejection."]),
         ...(scope.reasonCodes.includes("row_filter_scope_unresolved") ? [] : ["Expected unresolved scope reason."]),
+        ...(conflict.reasonCodes.includes("row_filter_target_conflict") ? [] : ["Expected canonical/legacy target conflict reason."]),
         ...(invalidPlanReadiness.status === "blocked" &&
         invalidPlanReadiness.reasonCodes.includes("row_filter_value_missing")
           ? []
@@ -350,27 +404,143 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "one valid row filter is structurally ready but renderer-incapable",
+    name: "one valid canonical row filter is structurally ready renderer-capable and renders WHERE",
     assert: () => {
       const plan = planWithFilters([filterFor()]);
       const readiness = readinessFor(plan);
       const capability = evaluateBusinessSqlRendererCapability(plan);
       const rendered = renderBusinessSqlQueryPlan(plan);
       const preview = createBusinessSqlRenderPreview(plan);
+      const expectedSql = [
+        "SELECT",
+        '  "operations"."region" AS "region",',
+        '  SUM("operations"."amount") AS "total_amount"',
+        'FROM "operations"',
+        `WHERE "operations"."status" = 'active'`,
+        'GROUP BY "operations"."region"',
+        'ORDER BY "total_amount" DESC;',
+      ].join("\n");
       return [
         ...(readiness.status === "ready" ? [] : ["Expected valid row filter to be structurally ready."]),
-        ...(capability.status === "incapable" &&
-        capability.reasonCodes.includes("row_filter_rendering_not_supported")
+        ...(capability.status === "capable" &&
+        !capability.reasonCodes.includes("row_filter_rendering_not_supported")
           ? []
-          : ["Expected row filter rendering capability guard."]),
-        ...(!rendered.rendered && rendered.sql === null ? [] : ["Filtered plan must not render SQL."]),
+          : ["Expected canonical row filter to be renderer-capable."]),
+        ...(rendered.sql === expectedSql ? [] : ["Expected canonical row filter WHERE SQL."]),
         ...(rendered.inserted === false && rendered.ranQuery === false ? [] : ["Filtered plan must remain manual."]),
-        ...(preview.sql === null &&
-        !preview.actions.canCopySql &&
+        ...(preview.sql === expectedSql &&
+        preview.actions.canCopySql &&
         !preview.actions.canInsertSql &&
         !preview.actions.canRunSql
           ? []
-          : ["Filtered preview must expose no SQL actions."]),
+          : ["Filtered preview must expose copy only."]),
+      ];
+    },
+  },
+  {
+    name: "primary numeric field projection renders exact WHERE SQL",
+    assert: () => {
+      const plan = primaryFieldProjectionPlan();
+      const readiness = readinessFor(plan);
+      const capability = evaluateBusinessSqlRendererCapability(plan);
+      const rendered = renderBusinessSqlQueryPlan(plan);
+      return [
+        ...(readiness.status === "ready" ? [] : ["Expected primary field projection to be structurally ready."]),
+        ...(capability.capable ? [] : ["Expected primary field projection to be renderer-capable."]),
+        ...(rendered.sql === expectedPrimaryWhereSql ? [] : ["Expected exact primary numeric WHERE SQL."]),
+      ];
+    },
+  },
+  {
+    name: "WHERE renders supported operators and typed literals safely",
+    assert: () => {
+      const cases = [
+        {
+          filter: filterFor({ operator: "not_equals", comparisonValue: { kind: "string", value: "O'Brien" } }),
+          expected: `WHERE "operations"."status" <> 'O''Brien'`,
+        },
+        {
+          filter: filterFor({ field: "amount", fieldInferredType: "numeric", operator: "greater_than_or_equal", comparisonValue: { kind: "number", value: 65 } }),
+          expected: 'WHERE "operations"."amount" >= 65',
+        },
+        {
+          filter: filterFor({ field: "amount", fieldInferredType: "numeric", operator: "less_than", comparisonValue: { kind: "number", value: 1000 } }),
+          expected: 'WHERE "operations"."amount" < 1000',
+        },
+        {
+          filter: filterFor({ field: "amount", fieldInferredType: "numeric", operator: "less_than_or_equal", comparisonValue: { kind: "number", value: 10.5 } }),
+          expected: 'WHERE "operations"."amount" <= 10.5',
+        },
+        {
+          filter: filterFor({ field: "discontinued", fieldInferredType: "boolean", operator: "equals", comparisonValue: { kind: "boolean", value: false } }),
+          expected: 'WHERE "operations"."discontinued" = FALSE',
+        },
+        {
+          filter: filterFor({ field: "priority", fieldInferredType: "text", operator: "contains", comparisonValue: { kind: "string", value: "urgent" } }),
+          expected: `WHERE contains("operations"."priority", 'urgent')`,
+        },
+        {
+          filter: filterFor({ field: "priority", fieldInferredType: "text", operator: "starts_with", comparisonValue: { kind: "string", value: "P1" } }),
+          expected: `WHERE starts_with("operations"."priority", 'P1')`,
+        },
+        {
+          filter: filterFor({ field: "priority", fieldInferredType: "text", operator: "ends_with", comparisonValue: { kind: "string", value: "closed" } }),
+          expected: `WHERE ends_with("operations"."priority", 'closed')`,
+        },
+        {
+          filter: filterFor({ field: "priority", fieldInferredType: "text", operator: "is_null", comparisonValue: undefined }),
+          expected: 'WHERE "operations"."priority" IS NULL',
+        },
+        {
+          filter: filterFor({ field: "priority", fieldInferredType: "text", operator: "is_not_null", comparisonValue: undefined }),
+          expected: 'WHERE "operations"."priority" IS NOT NULL',
+        },
+      ];
+      return cases.flatMap(({ filter, expected }) => {
+        const rendered = renderBusinessSqlQueryPlan(planWithFilters([filter]));
+        return rendered.sql?.includes(expected)
+          ? []
+          : [`Expected WHERE fragment ${expected}.`];
+      });
+    },
+  },
+  {
+    name: "legacy semantic and conflicting filters remain unrenderable",
+    assert: () => {
+      const legacy: BusinessSqlFilter = {
+        kind: "status",
+        entity: "operations",
+        table: "operations",
+        field: "status",
+        predicate: "status = active",
+        value: "active",
+        label: "Legacy status semantics",
+      };
+      const conflict = filterFor({
+        target: {
+          kind: "field",
+          entity: "operations",
+          table: "operations",
+          field: "status",
+          fieldInferredType: "categorical",
+          resolved: true,
+        },
+        field: "priority",
+      });
+      const legacyCapability = evaluateBusinessSqlRendererCapability(planWithFilters([legacy]));
+      const legacyRendered = renderBusinessSqlQueryPlan(planWithFilters([legacy]));
+      const conflictReadiness = readinessFor(planWithFilters([conflict]));
+      const conflictRendered = renderBusinessSqlQueryPlan(planWithFilters([conflict]));
+      return [
+        ...(legacyCapability.reasonCodes.includes("row_filter_legacy_semantics_not_renderable")
+          ? []
+          : ["Expected legacy semantic filter capability reason."]),
+        ...(!legacyRendered.rendered && legacyRendered.sql === null ? [] : ["Legacy semantic filter must not render SQL."]),
+        ...(conflictReadiness.status === "blocked" &&
+        conflictReadiness.reasonCodes.includes("row_filter_target_conflict")
+          ? []
+          : ["Expected conflicting canonical/legacy filter to block readiness."]),
+        ...(!conflictRendered.rendered && conflictRendered.sql === null ? [] : ["Conflicting filter must not render SQL."]),
       ];
     },
   },
@@ -392,9 +562,9 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "row filters never allow partial HAVING or ORDER BY fallback SQL",
+    name: "invalid row filters never allow partial HAVING or ORDER BY fallback SQL",
     assert: () => {
-      const filter = filterFor();
+      const filter = filterFor({ operator: "equals", comparisonValue: undefined });
       const baseHavingPlan = planWithFilters([filter], {
         aggregateResultConditions: [conditionFor()],
       });

@@ -5,6 +5,9 @@ import {
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlDerivedMeasure,
+  BusinessSqlFilter,
+  BusinessSqlFilterComparisonValue,
+  BusinessSqlFilterOperator,
   BusinessSqlJoinEdge,
   BusinessSqlMeasure,
   BusinessSqlQueryPlan,
@@ -14,6 +17,7 @@ import {
   normalizeMetricAndMeasures,
 } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
+import { evaluateBusinessSqlFilterCompatibility } from "./businessSqlFilterCompatibility";
 import type {
   BusinessSqlJoinPathResolution,
   BusinessSqlJoinRequirementResolution,
@@ -354,6 +358,68 @@ const aggregateComparisonOperatorSql: Record<BusinessSqlAggregateComparisonOpera
 const renderNumericComparisonValue = (value: number): string | null =>
   Number.isFinite(value) ? String(value) : null;
 
+const renderSqlLiteral = (value: BusinessSqlFilterComparisonValue): string | null => {
+  if (value.kind === "number") return Number.isFinite(value.value) ? String(value.value) : null;
+  if (value.kind === "boolean") return value.value ? "TRUE" : "FALSE";
+  if (value.kind === "string") {
+    if (!isValidIdentifier(value.value)) return null;
+    return `'${value.value.replace(/'/g, "''")}'`;
+  }
+  return null;
+};
+
+const rowFilterComparisonOperatorSql: Partial<Record<BusinessSqlFilterOperator, string>> = {
+  equals: "=",
+  not_equals: "<>",
+  greater_than: ">",
+  greater_than_or_equal: ">=",
+  less_than: "<",
+  less_than_or_equal: "<=",
+};
+
+const joinedTablesForRendering = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+): Set<string> | null => {
+  const firstRequiredTable = integrated.plan.entities.find((entity) => entity.required)?.table;
+  if (!hasText(firstRequiredTable)) return null;
+  const tables = new Set([firstRequiredTable]);
+  const edges = joinEdgesForRendering(integrated);
+  if (!edges) return null;
+  for (const edge of edges) {
+    if (!hasText(edge.fromTable) || !hasText(edge.toTable)) return null;
+    tables.add(edge.fromTable);
+    tables.add(edge.toTable);
+  }
+  return tables;
+};
+
+const renderWhere = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+  filters: readonly BusinessSqlFilter[],
+): string | null => {
+  if (filters.length === 0) return null;
+  if (filters.length > 1) return null;
+  const filter = filters[0];
+  if (filter.target?.kind !== "field") return null;
+  if (!evaluateBusinessSqlFilterCompatibility({ filter }).compatible) return null;
+  const target = filter.target;
+  if (!isValidIdentifier(target.table) || !isValidIdentifier(target.field)) return null;
+  const joinedTables = joinedTablesForRendering(integrated);
+  if (!joinedTables || !joinedTables.has(target.table)) return null;
+
+  const fieldExpression = qualified(target.table, target.field);
+  if (filter.operator === "is_null") return `WHERE ${fieldExpression} IS NULL`;
+  if (filter.operator === "is_not_null") return `WHERE ${fieldExpression} IS NOT NULL`;
+  if (!filter.comparisonValue) return null;
+  const literal = renderSqlLiteral(filter.comparisonValue);
+  if (!literal) return null;
+  if (filter.operator === "contains") return `WHERE contains(${fieldExpression}, ${literal})`;
+  if (filter.operator === "starts_with") return `WHERE starts_with(${fieldExpression}, ${literal})`;
+  if (filter.operator === "ends_with") return `WHERE ends_with(${fieldExpression}, ${literal})`;
+  const operator = filter.operator ? rowFilterComparisonOperatorSql[filter.operator] : null;
+  return operator ? `WHERE ${fieldExpression} ${operator} ${literal}` : null;
+};
+
 const renderHaving = (
   plan: BusinessSqlQueryPlan,
   measures: readonly BusinessSqlMeasure[],
@@ -524,22 +590,35 @@ export function renderBusinessSqlFromRenderability({
   }
 
   const normalizedPlan = normalizeMetricAndMeasures(plan);
-  if ((normalizedPlan.filters || []).length > 0) {
+  const groupings = groupingExpressions(plan);
+  const fromAndJoins = renderFromAndJoins(integrated);
+  const where = renderWhere(integrated, normalizedPlan.filters || []);
+  const requiresWhere = (normalizedPlan.filters || []).length > 0;
+  const fieldProjectionOnly =
+    normalizedPlan.measures.length === 0 &&
+    normalizedPlan.derivedMeasures.length === 0 &&
+    normalizedPlan.aggregateResultConditions.length === 0 &&
+    (normalizedPlan.orderBy || []).length === 0 &&
+    groupings &&
+    groupings.length > 0;
+
+  if (requiresWhere && !where) {
     return refused({
       integrated,
       reasonCode: "incomplete_plan_metadata",
       status: "needs_review",
-      reasons: ["Plan contains row-level filters, but WHERE rendering is not supported yet."],
+      reasons: ["Plan contains row-level filters that cannot be rendered as deterministic WHERE."],
       warnings: renderability.warnings,
     });
   }
+
   const derivedMeasure = normalizedPlan.derivedMeasures[0] || null;
   const rendersDerivedMeasure = Boolean(derivedMeasure);
   const measure = normalizedPlan.measures[0];
   if (
-    !measure ||
+    (!measure && !fieldProjectionOnly) ||
     plan.kind === "count_distinct_entity" ||
-    (!rendersDerivedMeasure && normalizedPlan.measures.length !== 1) ||
+    (!fieldProjectionOnly && !rendersDerivedMeasure && normalizedPlan.measures.length !== 1) ||
     (rendersDerivedMeasure && normalizedPlan.derivedMeasures.length !== 1)
   ) {
     return refused({
@@ -551,8 +630,6 @@ export function renderBusinessSqlFromRenderability({
     });
   }
 
-  const groupings = groupingExpressions(plan);
-  const fromAndJoins = renderFromAndJoins(integrated);
   const limit = renderLimit(plan);
   const having = renderHaving(
     normalizedPlan,
@@ -566,9 +643,11 @@ export function renderBusinessSqlFromRenderability({
   const derivedExpression = derivedMeasure
     ? derivedMeasureExpression(derivedMeasure, normalizedPlan.measures)
     : null;
-  const baseMetric = !derivedMeasure ? metricExpression(measure) : null;
+  const baseMetric = !derivedMeasure && measure ? metricExpression(measure) : null;
   const orderBy = groupings
-    ? derivedMeasure
+    ? fieldProjectionOnly
+      ? null
+      : derivedMeasure
       ? renderOptionalOrderBy(
           plan,
           normalizedPlan.measures,
@@ -577,13 +656,13 @@ export function renderBusinessSqlFromRenderability({
         )
       : renderOrderBy(plan, measure, groupings)
     : null;
-  const requiresOrderBy = !derivedMeasure || (plan.orderBy || []).length > 0;
+  const requiresOrderBy = !fieldProjectionOnly && (!derivedMeasure || (plan.orderBy || []).length > 0);
 
   if (
     !groupings ||
     groupings.length === 0 ||
     !fromAndJoins ||
-    (!derivedMeasure && !baseMetric) ||
+    (!fieldProjectionOnly && !derivedMeasure && !baseMetric) ||
     (derivedMeasure && (!operandMeasures || !derivedExpression || !isValidIdentifier(derivedMeasure.sqlAlias))) ||
     (requiresOrderBy && !orderBy) ||
     (plan.rowLimit && !limit) ||
@@ -601,6 +680,31 @@ export function renderBusinessSqlFromRenderability({
   const selectLines = groupings.map(
     (grouping) => `  ${grouping.expression} AS ${quoteIdentifier(grouping.alias)},`,
   );
+  if (fieldProjectionOnly) {
+    const projectionLines = groupings.map((grouping, index) => {
+      const suffix = index === groupings.length - 1 ? "" : ",";
+      return `  ${grouping.expression} AS ${quoteIdentifier(grouping.alias)}${suffix}`;
+    });
+    const tailClauses = [where, limit].filter((clause): clause is string => Boolean(clause));
+    const sql = [
+      "SELECT",
+      ...projectionLines,
+      fromAndJoins,
+      ...appendTerminalClause(tailClauses),
+    ].join("\n");
+    const safety = validateSelectOnlySql(sql);
+    if (!safety.ok) {
+      return refused({
+        integrated,
+        reasonCode: "unsafe_sql",
+        status: "blocked",
+        reasons: safety.reasons,
+        warnings: renderability.warnings,
+      });
+    }
+    return rendered(integrated, sql);
+  }
+
   const groupBy = `GROUP BY ${groupings.map((grouping) => grouping.expression).join(", ")}`;
   const tailClauses = [having, orderBy, limit].filter((clause): clause is string => Boolean(clause));
   const trailingClauses =
@@ -619,6 +723,7 @@ export function renderBusinessSqlFromRenderability({
     ...selectLines,
     ...measureSelectLines,
     fromAndJoins,
+    ...(where ? [where] : []),
     ...trailingClauses,
   ].join("\n");
   const safety = validateSelectOnlySql(sql);

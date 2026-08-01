@@ -1,10 +1,12 @@
 import {
   getBusinessSqlAggregateResultConditionTarget,
   normalizeMetricAndMeasures,
+  type BusinessSqlFilter,
   type BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlDerivedMeasureCompatibility } from "./businessSqlDerivedMeasureCompatibility";
 import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "./businessSqlAggregateResultConditionCompatibility";
+import { evaluateBusinessSqlFilterCompatibility } from "./businessSqlFilterCompatibility";
 
 export type BusinessSqlRendererCapabilityStatus = "capable" | "incapable";
 
@@ -18,6 +20,7 @@ export type BusinessSqlRendererIncapabilityReason =
   | "derived_measure_division_policy_missing"
   | "derived_measure_operand_mismatch"
   | "row_filter_rendering_not_supported"
+  | "row_filter_legacy_semantics_not_renderable"
   | "multiple_row_filters_not_supported"
   | "unrecognized_plan_shape";
 
@@ -38,12 +41,28 @@ const RENDERABLE_DERIVED_MEASURE_OPERATORS = new Set([
 const hasRenderableAlias = (value: string | undefined): value is string =>
   Boolean(value && value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value));
 
+const isCanonicalRenderableFilter = (filter: BusinessSqlFilter): boolean =>
+  filter.target?.kind === "field" &&
+  Boolean(filter.operator) &&
+  (filter.operator === "is_null" ||
+    filter.operator === "is_not_null" ||
+    Boolean(filter.comparisonValue)) &&
+  evaluateBusinessSqlFilterCompatibility({ filter }).compatible;
+
 export function evaluateBusinessSqlRendererCapability(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRendererCapability {
   const normalized = normalizeMetricAndMeasures(plan);
   const reasonCodes: BusinessSqlRendererIncapabilityReason[] = [];
   const derivedMeasures = normalized.derivedMeasures || [];
+  const rowFilterCount = (normalized.filters || []).length;
+  const fieldProjectionOnly =
+    rowFilterCount === 1 &&
+    normalized.measures.length === 0 &&
+    derivedMeasures.length === 0 &&
+    normalized.aggregateResultConditions.length === 0 &&
+    (normalized.orderBy || []).length === 0 &&
+    normalized.groupings.length > 0;
 
   if (derivedMeasures.length > 1) {
     reasonCodes.push("derived_measures_multiple_not_supported");
@@ -81,7 +100,6 @@ export function evaluateBusinessSqlRendererCapability(
   }
 
   const aggregateResultConditionCount = (normalized.aggregateResultConditions || []).length;
-  const rowFilterCount = (normalized.filters || []).length;
 
   if (aggregateResultConditionCount > 1) {
     reasonCodes.push("aggregate_condition_multiple_not_supported");
@@ -90,7 +108,14 @@ export function evaluateBusinessSqlRendererCapability(
   if (rowFilterCount > 1) {
     reasonCodes.push("multiple_row_filters_not_supported");
   } else if (rowFilterCount === 1) {
-    reasonCodes.push("row_filter_rendering_not_supported");
+    const filter = normalized.filters[0];
+    if (!isCanonicalRenderableFilter(filter)) {
+      reasonCodes.push(
+        filter.target?.kind === "field"
+          ? "row_filter_rendering_not_supported"
+          : "row_filter_legacy_semantics_not_renderable",
+      );
+    }
   }
 
   for (const sort of normalized.orderBy || []) {
@@ -120,7 +145,7 @@ export function evaluateBusinessSqlRendererCapability(
     }
   }
 
-  if (normalized.measures.length === 0 && !normalized.metric) {
+  if (normalized.measures.length === 0 && !normalized.metric && !fieldProjectionOnly) {
     reasonCodes.push("unrecognized_plan_shape");
   }
 

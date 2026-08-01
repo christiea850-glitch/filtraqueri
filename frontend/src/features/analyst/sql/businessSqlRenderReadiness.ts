@@ -49,6 +49,13 @@ export function evaluateBusinessSqlRenderReadiness(
   const rendererCapability = evaluateBusinessSqlRendererCapability(plan);
   const reasons: string[] = [];
   const warnings: string[] = [];
+  const fieldProjectionOnly =
+    (normalizedPlan.filters || []).length === 1 &&
+    normalizedPlan.measures.length === 0 &&
+    normalizedPlan.derivedMeasures.length === 0 &&
+    normalizedPlan.aggregateResultConditions.length === 0 &&
+    normalizedPlan.orderBy.length === 0 &&
+    normalizedPlan.groupings.length > 0;
 
   if (plan.support === "blocked") {
     reasons.push("Plan support is blocked.");
@@ -70,7 +77,7 @@ export function evaluateBusinessSqlRenderReadiness(
     reasons.push("Plan has blocking warnings.");
   }
 
-  if (normalizedPlan.measures.length === 0) {
+  if (!fieldProjectionOnly && normalizedPlan.measures.length === 0) {
     reasons.push("Plan must include a metric.");
   } else {
     for (const measure of normalizedPlan.measures) {

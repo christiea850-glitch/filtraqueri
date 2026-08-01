@@ -95,6 +95,13 @@ export function evaluateBusinessSqlPlanReadiness(
   const reasonCodes: BusinessSqlPlanReadinessReasonCode[] = [];
   const blockingReasons: string[] = [];
   const reviewReasons: string[] = [];
+  const fieldProjectionOnly =
+    (plan.filters || []).length === 1 &&
+    normalizedPlan.measures.length === 0 &&
+    (normalizedPlan.derivedMeasures || []).length === 0 &&
+    (normalizedPlan.aggregateResultConditions || []).length === 0 &&
+    (normalizedPlan.orderBy || []).length === 0 &&
+    normalizedPlan.groupings.length > 0;
 
   if (plan.support === "blocked" || plan.status === "blocked" || plan.kind === "blocked") {
     reasonCodes.push("base_plan_blocked");
@@ -109,7 +116,7 @@ export function evaluateBusinessSqlPlanReadiness(
     reviewReasons.push("One or more required relationships need review.");
   }
 
-  if (!normalizedPlan.metric && normalizedPlan.measures.length === 0) {
+  if (!fieldProjectionOnly && !normalizedPlan.metric && normalizedPlan.measures.length === 0) {
     reasonCodes.push("metric_missing");
     reviewReasons.push("The plan does not contain a supported metric.");
   }

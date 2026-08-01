@@ -10,6 +10,7 @@ export type BusinessSqlFilterCompatibilityReason =
   | "row_filter_target_unresolved"
   | "row_filter_target_ambiguous"
   | "row_filter_target_invalid"
+  | "row_filter_target_conflict"
   | "row_filter_operator_unsupported"
   | "row_filter_value_invalid"
   | "row_filter_value_missing"
@@ -86,6 +87,20 @@ const targetFor = (filter: BusinessSqlFilter): BusinessSqlFilterTarget | null =>
   }
   return null;
 };
+
+const hasCanonicalTarget = (filter: BusinessSqlFilter): boolean =>
+  filter.target?.kind === "field";
+
+const legacyConflictsWithTarget = (
+  filter: BusinessSqlFilter,
+  target: BusinessSqlFilterTarget,
+): boolean =>
+  (hasText(filter.entity) && hasText(target.entity) && !sameText(filter.entity, target.entity)) ||
+  (hasText(filter.table) && hasText(target.table) && !sameText(filter.table, target.table)) ||
+  (hasText(filter.field) && hasText(target.field) && !sameText(filter.field, target.field)) ||
+  (Boolean(filter.fieldInferredType) &&
+    Boolean(target.fieldInferredType) &&
+    filter.fieldInferredType !== target.fieldInferredType);
 
 const matchingAvailableFields = (
   target: BusinessSqlFilterTarget,
@@ -188,6 +203,8 @@ export function evaluateBusinessSqlFilterCompatibility({
     reasonCodes.push("row_filter_target_invalid");
   } else if (target.resolved === false || !hasText(target.table) || !hasText(target.field)) {
     reasonCodes.push("row_filter_target_unresolved");
+  } else if (hasCanonicalTarget(filter) && legacyConflictsWithTarget(filter, target)) {
+    reasonCodes.push("row_filter_target_conflict");
   } else if (availableFields.length > 0) {
     const matches = matchingAvailableFields(target, availableFields);
     if (matches.length === 0) {
