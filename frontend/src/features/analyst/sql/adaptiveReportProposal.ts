@@ -1114,9 +1114,12 @@ type RowFilterOperatorPhrase = {
 const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
   { operator: "not_equals", phrase: "is not equal to" },
   { operator: "not_equals", phrase: "does not equal" },
+  { operator: "between", phrase: "is in the range" },
   { operator: "greater_than_or_equal", phrase: "no less than" },
   { operator: "less_than_or_equal", phrase: "no more than" },
   { operator: "is_not_null", phrase: "is not null", nullary: true },
+  { operator: "between", phrase: "is between" },
+  { operator: "between", phrase: "ranges from" },
   { operator: "greater_than_or_equal", phrase: "at least" },
   { operator: "less_than_or_equal", phrase: "at most" },
   { operator: "greater_than", phrase: "greater than" },
@@ -1129,6 +1132,7 @@ const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
   { operator: "equals", phrase: "equals" },
   { operator: "greater_than", phrase: "above" },
   { operator: "less_than", phrase: "below" },
+  { operator: "between", phrase: "between" },
   { operator: "contains", phrase: "contains" },
   { operator: "is_null", phrase: "is null", nullary: true },
 ] satisfies readonly RowFilterOperatorPhrase[])
@@ -1158,7 +1162,7 @@ const detectRowFilterShell = (prompt: string): RowFilterShell => {
   if (/;|--|\/\*|\*\/|[()]/.test(masked)) {
     return { status: "unsupported", reason: "raw_predicate_text", baseQuestion, predicate };
   }
-  if (/\b(?:and|or)\b/i.test(masked)) {
+  if (/\bor\b/i.test(masked)) {
     return { status: "unsupported", reason: "multiple_predicates", baseQuestion, predicate };
   }
 
@@ -1191,6 +1195,9 @@ const detectRowFilterShell = (prompt: string): RowFilterShell => {
   const match = matches[0];
   const fieldPhrase = predicate.slice(0, match.index).trim();
   const valueText = predicate.slice(match.index + match.text.length).trim();
+  if (match.operator !== "between" && /\band\b/i.test(masked)) {
+    return { status: "unsupported", reason: "multiple_predicates", baseQuestion, predicate };
+  }
   if (!fieldPhrase) {
     return { status: "unsupported", reason: "missing_field", baseQuestion, predicate };
   }
@@ -1228,11 +1235,31 @@ const parseNaturalLanguageStringValue = (value: string): BusinessSqlFilterCompar
   return null;
 };
 
+const parseNaturalLanguageNumericRangeValue = (value: string): BusinessSqlFilterComparisonValue | null => {
+  const trimmed = trimNaturalLanguageValuePunctuation(value);
+  const parts = trimmed.split(/\band\b/i).map((part) => part.trim()).filter(Boolean);
+  if (parts.length !== 2) return null;
+  const lower = parseNumericThreshold(parts[0]);
+  const upper = parseNumericThreshold(parts[1]);
+  if (!lower || !upper || lower.value > upper.value) return null;
+  return {
+    kind: "range",
+    valueKind: "number",
+    lower: lower.value,
+    upper: upper.value,
+    lowerInclusive: true,
+    upperInclusive: true,
+  };
+};
+
 const parseRowFilterComparisonValue = (
   shell: Extract<RowFilterShell, { status: "detected" }>,
   fieldType: SchemaColumn["inferred_type"] | undefined,
 ): BusinessSqlFilterComparisonValue | undefined | null => {
   if (shell.operator === "is_null" || shell.operator === "is_not_null") return undefined;
+  if (shell.operator === "between") {
+    return fieldType === "numeric" ? parseNaturalLanguageNumericRangeValue(shell.valueText) : null;
+  }
   if (
     shell.operator === "greater_than" ||
     shell.operator === "greater_than_or_equal" ||
@@ -1824,7 +1851,24 @@ const matchingRowFilterFields = (
 };
 
 const valueIdentity = (value: BusinessSqlFilterComparisonValue | undefined): string =>
-  value ? `${value.kind}:${String(value.value)}` : "nullary";
+  value?.kind === "range"
+    ? [
+        value.kind,
+        value.valueKind,
+        value.lower,
+        value.upper,
+        value.lowerInclusive ? "lower-inclusive" : "lower-exclusive",
+        value.upperInclusive ? "upper-inclusive" : "upper-exclusive",
+      ].join(":")
+    : value?.kind === "set"
+      ? [
+          value.kind,
+          value.valueKind,
+          ...Array.from(new Set(value.values.map((member) => `${typeof member}:${String(member)}`))).sort(),
+        ].join(":")
+      : value
+        ? `${value.kind}:${String(value.value)}`
+        : "nullary";
 
 export const createProposedRowFilterId = ({
   target,
