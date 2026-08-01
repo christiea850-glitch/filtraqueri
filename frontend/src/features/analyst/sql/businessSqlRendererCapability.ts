@@ -20,8 +20,6 @@ export type BusinessSqlRendererIncapabilityReason =
   | "derived_measure_division_policy_missing"
   | "derived_measure_operand_mismatch"
   | "row_filter_rendering_not_supported"
-  | "row_filter_set_rendering_not_supported"
-  | "row_filter_range_rendering_not_supported"
   | "row_filter_legacy_semantics_not_renderable"
   | "multiple_row_filters_not_supported"
   | "unrecognized_plan_shape";

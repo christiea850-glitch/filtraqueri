@@ -334,8 +334,8 @@ const fixtures: Fixture[] = [
         ...(readinessFor(notInPlan).status === "ready" ? [] : ["Expected NOT IN structural readiness."]),
         ...(inCapability.capable ? [] : ["Expected IN set renderer capability."]),
         ...(notInCapability.capable ? [] : ["Expected NOT IN set renderer capability."]),
-        ...(!inCapability.reasonCodes.includes("row_filter_set_rendering_not_supported") ? [] : ["Expected no IN set rendering refusal."]),
-        ...(!notInCapability.reasonCodes.includes("row_filter_set_rendering_not_supported") ? [] : ["Expected no NOT IN set rendering refusal."]),
+        ...(!(inCapability.reasonCodes as readonly string[]).includes("row_filter_set_rendering_not_supported") ? [] : ["Expected no IN set rendering refusal."]),
+        ...(!(notInCapability.reasonCodes as readonly string[]).includes("row_filter_set_rendering_not_supported") ? [] : ["Expected no NOT IN set rendering refusal."]),
       ];
     },
   },

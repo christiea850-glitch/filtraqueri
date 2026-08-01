@@ -101,6 +101,21 @@ const rangeValue = (lower: unknown, upper: unknown): BusinessSqlFilterComparison
   upperInclusive: true,
 } as unknown as BusinessSqlFilterComparisonValue);
 
+const malformedRangeValue = (
+  overrides: Partial<{
+    lowerInclusive: unknown;
+    upperInclusive: unknown;
+  }>,
+): BusinessSqlFilterComparisonValue => ({
+  kind: "range",
+  valueKind: "number",
+  lower: 1,
+  upper: 10,
+  lowerInclusive: true,
+  upperInclusive: true,
+  ...overrides,
+} as unknown as BusinessSqlFilterComparisonValue);
+
 const setValue = (
   valueKind: "number" | "string" | "boolean",
   values: readonly (number | string | boolean)[],
@@ -291,6 +306,30 @@ const expectedEmptyUnsortedSql = [
 
 const validRangeFilter = () => filterFor();
 
+const malformedFlagCases = [
+  { name: "lowerInclusive false", value: malformedRangeValue({ lowerInclusive: false }) },
+  { name: "upperInclusive false", value: malformedRangeValue({ upperInclusive: false }) },
+  { name: "missing lowerInclusive", value: (() => {
+    const value = malformedRangeValue({});
+    delete (value as unknown as { lowerInclusive?: unknown }).lowerInclusive;
+    return value;
+  })() },
+  { name: "missing upperInclusive", value: (() => {
+    const value = malformedRangeValue({});
+    delete (value as unknown as { upperInclusive?: unknown }).upperInclusive;
+    return value;
+  })() },
+  { name: "string lowerInclusive", value: malformedRangeValue({ lowerInclusive: "true" }) },
+  { name: "string upperInclusive", value: malformedRangeValue({ upperInclusive: "true" }) },
+  { name: "numeric lowerInclusive", value: malformedRangeValue({ lowerInclusive: 1 }) },
+  { name: "numeric upperInclusive", value: malformedRangeValue({ upperInclusive: 1 }) },
+  { name: "null lowerInclusive", value: malformedRangeValue({ lowerInclusive: null }) },
+  { name: "undefined upperInclusive", value: malformedRangeValue({ upperInclusive: undefined }) },
+] as const;
+
+const malformedFlagFilters = (): BusinessSqlFilter[] =>
+  malformedFlagCases.map((entry) => filterFor({ comparisonValue: entry.value }));
+
 const rendersRangeSql = (plan: BusinessSqlQueryPlan): boolean => {
   const result = renderBusinessSqlQueryPlan(plan);
   return result.rendered &&
@@ -328,6 +367,16 @@ const fixtures: Fixture[] = [
   { name: "null endpoint is invalid at runtime", assert: () => compatibilityFor(filterFor({ comparisonValue: rangeValue(null, 10) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected null endpoint invalid."] },
   { name: "undefined endpoint is invalid at runtime", assert: () => compatibilityFor(filterFor({ comparisonValue: rangeValue(undefined, 10) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected undefined endpoint invalid."] },
   { name: "object endpoint is invalid at runtime", assert: () => compatibilityFor(filterFor({ comparisonValue: rangeValue({}, 10) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected object endpoint invalid."] },
+  { name: "lowerInclusive false is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ lowerInclusive: false }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected lowerInclusive false invalid."] },
+  { name: "upperInclusive false is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ upperInclusive: false }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected upperInclusive false invalid."] },
+  { name: "missing lowerInclusive is incompatible", assert: () => compatibilityFor(malformedFlagFilters()[2]).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected missing lowerInclusive invalid."] },
+  { name: "missing upperInclusive is incompatible", assert: () => compatibilityFor(malformedFlagFilters()[3]).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected missing upperInclusive invalid."] },
+  { name: "string lowerInclusive is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ lowerInclusive: "true" }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected string lowerInclusive invalid."] },
+  { name: "string upperInclusive is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ upperInclusive: "true" }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected string upperInclusive invalid."] },
+  { name: "numeric lowerInclusive is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ lowerInclusive: 1 }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected numeric lowerInclusive invalid."] },
+  { name: "numeric upperInclusive is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ upperInclusive: 1 }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected numeric upperInclusive invalid."] },
+  { name: "null lowerInclusive is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ lowerInclusive: null }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected null lowerInclusive invalid."] },
+  { name: "undefined upperInclusive is incompatible", assert: () => compatibilityFor(filterFor({ comparisonValue: malformedRangeValue({ upperInclusive: undefined }) })).reasonCodes.includes("row_filter_value_invalid") ? [] : ["Expected undefined upperInclusive invalid."] },
   { name: "BETWEEN requires a range value", assert: () => compatibilityFor({ ...filterFor(), comparisonValue: undefined }).reasonCodes.includes("row_filter_value_missing") ? [] : ["Expected missing range."] },
   { name: "BETWEEN rejects scalar value", assert: () => compatibilityFor(filterFor({ comparisonValue: { kind: "number", value: 100 } })).reasonCodes.includes("row_filter_type_incompatible") ? [] : ["Expected scalar rejection."] },
   { name: "BETWEEN rejects set value", assert: () => compatibilityFor(filterFor({ comparisonValue: setValue("number", [1, 10]) })).reasonCodes.includes("row_filter_type_incompatible") ? [] : ["Expected set rejection."] },
@@ -344,7 +393,7 @@ const fixtures: Fixture[] = [
   { name: "valid BETWEEN is structurally ready", assert: () => readinessFor(basePlan(validRangeFilter())).status === "ready" ? [] : ["Expected ready range plan."] },
   { name: "valid BETWEEN is renderer-capable", assert: () => {
     const capability = evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter()));
-    return capability.capable && !capability.reasonCodes.includes("row_filter_range_rendering_not_supported") ? [] : ["Expected range renderer capability."];
+    return capability.capable && !(capability.reasonCodes as readonly string[]).includes("row_filter_range_rendering_not_supported") ? [] : ["Expected range renderer capability."];
   } },
   { name: "invalid range is structurally blocked", assert: () => readinessFor(basePlan(filterFor({ comparisonValue: rangeValue(10, 1) }))).status === "blocked" ? [] : ["Expected invalid range blocked."] },
   { name: "multiple filters remain incapable", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected multiple filter refusal."] },
@@ -378,6 +427,35 @@ const fixtures: Fixture[] = [
       !preview.actions.canRunSql
       ? []
       : ["Expected malformed BETWEEN refusal."];
+  } },
+  { name: "every malformed flag structurally blocks", assert: () => malformedFlagFilters().every((filter) => readinessFor(basePlan(filter)).status === "blocked") ? [] : ["Expected malformed flag readiness block."] },
+  { name: "every malformed flag produces no SQL", assert: () => malformedFlagFilters().every((filter) => {
+    const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(filter));
+    return !result.rendered && result.sql === null && !result.inserted && !result.ranQuery;
+  }) ? [] : ["Expected malformed flag render refusal."] },
+  { name: "every malformed flag disables preview actions", assert: () => malformedFlagFilters().every((filter) => {
+    const preview = createBusinessSqlRenderPreview(fieldProjectionPlan(filter));
+    return preview.sql === null &&
+      !preview.actions.canCopySql &&
+      !preview.actions.canInsertSql &&
+      !preview.actions.canRunSql;
+  }) ? [] : ["Expected malformed flag preview gating."] },
+  { name: "every malformed flag creates invalid-range identity", assert: () => malformedFlagFilters().every((filter) => filter.filterId?.includes("invalid-range")) ? [] : ["Expected invalid-range identity."] },
+  { name: "invalid-range IDs differ from equivalent valid range ID", assert: () => {
+    const validId = filterFor({ comparisonValue: rangeValue(1, 10) }).filterId;
+    return malformedFlagFilters().every((filter) => filter.filterId !== validId) ? [] : ["Expected malformed identities to differ from valid range."];
+  } },
+  { name: "lower and upper malformed flag identities are distinguishable", assert: () => {
+    const lowerFalse = filterFor({ comparisonValue: malformedRangeValue({ lowerInclusive: false }) }).filterId;
+    const upperFalse = filterFor({ comparisonValue: malformedRangeValue({ upperInclusive: false }) }).filterId;
+    return lowerFalse !== upperFalse ? [] : ["Expected lower/upper malformed identities to differ."];
+  } },
+  { name: "malformed flag capability emits no removed reason", assert: () => {
+    const reasons = malformedFlagFilters().flatMap((filter) => evaluateBusinessSqlRendererCapability(basePlan(filter)).reasonCodes as readonly string[]);
+    return !reasons.includes("row_filter_range_rendering_not_supported") &&
+      !reasons.includes("row_filter_set_rendering_not_supported")
+      ? []
+      : ["Expected no removed reason for malformed flags."];
   } },
   { name: "BETWEEN plus grouping renders complete SQL", assert: () => rendersRangeSql(basePlan(validRangeFilter())) ? [] : ["Expected grouping BETWEEN SQL."] },
   { name: "BETWEEN plus HAVING renders complete SQL", assert: () => rendersRangeSql(basePlan(validRangeFilter(), { aggregateResultConditions: [{ conditionId: "range-having", measureId: revenueMeasure.measureId, operator: "greater_than", comparisonValue: { kind: "number", value: 10 } }] })) ? [] : ["Expected HAVING BETWEEN SQL."] },
@@ -449,6 +527,24 @@ const fixtures: Fixture[] = [
       ...(numberIn?.includes('WHERE "orders"."order_amount" IN (1, 10);') ? [] : ["Expected numeric IN SQL."]),
       ...(boolNotIn?.includes('WHERE "orders"."enabled" NOT IN (FALSE, TRUE);') ? [] : ["Expected boolean NOT IN SQL."]),
     ];
+  } },
+  { name: "valid IN and NOT IN remain renderer-capable", assert: () => [
+    ...(evaluateBusinessSqlRendererCapability(basePlan(filterFor({ field: "status", fieldInferredType: "categorical", operator: "in", comparisonValue: setValue("string", ["active", "pending"]) }))).capable ? [] : ["Expected IN capability."]),
+    ...(evaluateBusinessSqlRendererCapability(basePlan(filterFor({ field: "priority", fieldInferredType: "categorical", operator: "not_in", comparisonValue: setValue("string", ["cancelled", "closed"]) }))).capable ? [] : ["Expected NOT IN capability."]),
+  ] },
+  { name: "legacy filter reason remains unchanged", assert: () => {
+    const legacyPlan = basePlan(null, { filters: [{ kind: "custom", table: "orders", field: "order_amount", value: "100 to 500", label: "Legacy text" }] });
+    return evaluateBusinessSqlRendererCapability(legacyPlan).reasonCodes.includes("row_filter_legacy_semantics_not_renderable") ? [] : ["Expected legacy reason."]; 
+  } },
+  { name: "multiple-filter reason remains unchanged", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected multiple filter reason."] },
+  { name: "canonical target-conflict reason remains unchanged", assert: () => compatibilityFor({ ...validRangeFilter(), field: "discount" }).reasonCodes.includes("row_filter_target_conflict") ? [] : ["Expected target conflict reason."] },
+  { name: "removed set-rendering reason is absent from active vocabulary", assert: () => {
+    const capability = evaluateBusinessSqlRendererCapability(basePlan(filterFor({ field: "status", fieldInferredType: "categorical", operator: "in", comparisonValue: setValue("string", ["active"]) })));
+    return !(capability.reasonCodes as readonly string[]).includes("row_filter_set_rendering_not_supported") ? [] : ["Expected absent set-rendering reason."];
+  } },
+  { name: "removed range-rendering reason is absent from active vocabulary", assert: () => {
+    const capability = evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter()));
+    return !(capability.reasonCodes as readonly string[]).includes("row_filter_range_rendering_not_supported") ? [] : ["Expected absent range-rendering reason."];
   } },
   { name: "filters empty SQL remains byte-identical", assert: () => renderBusinessSqlQueryPlan(basePlan(null)).sql === expectedEmptySql ? [] : ["Expected filters empty SQL."] },
   { name: "explicit default aggregate ordering remains plan-driven", assert: () => {
