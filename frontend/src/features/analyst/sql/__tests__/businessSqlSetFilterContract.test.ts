@@ -1,4 +1,4 @@
-/** PS-6a - canonical IN/NOT IN row-filter contract fixtures. */
+/** PS-6 - canonical IN/NOT IN row-filter contract and rendering fixtures. */
 
 import {
   createBusinessSqlDerivedMeasureId,
@@ -199,19 +199,6 @@ const derivedConditionPlan = (filter: BusinessSqlFilter): BusinessSqlQueryPlan =
   });
 };
 
-const noSqlAndNoActions = (plan: BusinessSqlQueryPlan): boolean => {
-  const rendered = renderBusinessSqlQueryPlan(plan);
-  const preview = createBusinessSqlRenderPreview(plan);
-  return !rendered.rendered &&
-    rendered.sql === null &&
-    rendered.inserted === false &&
-    rendered.ranQuery === false &&
-    preview.sql === null &&
-    !preview.actions.canCopySql &&
-    !preview.actions.canInsertSql &&
-    !preview.actions.canRunSql;
-};
-
 const expectedScalarSql = [
   "SELECT",
   '  "orders"."order_id" AS "order_id"',
@@ -219,16 +206,53 @@ const expectedScalarSql = [
   'WHERE "orders"."order_amount" > 1000;',
 ].join("\n");
 
-const fieldProjectionPlan = (filter: BusinessSqlFilter | null): BusinessSqlQueryPlan => ({
+const fieldProjectionPlan = (
+  filter: BusinessSqlFilter | null,
+  {
+    table = "orders",
+    field = "order_id",
+  }: {
+    table?: string;
+    field?: string;
+  } = {},
+): BusinessSqlQueryPlan => ({
   ...createEmptyBusinessSqlQueryPlan(),
   id: "business-sql-plan:set-filter-field-projection",
   kind: "empty",
   status: "resolved",
   support: "supported",
-  entities: [sourceEntity],
-  groupings: [{ entity: "orders", table: "orders", field: "order_id", label: "order_id" }],
+  entities: [{ entity: table, table, required: true, role: "source" }],
+  groupings: [{ entity: table, table, field, label: field }],
   filters: filter ? [filter] : [],
 });
+
+const expectedTextInSql = [
+  "SELECT",
+  '  "customers"."customer_id" AS "customer_id"',
+  'FROM "customers"',
+  'WHERE "customers"."status" IN (\'active\', \'pending\');',
+].join("\n");
+
+const expectedTextNotInSql = [
+  "SELECT",
+  '  "orders"."order_id" AS "order_id"',
+  'FROM "orders"',
+  'WHERE "orders"."priority" NOT IN (\'cancelled\', \'closed\');',
+].join("\n");
+
+const expectedNumberInSql = [
+  "SELECT",
+  '  "inventory"."sku" AS "sku"',
+  'FROM "inventory"',
+  'WHERE "inventory"."warehouse_id" IN (10, 20, 30);',
+].join("\n");
+
+const expectedBooleanInSql = [
+  "SELECT",
+  '  "accounts"."account_id" AS "account_id"',
+  'FROM "accounts"',
+  'WHERE "accounts"."enabled" IN (FALSE, TRUE);',
+].join("\n");
 
 const expectedEmptySql = [
   "SELECT",
@@ -299,7 +323,7 @@ const fixtures: Fixture[] = [
     ],
   },
   {
-    name: "IN and NOT IN are structurally ready but renderer-incapable",
+    name: "IN and NOT IN are structurally ready and renderer-capable",
     assert: () => {
       const inPlan = basePlan(filterFor());
       const notInPlan = basePlan(filterFor({ operator: "not_in" }));
@@ -308,8 +332,10 @@ const fixtures: Fixture[] = [
       return [
         ...(readinessFor(inPlan).status === "ready" ? [] : ["Expected IN structural readiness."]),
         ...(readinessFor(notInPlan).status === "ready" ? [] : ["Expected NOT IN structural readiness."]),
-        ...(inCapability.reasonCodes.includes("row_filter_set_rendering_not_supported") ? [] : ["Expected IN set rendering refusal."]),
-        ...(notInCapability.reasonCodes.includes("row_filter_set_rendering_not_supported") ? [] : ["Expected NOT IN set rendering refusal."]),
+        ...(inCapability.capable ? [] : ["Expected IN set renderer capability."]),
+        ...(notInCapability.capable ? [] : ["Expected NOT IN set renderer capability."]),
+        ...(!inCapability.reasonCodes.includes("row_filter_set_rendering_not_supported") ? [] : ["Expected no IN set rendering refusal."]),
+        ...(!notInCapability.reasonCodes.includes("row_filter_set_rendering_not_supported") ? [] : ["Expected no NOT IN set rendering refusal."]),
       ];
     },
   },
@@ -323,14 +349,64 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "renderer and preview emit no IN or NOT IN SQL",
-    assert: () => [
-      ...(noSqlAndNoActions(basePlan(filterFor())) ? [] : ["Expected no IN SQL/actions."]),
-      ...(noSqlAndNoActions(basePlan(filterFor({ operator: "not_in" }))) ? [] : ["Expected no NOT IN SQL/actions."]),
-    ],
+    name: "renderer and preview emit deterministic IN and NOT IN SQL",
+    assert: () => {
+      const inFilter = filterFor({
+        table: "customers",
+        entity: "customers",
+        field: "status",
+        comparisonValue: setValue("string", ["pending", "active", "active"]),
+      });
+      const notInFilter = filterFor({
+        field: "priority",
+        operator: "not_in",
+        comparisonValue: setValue("string", ["closed", "cancelled"]),
+      });
+      const inPlan = fieldProjectionPlan(inFilter, { table: "customers", field: "customer_id" });
+      const notInPlan = fieldProjectionPlan(notInFilter);
+      const preview = createBusinessSqlRenderPreview(inPlan);
+      return [
+        ...(renderBusinessSqlQueryPlan(inPlan).sql === expectedTextInSql ? [] : ["Expected canonical text IN SQL."]),
+        ...(renderBusinessSqlQueryPlan(notInPlan).sql === expectedTextNotInSql ? [] : ["Expected canonical text NOT IN SQL."]),
+        ...(preview.sql === expectedTextInSql ? [] : ["Expected preview SQL to match renderer SQL."]),
+        ...(preview.actions.canCopySql && !preview.actions.canInsertSql && !preview.actions.canRunSql ? [] : ["Expected rendered SQL to remain behind manual insert/run gates."]),
+      ];
+    },
   },
   {
-    name: "IN combinations emit no partial SQL",
+    name: "number boolean and apostrophe set literals render safely",
+    assert: () => {
+      const numberFilter = filterFor({
+        table: "inventory",
+        entity: "inventory",
+        field: "warehouse_id",
+        fieldInferredType: "numeric",
+        comparisonValue: setValue("number", [30, 10, 20, 10]),
+      });
+      const booleanFilter = filterFor({
+        table: "accounts",
+        entity: "accounts",
+        field: "enabled",
+        fieldInferredType: "boolean",
+        comparisonValue: setValue("boolean", [true, false, true]),
+      });
+      const apostropheFilter = filterFor({
+        table: "customers",
+        entity: "customers",
+        field: "status",
+        comparisonValue: setValue("string", ["O'Brien", "active"]),
+      });
+      const apostropheSql = renderBusinessSqlQueryPlan(fieldProjectionPlan(apostropheFilter, { table: "customers", field: "customer_id" })).sql || "";
+      return [
+        ...(renderBusinessSqlQueryPlan(fieldProjectionPlan(numberFilter, { table: "inventory", field: "sku" })).sql === expectedNumberInSql ? [] : ["Expected numeric IN SQL."]),
+        ...(renderBusinessSqlQueryPlan(fieldProjectionPlan(booleanFilter, { table: "accounts", field: "account_id" })).sql === expectedBooleanInSql ? [] : ["Expected boolean IN SQL."]),
+        ...(apostropheSql.includes("'O''Brien'") ? [] : ["Expected apostrophe escaping."]),
+        ...(!apostropheSql.includes("O'Brien)") ? [] : ["Expected no raw apostrophe literal."]),
+      ];
+    },
+  },
+  {
+    name: "IN combinations render complete SQL without dropping membership intent",
     assert: () => {
       const filter = filterFor();
       const rowLimit = { value: 5 };
@@ -375,26 +451,39 @@ const fixtures: Fixture[] = [
           },
         }),
       ];
-      return plans.every(noSqlAndNoActions) ? [] : ["Expected no partial SQL for IN combinations."];
+      const rendered = plans.map(renderBusinessSqlQueryPlan);
+      return rendered.every((result) => result.rendered && result.sql?.includes(" IN ('active', 'pending')"))
+        ? []
+        : ["Expected complete IN SQL for supported clause combinations."];
     },
   },
   {
-    name: "set filter identity is normalized and type-aware",
+    name: "set filter identity is normalized type-aware and hardened for malformed members",
     assert: () => {
       const first = filterFor({ comparisonValue: setValue("string", ["active", "pending"]) });
       const reordered = filterFor({ comparisonValue: setValue("string", ["pending", "active"]) });
       const duplicate = filterFor({ comparisonValue: setValue("string", ["active", "active", "pending"]) });
       const changed = filterFor({ comparisonValue: setValue("string", ["active", "closed"]) });
+      const caseChanged = filterFor({ comparisonValue: setValue("string", ["Active", "pending"]) });
       const notIn = filterFor({ operator: "not_in", comparisonValue: setValue("string", ["active", "pending"]) });
       const stringOne = filterFor({ comparisonValue: setValue("string", ["1"]) });
       const numberOne = filterFor({ field: "amount", fieldInferredType: "numeric", comparisonValue: setValue("number", [1]) });
+      const booleanTrue = filterFor({ field: "enabled", fieldInferredType: "boolean", comparisonValue: setValue("boolean", [true]) });
+      const stringTrue = filterFor({ comparisonValue: setValue("string", ["true"]) });
+      const validSubset = filterFor({ field: "amount", fieldInferredType: "numeric", comparisonValue: setValue("number", [1, 2]) });
+      const malformedSuperset = filterFor({ field: "amount", fieldInferredType: "numeric", comparisonValue: setValue("number", [1, 2, Number.NaN]) });
+      const malformedOnly = filterFor({ field: "amount", fieldInferredType: "numeric", comparisonValue: setValue("number", [Number.NaN]) });
       const relabeled = { ...first, label: "Other", evidence: "Other" };
       return [
         ...(first.filterId === reordered.filterId ? [] : ["Expected authored order to be identity-neutral."]),
         ...(first.filterId === duplicate.filterId ? [] : ["Expected duplicate members to be identity-neutral."]),
         ...(first.filterId !== changed.filterId ? [] : ["Expected changed member to change ID."]),
+        ...(first.filterId !== caseChanged.filterId ? [] : ["Expected case-distinct strings to change ID."]),
         ...(first.filterId !== notIn.filterId ? [] : ["Expected IN and NOT IN IDs to differ."]),
         ...(stringOne.filterId !== numberOne.filterId ? [] : ["Expected string 1 and number 1 not to collide."]),
+        ...(booleanTrue.filterId !== stringTrue.filterId ? [] : ["Expected boolean true and string true not to collide."]),
+        ...(validSubset.filterId !== malformedSuperset.filterId ? [] : ["Expected malformed superset not to collide with valid subset."]),
+        ...(validSubset.filterId !== malformedOnly.filterId ? [] : ["Expected malformed-only set not to collide with valid set."]),
         ...(first.filterId === createBusinessSqlFilterId(relabeled) ? [] : ["Expected label/evidence to be ignored."]),
       ];
     },

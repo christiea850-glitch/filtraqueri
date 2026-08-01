@@ -45,18 +45,9 @@ const hasRenderableAlias = (value: string | undefined): value is string =>
 const isCanonicalRenderableFilter = (filter: BusinessSqlFilter): boolean =>
   filter.target?.kind === "field" &&
   Boolean(filter.operator) &&
-  filter.operator !== "in" &&
-  filter.operator !== "not_in" &&
-  filter.comparisonValue?.kind !== "set" &&
   (filter.operator === "is_null" ||
     filter.operator === "is_not_null" ||
     Boolean(filter.comparisonValue)) &&
-  evaluateBusinessSqlFilterCompatibility({ filter }).compatible;
-
-const isCanonicalSetFilter = (filter: BusinessSqlFilter): boolean =>
-  filter.target?.kind === "field" &&
-  (filter.operator === "in" || filter.operator === "not_in") &&
-  filter.comparisonValue?.kind === "set" &&
   evaluateBusinessSqlFilterCompatibility({ filter }).compatible;
 
 export function evaluateBusinessSqlRendererCapability(
@@ -121,9 +112,7 @@ export function evaluateBusinessSqlRendererCapability(
     const filter = normalized.filters[0];
     if (!isCanonicalRenderableFilter(filter)) {
       reasonCodes.push(
-        isCanonicalSetFilter(filter)
-          ? "row_filter_set_rendering_not_supported"
-          : filter.target?.kind === "field"
+        filter.target?.kind === "field"
           ? "row_filter_rendering_not_supported"
           : "row_filter_legacy_semantics_not_renderable",
       );

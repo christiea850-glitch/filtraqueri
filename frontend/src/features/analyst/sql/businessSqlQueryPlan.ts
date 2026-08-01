@@ -382,6 +382,85 @@ export const createBusinessSqlRowLimitId = (
   rowLimit: Pick<BusinessSqlRowLimit, "value">,
 ): string => stablePrimitiveId("business-sql-row-limit", [rowLimit.value]);
 
+const exactStringIdentity = (value: string): string =>
+  Array.from(value)
+    .map((character) => character.codePointAt(0)?.toString(16).padStart(4, "0") || "")
+    .join("");
+
+const invalidSetMemberIdentity = (value: unknown): string => {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return `array:${value.length}`;
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return "number:nan";
+    if (!Number.isFinite(value)) return `number:${value > 0 ? "infinity" : "negative-infinity"}`;
+    return `number:${value}`;
+  }
+  if (typeof value === "string") return `string:${exactStringIdentity(value)}`;
+  if (typeof value === "boolean") return `boolean:${value}`;
+  if (typeof value === "undefined") return "undefined";
+  if (typeof value === "symbol") return "symbol";
+  if (typeof value === "function") return "function";
+  return `object:${Object.prototype.toString.call(value)}`;
+};
+
+const setComparisonIdentity = (
+  comparisonValue: Extract<BusinessSqlFilterComparisonValue, { kind: "set" }>,
+): string => {
+  const valueKind = comparisonValue.valueKind;
+  const rawValues = comparisonValue.values as readonly unknown[];
+  if (
+    (valueKind !== "number" && valueKind !== "string" && valueKind !== "boolean") ||
+    !Array.isArray(rawValues) ||
+    rawValues.length === 0
+  ) {
+    return [
+      "invalid-set",
+      String(valueKind),
+      Array.isArray(rawValues) ? rawValues.length : "non-array",
+    ].join("|");
+  }
+
+  const invalidMembers: string[] = [];
+  const validMembers: string[] = [];
+  for (const value of rawValues) {
+    if (valueKind === "number") {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        validMembers.push(String(value));
+      } else {
+        invalidMembers.push(invalidSetMemberIdentity(value));
+      }
+    } else if (valueKind === "string") {
+      if (typeof value === "string" && value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value)) {
+        validMembers.push(exactStringIdentity(value));
+      } else {
+        invalidMembers.push(invalidSetMemberIdentity(value));
+      }
+    } else if (typeof value === "boolean") {
+      validMembers.push(String(value));
+    } else {
+      invalidMembers.push(invalidSetMemberIdentity(value));
+    }
+  }
+
+  if (invalidMembers.length > 0 || validMembers.length === 0) {
+    return [
+      "invalid-set",
+      valueKind,
+      ...Array.from(new Set(validMembers)).sort(),
+      ...invalidMembers.sort(),
+    ].join("|");
+  }
+
+  const normalizedMembers =
+    valueKind === "number"
+      ? Array.from(new Set(validMembers.map(Number))).sort((left, right) => left - right).map(String)
+      : valueKind === "boolean"
+      ? Array.from(new Set(validMembers)).sort((left, right) => Number(left === "true") - Number(right === "true"))
+      : Array.from(new Set(validMembers)).sort();
+
+  return ["valid-set", valueKind, ...normalizedMembers].join("|");
+};
+
 export const createBusinessSqlFilterId = (
   filter: Pick<BusinessSqlFilter, "target" | "entity" | "table" | "field" | "operator" | "comparisonValue">,
 ): string => {
@@ -396,20 +475,7 @@ export const createBusinessSqlFilterId = (
   const comparisonValue = filter.comparisonValue;
   const comparisonIdentity =
     comparisonValue?.kind === "set"
-      ? [
-          comparisonValue.valueKind,
-          ...Array.from(
-            new Set(
-              comparisonValue.values
-                .filter((value) => {
-                  if (comparisonValue.valueKind === "number") return typeof value === "number" && Number.isFinite(value);
-                  if (comparisonValue.valueKind === "string") return typeof value === "string";
-                  return typeof value === "boolean";
-                })
-                .map((value) => `${comparisonValue.valueKind}:${String(value).trim().toLowerCase()}`),
-            ),
-          ).sort(),
-        ].join("|")
+      ? setComparisonIdentity(comparisonValue)
       : comparisonValue?.kind === "number" ||
         comparisonValue?.kind === "string" ||
         comparisonValue?.kind === "boolean"

@@ -368,6 +368,38 @@ const renderSqlLiteral = (value: BusinessSqlFilterComparisonValue): string | nul
   return null;
 };
 
+const renderSqlSetLiteral = (
+  value: BusinessSqlFilterComparisonValue,
+): string | null => {
+  if (value.kind !== "set") return null;
+  if (!Array.isArray(value.values) || value.values.length === 0) return null;
+
+  const literals: string[] = [];
+  if (value.valueKind === "number") {
+    const members = Array.from(new Set(value.values));
+    if (!members.every((member): member is number => typeof member === "number" && Number.isFinite(member))) {
+      return null;
+    }
+    literals.push(...members.sort((left, right) => left - right).map(String));
+  } else if (value.valueKind === "string") {
+    const members = Array.from(new Set(value.values));
+    if (!members.every((member): member is string => typeof member === "string" && isValidIdentifier(member))) {
+      return null;
+    }
+    literals.push(...members.sort().map((member) => `'${member.replace(/'/g, "''")}'`));
+  } else if (value.valueKind === "boolean") {
+    const members = Array.from(new Set(value.values));
+    if (!members.every((member): member is boolean => typeof member === "boolean")) return null;
+    literals.push(...members
+      .sort((left, right) => Number(left) - Number(right))
+      .map((member) => member ? "TRUE" : "FALSE"));
+  } else {
+    return null;
+  }
+
+  return literals.length > 0 ? `(${literals.join(", ")})` : null;
+};
+
 const rowFilterComparisonOperatorSql: Partial<Record<BusinessSqlFilterOperator, string>> = {
   equals: "=",
   not_equals: "<>",
@@ -411,6 +443,11 @@ const renderWhere = (
   if (filter.operator === "is_null") return `WHERE ${fieldExpression} IS NULL`;
   if (filter.operator === "is_not_null") return `WHERE ${fieldExpression} IS NOT NULL`;
   if (!filter.comparisonValue) return null;
+  if (filter.operator === "in" || filter.operator === "not_in") {
+    const literal = renderSqlSetLiteral(filter.comparisonValue);
+    if (!literal) return null;
+    return `WHERE ${fieldExpression} ${filter.operator === "in" ? "IN" : "NOT IN"} ${literal}`;
+  }
   const literal = renderSqlLiteral(filter.comparisonValue);
   if (!literal) return null;
   if (filter.operator === "contains") return `WHERE contains(${fieldExpression}, ${literal})`;
