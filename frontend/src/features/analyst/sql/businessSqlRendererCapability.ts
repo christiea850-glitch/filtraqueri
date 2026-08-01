@@ -32,6 +32,9 @@ const RENDERABLE_DERIVED_MEASURE_OPERATORS = new Set([
   "divide",
 ]);
 
+const hasRenderableAlias = (value: string | undefined): value is string =>
+  Boolean(value && value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value));
+
 export function evaluateBusinessSqlRendererCapability(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRendererCapability {
@@ -80,8 +83,18 @@ export function evaluateBusinessSqlRendererCapability(
     reasonCodes.push("aggregate_condition_multiple_not_supported");
   }
 
-  if ((normalized.orderBy || []).some((sort) => sort.target.kind === "derived_measure")) {
-    reasonCodes.push("derived_measure_order_by_rendering_not_supported");
+  for (const sort of normalized.orderBy || []) {
+    if (sort.target.kind !== "derived_measure") continue;
+    const target = sort.target;
+    const matchingDerivedMeasures = derivedMeasures.filter(
+      (derivedMeasure) => derivedMeasure.derivedMeasureId === target.derivedMeasureId,
+    );
+    const derivedMeasure = matchingDerivedMeasures.length === 1
+      ? matchingDerivedMeasures[0]
+      : null;
+    if (!derivedMeasure || !hasRenderableAlias(derivedMeasure.sqlAlias)) {
+      reasonCodes.push("derived_measure_order_by_rendering_not_supported");
+    }
   }
 
   if (

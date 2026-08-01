@@ -302,6 +302,7 @@ const renderOrderBy = (
 const renderOptionalOrderBy = (
   plan: BusinessSqlQueryPlan,
   measures: readonly BusinessSqlMeasure[],
+  derivedMeasures: readonly BusinessSqlDerivedMeasure[],
   groupings: NonNullable<ReturnType<typeof groupingExpressions>>,
 ): string | null => {
   const sort = plan.orderBy[0];
@@ -312,7 +313,18 @@ const renderOptionalOrderBy = (
     const measure = measures.find((candidate) => candidate.measureId === measureId);
     return measure ? `ORDER BY ${quoteIdentifier(measure.sqlAlias)} ${direction}` : null;
   }
-  if (sort.target.kind === "derived_measure") return null;
+  if (sort.target.kind === "derived_measure") {
+    const target = sort.target;
+    const matchingDerivedMeasures = derivedMeasures.filter(
+      (candidate) => candidate.derivedMeasureId === target.derivedMeasureId,
+    );
+    const derivedMeasure = matchingDerivedMeasures.length === 1
+      ? matchingDerivedMeasures[0]
+      : null;
+    return derivedMeasure && isValidIdentifier(derivedMeasure.sqlAlias)
+      ? `ORDER BY ${quoteIdentifier(derivedMeasure.sqlAlias)} ${direction}`
+      : null;
+  }
   const sortTarget = sort.target;
   const grouping = groupings.find(
     (candidate) =>
@@ -534,7 +546,12 @@ export function renderBusinessSqlFromRenderability({
   const baseMetric = !derivedMeasure ? metricExpression(measure) : null;
   const orderBy = groupings
     ? derivedMeasure
-      ? renderOptionalOrderBy(plan, normalizedPlan.measures, groupings)
+      ? renderOptionalOrderBy(
+          plan,
+          normalizedPlan.measures,
+          normalizedPlan.derivedMeasures,
+          groupings,
+        )
       : renderOrderBy(plan, measure, groupings)
     : null;
   const requiresOrderBy = !derivedMeasure || (plan.orderBy || []).length > 0;

@@ -1,4 +1,4 @@
-/** PS-4a - derived-measure sort and aggregate-condition target contract fixtures. */
+/** PS-4b - derived-measure ORDER BY rendering fixtures. */
 
 import {
   attachBusinessSqlJoinResolutionToPlan,
@@ -11,8 +11,10 @@ import {
   createBusinessSqlSortId,
   createEmptyBusinessSqlQueryPlan,
   type BusinessSqlAggregateResultCondition,
+  type BusinessSqlDerivedMeasure,
   type BusinessSqlMeasure,
   type BusinessSqlQueryPlan,
+  type BusinessSqlSort,
   type BusinessSqlSortTarget,
 } from "../businessSqlQueryPlan";
 import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "../businessSqlAggregateResultConditionCompatibility";
@@ -127,6 +129,38 @@ const conditionFor = (
   };
 };
 
+const derivedFor = ({
+  operator,
+  sqlAlias,
+  left = leftMeasure,
+  right = rightMeasure,
+}: {
+  operator: BusinessSqlDerivedMeasure["operator"];
+  sqlAlias: string;
+  left?: BusinessSqlMeasure;
+  right?: BusinessSqlMeasure;
+}): BusinessSqlDerivedMeasure => {
+  const seed = {
+    operator,
+    leftMeasureId: left.measureId,
+    rightMeasureId: right.measureId,
+    ...(operator === "divide"
+      ? { divisionPolicy: { zeroDenominator: "null" as const } }
+      : {}),
+  };
+  return {
+    ...seed,
+    derivedMeasureId: createBusinessSqlDerivedMeasureId(seed),
+    sqlAlias,
+    label: sqlAlias,
+  };
+};
+
+const primaryDerivedSortMeasure = derivedFor({
+  operator: "subtract",
+  sqlAlias: "revenue_minus_cost",
+});
+
 const derivedConditionFor = (
   overrides: Partial<BusinessSqlAggregateResultCondition> = {},
 ): BusinessSqlAggregateResultCondition => {
@@ -143,10 +177,13 @@ const derivedConditionFor = (
   };
 };
 
-const withSort = (target: BusinessSqlSortTarget): BusinessSqlQueryPlan => {
+const withSort = (
+  target: BusinessSqlSortTarget,
+  direction: BusinessSqlSort["direction"] = "desc",
+): BusinessSqlQueryPlan => {
   const sort = {
     target,
-    direction: "desc" as const,
+    direction,
   };
   return {
     ...basePlan(),
@@ -157,6 +194,63 @@ const withSort = (target: BusinessSqlSortTarget): BusinessSqlQueryPlan => {
       },
     ],
   };
+};
+
+const withDerivedSort = ({
+  derived = primaryDerivedSortMeasure,
+  direction = "desc",
+  target = {
+    kind: "derived_measure" as const,
+    derivedMeasureId: derived.derivedMeasureId,
+    resolved: true,
+  },
+  plan = basePlan(),
+}: {
+  derived?: BusinessSqlDerivedMeasure;
+  direction?: BusinessSqlSort["direction"];
+  target?: BusinessSqlSortTarget;
+  plan?: BusinessSqlQueryPlan;
+} = {}): BusinessSqlQueryPlan => {
+  const sort = { target, direction };
+  return {
+    ...plan,
+    derivedMeasures: [derived],
+    orderBy: [{ ...sort, sortId: createBusinessSqlSortId(sort) }],
+  };
+};
+
+const expectedDerivedSql = ({
+  operator = "subtract",
+  alias = "revenue_minus_cost",
+  direction = "DESC",
+}: {
+  operator?: BusinessSqlDerivedMeasure["operator"];
+  alias?: string;
+  direction?: "ASC" | "DESC";
+} = {}): string => {
+  const expression =
+    operator === "add"
+      ? '(SUM("finance"."revenue")) + (SUM("finance"."cost"))'
+      : operator === "multiply"
+        ? '(SUM("finance"."revenue")) * (SUM("finance"."cost"))'
+        : operator === "divide"
+          ? [
+              "CASE",
+              '    WHEN (SUM("finance"."cost")) = 0 THEN NULL',
+              '    ELSE (SUM("finance"."revenue")) / (SUM("finance"."cost"))',
+              "  END",
+            ].join("\n")
+          : '(SUM("finance"."revenue")) - (SUM("finance"."cost"))';
+  return [
+    "SELECT",
+    '  "finance"."region" AS "region",',
+    '  SUM("finance"."revenue") AS "total_revenue",',
+    '  SUM("finance"."cost") AS "total_cost",',
+    `  ${expression} AS "${alias}"`,
+    'FROM "finance"',
+    'GROUP BY "finance"."region"',
+    `ORDER BY "${alias}" ${direction};`,
+  ].join("\n");
 };
 
 const fixtures: Fixture[] = [
@@ -201,30 +295,94 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "valid derived sort target is structurally ready but renderer-incapable",
+    name: "valid derived sort target is structurally ready, renderer-capable, and preview-safe",
     assert: () => {
-      const plan = withSort({
-        kind: "derived_measure",
-        derivedMeasureId: derivedMeasure.derivedMeasureId,
-        resolved: true,
-      });
+      const plan = withDerivedSort();
       const readiness = readinessFor(plan);
       const capability = evaluateBusinessSqlRendererCapability(plan);
       const rendered = renderBusinessSqlQueryPlan(plan);
       const preview = createBusinessSqlRenderPreview(plan);
       return [
         ...(readiness.status === "ready" ? [] : ["Expected valid derived sort to be structurally ready."]),
-        ...(capability.status === "incapable" &&
-        capability.reasonCodes.includes("derived_measure_order_by_rendering_not_supported")
+        ...(capability.status === "capable" &&
+        !capability.reasonCodes.includes("derived_measure_order_by_rendering_not_supported")
           ? []
-          : ["Expected derived sort renderer incapability reason."]),
-        ...(!rendered.rendered && rendered.sql === null ? [] : ["Derived sort must not render SQL."]),
-        ...(preview.sql === null &&
-        !preview.actions.canCopySql &&
+          : ["Expected valid derived sort renderer capability."]),
+        ...(rendered.sql === expectedDerivedSql() ? [] : ["Expected descending derived ORDER BY SQL."]),
+        ...(rendered.inserted === false && rendered.ranQuery === false
+          ? []
+          : ["Derived sort render must remain manual."]),
+        ...(preview.sql === expectedDerivedSql() &&
+        preview.actions.canCopySql &&
         !preview.actions.canInsertSql &&
         !preview.actions.canRunSql
           ? []
-          : ["Derived sort preview must expose no SQL actions."]),
+          : ["Valid derived sort preview must expose only copy action."]),
+      ];
+    },
+  },
+  {
+    name: "derived ORDER BY renders through the same generic path across operators",
+    assert: () => {
+      const add = derivedFor({ operator: "add", sqlAlias: "revenue_plus_cost" });
+      const subtract = derivedFor({ operator: "subtract", sqlAlias: "revenue_minus_cost" });
+      const multiply = derivedFor({ operator: "multiply", sqlAlias: "revenue_times_cost" });
+      const divide = derivedFor({ operator: "divide", sqlAlias: "revenue_divided_by_cost" });
+      const cases = [
+        { derived: add, direction: "asc" as const, sqlDirection: "ASC" as const, operator: "add" as const },
+        { derived: subtract, direction: "desc" as const, sqlDirection: "DESC" as const, operator: "subtract" as const },
+        { derived: multiply, direction: "desc" as const, sqlDirection: "DESC" as const, operator: "multiply" as const },
+        { derived: divide, direction: "desc" as const, sqlDirection: "DESC" as const, operator: "divide" as const },
+      ];
+      return cases.flatMap(({ derived, direction, sqlDirection, operator }) => {
+        const plan = withDerivedSort({ derived, direction });
+        const capability = evaluateBusinessSqlRendererCapability(plan);
+        const rendered = renderBusinessSqlQueryPlan(plan);
+        const expected = expectedDerivedSql({
+          operator,
+          alias: derived.sqlAlias,
+          direction: sqlDirection,
+        });
+        const orderBy = `ORDER BY "${derived.sqlAlias}" ${sqlDirection};`;
+        return [
+          ...(capability.capable ? [] : [`Expected ${operator} derived sort to be renderer-capable.`]),
+          ...(rendered.sql === expected ? [] : [`Expected exact ${operator} derived sort SQL.`]),
+          ...(rendered.sql?.includes(orderBy) ? [] : [`Expected ${operator} ORDER BY projected alias.`]),
+          ...(rendered.sql && !rendered.sql.split("ORDER BY")[1]?.includes("SUM(")
+            ? []
+            : [`Expected ${operator} ORDER BY not to duplicate expression.`]),
+        ];
+      });
+    },
+  },
+  {
+    name: "derived sort target metadata is ignored in favor of stable derivedMeasureId",
+    assert: () => {
+      const target: BusinessSqlSortTarget = {
+        kind: "derived_measure",
+        derivedMeasureId: primaryDerivedSortMeasure.derivedMeasureId,
+        resolved: true,
+        sqlAlias: "stale_alias_must_not_render",
+        label: "Unrelated display label",
+      };
+      const relabeledTarget = {
+        ...target,
+        sqlAlias: "another_stale_alias",
+        label: "Another unrelated label",
+      };
+      const rendered = renderBusinessSqlQueryPlan(withDerivedSort({ target }));
+      const relabeled = renderBusinessSqlQueryPlan(withDerivedSort({ target: relabeledTarget }));
+      return [
+        ...(rendered.sql?.includes('ORDER BY "revenue_minus_cost" DESC;')
+          ? []
+          : ["Expected ORDER BY to use resolved derivedMeasure.sqlAlias."]),
+        ...(!rendered.sql?.includes("stale_alias_must_not_render") &&
+        !rendered.sql?.includes("Unrelated display label")
+          ? []
+          : ["Sort target alias and label must be ignored."]),
+        ...(rendered.sql === relabeled.sql
+          ? []
+          : ["Changing sort target label or optional alias must not change SQL."]),
       ];
     },
   },
@@ -243,6 +401,12 @@ const fixtures: Fixture[] = [
       });
       ambiguousPlan.derivedMeasures = [derivedMeasure, { ...derivedMeasure }];
       const ambiguous = readinessFor(ambiguousPlan);
+      const missingRendered = renderBusinessSqlQueryPlan(withSort({
+        kind: "derived_measure",
+        derivedMeasureId: "business-sql-derived-measure:missing",
+        resolved: true,
+      }));
+      const ambiguousRendered = renderBusinessSqlQueryPlan(ambiguousPlan);
       return [
         ...(missing.status !== "ready" &&
         missing.reasonCodes.includes("derived_sort_target_unresolved")
@@ -252,6 +416,12 @@ const fixtures: Fixture[] = [
         ambiguous.reasonCodes.includes("derived_sort_target_ambiguous")
           ? []
           : ["Expected ambiguous derived sort target to block readiness."]),
+        ...(!missingRendered.rendered && missingRendered.sql === null
+          ? []
+          : ["Missing derived sort target must produce no SQL."]),
+        ...(!ambiguousRendered.rendered && ambiguousRendered.sql === null
+          ? []
+          : ["Ambiguous derived sort target must produce no SQL."]),
       ];
     },
   },
@@ -287,6 +457,37 @@ const fixtures: Fixture[] = [
         !preview.actions.canRunSql
           ? []
           : ["Derived aggregate condition preview must expose no SQL actions."]),
+      ];
+    },
+  },
+  {
+    name: "valid derived ORDER BY plus derived aggregate condition remains no-SQL",
+    assert: () => {
+      const plan = withDerivedSort({
+        plan: {
+          ...basePlan(),
+          aggregateResultConditions: [derivedConditionFor()],
+        },
+      });
+      const readiness = readinessFor(plan);
+      const capability = evaluateBusinessSqlRendererCapability(plan);
+      const rendered = renderBusinessSqlQueryPlan(plan);
+      const preview = createBusinessSqlRenderPreview(plan);
+      return [
+        ...(readiness.status === "ready" ? [] : ["Expected combined valid targets to be structurally ready."]),
+        ...(capability.status === "incapable" &&
+        capability.reasonCodes.includes("derived_measure_aggregate_condition_rendering_not_supported")
+          ? []
+          : ["Expected derived HAVING guard to remain the renderer blocker."]),
+        ...(!rendered.rendered && rendered.sql === null
+          ? []
+          : ["Derived HAVING intent must not be silently dropped to render ORDER BY."]),
+        ...(preview.sql === null &&
+        !preview.actions.canCopySql &&
+        !preview.actions.canInsertSql &&
+        !preview.actions.canRunSql
+          ? []
+          : ["Unsupported combined derived plan must expose no preview actions."]),
       ];
     },
   },
@@ -416,6 +617,57 @@ const fixtures: Fixture[] = [
     },
   },
   {
+    name: "grouping ORDER BY and base HAVING plus derived ORDER BY keep clause order",
+    assert: () => {
+      const groupingSort = {
+        target: {
+          kind: "grouping" as const,
+          entity: "finance",
+          table: "finance",
+          field: "region",
+          resolved: true,
+        },
+        direction: "asc" as const,
+      };
+      const groupingPlan = {
+        ...createEmptyBusinessSqlQueryPlan(),
+        id: "business-sql-plan:grouping-order",
+        kind: "single_table_count_grouping" as const,
+        status: "resolved" as const,
+        support: "supported" as const,
+        entities: [sourceEntity],
+        metric: null,
+        measures: [leftMeasure],
+        groupings: [grouping],
+        orderBy: [{ ...groupingSort, sortId: createBusinessSqlSortId(groupingSort) }],
+      };
+      const havingPlan = withDerivedSort({
+        plan: {
+          ...basePlan(),
+          aggregateResultConditions: [conditionFor()],
+          rowLimit: { rowLimitId: "business-sql-row-limit:25", value: 25 },
+        },
+      });
+      const groupingSql = [
+        "SELECT",
+        '  "finance"."region" AS "region",',
+        '  SUM("finance"."revenue") AS "total_revenue"',
+        'FROM "finance"',
+        'GROUP BY "finance"."region"',
+        'ORDER BY "region" ASC;',
+      ].join("\n");
+      const havingSql = renderBusinessSqlQueryPlan(havingPlan).sql;
+      return [
+        ...(renderBusinessSqlQueryPlan(groupingPlan).sql === groupingSql
+          ? []
+          : ["Expected grouping ORDER BY SQL byte identity."]),
+        ...(Boolean(havingSql?.includes('\nHAVING SUM("finance"."revenue") > 10\nORDER BY "revenue_minus_cost" DESC\nLIMIT 25;'))
+          ? []
+          : ["Expected HAVING before derived ORDER BY and LIMIT after ORDER BY."]),
+      ];
+    },
+  },
+  {
     name: "existing derived SELECT SQL remains byte-identical without derived targeting",
     assert: () => {
       const result = renderBusinessSqlQueryPlan(basePlan());
@@ -431,6 +683,85 @@ const fixtures: Fixture[] = [
       return result.sql === expectedSql && result.inserted === false && result.ranQuery === false
         ? []
         : ["Expected existing derived SELECT SQL and manual workflow to remain unchanged."];
+    },
+  },
+  {
+    name: "invalid derived sort rendering never falls back to unsorted SQL",
+    assert: () => {
+      const invalidOperandPlan = withDerivedSort({
+        derived: {
+          ...derivedMeasure,
+          leftMeasureId: "business-sql-measure:missing:left",
+          derivedMeasureId: "business-sql-derived-measure:invalid-operand",
+        },
+      });
+      const unsupportedOperatorPlan = withDerivedSort({
+        derived: {
+          ...derivedMeasure,
+          operator: "modulo" as BusinessSqlDerivedMeasure["operator"],
+          derivedMeasureId: "business-sql-derived-measure:unsupported-operator",
+        },
+      });
+      const invalidOperand = renderBusinessSqlQueryPlan(invalidOperandPlan);
+      const unsupportedOperator = renderBusinessSqlQueryPlan(unsupportedOperatorPlan);
+      return [
+        ...(!invalidOperand.rendered && invalidOperand.sql === null
+          ? []
+          : ["Invalid derived operand composition must produce no SQL."]),
+        ...(!unsupportedOperator.rendered && unsupportedOperator.sql === null
+          ? []
+          : ["Unsupported derived operator must produce no SQL."]),
+      ];
+    },
+  },
+  {
+    name: "joins and grouping remain unchanged with derived ORDER BY",
+    assert: () => {
+      const joinedPlan = withDerivedSort({
+        plan: {
+          ...basePlan(),
+          id: "business-sql-plan:joined-derived-sort",
+          entities: [
+            sourceEntity,
+            {
+              entity: "regions",
+              table: "regions",
+              required: false,
+              role: "join_subject" as const,
+            },
+          ],
+          joinPath: {
+            required: true,
+            status: "resolved",
+            entities: ["finance", "regions"],
+            requirements: [
+              {
+                fromEntity: "finance",
+                toEntity: "regions",
+                required: true,
+                verified: true,
+              },
+            ],
+            edges: [
+              {
+                fromEntity: "finance",
+                fromTable: "finance",
+                fromField: "region_id",
+                toEntity: "regions",
+                toTable: "regions",
+                toField: "id",
+                verified: true,
+              },
+            ],
+          },
+        },
+      });
+      const sql = renderBusinessSqlQueryPlan(joinedPlan).sql;
+      return [
+        ...(Boolean(sql?.includes('FROM "finance"\nJOIN "regions" ON "finance"."region_id" = "regions"."id"\nGROUP BY "finance"."region"\nORDER BY "revenue_minus_cost" DESC;'))
+          ? []
+          : ["Expected joins and grouping to remain unchanged before derived ORDER BY."]),
+      ];
     },
   },
   {
