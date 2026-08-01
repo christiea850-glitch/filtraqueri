@@ -21,6 +21,7 @@ export type BusinessSqlRendererIncapabilityReason =
   | "derived_measure_operand_mismatch"
   | "row_filter_rendering_not_supported"
   | "row_filter_set_rendering_not_supported"
+  | "row_filter_range_rendering_not_supported"
   | "row_filter_legacy_semantics_not_renderable"
   | "multiple_row_filters_not_supported"
   | "unrecognized_plan_shape";
@@ -45,9 +46,17 @@ const hasRenderableAlias = (value: string | undefined): value is string =>
 const isCanonicalRenderableFilter = (filter: BusinessSqlFilter): boolean =>
   filter.target?.kind === "field" &&
   Boolean(filter.operator) &&
+  filter.operator !== "between" &&
+  filter.comparisonValue?.kind !== "range" &&
   (filter.operator === "is_null" ||
     filter.operator === "is_not_null" ||
     Boolean(filter.comparisonValue)) &&
+  evaluateBusinessSqlFilterCompatibility({ filter }).compatible;
+
+const isCanonicalRangeFilter = (filter: BusinessSqlFilter): boolean =>
+  filter.target?.kind === "field" &&
+  filter.operator === "between" &&
+  filter.comparisonValue?.kind === "range" &&
   evaluateBusinessSqlFilterCompatibility({ filter }).compatible;
 
 export function evaluateBusinessSqlRendererCapability(
@@ -112,7 +121,9 @@ export function evaluateBusinessSqlRendererCapability(
     const filter = normalized.filters[0];
     if (!isCanonicalRenderableFilter(filter)) {
       reasonCodes.push(
-        filter.target?.kind === "field"
+        isCanonicalRangeFilter(filter)
+          ? "row_filter_range_rendering_not_supported"
+          : filter.target?.kind === "field"
           ? "row_filter_rendering_not_supported"
           : "row_filter_legacy_semantics_not_renderable",
       );

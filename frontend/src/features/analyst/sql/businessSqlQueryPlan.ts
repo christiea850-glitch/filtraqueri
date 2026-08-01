@@ -197,6 +197,15 @@ export type BusinessSqlFilterComparisonValue =
       valueKind: "number" | "string" | "boolean";
       values: readonly (number | string | boolean)[];
       value?: never;
+    }
+  | {
+      kind: "range";
+      valueKind: "number";
+      lower: number;
+      upper: number;
+      lowerInclusive: true;
+      upperInclusive: true;
+      value?: never;
     };
 
 export type BusinessSqlFilterTarget =
@@ -461,6 +470,55 @@ const setComparisonIdentity = (
   return ["valid-set", valueKind, ...normalizedMembers].join("|");
 };
 
+const rangeEndpointIdentity = (value: unknown): string => {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return `array:${value.length}`;
+  if (typeof value === "number") {
+    if (Number.isNaN(value)) return "number:nan";
+    if (!Number.isFinite(value)) return `number:${value > 0 ? "infinity" : "negative-infinity"}`;
+    return `number:${Object.is(value, -0) ? 0 : value}`;
+  }
+  if (typeof value === "string") return `string:${exactStringIdentity(value)}`;
+  if (typeof value === "boolean") return `boolean:${value}`;
+  if (typeof value === "undefined") return "undefined";
+  if (typeof value === "symbol") return "symbol";
+  if (typeof value === "function") return "function";
+  return `object:${Object.prototype.toString.call(value)}`;
+};
+
+const rangeComparisonIdentity = (
+  comparisonValue: Extract<BusinessSqlFilterComparisonValue, { kind: "range" }>,
+): string => {
+  const lower = comparisonValue.lower as unknown;
+  const upper = comparisonValue.upper as unknown;
+  const valid =
+    comparisonValue.valueKind === "number" &&
+    comparisonValue.lowerInclusive === true &&
+    comparisonValue.upperInclusive === true &&
+    typeof lower === "number" &&
+    typeof upper === "number" &&
+    Number.isFinite(lower) &&
+    Number.isFinite(upper) &&
+    lower <= upper;
+  return valid
+    ? [
+        "valid-range",
+        comparisonValue.valueKind,
+        rangeEndpointIdentity(lower),
+        rangeEndpointIdentity(upper),
+        "inclusive",
+        "inclusive",
+      ].join("|")
+    : [
+        "invalid-range",
+        String(comparisonValue.valueKind),
+        rangeEndpointIdentity(lower),
+        rangeEndpointIdentity(upper),
+        comparisonValue.lowerInclusive === true ? "lower-inclusive" : "lower-not-inclusive",
+        comparisonValue.upperInclusive === true ? "upper-inclusive" : "upper-not-inclusive",
+      ].join("|");
+};
+
 export const createBusinessSqlFilterId = (
   filter: Pick<BusinessSqlFilter, "target" | "entity" | "table" | "field" | "operator" | "comparisonValue">,
 ): string => {
@@ -476,6 +534,8 @@ export const createBusinessSqlFilterId = (
   const comparisonIdentity =
     comparisonValue?.kind === "set"
       ? setComparisonIdentity(comparisonValue)
+      : comparisonValue?.kind === "range"
+      ? rangeComparisonIdentity(comparisonValue)
       : comparisonValue?.kind === "number" ||
         comparisonValue?.kind === "string" ||
         comparisonValue?.kind === "boolean"

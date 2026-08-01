@@ -443,6 +443,7 @@ const renderWhere = (
   if (filter.operator === "is_null") return `WHERE ${fieldExpression} IS NULL`;
   if (filter.operator === "is_not_null") return `WHERE ${fieldExpression} IS NOT NULL`;
   if (!filter.comparisonValue) return null;
+  if (filter.operator === "between" || filter.comparisonValue.kind === "range") return null;
   if (filter.operator === "in" || filter.operator === "not_in") {
     const literal = renderSqlSetLiteral(filter.comparisonValue);
     if (!literal) return null;

@@ -42,6 +42,7 @@ const SUPPORTED_ROW_FILTER_OPERATORS: readonly BusinessSqlFilterOperator[] = [
   "ends_with",
   "in",
   "not_in",
+  "between",
   "is_null",
   "is_not_null",
 ];
@@ -67,6 +68,10 @@ const TEXT_OPERATORS = new Set<BusinessSqlFilterOperator>([
 const SET_OPERATORS = new Set<BusinessSqlFilterOperator>([
   "in",
   "not_in",
+]);
+
+const RANGE_OPERATORS = new Set<BusinessSqlFilterOperator>([
+  "between",
 ]);
 
 export const isBusinessSqlRowFilterOperator = (
@@ -174,6 +179,16 @@ const valueIsValid = (value: BusinessSqlFilterComparisonValue | undefined): bool
       return typeof member === "boolean";
     });
   }
+  if (value.kind === "range") {
+    return value.valueKind === "number" &&
+      value.lowerInclusive === true &&
+      value.upperInclusive === true &&
+      typeof value.lower === "number" &&
+      typeof value.upper === "number" &&
+      Number.isFinite(value.lower) &&
+      Number.isFinite(value.upper) &&
+      value.lower <= value.upper;
+  }
   return false;
 };
 
@@ -193,6 +208,12 @@ const valueCompatibleWithType = ({
     if (value.valueKind === "boolean") return isBooleanField(fieldType);
     return false;
   }
+  if (RANGE_OPERATORS.has(operator)) {
+    return value.kind === "range" &&
+      value.valueKind === "number" &&
+      isNumericField(fieldType);
+  }
+  if (value.kind === "range") return false;
   if (value.kind === "set") return false;
   if (ORDERED_OPERATORS.has(operator)) {
     return isNumericField(fieldType) && value.kind === "number";
@@ -256,7 +277,7 @@ export function evaluateBusinessSqlFilterCompatibility({
     const value = comparisonValueFor(filter);
     if (NULLARY_OPERATORS.has(filter.operator)) {
       if (value) reasonCodes.push("row_filter_value_not_allowed");
-    } else if (SET_OPERATORS.has(filter.operator) && !value) {
+    } else if ((SET_OPERATORS.has(filter.operator) || RANGE_OPERATORS.has(filter.operator)) && !value) {
       reasonCodes.push("row_filter_value_missing");
     } else if (!value) {
       reasonCodes.push("row_filter_value_missing");
