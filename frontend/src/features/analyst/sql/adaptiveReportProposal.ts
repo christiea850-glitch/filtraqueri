@@ -1113,13 +1113,16 @@ type RowFilterOperatorPhrase = {
 
 const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
   { operator: "not_equals", phrase: "is not equal to" },
+  { operator: "not_in", phrase: "is not one of" },
   { operator: "not_equals", phrase: "does not equal" },
   { operator: "between", phrase: "is in the range" },
   { operator: "greater_than_or_equal", phrase: "no less than" },
   { operator: "less_than_or_equal", phrase: "no more than" },
   { operator: "is_not_null", phrase: "is not null", nullary: true },
   { operator: "between", phrase: "is between" },
+  { operator: "not_in", phrase: "is not in" },
   { operator: "between", phrase: "ranges from" },
+  { operator: "in", phrase: "is one of" },
   { operator: "greater_than_or_equal", phrase: "at least" },
   { operator: "less_than_or_equal", phrase: "at most" },
   { operator: "greater_than", phrase: "greater than" },
@@ -1132,6 +1135,7 @@ const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
   { operator: "equals", phrase: "equals" },
   { operator: "greater_than", phrase: "above" },
   { operator: "less_than", phrase: "below" },
+  { operator: "in", phrase: "is in" },
   { operator: "between", phrase: "between" },
   { operator: "contains", phrase: "contains" },
   { operator: "is_null", phrase: "is null", nullary: true },
@@ -1235,6 +1239,98 @@ const parseNaturalLanguageStringValue = (value: string): BusinessSqlFilterCompar
   return null;
 };
 
+const trimListValuePunctuation = (value: string): string =>
+  value.trim().replace(/[.?]+$/g, "").trim();
+
+const isNumericGroupingComma = (value: string, index: number): boolean => {
+  if (!/\d/.test(value[index - 1] || "")) return false;
+  if (/\d/.test(value[index + 1] || "")) return true;
+  const remainder = value.slice(index + 1);
+  return /^\d{3}(?!\d)/.test(remainder);
+};
+
+const tokenizeNaturalLanguageList = (value: string): string[] | null => {
+  const trimmed = trimListValuePunctuation(value);
+  if (!trimmed) return null;
+  const tokens: string[] = [];
+  let current = "";
+  let quote: "\"" | "'" | null = null;
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const character = trimmed[index];
+    if (quote) {
+      current += character;
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "\"" || character === "'") {
+      quote = character;
+      current += character;
+      continue;
+    }
+    if (character === "," && !isNumericGroupingComma(trimmed, index)) {
+      const token = current.trim();
+      if (!token) return null;
+      tokens.push(token);
+      current = "";
+      continue;
+    }
+    current += character;
+  }
+
+  if (quote) return null;
+  const last = current.trim();
+  if (!last) return null;
+  tokens.push(last);
+  return tokens;
+};
+
+const parseNaturalLanguageSetValue = (
+  value: string,
+  fieldType: SchemaColumn["inferred_type"] | undefined,
+): BusinessSqlFilterComparisonValue | null => {
+  const tokens = tokenizeNaturalLanguageList(value);
+  if (!tokens || tokens.length === 0) return null;
+  if (fieldType === "numeric") {
+    const values = tokens.map((token) => parseNumericThreshold(token));
+    if (values.some((token) => !token)) return null;
+    return {
+      kind: "set",
+      valueKind: "number",
+      values: values.map((token) => token!.value),
+    };
+  }
+  if (textType(fieldType)) {
+    const values = tokens.map((token) => parseNaturalLanguageStringValue(token));
+    if (values.some((token) => token?.kind !== "string")) return null;
+    const stringValues = values
+      .filter((token): token is Extract<BusinessSqlFilterComparisonValue, { kind: "string" }> =>
+        token?.kind === "string",
+      )
+      .map((token) => token.value);
+    return {
+      kind: "set",
+      valueKind: "string",
+      values: stringValues,
+    };
+  }
+  if (fieldType === "boolean") {
+    const values = tokens.map((token) => {
+      const normalized = trimListValuePunctuation(token).toLowerCase();
+      if (normalized === "true") return true;
+      if (normalized === "false") return false;
+      return null;
+    });
+    if (values.some((token) => typeof token !== "boolean")) return null;
+    return {
+      kind: "set",
+      valueKind: "boolean",
+      values: values as boolean[],
+    };
+  }
+  return null;
+};
+
 const parseNaturalLanguageNumericRangeValue = (value: string): BusinessSqlFilterComparisonValue | null => {
   const trimmed = trimNaturalLanguageValuePunctuation(value);
   const parts = trimmed.split(/\band\b/i).map((part) => part.trim()).filter(Boolean);
@@ -1259,6 +1355,9 @@ const parseRowFilterComparisonValue = (
   if (shell.operator === "is_null" || shell.operator === "is_not_null") return undefined;
   if (shell.operator === "between") {
     return fieldType === "numeric" ? parseNaturalLanguageNumericRangeValue(shell.valueText) : null;
+  }
+  if (shell.operator === "in" || shell.operator === "not_in") {
+    return parseNaturalLanguageSetValue(shell.valueText, fieldType);
   }
   if (
     shell.operator === "greater_than" ||
@@ -1850,6 +1949,11 @@ const matchingRowFilterFields = (
   .map((candidate) => ({ ...candidate.item, confidence: candidate.confidence }));
 };
 
+const exactStringIdentity = (value: string): string =>
+  Array.from(value)
+    .map((character) => character.codePointAt(0)?.toString(16).padStart(4, "0") || "")
+    .join("");
+
 const valueIdentity = (value: BusinessSqlFilterComparisonValue | undefined): string =>
   value?.kind === "range"
     ? [
@@ -1864,7 +1968,19 @@ const valueIdentity = (value: BusinessSqlFilterComparisonValue | undefined): str
       ? [
           value.kind,
           value.valueKind,
-          ...Array.from(new Set(value.values.map((member) => `${typeof member}:${String(member)}`))).sort(),
+          ...(value.valueKind === "number"
+            ? Array.from(
+                new Set(
+                  value.values.filter((member): member is number => typeof member === "number" && Number.isFinite(member)),
+                ),
+              ).sort((left, right) => left - right).map((member) => `number:${member}`)
+            : value.valueKind === "boolean"
+              ? Array.from(
+                  new Set(value.values.filter((member): member is boolean => typeof member === "boolean")),
+                ).sort((left, right) => Number(left) - Number(right)).map((member) => `boolean:${member}`)
+              : Array.from(
+                  new Set(value.values.filter((member): member is string => typeof member === "string")),
+                ).sort().map((member) => `string:${exactStringIdentity(member)}`)),
         ].join(":")
       : value
         ? `${value.kind}:${String(value.value)}`
