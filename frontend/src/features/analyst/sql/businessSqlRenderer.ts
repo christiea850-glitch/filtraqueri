@@ -466,6 +466,13 @@ const renderWhere = (
     return `WHERE ${fieldExpression} BETWEEN ${literal.lower} AND ${literal.upper}`;
   }
   if (filter.comparisonValue.kind === "range") return null;
+  if (
+    filter.operator === "before" ||
+    filter.operator === "after" ||
+    filter.comparisonValue.kind === "date"
+  ) {
+    return null;
+  }
   if (filter.operator === "in" || filter.operator === "not_in") {
     const literal = renderSqlSetLiteral(filter.comparisonValue);
     if (!literal) return null;

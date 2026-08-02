@@ -1,4 +1,5 @@
 import type { SchemaColumn } from "../../dataset/datasetTypes";
+import { isCanonicalBusinessSqlDateValue } from "./businessSqlQueryPlan";
 import type {
   BusinessSqlFilter,
   BusinessSqlFilterComparisonValue,
@@ -42,6 +43,8 @@ const SUPPORTED_ROW_FILTER_OPERATORS: readonly BusinessSqlFilterOperator[] = [
   "ends_with",
   "in",
   "not_in",
+  "before",
+  "after",
   "between",
   "is_null",
   "is_not_null",
@@ -72,6 +75,11 @@ const SET_OPERATORS = new Set<BusinessSqlFilterOperator>([
 
 const RANGE_OPERATORS = new Set<BusinessSqlFilterOperator>([
   "between",
+]);
+
+const DATE_OPERATORS = new Set<BusinessSqlFilterOperator>([
+  "before",
+  "after",
 ]);
 
 export const isBusinessSqlRowFilterOperator = (
@@ -143,6 +151,9 @@ const isTextField = (type: SchemaColumn["inferred_type"] | undefined): boolean =
 const isBooleanField = (type: SchemaColumn["inferred_type"] | undefined): boolean =>
   type === "boolean";
 
+const isDateField = (type: SchemaColumn["inferred_type"] | undefined): boolean =>
+  type === "date";
+
 const valueKindForLegacy = (
   value: BusinessSqlFilter["value"],
 ): BusinessSqlFilterComparisonValue | undefined => {
@@ -160,6 +171,9 @@ const valueIsValid = (value: BusinessSqlFilterComparisonValue | undefined): bool
   if (value.kind === "number") return Number.isFinite(value.value);
   if (value.kind === "string") return hasText(value.value) && !/[\u0000-\u001f\u007f]/.test(value.value);
   if (value.kind === "boolean") return typeof value.value === "boolean";
+  if (value.kind === "date") {
+    return value.valueKind === "date" && isCanonicalBusinessSqlDateValue(value.value);
+  }
   if (value.kind === "set") {
     if (
       value.valueKind !== "number" &&
@@ -213,8 +227,14 @@ const valueCompatibleWithType = ({
       value.valueKind === "number" &&
       isNumericField(fieldType);
   }
+  if (DATE_OPERATORS.has(operator)) {
+    return value.kind === "date" &&
+      value.valueKind === "date" &&
+      isDateField(fieldType);
+  }
   if (value.kind === "range") return false;
   if (value.kind === "set") return false;
+  if (value.kind === "date") return false;
   if (ORDERED_OPERATORS.has(operator)) {
     return isNumericField(fieldType) && value.kind === "number";
   }
@@ -277,7 +297,12 @@ export function evaluateBusinessSqlFilterCompatibility({
     const value = comparisonValueFor(filter);
     if (NULLARY_OPERATORS.has(filter.operator)) {
       if (value) reasonCodes.push("row_filter_value_not_allowed");
-    } else if ((SET_OPERATORS.has(filter.operator) || RANGE_OPERATORS.has(filter.operator)) && !value) {
+    } else if (
+      (SET_OPERATORS.has(filter.operator) ||
+        RANGE_OPERATORS.has(filter.operator) ||
+        DATE_OPERATORS.has(filter.operator)) &&
+      !value
+    ) {
       reasonCodes.push("row_filter_value_missing");
     } else if (!value) {
       reasonCodes.push("row_filter_value_missing");

@@ -192,6 +192,7 @@ export type BusinessSqlFilterComparisonValue =
   | { kind: "number"; value: number }
   | { kind: "string"; value: string }
   | { kind: "boolean"; value: boolean }
+  | { kind: "date"; valueKind: "date"; value: string }
   | {
       kind: "set";
       valueKind: "number" | "string" | "boolean";
@@ -519,6 +520,31 @@ const rangeComparisonIdentity = (
       ].join("|");
 };
 
+export const isCanonicalBusinessSqlDateValue = (value: unknown): value is string => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false;
+  if (month < 1 || month > 12) return false;
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const daysByMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day >= 1 && day <= daysByMonth[month - 1];
+};
+
+const dateComparisonIdentity = (
+  comparisonValue: Extract<BusinessSqlFilterComparisonValue, { kind: "date" }>,
+): string => {
+  const value = comparisonValue.value as unknown;
+  return comparisonValue.valueKind === "date" && isCanonicalBusinessSqlDateValue(value)
+    ? ["valid-date", comparisonValue.valueKind, value].join("|")
+    : [
+        "invalid-date",
+        String(comparisonValue.valueKind),
+        rangeEndpointIdentity(value),
+      ].join("|");
+};
+
 export const createBusinessSqlFilterId = (
   filter: Pick<BusinessSqlFilter, "target" | "entity" | "table" | "field" | "operator" | "comparisonValue">,
 ): string => {
@@ -536,6 +562,8 @@ export const createBusinessSqlFilterId = (
       ? setComparisonIdentity(comparisonValue)
       : comparisonValue?.kind === "range"
       ? rangeComparisonIdentity(comparisonValue)
+      : comparisonValue?.kind === "date"
+      ? dateComparisonIdentity(comparisonValue)
       : comparisonValue?.kind === "number" ||
         comparisonValue?.kind === "string" ||
         comparisonValue?.kind === "boolean"
