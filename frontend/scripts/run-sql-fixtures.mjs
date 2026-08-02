@@ -282,6 +282,11 @@ const fixtures = [
     exportName: "runExplicitRowFilterGroundingFixtures",
   },
   {
+    label: "Explicit BEFORE/AFTER filter grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/explicitBeforeAfterFilterGrounding.test.ts",
+    exportName: "runExplicitBeforeAfterFilterGroundingFixtures",
+  },
+  {
     label: "Explicit BETWEEN filter grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitBetweenFilterGrounding.test.ts",
     exportName: "runExplicitBetweenFilterGroundingFixtures",

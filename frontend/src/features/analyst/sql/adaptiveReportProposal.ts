@@ -9,13 +9,13 @@ import {
   EMPTY_BUSINESS_INTENT,
   type BusinessIntent,
 } from "./businessIntentGrounding";
+import { createBusinessSqlMeasureAlias, isCanonicalBusinessSqlDateValue } from "./businessSqlQueryPlan";
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlAggregateComparisonValue,
   BusinessSqlFilterComparisonValue,
   BusinessSqlFilterOperator,
 } from "./businessSqlQueryPlan";
-import { createBusinessSqlMeasureAlias } from "./businessSqlQueryPlan";
 import {
   inferSemanticTableHints,
   type SemanticColumnHint,
@@ -1123,6 +1123,8 @@ const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
   { operator: "not_in", phrase: "is not in" },
   { operator: "between", phrase: "ranges from" },
   { operator: "in", phrase: "is one of" },
+  { operator: "before", phrase: "is before" },
+  { operator: "after", phrase: "is after" },
   { operator: "greater_than_or_equal", phrase: "at least" },
   { operator: "less_than_or_equal", phrase: "at most" },
   { operator: "greater_than", phrase: "greater than" },
@@ -1348,11 +1350,21 @@ const parseNaturalLanguageNumericRangeValue = (value: string): BusinessSqlFilter
   };
 };
 
+const parseNaturalLanguageDateValue = (value: string): BusinessSqlFilterComparisonValue | null => {
+  const trimmed = trimNaturalLanguageValuePunctuation(value);
+  return isCanonicalBusinessSqlDateValue(trimmed)
+    ? { kind: "date", valueKind: "date", value: trimmed }
+    : null;
+};
+
 const parseRowFilterComparisonValue = (
   shell: Extract<RowFilterShell, { status: "detected" }>,
   fieldType: SchemaColumn["inferred_type"] | undefined,
 ): BusinessSqlFilterComparisonValue | undefined | null => {
   if (shell.operator === "is_null" || shell.operator === "is_not_null") return undefined;
+  if (shell.operator === "before" || shell.operator === "after") {
+    return fieldType === "date" ? parseNaturalLanguageDateValue(shell.valueText) : null;
+  }
   if (shell.operator === "between") {
     return fieldType === "numeric" ? parseNaturalLanguageNumericRangeValue(shell.valueText) : null;
   }
@@ -1982,6 +1994,8 @@ const valueIdentity = (value: BusinessSqlFilterComparisonValue | undefined): str
                   new Set(value.values.filter((member): member is string => typeof member === "string")),
                 ).sort().map((member) => `string:${exactStringIdentity(member)}`)),
         ].join(":")
+      : value?.kind === "date"
+        ? [value.kind, value.valueKind, value.value].join(":")
       : value
         ? `${value.kind}:${String(value.value)}`
         : "nullary";
@@ -2104,7 +2118,20 @@ const proposeFilters = (
   if (rowFilterShell.status === "unsupported" && !hasDerivedThresholdShell && !hasAggregateThresholdShell) {
     filters.push(unsupportedRowFilter(rowFilterShell));
   } else if (rowFilterShell.status === "detected") {
-    if (!hasDerivedThresholdShell && aggregateResultConditions.length === 0 && !hasAggregateThresholdShell) {
+    if (
+      (rowFilterShell.operator === "before" || rowFilterShell.operator === "after") &&
+      (hasDerivedThresholdShell || hasAggregateThresholdShell)
+    ) {
+      filters.push({
+        id: "filter:row-filter:aggregate-date-threshold",
+        label: "Row-filter semantics",
+        tableName: null,
+        columnName: null,
+        semantics: "needs_review",
+        reason: "Aggregate date threshold wording is not supported as a row-level date filter.",
+        evidence: rowFilterShell.evidence,
+      });
+    } else if (!hasDerivedThresholdShell && aggregateResultConditions.length === 0 && !hasAggregateThresholdShell) {
       filters.push(proposedCanonicalRowFilter(rowFilterShell, worksheets));
     }
   }
