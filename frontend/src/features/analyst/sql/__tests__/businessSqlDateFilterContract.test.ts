@@ -346,13 +346,13 @@ const fixtures: Fixture[] = [
   { name: "valid date filter is structurally ready", assert: () => readinessFor(basePlan(filterFor())).status === "ready" ? [] : ["Expected date filter structurally ready."] },
   { name: "valid date field projection is structurally ready", assert: () => readinessFor(fieldProjectionPlan(filterFor())).status === "ready" ? [] : ["Expected date field projection ready."] },
   { name: "invalid date filter is structurally blocked", assert: () => readinessFor(basePlan(filterFor({ comparisonValue: dateValue("2026-02-29") }))).status === "blocked" ? [] : ["Expected invalid date structurally blocked."] },
-  { name: "valid before is renderer-incapable", assert: () => {
+  { name: "valid before is renderer-capable", assert: () => {
     const capability = evaluateBusinessSqlRendererCapability(basePlan(filterFor({ operator: "before" })));
-    return !capability.capable && capability.reasonCodes.includes("row_filter_rendering_not_supported") ? [] : ["Expected before renderer refusal."];
+    return capability.capable && capability.reasonCodes.length === 0 ? [] : ["Expected before renderer capability."];
   } },
-  { name: "valid after is renderer-incapable", assert: () => {
+  { name: "valid after is renderer-capable", assert: () => {
     const capability = evaluateBusinessSqlRendererCapability(basePlan(filterFor({ operator: "after" })));
-    return !capability.capable && capability.reasonCodes.includes("row_filter_rendering_not_supported") ? [] : ["Expected after renderer refusal."];
+    return capability.capable && capability.reasonCodes.length === 0 ? [] : ["Expected after renderer capability."];
   } },
   { name: "valid date does not emit date-specific rendering reason", assert: () => {
     const reasons = evaluateBusinessSqlRendererCapability(basePlan(filterFor())).reasonCodes as readonly string[];
@@ -361,44 +361,56 @@ const fixtures: Fixture[] = [
       ? []
       : ["Expected generic rendering reason only."];
   } },
-  { name: "valid date emits no SQL and no actions", assert: () => noSqlAndNoActions(fieldProjectionPlan(filterFor())) ? [] : ["Expected no SQL/actions for date."] },
+  { name: "valid date emits SQL with manual gates", assert: () => {
+    const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor()));
+    const preview = createBusinessSqlRenderPreview(fieldProjectionPlan(filterFor()));
+    return result.rendered &&
+      result.sql?.includes('WHERE "orders"."order_date" < DATE \'2026-01-31\';') &&
+      result.inserted === false &&
+      result.ranQuery === false &&
+      preview.actions.canCopySql &&
+      !preview.actions.canInsertSql &&
+      !preview.actions.canRunSql
+      ? []
+      : ["Expected rendered date SQL with manual gates."];
+  } },
   { name: "invalid date emits no SQL and no actions", assert: () => noSqlAndNoActions(fieldProjectionPlan(filterFor({ comparisonValue: dateValue("2026-02-29") }))) ? [] : ["Expected invalid date no SQL/actions."] },
-  { name: "before never renders DATE SQL", assert: () => {
+  { name: "before renders DATE SQL", assert: () => {
     const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor({ operator: "before" })));
-    return result.sql === null ? [] : ["Expected before SQL null."];
+    return result.sql?.includes('WHERE "orders"."order_date" < DATE \'2026-01-31\';') ? [] : ["Expected before DATE SQL."];
   } },
-  { name: "after never renders DATE SQL", assert: () => {
+  { name: "after renders DATE SQL", assert: () => {
     const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor({ operator: "after" })));
-    return result.sql === null ? [] : ["Expected after SQL null."];
+    return result.sql?.includes('WHERE "orders"."order_date" > DATE \'2026-01-31\';') ? [] : ["Expected after DATE SQL."];
   } },
-  { name: "before plus grouping emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ operator: "before" }))) ? [] : ["Expected before grouping no partial SQL."] },
-  { name: "before plus HAVING emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ operator: "before" }), {
+  { name: "before plus grouping renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ operator: "before" }))).sql?.includes("WHERE ") ? [] : ["Expected before grouping SQL."] },
+  { name: "before plus HAVING renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ operator: "before" }), {
     aggregateResultConditions: [{
       conditionId: "business-sql-aggregate-condition:date-base-having",
       measureId: revenueMeasure.measureId,
       operator: "greater_than",
       comparisonValue: { kind: "number", value: 10 },
     }],
-  })) ? [] : ["Expected before HAVING no partial SQL."] },
-  { name: "after plus aggregate condition emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ operator: "after" }), {
+  })).sql?.includes("HAVING ") ? [] : ["Expected before HAVING SQL."] },
+  { name: "after plus aggregate condition renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ operator: "after" }), {
     aggregateResultConditions: [{
       conditionId: "business-sql-aggregate-condition:date-after-having",
       measureId: revenueMeasure.measureId,
       operator: "less_than",
       comparisonValue: { kind: "number", value: 1000 },
     }],
-  })) ? [] : ["Expected after aggregate condition no partial SQL."] },
-  { name: "before plus ORDER BY emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ operator: "before" }), {
+  })).sql?.includes("HAVING ") ? [] : ["Expected after aggregate condition SQL."] },
+  { name: "before plus ORDER BY renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ operator: "before" }), {
     orderBy: [{
       sortId: "business-sql-sort:date-revenue",
       target: { kind: "measure", measureId: revenueMeasure.measureId, resolved: true },
       direction: "desc",
     }],
-  })) ? [] : ["Expected before ORDER BY no partial SQL."] },
-  { name: "after plus rowLimit emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ operator: "after" }), {
+  })).sql?.includes("ORDER BY ") ? [] : ["Expected before ORDER BY SQL."] },
+  { name: "after plus rowLimit renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ operator: "after" }), {
     rowLimit: { rowLimitId: "business-sql-row-limit:5", value: 5 },
-  })) ? [] : ["Expected after rowLimit no partial SQL."] },
-  { name: "before plus resolved join emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ table: "customers", entity: "customers" }), {
+  })).sql?.endsWith("LIMIT 5;") ? [] : ["Expected after rowLimit SQL."] },
+  { name: "before plus resolved join renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ table: "customers", entity: "customers" }), {
     entities: [sourceEntity, { entity: "customers", table: "customers", required: true, role: "filter_subject" }],
     joinPath: {
       required: true,
@@ -407,7 +419,7 @@ const fixtures: Fixture[] = [
       requirements: [{ fromEntity: "orders", toEntity: "customers", required: true, relationship: "orders customer", verified: true }],
       edges: [{ fromEntity: "orders", fromTable: "orders", fromField: "customer_id", toEntity: "customers", toTable: "customers", toField: "customer_id", relationship: "orders customer", verified: true }],
     },
-  })) ? [] : ["Expected before resolved join no partial SQL."] },
+  })).sql?.includes('WHERE "customers"."order_date" < DATE') ? [] : ["Expected before resolved join SQL."] },
   { name: "manual insert gate remains closed for date", assert: () => !createBusinessSqlRenderPreview(fieldProjectionPlan(filterFor())).actions.canInsertSql ? [] : ["Expected insert gate closed."] },
   { name: "manual run gate remains closed for date", assert: () => !createBusinessSqlRenderPreview(fieldProjectionPlan(filterFor())).actions.canRunSql ? [] : ["Expected run gate closed."] },
   { name: "legacy ISO date semantic filter remains legacy", assert: () => {

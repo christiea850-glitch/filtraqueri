@@ -14,6 +14,7 @@ import type {
 } from "./businessSqlQueryPlan";
 import {
   getBusinessSqlAggregateResultConditionTarget,
+  isCanonicalBusinessSqlDateValue,
   normalizeMetricAndMeasures,
 } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
@@ -368,6 +369,12 @@ const renderSqlLiteral = (value: BusinessSqlFilterComparisonValue): string | nul
   return null;
 };
 
+const renderSqlDateLiteral = (value: BusinessSqlFilterComparisonValue): string | null => {
+  if (value.kind !== "date") return null;
+  if (value.valueKind !== "date") return null;
+  return isCanonicalBusinessSqlDateValue(value.value) ? `DATE '${value.value}'` : null;
+};
+
 const renderSqlSetLiteral = (
   value: BusinessSqlFilterComparisonValue,
 ): string | null => {
@@ -466,13 +473,12 @@ const renderWhere = (
     return `WHERE ${fieldExpression} BETWEEN ${literal.lower} AND ${literal.upper}`;
   }
   if (filter.comparisonValue.kind === "range") return null;
-  if (
-    filter.operator === "before" ||
-    filter.operator === "after" ||
-    filter.comparisonValue.kind === "date"
-  ) {
-    return null;
+  if (filter.operator === "before" || filter.operator === "after") {
+    const literal = renderSqlDateLiteral(filter.comparisonValue);
+    if (!literal) return null;
+    return `WHERE ${fieldExpression} ${filter.operator === "before" ? "<" : ">"} ${literal}`;
   }
+  if (filter.comparisonValue.kind === "date") return null;
   if (filter.operator === "in" || filter.operator === "not_in") {
     const literal = renderSqlSetLiteral(filter.comparisonValue);
     if (!literal) return null;
