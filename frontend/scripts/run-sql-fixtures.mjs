@@ -297,6 +297,11 @@ const fixtures = [
     exportName: "runExplicitBeforeAfterFilterGroundingFixtures",
   },
   {
+    label: "Explicit date-range filter grounding",
+    modulePath: "/src/features/analyst/sql/__tests__/explicitDateRangeFilterGrounding.test.ts",
+    exportName: "runExplicitDateRangeFilterGroundingFixtures",
+  },
+  {
     label: "Explicit BETWEEN filter grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitBetweenFilterGrounding.test.ts",
     exportName: "runExplicitBetweenFilterGroundingFixtures",

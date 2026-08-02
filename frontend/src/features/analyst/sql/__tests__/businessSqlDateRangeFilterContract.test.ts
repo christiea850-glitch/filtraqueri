@@ -239,6 +239,13 @@ const expectedAfterSql = [
   'WHERE "orders"."order_date" > DATE \'2026-01-01\';',
 ].join("\n");
 
+const expectedDateRangeSql = [
+  "SELECT",
+  '  "orders"."order_id" AS "order_id"',
+  'FROM "orders"',
+  'WHERE "orders"."order_date" BETWEEN DATE \'2026-01-01\' AND DATE \'2026-12-31\';',
+].join("\n");
+
 const expectedEmptySql = [
   "SELECT",
   '  "orders"."region" AS "region",',
@@ -505,7 +512,7 @@ const fixtures: Fixture[] = [
     ...(nlSql("Show order_id where order_date is before 2026-01-01.") === expectedBeforeSql ? [] : ["Expected BEFORE NL."]),
     ...(nlSql("Show order_id where order_date is after 2026-01-01.") === expectedAfterSql ? [] : ["Expected AFTER NL."]),
   ] },
-  { name: "Date-range NL grounding remains unsupported", assert: () => !nlSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31.") ? [] : ["Expected date-range NL unsupported."] },
+  { name: "Date-range NL grounding renders canonical SQL", assert: () => nlSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31.") === expectedDateRangeSql ? [] : ["Expected date-range NL SQL."] },
   { name: "filters empty SQL remains byte-identical", assert: () => renderBusinessSqlQueryPlan(basePlan(null)).sql === expectedEmptySql ? [] : ["Expected empty SQL."] },
   { name: "Explicit default ordering remains plan-driven", assert: () => basePlan(null).orderBy.length === 1 && renderBusinessSqlQueryPlan(basePlan(null)).sql === expectedEmptySql ? [] : ["Expected plan-driven ordering."] },
   { name: "Empty orderBy remains unsorted", assert: () => renderBusinessSqlQueryPlan(basePlan(null, { orderBy: [] })).sql === expectedEmptyUnsortedSql ? [] : ["Expected unsorted."] },

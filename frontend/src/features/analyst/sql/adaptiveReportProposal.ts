@@ -9,7 +9,11 @@ import {
   EMPTY_BUSINESS_INTENT,
   type BusinessIntent,
 } from "./businessIntentGrounding";
-import { createBusinessSqlMeasureAlias, isCanonicalBusinessSqlDateValue } from "./businessSqlQueryPlan";
+import {
+  createBusinessSqlMeasureAlias,
+  isCanonicalBusinessSqlDateRangeValue,
+  isCanonicalBusinessSqlDateValue,
+} from "./businessSqlQueryPlan";
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlAggregateComparisonValue,
@@ -1333,12 +1337,17 @@ const parseNaturalLanguageSetValue = (
   return null;
 };
 
-const parseNaturalLanguageNumericRangeValue = (value: string): BusinessSqlFilterComparisonValue | null => {
+const parseNaturalLanguageRangeEndpoints = (value: string): [string, string] | null => {
   const trimmed = trimNaturalLanguageValuePunctuation(value);
-  const parts = trimmed.split(/\band\b/i).map((part) => part.trim()).filter(Boolean);
-  if (parts.length !== 2) return null;
-  const lower = parseNumericThreshold(parts[0]);
-  const upper = parseNumericThreshold(parts[1]);
+  const parts = trimmed.split(/\band\b/i).map((part) => part.trim());
+  return parts.length === 2 && parts.every(Boolean) ? [parts[0], parts[1]] : null;
+};
+
+const parseNaturalLanguageNumericRangeValue = (value: string): BusinessSqlFilterComparisonValue | null => {
+  const endpoints = parseNaturalLanguageRangeEndpoints(value);
+  if (!endpoints) return null;
+  const lower = parseNumericThreshold(endpoints[0]);
+  const upper = parseNumericThreshold(endpoints[1]);
   if (!lower || !upper || lower.value > upper.value) return null;
   return {
     kind: "range",
@@ -1348,6 +1357,20 @@ const parseNaturalLanguageNumericRangeValue = (value: string): BusinessSqlFilter
     lowerInclusive: true,
     upperInclusive: true,
   };
+};
+
+const parseNaturalLanguageDateRangeValue = (value: string): BusinessSqlFilterComparisonValue | null => {
+  const endpoints = parseNaturalLanguageRangeEndpoints(value);
+  if (!endpoints) return null;
+  const candidate = {
+    kind: "range" as const,
+    valueKind: "date" as const,
+    lower: endpoints[0],
+    upper: endpoints[1],
+    lowerInclusive: true as const,
+    upperInclusive: true as const,
+  };
+  return isCanonicalBusinessSqlDateRangeValue(candidate) ? candidate : null;
 };
 
 const parseNaturalLanguageDateValue = (value: string): BusinessSqlFilterComparisonValue | null => {
@@ -1366,7 +1389,9 @@ const parseRowFilterComparisonValue = (
     return fieldType === "date" ? parseNaturalLanguageDateValue(shell.valueText) : null;
   }
   if (shell.operator === "between") {
-    return fieldType === "numeric" ? parseNaturalLanguageNumericRangeValue(shell.valueText) : null;
+    if (fieldType === "numeric") return parseNaturalLanguageNumericRangeValue(shell.valueText);
+    if (fieldType === "date") return parseNaturalLanguageDateRangeValue(shell.valueText);
+    return null;
   }
   if (shell.operator === "in" || shell.operator === "not_in") {
     return parseNaturalLanguageSetValue(shell.valueText, fieldType);
@@ -2114,12 +2139,17 @@ const proposeFilters = (
   const hasAggregateThresholdShell =
     aggregateResultConditions.length > 0 ||
     /\bwhere\b\s+(?:total|sum|average|avg|minimum|min|maximum|max|count)\b/i.test(prompt);
+  const isAggregateDateRangeShell =
+    rowFilterShell.status === "detected" &&
+    rowFilterShell.operator === "between" &&
+    /\d{4}-\d{2}-\d{2}/.test(rowFilterShell.valueText) &&
+    (hasDerivedThresholdShell || hasAggregateThresholdShell);
   const legacyPrompt = rowFilterShell.status === "detected" ? rowFilterShell.baseQuestion : prompt;
   if (rowFilterShell.status === "unsupported" && !hasDerivedThresholdShell && !hasAggregateThresholdShell) {
     filters.push(unsupportedRowFilter(rowFilterShell));
   } else if (rowFilterShell.status === "detected") {
     if (
-      (rowFilterShell.operator === "before" || rowFilterShell.operator === "after") &&
+      (rowFilterShell.operator === "before" || rowFilterShell.operator === "after" || isAggregateDateRangeShell) &&
       (hasDerivedThresholdShell || hasAggregateThresholdShell)
     ) {
       filters.push({
