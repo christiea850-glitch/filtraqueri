@@ -14,6 +14,7 @@ import type {
 } from "./businessSqlQueryPlan";
 import {
   getBusinessSqlAggregateResultConditionTarget,
+  isCanonicalBusinessSqlDateRangeValue,
   isCanonicalBusinessSqlDateValue,
   normalizeMetricAndMeasures,
 } from "./businessSqlQueryPlan";
@@ -424,6 +425,16 @@ const renderSqlRangeLiteral = (
   return lower !== null && upper !== null ? { lower, upper } : null;
 };
 
+const renderSqlDateRangeLiteral = (
+  value: BusinessSqlFilterComparisonValue,
+): { lower: string; upper: string } | null => {
+  if (!isCanonicalBusinessSqlDateRangeValue(value)) return null;
+  return {
+    lower: `DATE '${value.lower}'`,
+    upper: `DATE '${value.upper}'`,
+  };
+};
+
 const rowFilterComparisonOperatorSql: Partial<Record<BusinessSqlFilterOperator, string>> = {
   equals: "=",
   not_equals: "<>",
@@ -468,7 +479,9 @@ const renderWhere = (
   if (filter.operator === "is_not_null") return `WHERE ${fieldExpression} IS NOT NULL`;
   if (!filter.comparisonValue) return null;
   if (filter.operator === "between") {
-    const literal = renderSqlRangeLiteral(filter.comparisonValue);
+    const literal = filter.comparisonValue.kind === "range" && filter.comparisonValue.valueKind === "date"
+      ? renderSqlDateRangeLiteral(filter.comparisonValue)
+      : renderSqlRangeLiteral(filter.comparisonValue);
     if (!literal) return null;
     return `WHERE ${fieldExpression} BETWEEN ${literal.lower} AND ${literal.upper}`;
   }

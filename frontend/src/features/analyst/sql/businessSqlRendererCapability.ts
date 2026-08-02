@@ -44,11 +44,6 @@ const hasRenderableAlias = (value: string | undefined): value is string =>
 const isCanonicalRenderableFilter = (filter: BusinessSqlFilter): boolean =>
   filter.target?.kind === "field" &&
   Boolean(filter.operator) &&
-  !(
-    filter.operator === "between" &&
-    filter.comparisonValue?.kind === "range" &&
-    filter.comparisonValue.valueKind === "date"
-  ) &&
   (filter.operator === "is_null" ||
     filter.operator === "is_not_null" ||
     Boolean(filter.comparisonValue)) &&

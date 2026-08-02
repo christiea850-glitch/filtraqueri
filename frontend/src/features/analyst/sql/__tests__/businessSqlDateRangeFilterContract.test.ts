@@ -429,31 +429,31 @@ const fixtures: Fixture[] = [
   { name: "Reversed date range structurally blocks", assert: () => readinessFor(basePlan(filterFor({ comparisonValue: dateRangeValue("2026-12-31", "2026-01-01") }))).status === "blocked" ? [] : ["Expected reversed blocked."] },
   { name: "Malformed date range structurally blocks", assert: () => readinessFor(basePlan(filterFor({ comparisonValue: dateRangeValue("2026-02-29", "2026-12-31") }))).status === "blocked" ? [] : ["Expected malformed blocked."] },
   { name: "Wrong field type structurally blocks", assert: () => readinessFor(basePlan(filterFor({ fieldInferredType: "numeric" }))).status === "blocked" ? [] : ["Expected wrong type blocked."] },
-  { name: "Valid date range remains renderer-incapable", assert: () => {
+  { name: "Valid date range becomes renderer-capable", assert: () => {
     const capability = evaluateBusinessSqlRendererCapability(basePlan(filterFor()));
-    return !capability.capable && capability.reasonCodes.includes("row_filter_rendering_not_supported") ? [] : ["Expected date range renderer refusal."];
+    return capability.capable && capability.reasonCodes.length === 0 ? [] : ["Expected date range renderer capability."];
   } },
-  { name: "Renderer emits no date BETWEEN SQL", assert: () => noSqlAndNoActions(fieldProjectionPlan(filterFor())) ? [] : ["Expected no date range SQL."] },
-  { name: "Preview exposes no actions for date range", assert: () => {
+  { name: "Renderer emits date BETWEEN SQL", assert: () => renderBusinessSqlQueryPlan(fieldProjectionPlan(filterFor())).sql?.includes('WHERE "orders"."order_date" BETWEEN DATE \'2026-01-01\' AND DATE \'2026-12-31\';') ? [] : ["Expected date range SQL."] },
+  { name: "Preview exposes copy-only actions for date range", assert: () => {
     const preview = createBusinessSqlRenderPreview(fieldProjectionPlan(filterFor()));
-    return preview.sql === null && !preview.actions.canCopySql && !preview.actions.canInsertSql && !preview.actions.canRunSql ? [] : ["Expected preview no actions."];
+    return preview.sql?.includes("BETWEEN DATE") && preview.actions.canCopySql && !preview.actions.canInsertSql && !preview.actions.canRunSql ? [] : ["Expected preview copy-only actions."];
   } },
-  { name: "Date range plus grouping emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor())) ? [] : ["Expected grouping refusal."] },
-  { name: "Date range plus HAVING emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor(), { aggregateResultConditions: [{ conditionId: "date-range-having", measureId: revenueMeasure.measureId, operator: "greater_than", comparisonValue: { kind: "number", value: 10 } }] })) ? [] : ["Expected HAVING refusal."] },
-  { name: "Date range plus derived HAVING emits no partial SQL", assert: () => {
+  { name: "Date range plus grouping renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor())).sql?.includes("GROUP BY") ? [] : ["Expected grouping SQL."] },
+  { name: "Date range plus HAVING renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor(), { aggregateResultConditions: [{ conditionId: "date-range-having", measureId: revenueMeasure.measureId, operator: "greater_than", comparisonValue: { kind: "number", value: 10 } }] })).sql?.includes("HAVING") ? [] : ["Expected HAVING SQL."] },
+  { name: "Date range plus derived HAVING renders complete SQL", assert: () => {
     const derived = derivedMeasure();
-    return noSqlAndNoActions(basePlan(filterFor(), {
+    return renderBusinessSqlQueryPlan(basePlan(filterFor(), {
       measures: [revenueMeasure, costMeasure],
       derivedMeasures: [derived],
       aggregateResultConditions: [{ conditionId: "date-range-derived-having", target: { kind: "derived_measure", derivedMeasureId: derived.derivedMeasureId }, operator: "greater_than", comparisonValue: { kind: "number", value: 1 } }],
-    })) ? [] : ["Expected derived HAVING refusal."];
+    })).sql?.includes("HAVING") ? [] : ["Expected derived HAVING SQL."];
   } },
-  { name: "Date range plus ORDER BY emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor(), { orderBy: [defaultSort()] })) ? [] : ["Expected ORDER BY refusal."] },
-  { name: "Date range plus rowLimit emits no partial SQL", assert: () => {
+  { name: "Date range plus ORDER BY renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor(), { orderBy: [defaultSort()] })).sql?.includes("ORDER BY") ? [] : ["Expected ORDER BY SQL."] },
+  { name: "Date range plus rowLimit renders complete SQL", assert: () => {
     const rowLimit = { value: 5 };
-    return noSqlAndNoActions(basePlan(filterFor(), { rowLimit: { ...rowLimit, rowLimitId: createBusinessSqlRowLimitId(rowLimit) } })) ? [] : ["Expected rowLimit refusal."];
+    return renderBusinessSqlQueryPlan(basePlan(filterFor(), { rowLimit: { ...rowLimit, rowLimitId: createBusinessSqlRowLimitId(rowLimit) } })).sql?.endsWith("LIMIT 5;") ? [] : ["Expected rowLimit SQL."];
   } },
-  { name: "Date range plus resolved join emits no partial SQL", assert: () => noSqlAndNoActions(basePlan(filterFor({ table: "customers", entity: "customers", field: "signup_date" }), {
+  { name: "Date range plus resolved join renders complete SQL", assert: () => renderBusinessSqlQueryPlan(basePlan(filterFor({ table: "customers", entity: "customers", field: "signup_date" }), {
     entities: [sourceEntity, { entity: "customers", table: "customers", required: true, role: "filter_subject" }],
     joinPath: {
       required: true,
@@ -462,7 +462,7 @@ const fixtures: Fixture[] = [
       requirements: [{ fromEntity: "orders", toEntity: "customers", required: true, relationship: "orders customer", verified: true }],
       edges: [{ fromEntity: "orders", fromTable: "orders", fromField: "customer_id", toEntity: "customers", toTable: "customers", toField: "customer_id", relationship: "orders customer", verified: true }],
     },
-  })) ? [] : ["Expected joined refusal."] },
+  })).sql?.includes('WHERE "customers"."signup_date" BETWEEN DATE') ? [] : ["Expected joined SQL."] },
   { name: "Identical date ranges share filterId", assert: () => filterFor().filterId === filterFor().filterId ? [] : ["Expected stable ID."] },
   { name: "Changing lower date changes filterId", assert: () => filterFor().filterId !== filterFor({ comparisonValue: dateRangeValue("2026-02-01", "2026-12-31") }).filterId ? [] : ["Expected lower-sensitive ID."] },
   { name: "Changing upper date changes filterId", assert: () => filterFor().filterId !== filterFor({ comparisonValue: dateRangeValue("2026-01-01", "2026-11-30") }).filterId ? [] : ["Expected upper-sensitive ID."] },
