@@ -207,6 +207,15 @@ export type BusinessSqlFilterComparisonValue =
       lowerInclusive: true;
       upperInclusive: true;
       value?: never;
+    }
+  | {
+      kind: "range";
+      valueKind: "date";
+      lower: string;
+      upper: string;
+      lowerInclusive: true;
+      upperInclusive: true;
+      value?: never;
     };
 
 export type BusinessSqlFilterTarget =
@@ -493,14 +502,18 @@ const rangeComparisonIdentity = (
   const lower = comparisonValue.lower as unknown;
   const upper = comparisonValue.upper as unknown;
   const valid =
-    comparisonValue.valueKind === "number" &&
     comparisonValue.lowerInclusive === true &&
     comparisonValue.upperInclusive === true &&
-    typeof lower === "number" &&
-    typeof upper === "number" &&
-    Number.isFinite(lower) &&
-    Number.isFinite(upper) &&
-    lower <= upper;
+    (comparisonValue.valueKind === "number"
+      ? typeof lower === "number" &&
+        typeof upper === "number" &&
+        Number.isFinite(lower) &&
+        Number.isFinite(upper) &&
+        lower <= upper
+      : comparisonValue.valueKind === "date" &&
+        isCanonicalBusinessSqlDateValue(lower) &&
+        isCanonicalBusinessSqlDateValue(upper) &&
+        lower <= upper);
   return valid
     ? [
         "valid-range",
@@ -530,6 +543,27 @@ export const isCanonicalBusinessSqlDateValue = (value: unknown): value is string
   const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
   const daysByMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   return day >= 1 && day <= daysByMonth[month - 1];
+};
+
+export const isCanonicalBusinessSqlDateRangeValue = (
+  value: unknown,
+): value is Extract<BusinessSqlFilterComparisonValue, { kind: "range"; valueKind: "date" }> => {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as {
+    kind?: unknown;
+    valueKind?: unknown;
+    lower?: unknown;
+    upper?: unknown;
+    lowerInclusive?: unknown;
+    upperInclusive?: unknown;
+  };
+  return candidate.kind === "range" &&
+    candidate.valueKind === "date" &&
+    candidate.lowerInclusive === true &&
+    candidate.upperInclusive === true &&
+    isCanonicalBusinessSqlDateValue(candidate.lower) &&
+    isCanonicalBusinessSqlDateValue(candidate.upper) &&
+    candidate.lower <= candidate.upper;
 };
 
 const dateComparisonIdentity = (

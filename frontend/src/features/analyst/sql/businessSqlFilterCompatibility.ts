@@ -1,5 +1,8 @@
 import type { SchemaColumn } from "../../dataset/datasetTypes";
-import { isCanonicalBusinessSqlDateValue } from "./businessSqlQueryPlan";
+import {
+  isCanonicalBusinessSqlDateRangeValue,
+  isCanonicalBusinessSqlDateValue,
+} from "./businessSqlQueryPlan";
 import type {
   BusinessSqlFilter,
   BusinessSqlFilterComparisonValue,
@@ -194,14 +197,16 @@ const valueIsValid = (value: BusinessSqlFilterComparisonValue | undefined): bool
     });
   }
   if (value.kind === "range") {
-    return value.valueKind === "number" &&
-      value.lowerInclusive === true &&
-      value.upperInclusive === true &&
-      typeof value.lower === "number" &&
-      typeof value.upper === "number" &&
-      Number.isFinite(value.lower) &&
-      Number.isFinite(value.upper) &&
-      value.lower <= value.upper;
+    if (value.valueKind === "number") {
+      return value.lowerInclusive === true &&
+        value.upperInclusive === true &&
+        typeof value.lower === "number" &&
+        typeof value.upper === "number" &&
+        Number.isFinite(value.lower) &&
+        Number.isFinite(value.upper) &&
+        value.lower <= value.upper;
+    }
+    return isCanonicalBusinessSqlDateRangeValue(value);
   }
   return false;
 };
@@ -223,9 +228,10 @@ const valueCompatibleWithType = ({
     return false;
   }
   if (RANGE_OPERATORS.has(operator)) {
-    return value.kind === "range" &&
-      value.valueKind === "number" &&
-      isNumericField(fieldType);
+    if (value.kind !== "range") return false;
+    if (value.valueKind === "number") return isNumericField(fieldType);
+    if (value.valueKind === "date") return isDateField(fieldType);
+    return false;
   }
   if (DATE_OPERATORS.has(operator)) {
     return value.kind === "date" &&
