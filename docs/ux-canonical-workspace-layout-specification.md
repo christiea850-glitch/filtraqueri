@@ -1,3 +1,6 @@
+> Authority notice
+> This document is authoritative only for workspace shell layout, layout geometry, stable surface placement, and narrow layout conventions. It is subordinate to `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md` for product naming, top-level navigation, roadmap strategy, and Investigation positioning. Explore remains the user-facing workspace; Investigation is contextual within Explore.
+
 # FiltraQueri Workspace Layout Specification
 
 ## Status

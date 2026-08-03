@@ -1,3 +1,6 @@
+> Revision status
+> This document remains useful within its stated scope but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Where conflicts exist, the product-direction document controls. Explore is the user-facing workspace; Investigation is contextual inside Explore and no top-level Investigation tab is restored.
+
 # Investigation Workspace Boundary
 
 S7-A/B/C/D establish the current stable baseline for this proof. It is local-state-only, non-routed, and presentation-only.

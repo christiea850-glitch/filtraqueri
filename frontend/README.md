@@ -1,3 +1,6 @@
+> Revision status
+> This document remains useful within its stated setup scope but is not repository-wide authority. It requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Where conflicts exist, the product-direction document controls. Do not delete this file until a replacement project README exists and references are migrated.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

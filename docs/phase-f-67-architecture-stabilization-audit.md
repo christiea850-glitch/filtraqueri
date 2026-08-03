@@ -1,3 +1,6 @@
+> Superseded notice
+> This document is superseded for current architectural status and retained as historical audit evidence. Current product direction and roadmap authority are defined by `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Completed-phase findings remain part of the historical record, but do not override the current direction.
+
 # Phase F-67 Architecture Stabilization Audit
 
 ## Scope

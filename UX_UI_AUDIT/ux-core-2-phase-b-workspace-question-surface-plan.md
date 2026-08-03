@@ -1,3 +1,6 @@
+> Revision status
+> This document remains useful as historical implementation rationale but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Current navigation direction controls. Where conflicts exist, the product-direction document controls.
+
 # UX-CORE-2 - Phase B Workspace Question Surface Plan
 
 ## Document Status

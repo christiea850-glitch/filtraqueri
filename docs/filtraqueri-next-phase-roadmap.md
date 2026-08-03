@@ -1,3 +1,6 @@
+> Superseded notice
+> This document is retained for historical and audit context. Current product direction and roadmap authority are defined by `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Do not use this document to override the current direction.
+
 # FiltraQueri Recommended Next Phase Roadmap
 
 ## Roadmap Principles

@@ -1,3 +1,6 @@
+> Revision status
+> This document remains useful as supporting UX guidance but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. It does not control repository-wide product strategy. Where conflicts exist, the product-direction document controls.
+
 # FiltraQueri Operational UX Charter
 
 ## Purpose
