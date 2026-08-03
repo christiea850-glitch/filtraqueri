@@ -1,17 +1,25 @@
-> Revision status
-> This document remains useful as supporting UX guidance but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. It does not control repository-wide product strategy. Where conflicts exist, the product-direction document controls.
+> Status
+> Aligned supporting UX guidance. This charter guides operational UX behavior, but `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md` controls repository-wide product strategy, architecture direction, and roadmap sequencing.
 
 # FiltraQueri Operational UX Charter
 
 ## Purpose
 
-This charter locks FiltraQueri's product concept so future development does not drift back into metadata-heavy dashboards, duplicated panels, global Human/Analyst mode, or preview-only advisory UI.
+This charter guides FiltraQueri's operational UX behavior so future development does not drift back into metadata-heavy dashboards, duplicated panels, global Human/Analyst mode, or preview-only advisory UI. It is subordinate to `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md` and does not set architecture or roadmap sequencing independently.
 
-FiltraQueri exists to answer business questions through guided, AI-native workflows. It should not expose internal system architecture as the main UI.
+FiltraQueri is an analytical-answer system. It exists to answer business questions through guided, AI-native workflows, not merely to translate natural language into SQL. It should not expose internal system architecture as the main UI.
+
+Reference: `docs/DOCUMENT_INDEX.md`.
+
+## Current Product Alignment
+
+Current product terminology treats Explore as the user-facing workspace. Investigation is contextual inside Explore, and no top-level Investigation navigation is restored by this charter. Data remains an active product surface for dataset understanding. Analyst routes and surfaces include Inspect SQL, Browse Templates, and Browse Reports. Compose, Refine, Answer, and Ask FiltraQueri remain active product surfaces or workflow states.
+
+The original tab charters below preserve UX rationale from an earlier product model. Read "Workspace" as the operational Explore workspace where applicable. Read "Investigation" as a contextual depth of analysis inside Explore. SQL preview and execution remain separate concerns; previewing SQL does not grant execution permission, and production database execution requires future PS-Exec policy gates.
 
 ## Core Product Principle
 
-FiltraQueri is an operational investigation workspace for business users and analysts.
+FiltraQueri is an operational analytical-answer workspace for business users and analysts.
 
 The product should help users move from an uploaded dataset to a useful answer through understandable steps:
 

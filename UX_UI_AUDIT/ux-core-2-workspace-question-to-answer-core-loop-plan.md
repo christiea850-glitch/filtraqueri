@@ -1,5 +1,5 @@
-> Revision status
-> This document remains useful as historical implementation rationale but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Current navigation and execution-governance direction controls. Where conflicts exist, the product-direction document controls.
+> Status
+> Historical phase plan aligned with current execution-governance direction. This document preserves core-loop rationale; `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md` controls current product strategy, roadmap, SQL architecture direction, and Investigation positioning.
 
 # UX-CORE-2 - Workspace Question-to-Answer Core Loop
 
@@ -11,13 +11,33 @@ No application code, backend logic, SQL execution behavior, result/export behavi
 
 ## Authoritative Direction
 
-The FiltraQueri Operational UX Charter is authoritative.
+Current repository-wide product direction is authoritative: `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. This historical phase plan remains useful for UX sequencing and implementation rationale. Reference: `docs/DOCUMENT_INDEX.md`.
 
-Business questions belong to Workspace, not Data. Data may suggest lightweight dataset hints only. Workspace must own the typed-question experience, generated logic, execution approval, results, and optional analyst-depth logic view.
+Business questions belong to Explore/Workspace flow, not Data. Data may suggest lightweight dataset hints only. Explore owns user-facing question shaping, while Analyst surfaces provide technical depth such as Inspect SQL. Future execution remains governed and manual.
+
+## Current Authority Alignment
+
+Current SQL and analytical-answer work follows this chain:
+
+```text
+question capture
+-> grounding or proposal
+-> canonical plan
+-> readiness
+-> capability
+-> preview
+-> manual Insert
+-> manual Run
+-> provenance
+```
+
+The canonical BusinessSqlQueryPlan is the source of analytical meaning after grounding for SQL work. No downstream layer may independently reinterpret the raw question. Preview and execution are separate concerns: previewing a dialect does not grant permission to execute against that dialect. There is no automatic Insert and no automatic Run. Real production-database execution later requires PS-Exec policy gates.
+
+Future concepts such as `InvestigationPlan`, PS-Exec, ExecutedResult, AnalysisArtifact, VisualizationPlan, InsightFact, a metric registry, PostgreSQL execution, Oracle rendering, and rerun comparison are not claimed as implemented by this historical plan unless separately proven by current implementation documents.
 
 ## Product Goal
 
-Slice 2 creates the real Workspace loop:
+Slice 2 described the original phase goal for a real Workspace loop:
 
 > The user types a business question in their own words, and FiltraQueri answers using the actual uploaded dataset.
 
@@ -169,7 +189,7 @@ Rules:
 
 ### 3. Intent Detection
 
-Workspace detects intent from the typed question and current schema.
+Workspace detects intent from the typed question and current schema. Under current authority, any SQL-facing implementation must convert grounded meaning into a canonical BusinessSqlQueryPlan; downstream layers must not reinterpret the raw prompt.
 
 Initial intent categories may include:
 
@@ -206,7 +226,7 @@ The first safe implementation should prefer one of two routes:
 
 Python/R should remain future-facing unless an explicit execution engine exists. Generated Python/R may be shown as non-executable analyst-depth explanation only until execution support exists.
 
-Generated logic must be inspectable before execution:
+Generated logic must be inspectable before execution. Current authority separates the canonical analytical plan from renderer output and execution permission:
 
 - human-readable plan
 - selected fields
@@ -216,7 +236,7 @@ Generated logic must be inspectable before execution:
 
 ### 5. User Review / Approval
 
-Execution must remain user-mediated.
+Execution must remain user-mediated. Current authority requires manual Insert and manual Run boundaries where SQL preview enters an executable surface.
 
 The review state should answer:
 
@@ -225,9 +245,9 @@ The review state should answer:
 - What logic will run?
 - What result should the user expect?
 
-Allowed actions:
+Allowed future actions, when implemented under the relevant execution phase:
 
-- "Run answer"
+- "Run answer" only after readiness, capability, and policy gates are satisfied
 - "Edit fields"
 - "View logic"
 - "Cancel"
@@ -242,7 +262,7 @@ Forbidden:
 
 ### 6. Execute Through Existing Engine Path
 
-Execution must reuse existing owners.
+Execution must reuse existing owners. Production database execution is future PS-Exec scope and must not be inferred from preview capability.
 
 Preferred paths:
 
@@ -321,6 +341,8 @@ Rules:
 ## Existing Systems To Reuse
 
 ### DuckDB / Backend Query Execution Path
+
+This section describes the execution path available to the historical phase. It does not make DuckDB the permanent dialect strategy; current direction remains dialect-neutral, and production database execution requires future PS-Exec gates.
 
 Existing backend owners:
 
@@ -565,7 +587,7 @@ Architectural requirements:
 - LLM fallback is allowed only when deterministic parsing cannot confidently translate the question.
 - Structured Query Builder specs are preferred over raw SQL.
 - Safe SELECT SQL is allowed only as fallback when the question cannot be represented cleanly as a Query Builder request.
-- All execution must still pass through existing `executeWorkspaceQuery`, backend validation, and DuckDB.
+- Historical local execution must still pass through existing `executeWorkspaceQuery`, backend validation, and the then-current DuckDB-backed path; this does not override current dialect-neutral direction.
 - No LLM-generated answer text may be treated as a result unless backed by executed data.
 - No direct LLM execution is allowed.
 - Provider choice remains implementation-configurable.

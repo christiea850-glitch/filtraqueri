@@ -1,7 +1,19 @@
-> Revision status
-> This document remains useful within its stated scope but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Where conflicts exist, the product-direction document controls. Explore is the user-facing workspace; Investigation is contextual inside Explore and no top-level Investigation tab is restored.
+> Status
+> Aligned workspace-governance reference. `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md` controls product taxonomy, navigation, roadmap, and Investigation positioning.
 
 # Workspace Governance
+
+## Current Product Taxonomy
+
+The current product taxonomy is:
+
+- Data: active product surface for dataset understanding, worksheet relationships, source shape, readiness signals, and data-quality context.
+- Explore: user-facing workspace for asking and shaping analytical work; Investigation is contextual inside Explore and does not return as a top-level navigation tab.
+- Analyst: technical and analyst-depth surfaces, including Inspect SQL, Browse Templates, and Browse Reports.
+
+Compose, Refine, and Answer remain interaction rooms or workflow states where applicable. Ask FiltraQueri remains active as an answer-oriented product surface. Inspect SQL, Browse Templates, and Browse Reports remain Analyst routes or surfaces, not separate product strategies.
+
+This folder may continue to use implementation names from earlier workspace-governance phases. Those names do not define top-level navigation. Reference: `docs/DOCUMENT_INDEX.md`.
 
 `features/workspaces` defines S5 workspace shell governance foundations for future analytical workspace systems.
 
@@ -38,9 +50,9 @@ This folder may define:
 
 ## Future Use
 
-Future S5 phases may use this registry to evaluate whether an investigation, explainability, executive, analyst, orchestration, or future consumer workspace is ready for routed activation. That future activation must remain staged and governed by navigation, preservation, and integrity layers.
+Future S5 phases may use this registry to evaluate whether contextual investigation, explainability, executive, analyst, orchestration, or future consumer workspace support is ready for activation. That future activation must remain staged and governed by navigation, preservation, and integrity layers.
 
-S6-X narrows the immediate planning target to one future Investigation workspace activation. Executive, Analyst, and generic future-consumer workspace shells should not be reintroduced until paired with a real activation phase and matching governance evidence.
+S6-X used original phase terminology for a future Investigation workspace activation. Under current product direction, that means contextual investigation support inside Explore, not a peer top-level workspace. Executive, Analyst, and generic future-consumer workspace shells should not be reintroduced until paired with a real activation phase and matching governance evidence.
 
 ## Governance Reporting
 
@@ -58,7 +70,7 @@ The reporting layer does not activate workspaces, does not activate orchestratio
 
 ## Investigation Pre-Activation Contract
 
-Phase 0 documents the Investigation workspace activation contract before any local proof begins.
+Phase 0 documents the original Investigation workspace activation contract before any local proof begins. Current product terminology interprets this as contextual investigation support inside Explore.
 
 The Investigation workspace may read:
 

@@ -1,7 +1,18 @@
-> Revision status
-> This document remains useful within its stated setup scope but is not repository-wide authority. It requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Where conflicts exist, the product-direction document controls. Do not delete this file until a replacement project README exists and references are migrated.
+> Status
+> Active frontend reference, needs future consolidation. This document is not repository-wide authority and must remain until a replacement project README exists and references are migrated.
 
 # React + TypeScript + Vite
+
+## FiltraQueri Frontend Reference Scope
+
+- Status: Active frontend reference, needs future consolidation
+- Scope: frontend setup, structure, and local implementation guidance
+- Repository-wide authority: none
+- Controlling product direction: `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`
+- Documentation index: `docs/DOCUMENT_INDEX.md`
+- Working documentation classification: `docs/strategy/DOCUMENTATION_INVENTORY.md`
+
+This README is a frontend-local entry document. It may describe setup and local implementation conventions for the Vite/React frontend, but it does not define product strategy, roadmap sequencing, information architecture, execution governance, or repository-wide documentation authority. Where this file conflicts with the product-direction document, the product-direction document controls.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

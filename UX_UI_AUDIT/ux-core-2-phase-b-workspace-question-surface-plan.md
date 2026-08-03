@@ -1,5 +1,5 @@
-> Revision status
-> This document remains useful as historical implementation rationale but contains terminology, authority, or sequencing that requires alignment with `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md`. Current navigation direction controls. Where conflicts exist, the product-direction document controls.
+> Status
+> Historical phase plan with current-direction mapping. This document preserves implementation rationale from its original phase terminology; `docs/strategy/FILTRAQUERI_PRODUCT_DIRECTION.md` controls current navigation, roadmap, and execution-governance direction.
 
 # UX-CORE-2 - Phase B Workspace Question Surface Plan
 
@@ -8,6 +8,22 @@
 Planning, audit, and implementation preparation only.
 
 No application code, backend logic, SQL execution behavior, Query Builder behavior, SQL Workspace behavior, ResultsGrid behavior, ActiveResultModel behavior, pagination, export, upload/session restore, runtime persistence, routing, command channels, or governance contracts are changed by this document.
+
+## Current-Direction Mapping
+
+Original phase terminology remains in this document for historical context. Current product interpretation is:
+
+| Original phase concept | Current product interpretation |
+| --- | --- |
+| Investigation surface | Contextual Investigation workflow within Explore. |
+| Open Investigations navigation | Historical navigation wording; Explore is the user-facing workspace and no top-level Investigation tab is restored. |
+| Query Builder | Current SQL and analysis workflow surfaced through Analyst and Ask FiltraQueri where applicable. |
+| Prepare answer | Manual, readiness-gated progression; no automatic Insert, no automatic Run, and no execution permission from preview alone. |
+| Workspace-owned typed question | Explore-owned user-facing question shaping after grounding, with analytical meaning carried by the canonical BusinessSqlQueryPlan in later SQL planning. |
+
+The canonical BusinessSqlQueryPlan is the sole source of analytical meaning after grounding for SQL work. No downstream layer may independently reinterpret the original question. Production database execution requires future PS-Exec policy gates.
+
+Reference: `docs/DOCUMENT_INDEX.md`.
 
 ## Authoritative Sources Reviewed
 
@@ -27,9 +43,9 @@ No application code, backend logic, SQL execution behavior, Query Builder behavi
 
 ## Executive Summary
 
-Phase B should establish Workspace ownership for typed business questions without introducing translation or execution.
+Phase B should establish Explore/Workspace ownership for typed business questions without introducing translation or execution.
 
-The safest first implementation is a non-executable question surface mounted in the existing Human `queryBuilder` view. In the current app, `queryBuilder` is the Workspace-like surface users reach through "Open Investigations" and Human guidance actions. Adding a new `ActiveView` such as `"workspace"` in Phase B would create avoidable risk because `ActiveView` is referenced by session restore, runtime persistence validation, command navigation, Runtime Context, and App view registries.
+The safest first implementation was a non-executable question surface mounted in the existing Human `queryBuilder` view. In the app state reviewed for this historical phase, `queryBuilder` was the Workspace-like surface users reached through "Open Investigations" and Human guidance actions. Under current product terminology, read that navigation wording as legacy implementation language rather than a restored top-level Investigation product area. Adding a new `ActiveView` such as `"workspace"` in Phase B would create avoidable risk because `ActiveView` is referenced by session restore, runtime persistence validation, command navigation, Runtime Context, and App view registries.
 
 Therefore, Phase B should:
 
@@ -42,7 +58,7 @@ Therefore, Phase B should:
 - explicitly state that no query has run yet
 - avoid SQL generation, Query Builder request generation, LLM calls, backend calls, result mutation, persistence writes, and route changes
 
-This phase is a product ownership correction: business questions begin in Workspace, not Data. It is not yet the ask-and-answer engine.
+This phase is a product ownership correction: business questions begin in the Explore/Workspace flow, not Data. It is not yet the ask-and-answer engine.
 
 ## Current Workspace Audit
 
@@ -56,7 +72,7 @@ There is no separate `ActiveView` named `workspace` today. The closest current W
 - Navigation command: `nav:analyze`, titled "Open Investigations", calls `openHumanView("queryBuilder")`
 - Human guidance actions often route to `"queryBuilder"` for "Build summary", "Choose columns", "Build trend", and similar flows
 
-Under the Operational UX Charter, this surface is currently doing Workspace work: shaping fields, filters, grouping, comparisons, review, and eventual query execution.
+Under the Operational UX Charter's original phase terminology, this surface is doing Workspace work: shaping fields, filters, grouping, comparisons, review, and eventual query execution. Under current product terminology, read that as Explore-owned question shaping with Analyst depth available where appropriate.
 
 ### Route / View Ownership
 
@@ -552,7 +568,7 @@ npm.cmd run governance:audit
 Manual verification:
 
 1. Open a dataset.
-2. Navigate to Investigations / Query Builder.
+2. Navigate to the current Explore/Analyst entry that opens the legacy Investigations / Query Builder surface.
 3. Confirm the question surface appears above the existing Query Builder.
 4. Type a question.
 5. Click a starter prompt and confirm it fills the input only.
