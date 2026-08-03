@@ -1109,6 +1109,25 @@ type RowFilterShell =
       evidence: string;
     };
 
+type RowFilterShellCollection =
+  | { status: "none" }
+  | { status: "unsupported"; reason: string; baseQuestion?: string; predicate?: string }
+  | {
+      status: "detected";
+      baseQuestion: string;
+      predicate: string;
+      shells: Array<Extract<RowFilterShell, { status: "detected" }>>;
+    };
+
+type BoundedWhereParts =
+  | { status: "none" }
+  | { status: "unsupported"; reason: string; baseQuestion?: string; predicate?: string }
+  | {
+      status: "parts";
+      baseQuestion: string;
+      predicate: string;
+    };
+
 type RowFilterOperatorPhrase = {
   operator: BusinessSqlFilterOperator;
   phrase: string;
@@ -1157,13 +1176,13 @@ const maskQuotedNaturalLanguageStrings = (value: string): string =>
 const standaloneWhereMatches = (value: string): RegExpMatchArray[] =>
   [...value.matchAll(/\bwhere\b/gi)];
 
-const detectRowFilterShell = (prompt: string): RowFilterShell => {
-  const whereMatches = standaloneWhereMatches(prompt);
-  if (whereMatches.length === 0) return { status: "none" };
-  if (whereMatches.length > 1) return { status: "unsupported", reason: "multiple_where_clauses" };
-  const whereIndex = whereMatches[0].index || 0;
-  const baseQuestion = prompt.slice(0, whereIndex).trim();
-  const predicate = prompt.slice(whereIndex + whereMatches[0][0].length).trim();
+const detectSingleRowFilterPredicateShell = ({
+  baseQuestion,
+  predicate,
+}: {
+  baseQuestion: string;
+  predicate: string;
+}): RowFilterShell => {
   if (!baseQuestion || !predicate) {
     return { status: "unsupported", reason: "missing_where_clause_part", baseQuestion, predicate };
   }
@@ -1220,6 +1239,12 @@ const detectRowFilterShell = (prompt: string): RowFilterShell => {
   if (!match.nullary && !trimNaturalLanguageValuePunctuation(valueText)) {
     return { status: "unsupported", reason: "missing_value", baseQuestion, predicate };
   }
+  if (
+    match.operator === "between" &&
+    trimNaturalLanguageValuePunctuation(valueText).split(/\band\b/i).map((part) => part.trim()).filter(Boolean).length !== 2
+  ) {
+    return { status: "unsupported", reason: "malformed_between_value", baseQuestion, predicate };
+  }
 
   return {
     status: "detected",
@@ -1230,6 +1255,99 @@ const detectRowFilterShell = (prompt: string): RowFilterShell => {
     valueText,
     evidence: predicate,
   };
+};
+
+const boundedWhereParts = (prompt: string): BoundedWhereParts => {
+  const whereMatches = standaloneWhereMatches(prompt);
+  if (whereMatches.length === 0) return { status: "none" };
+  if (whereMatches.length > 1) return { status: "unsupported", reason: "multiple_where_clauses" };
+  const whereIndex = whereMatches[0].index || 0;
+  const baseQuestion = prompt.slice(0, whereIndex).trim();
+  const predicate = prompt.slice(whereIndex + whereMatches[0][0].length).trim();
+  if (!baseQuestion || !predicate) {
+    return { status: "unsupported", reason: "missing_where_clause_part", baseQuestion, predicate };
+  }
+  return { status: "parts", baseQuestion, predicate };
+};
+
+const standaloneAndSpans = (masked: string): Array<{ start: number; end: number }> =>
+  [...masked.matchAll(/\band\b/gi)].map((match) => ({
+    start: match.index || 0,
+    end: (match.index || 0) + match[0].length,
+  }));
+
+const predicateSegmentsForSeparators = (
+  predicate: string,
+  separators: readonly { start: number; end: number }[],
+): string[] => {
+  const segments: string[] = [];
+  let start = 0;
+  for (const separator of separators) {
+    segments.push(predicate.slice(start, separator.start).trim());
+    start = separator.end;
+  }
+  segments.push(predicate.slice(start).trim());
+  return segments;
+};
+
+const separatorSubsets = <T,>(items: readonly T[]): T[][] => {
+  if (items.length > 8) return [];
+  const subsets: T[][] = [];
+  const count = 2 ** items.length;
+  for (let mask = 0; mask < count; mask += 1) {
+    const subset: T[] = [];
+    items.forEach((item, index) => {
+      if ((mask & (1 << index)) !== 0) subset.push(item);
+    });
+    subsets.push(subset);
+  }
+  return subsets;
+};
+
+export const detectRowFilterShells = (prompt: string): RowFilterShellCollection => {
+  const parts = boundedWhereParts(prompt);
+  if (parts.status !== "parts") return parts;
+  const { baseQuestion, predicate } = parts;
+  const masked = maskQuotedNaturalLanguageStrings(predicate);
+  if (/;|--|\/\*|\*\/|[()]/.test(masked)) {
+    return { status: "unsupported", reason: "raw_predicate_text", baseQuestion, predicate };
+  }
+  if (/\bor\b/i.test(masked)) {
+    return { status: "unsupported", reason: "multiple_predicates", baseQuestion, predicate };
+  }
+
+  const andSpans = standaloneAndSpans(masked);
+  if (andSpans.length === 0) {
+    const shell = detectSingleRowFilterPredicateShell({ baseQuestion, predicate });
+    return shell.status === "detected"
+      ? { status: "detected", baseQuestion, predicate, shells: [shell] }
+      : shell;
+  }
+
+  const validPartitions: Array<Array<Extract<RowFilterShell, { status: "detected" }>>> = [];
+  for (const separators of separatorSubsets(andSpans)) {
+    const segments = predicateSegmentsForSeparators(predicate, separators);
+    if (segments.length < 2 || segments.some((segment) => segment.length === 0)) continue;
+    const shells = segments.map((segment) =>
+      detectSingleRowFilterPredicateShell({ baseQuestion, predicate: segment }),
+    );
+    if (shells.every((shell): shell is Extract<RowFilterShell, { status: "detected" }> => shell.status === "detected")) {
+      validPartitions.push(shells);
+    }
+  }
+
+  if (validPartitions.length === 1) {
+    return { status: "detected", baseQuestion, predicate, shells: validPartitions[0] };
+  }
+  if (validPartitions.length > 1) {
+    return { status: "unsupported", reason: "ambiguous_predicate_partition", baseQuestion, predicate };
+  }
+
+  const single = detectSingleRowFilterPredicateShell({ baseQuestion, predicate });
+  if (single.status === "detected") {
+    return { status: "detected", baseQuestion, predicate, shells: [single] };
+  }
+  return { status: "unsupported", reason: "multiple_predicates", baseQuestion, predicate };
 };
 
 const textType = (value: SchemaColumn["inferred_type"] | undefined): boolean =>
@@ -1660,8 +1778,9 @@ const proposeMetrics = (
   }
   if (explicitFormula.status === "unsupported") return [];
 
+  if (simpleProjectionFieldPhrase(rowFilterShell)) return [];
+
   if (intent.metrics.length === 0) {
-    if (simpleProjectionFieldPhrase(rowFilterShell)) return [];
     const thresholdMetric = thresholdCountMetricName(
       detectAggregateThresholdMatches(prompt),
       intent.entities,
@@ -2134,22 +2253,37 @@ const proposeFilters = (
   aggregateResultConditions: readonly ProposedAggregateResultCondition[] = [],
 ): ProposedFilter[] => {
   const filters: ProposedFilter[] = [];
-  const rowFilterShell = detectRowFilterShell(prompt);
+  const rowFilterShells = detectRowFilterShells(prompt);
+  const rowFilterShell: RowFilterShell = rowFilterShells.status === "detected" && rowFilterShells.shells.length === 1
+    ? rowFilterShells.shells[0]
+    : rowFilterShells.status === "detected"
+      ? {
+          status: "detected",
+          baseQuestion: rowFilterShells.baseQuestion,
+          predicate: rowFilterShells.predicate,
+          fieldPhrase: "",
+          operator: "equals",
+          valueText: "",
+          evidence: rowFilterShells.predicate,
+        }
+      : rowFilterShells;
   const hasDerivedThresholdShell = detectDerivedThresholdShell(prompt).status === "detected";
   const hasAggregateThresholdShell =
     aggregateResultConditions.length > 0 ||
     /\bwhere\b\s+(?:total|sum|average|avg|minimum|min|maximum|max|count)\b/i.test(prompt);
   const isAggregateDateRangeShell =
-    rowFilterShell.status === "detected" &&
-    rowFilterShell.operator === "between" &&
-    /\d{4}-\d{2}-\d{2}/.test(rowFilterShell.valueText) &&
+    rowFilterShells.status === "detected" &&
+    rowFilterShells.shells.some((shell) =>
+      shell.operator === "between" &&
+      /\d{4}-\d{2}-\d{2}/.test(shell.valueText),
+    ) &&
     (hasDerivedThresholdShell || hasAggregateThresholdShell);
   const legacyPrompt = rowFilterShell.status === "detected" ? rowFilterShell.baseQuestion : prompt;
-  if (rowFilterShell.status === "unsupported" && !hasDerivedThresholdShell && !hasAggregateThresholdShell) {
-    filters.push(unsupportedRowFilter(rowFilterShell));
-  } else if (rowFilterShell.status === "detected") {
+  if (rowFilterShells.status === "unsupported" && !hasDerivedThresholdShell && !hasAggregateThresholdShell) {
+    filters.push(unsupportedRowFilter(rowFilterShells));
+  } else if (rowFilterShells.status === "detected") {
     if (
-      (rowFilterShell.operator === "before" || rowFilterShell.operator === "after" || isAggregateDateRangeShell) &&
+      (rowFilterShells.shells.some((shell) => shell.operator === "before" || shell.operator === "after") || isAggregateDateRangeShell) &&
       (hasDerivedThresholdShell || hasAggregateThresholdShell)
     ) {
       filters.push({
@@ -2159,10 +2293,17 @@ const proposeFilters = (
         columnName: null,
         semantics: "needs_review",
         reason: "Aggregate date threshold wording is not supported as a row-level date filter.",
-        evidence: rowFilterShell.evidence,
+        evidence: rowFilterShells.predicate,
       });
     } else if (!hasDerivedThresholdShell && aggregateResultConditions.length === 0 && !hasAggregateThresholdShell) {
-      filters.push(proposedCanonicalRowFilter(rowFilterShell, worksheets));
+      const canonicalCandidates = rowFilterShells.shells.map((shell) =>
+        proposedCanonicalRowFilter(shell, worksheets),
+      );
+      if (canonicalCandidates.every((filter) => filter.semantics === "canonical" && filter.executable === true)) {
+        filters.push(...canonicalCandidates);
+      } else if (canonicalCandidates.length > 0) {
+        filters.push(canonicalCandidates.find((filter) => filter.semantics !== "canonical") || canonicalCandidates[0]);
+      }
     }
   }
   const statusColumn = findColumn("status", worksheets, semanticColumns, [
@@ -2370,6 +2511,7 @@ const createMissingRequirements = ({
   const missing: MissingRequirement[] = [];
   const hasGroundedAggregateThreshold = aggregateResultConditions.length === 1;
   const hasCanonicalRowFilter = filters.some((filter) => filter.semantics === "canonical");
+  const canonicalFieldProjection = hasCanonicalRowFilter && groupings.length > 0;
   const explicitFormula = selectedExplicitDerivedFormulaForProposal(prompt);
   const rankingShell = detectDerivedRankingShell(prompt);
   const thresholdShell = detectDerivedThresholdShell(prompt);
@@ -2386,7 +2528,7 @@ const createMissingRequirements = ({
     intent.alternates.length === 0 &&
     !hasGroundedAggregateThreshold &&
     !hasGroundedDerivedFormula &&
-    !(hasCanonicalRowFilter && groupings.length > 0)
+    !canonicalFieldProjection
   ) {
     missing.push({
       id: "missing-intent",
@@ -2417,7 +2559,7 @@ const createMissingRequirements = ({
       message: `Could not bind grouping \`${grouping.label}\` to a column.`,
     });
   }
-  for (const metric of metrics.filter((metric) => metric.confidence === "low")) {
+  for (const metric of metrics.filter((metric) => metric.confidence === "low" && !canonicalFieldProjection)) {
     missing.push({
       id: `missing-metric:${compactId(metric.label)}`,
       kind: "column",
@@ -2777,7 +2919,10 @@ export function proposeAdaptiveReport(
     ...(request.semanticHints || []),
     ...semanticHintsForProposal(semanticColumns),
   ]);
-  const rowFilterShell = detectRowFilterShell(prompt);
+  const rowFilterShells = detectRowFilterShells(prompt);
+  const rowFilterShell: RowFilterShell = rowFilterShells.status === "detected"
+    ? rowFilterShells.shells[0]
+    : rowFilterShells;
   const requestedEntities = detectedIntent.entities.length > 0 ? detectedIntent.entities : [];
   const entities =
     requestedEntities.length > 0
@@ -2792,14 +2937,18 @@ export function proposeAdaptiveReport(
     groupings: fullPromptGroupings,
     derivedMeasures: fullPromptDerivedMeasures,
   });
+  const hasAggregateThresholdPrompt =
+    /\bwhere\b\s+(?:total|sum|average|avg|minimum|min|maximum|max|count)\b/i.test(prompt);
   const useRowFilterBasePrompt =
-    rowFilterShell.status === "detected" &&
+    rowFilterShells.status === "detected" &&
     fullPromptAggregateResultConditions.length === 0 &&
+    !hasAggregateThresholdPrompt &&
     detectDerivedThresholdShell(prompt).status !== "detected";
-  const planningPrompt = useRowFilterBasePrompt ? rowFilterShell.baseQuestion : prompt;
-  const metrics = proposeMetrics(detectedIntent, planningPrompt, worksheets, semanticColumns, rowFilterShell);
+  const planningPrompt = useRowFilterBasePrompt ? rowFilterShells.baseQuestion : prompt;
+  const planningRowFilterShell: RowFilterShell = hasAggregateThresholdPrompt ? { status: "none" } : rowFilterShell;
+  const metrics = proposeMetrics(detectedIntent, planningPrompt, worksheets, semanticColumns, planningRowFilterShell);
   const derivedMeasures = proposeDerivedMeasures(planningPrompt, metrics);
-  const groupings = proposeGroupings(detectedIntent, planningPrompt, worksheets, semanticColumns, rowFilterShell);
+  const groupings = proposeGroupings(detectedIntent, planningPrompt, worksheets, semanticColumns, planningRowFilterShell);
   const aggregateResultConditions = proposeAggregateResultConditions({
     prompt: planningPrompt,
     metrics,
@@ -2828,7 +2977,7 @@ export function proposeAdaptiveReport(
     semanticColumns,
   );
   const missingRequirements = createMissingRequirements({
-    prompt,
+    prompt: planningPrompt,
     intent: detectedIntent,
     scope: appliedScopeSelections,
     entities,

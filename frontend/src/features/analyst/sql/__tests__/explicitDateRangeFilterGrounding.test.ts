@@ -264,9 +264,9 @@ const fixtures: Fixture[] = [
   } },
   { name: "Exactly one WHERE required", assert: () => noSql("Show order_id order_date is between 2026-01-01 and 2026-12-31.", orders) ? [] : ["Expected missing WHERE rejection."] },
   { name: "Multiple WHERE shells reject", assert: () => noSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31 where status equals active.", orders) ? [] : ["Expected multiple WHERE rejection."] },
-  { name: "Extra AND predicate rejects", assert: () => noSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31 and status equals active.", orders) ? [] : ["Expected extra AND rejection."] },
+  { name: "Extra AND row predicate grounds", assert: () => !noSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31 and status equals active.", orders) ? [] : ["Expected extra AND row predicate grounding."] },
   { name: "OR predicate rejects", assert: () => noSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31 or status equals active.", orders) ? [] : ["Expected OR rejection."] },
-  { name: "Multiple range predicates reject", assert: () => noSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31 and order_date is between 2027-01-01 and 2027-12-31.", orders) ? [] : ["Expected multiple ranges rejection."] },
+  { name: "Multiple range predicates ground", assert: () => !noSql("Show order_id where order_date is between 2026-01-01 and 2026-12-31 and order_date is between 2027-01-01 and 2027-12-31.", orders) ? [] : ["Expected multiple ranges grounding."] },
   { name: "Standard date range parses", assert: () => {
     const value = validRange();
     return value?.kind === "range" && value.lower === "2026-01-01" && value.upper === "2026-12-31" ? [] : ["Expected standard endpoints."];

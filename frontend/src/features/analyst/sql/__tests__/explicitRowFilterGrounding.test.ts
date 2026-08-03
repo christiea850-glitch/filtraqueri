@@ -287,8 +287,8 @@ const fixtures: Fixture[] = [
     assert: () => noSql(proposalFor("Show order_id where status equals active where order_amount is above 1000.", orders)) ? [] : ["Expected multiple WHERE block."],
   },
   {
-    name: "AND composition blocks",
-    assert: () => noSql(proposalFor("Show order_id where status equals active and order_amount is above 1000.", orders)) ? [] : ["Expected AND block."],
+    name: "AND composition grounds",
+    assert: () => previewSqlFor(proposalFor("Show order_id where status equals active and order_amount is above 1000.", orders))?.includes("\n  AND ") ? [] : ["Expected AND grounding."],
   },
   {
     name: "OR composition blocks",

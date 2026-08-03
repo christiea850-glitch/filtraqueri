@@ -237,7 +237,7 @@ const validRange = (proposal = validProposal()) =>
 const fixtures: Fixture[] = [
   { name: "standalone BETWEEN phrase detection", assert: () => canonicalFilter(validProposal())?.operator === "between" ? [] : ["Expected BETWEEN operator."] },
   { name: "BETWEEN endpoint AND is accepted as range syntax", assert: () => validRange()?.kind === "range" ? [] : ["Expected one range comparison."] },
-  { name: "additional logical AND is rejected", assert: () => noSql("Show order_id where order_amount is between 100 and 500 and status equals active.") ? [] : ["Expected AND composition rejection."] },
+  { name: "additional logical AND grounds", assert: () => sqlFor(proposalFor("Show order_id where order_amount is between 100 and 500 and status equals active."))?.includes("\n  AND ") ? [] : ["Expected AND composition grounding."] },
   { name: "OR is rejected", assert: () => noSql("Show order_id where order_amount is between 100 and 500 or order_amount equals 900.") ? [] : ["Expected OR rejection."] },
   { name: "multiple WHERE shells rejected", assert: () => noSql("Show order_id where order_amount is between 100 and 500 where status equals active.") ? [] : ["Expected multiple WHERE rejection."] },
   { name: "integer endpoints parse", assert: () => {

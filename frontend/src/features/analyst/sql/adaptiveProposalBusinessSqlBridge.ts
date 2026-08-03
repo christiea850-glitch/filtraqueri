@@ -201,8 +201,8 @@ const isCanonicalProposedFilter = (
 const hasCanonicalFieldProjection = (proposal: AdaptiveReportProposal): boolean =>
   proposal.metrics.length === 0 &&
   proposal.groupings.length > 0 &&
-  proposal.filters.length === 1 &&
-  isCanonicalProposedFilter(proposal.filters[0]);
+  proposal.filters.length >= 1 &&
+  proposal.filters.every(isCanonicalProposedFilter);
 
 const hasCanonicalRowFilter = (proposal: AdaptiveReportProposal): boolean =>
   proposal.filters.some(isCanonicalProposedFilter);
@@ -915,6 +915,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     derivedMeasures: derivedMeasureResult.derivedMeasures,
     groupings,
     filters: filterResult.filters,
+    filterCombinator: "and",
     orderBy: orderByResult.orderBy,
     rowLimit,
     aggregateResultConditions: aggregateConditionResult.aggregateResultConditions,

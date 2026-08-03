@@ -258,9 +258,9 @@ const fixtures: Fixture[] = [
   ] },
   { name: "exactly one WHERE required", assert: () => canonicalFilter(textInProposal()) ? [] : ["Expected one WHERE."] },
   { name: "multiple WHERE rejected", assert: () => noSql("Show customer_id where status is one of active, pending where city is one of Boston.") ? [] : ["Expected multiple WHERE rejection."] },
-  { name: "extra AND rejected", assert: () => noSql("Show customer_id where status is one of active, pending and city equals Boston.") ? [] : ["Expected AND rejection."] },
+  { name: "extra AND row predicate grounds", assert: () => sqlFor(proposalFor("Show customer_id where status is one of active, pending and city equals Boston."))?.includes("\n  AND ") ? [] : ["Expected AND grounding."] },
   { name: "OR rejected", assert: () => noSql("Show customer_id where status is in active, pending or status equals closed.") ? [] : ["Expected OR rejection."] },
-  { name: "multiple membership predicates rejected", assert: () => noSql("Show customer_id where status is one of active, pending and city is one of Boston, Miami.") ? [] : ["Expected multiple membership rejection."] },
+  { name: "multiple membership predicates ground", assert: () => sqlFor(proposalFor("Show customer_id where status is one of active, pending and city is one of Boston, Miami."))?.includes("\n  AND ") ? [] : ["Expected multiple membership grounding."] },
   { name: "text list parses", assert: () => {
     const value = valueFor();
     return value?.kind === "set" && value.valueKind === "string" ? [] : ["Expected text set."];

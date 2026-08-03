@@ -233,9 +233,9 @@ const fixtures: Fixture[] = [
   ] },
   { name: "Exactly one WHERE is required", assert: () => canonicalFilter(beforeProposal()) && !canonicalFilter(proposalFor("Show order_id before 2026-01-01.", orders)) ? [] : ["Expected one WHERE boundary."] },
   { name: "Multiple WHERE shells reject", assert: () => noSql("Show order_id where order_date is before 2026-01-01 where status equals active.", orders) ? [] : ["Expected multiple WHERE rejection."] },
-  { name: "Extra AND rejects", assert: () => noSql("Show order_id where order_date is before 2026-01-01 and status is active.", orders) ? [] : ["Expected AND rejection."] },
+  { name: "Extra AND with unsupported predicate rejects", assert: () => noSql("Show order_id where order_date is before 2026-01-01 and status is active.", orders) ? [] : ["Expected unsupported AND rejection."] },
   { name: "OR rejects", assert: () => noSql("Show order_id where order_date is after 2026-01-01 or status is pending.", orders) ? [] : ["Expected OR rejection."] },
-  { name: "Multiple date predicates reject", assert: () => noSql("Show order_id where order_date is before 2026-01-01 and order_date is after 2025-01-01.", orders) ? [] : ["Expected multiple date predicate rejection."] },
+  { name: "Multiple date predicates ground", assert: () => sqlFor(proposalFor("Show order_id where order_date is before 2026-01-01 and order_date is after 2025-01-01.", orders))?.includes("\n  AND ") ? [] : ["Expected multiple date predicate grounding."] },
   ...validDates.map((date): Fixture => ({
     name: `${date} parses and renders`,
     assert: () => {
