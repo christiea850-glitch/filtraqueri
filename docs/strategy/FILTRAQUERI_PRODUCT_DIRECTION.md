@@ -16,6 +16,10 @@ Customer-facing statement:
 
 > Ask a business question. FiltraQueri builds and verifies the analysis, runs it safely on your data, shows and explains the result, and preserves exactly how the answer was produced.
 
+Executive-value message:
+
+> Know which numbers are trusted, how they were calculated, and why they changed.
+
 "Without syntax or query tension" remains an important experience promise. It is not the sole product positioning. FiltraQueri is not merely a natural-language-to-SQL assistant. FiltraQueri is an analytical-answer system.
 
 ## 2. Product Category
@@ -131,19 +135,33 @@ No downstream layer may independently reinterpret the original question.
 
 ## 8. Standing Product and Architectural Rules
 
+Doctrine-status legend:
+
+- Enforced: represented in current production contracts and gates.
+- Principle: governs current and future design.
+- Planned: requires a named future roadmap arc.
+
 ### Rule 1 - Reusable engineering
+
+Status: Enforced.
 
 Production behavior must be domain-neutral and derived from canonical contracts, field identities, types, measures, groupings, filters, relationships, readiness, and capability. No static industry branches unless explicitly approved.
 
 ### Rule 2 - Canonical plan
 
+Status: Enforced.
+
 The canonical analysis plan is the sole source of analytical meaning. SQL, visualization, explanation, export, execution, and rerun behavior derive from it.
 
 ### Rule 3 - Dialect neutrality
 
+Status: Principle, transitioning through PS-9a-i and PS-9a-ii.
+
 No SQL dialect syntax belongs in the canonical plan. Dialect-specific syntax belongs only to renderer implementations and SQL artifacts.
 
 ### Rule 4 - Rendering as a separate operation
+
+Status: Planned: PS-9a-i and PS-9a-ii.
 
 A render operation conceptually follows:
 
@@ -158,7 +176,13 @@ A SQL artifact should include:
 - capability status;
 - warnings or blockers.
 
+Current BusinessSqlQueryPlan renderer hygiene note:
+
+The current BusinessSqlQueryPlan contains renderer-related metadata from the DuckDB-first implementation. During PS-9a, dialect targeting must move out of canonical plan semantics, rendered SQL must move into SqlArtifact, and renderer status and warnings must belong to rendering results. Compatibility wrappers may preserve existing callers temporarily. The migration must not change analytical meaning or DuckDB SQL output. This document does not prescribe a final TypeScript field layout.
+
 ### Rule 5 - Execution and preview separation
+
+Status: Principle and Planned: PS-9a-ii and PS-Exec.
 
 Preview/export dialect is user-selectable.
 
@@ -174,6 +198,8 @@ Run target: DuckDB
 
 ### Rule 6 - Honest readiness and capability
 
+Status: Enforced.
+
 The system must distinguish:
 
 - ready;
@@ -185,6 +211,8 @@ Unsupported, ambiguous, or incomplete analyses must fail closed.
 No partial query, partial result, valid-subset fallback, or filter-free fallback may silently replace the requested analysis.
 
 ### Rule 7 - Visualization grounding
+
+Status: Planned: VisualizationPlan.
 
 Visualization decisions require:
 
@@ -198,6 +226,8 @@ Visualization decisions require:
 Chart choice must not be derived from column names or plan structure alone.
 
 ### Rule 8 - Explanation grounding
+
+Status: Planned: InsightFact and narrative arc.
 
 Narratives may verbalize only deterministic validated InsightFacts.
 
@@ -217,6 +247,8 @@ Reject narratives that:
 - ignore material warnings.
 
 ### Rule 9 - Reproducibility
+
+Status: Planned: AnalysisArtifact.
 
 Every durable analysis preserves sufficient information to identify why a rerun changed.
 
@@ -242,6 +274,8 @@ Include:
 
 ### Rule 10 - Honest rerun classification
 
+Status: Planned: RerunComparison.
+
 FiltraQueri should distinguish:
 
 - analytical definition changed;
@@ -256,6 +290,8 @@ Use language such as:
 > The analytical definition remained unchanged, while the returned data and result changed.
 
 ### Rule 11 - Guided decomposition
+
+Status: Principle and Planned: InvestigationPlan.
 
 Broad questions produce grounded investigation proposals based only on available:
 
@@ -276,6 +312,8 @@ Do not invent useful-sounding analytical paths unsupported by the data.
 
 ### Rule 12 - Human review
 
+Status: Principle and Planned: ReviewCheckpoint and ReviewRecord.
+
 Human review checkpoints should be risk-based.
 
 Require review when:
@@ -291,6 +329,8 @@ Require review when:
 - publication risk is high.
 
 ### Rule 13 - Data-quality impact
+
+Status: Principle and Planned: PS-Q1 through PS-Q4.
 
 Data-quality findings must affect analytical readiness.
 
@@ -318,6 +358,8 @@ Issues may result in:
 
 ### Rule 14 - Execution governance
 
+Status: Principle and Planned: PS-Exec.
+
 Preview capability never implies permission to execute.
 
 Every execution must pass connection-bound policy checks covering:
@@ -334,6 +376,8 @@ Every execution must pass connection-bound policy checks covering:
 - audit metadata.
 
 ### Rule 15 - Tool-independent workflows
+
+Status: Principle and Planned: ReusableAnalysisWorkflow.
 
 Reusable analytical work must not be stored only as:
 
@@ -361,6 +405,8 @@ Reusable workflows should preserve:
 FiltraQueri previously had an Investigation tab. It was renamed to Explore to reduce interface heaviness and broaden the experience. Investigative capability was not abandoned. Explore remains the user-facing workspace. InvestigationPlan is the internal tool-independent contract for multi-step analysis.
 
 > Explore is the user-facing workspace for discovery, quick answers, guided analysis, and investigation. InvestigationPlan is the internal contract used when a question requires multiple coordinated analytical steps. The previous Investigation tab was renamed to Explore to reduce interface complexity; investigative capability remains a core product behavior rather than a separate top-level mode.
+
+Investigation remains available as a contextual workflow label within Explore. It does not return as a top-level navigation tab. Quick answers should not be forced through investigation language.
 
 Three depths inside Explore:
 
@@ -414,6 +460,15 @@ DataQualityAssessment captures:
 - remediation recommendation;
 - readiness impact.
 
+DataQualityAssessment should be divided conceptually into:
+
+- PS-Q1 - Structural quality: required fields, types, schema presence, key structure, and relationship availability.
+- PS-Q2 - Semantic quality: metric compatibility, units, currency, grain, target conflicts, and relationship meaning.
+- PS-Q3 - Statistical quality: null rates, uniqueness, cardinality, sparse categories, outliers, and insufficient sample size.
+- PS-Q4 - Execution-result quality: zero-row results, truncation, distribution shift, incomplete periods, and unexpected result shape.
+
+Structural quality may begin before ExecutedResult. Execution-result quality depends on ExecutedResult. Visualization consumes quality findings. InvestigationPlan consumes quality findings. Quality issues map to ready, ready with warnings, or blocked. Not every quality check must ship before initial visualization.
+
 ReviewCheckpoint captures:
 
 - checkpoint kind;
@@ -425,6 +480,8 @@ ReviewCheckpoint captures:
 - reviewer;
 - decision;
 - timestamp.
+
+Reviewer roles are workspace-configurable. Review risk should use a conceptual scale of low, medium, high, and blocking. Exact triggers belong in later contracts and policies. Review decisions attach through ReviewRecord rather than becoming canonical plan semantics.
 
 ReusableAnalysisWorkflow captures:
 
@@ -465,12 +522,17 @@ A future metric definition should include:
 - aggregation;
 - required filters and exclusions;
 - expected grain;
-- default time field;
+- additivity: additive, semi-additive, or non-additive;
+- unit or currency;
+- default time dimension;
 - compatible groupings;
 - owner;
-- approval status;
+- lifecycle state: draft, approved, deprecated, or archived;
 - version;
 - created and modified timestamps;
+- dependency lineage for derived metrics;
+- migration or replacement metadata;
+- external semantic-layer source when imported;
 - semantic fingerprint.
 
 Example:
@@ -486,6 +548,8 @@ Status: approved
 ```
 
 Metric changes create new versions.
+
+Metric versions are immutable once used by a durable analysis.
 
 Old analyses retain the metric version originally used.
 
@@ -512,6 +576,12 @@ Execution always uses the artifact generated for the connected engine.
 
 Preview may display another dialect.
 
+PostgreSQL is the second dialect because it is a lower-risk proof of the renderer abstraction, has meaningful syntax differences without Oracle's full complexity, and allows the interface to be tested before the more distinctive Oracle adapter. Oracle remains an explicit architecture stress test later.
+
+Risk: DuckDB and PostgreSQL are relatively similar, so PS-9c Oracle must include an abstraction-sufficiency audit and may require interface refinement.
+
+PostgreSQL rendering may ship before real PostgreSQL execution. Real production-database execution requires PS-Exec.
+
 ## 14. Executed Result and Analysis Artifact
 
 A future ExecutedResult conceptually contains:
@@ -530,23 +600,85 @@ A future ExecutedResult conceptually contains:
 - execution statistics;
 - result fingerprint.
 
-A future AnalysisArtifact conceptually contains:
+Stable or reproducibility-relevant ExecutedResult references may include:
+
+- plan identity;
+- SQL artifact identity;
+- result schema;
+- result fingerprint;
+- engine or FiltraQueri version;
+- renderer configuration identity.
+
+Runtime metadata may include:
+
+- execution ID;
+- timestamps;
+- runtime statistics;
+- transient warnings;
+- authenticated principal;
+- connection instance.
+
+Two executions may represent the same analysis while having different runtime metadata.
+
+VisualizationPlan requires ExecutedResult or an equivalent dialect-neutral result contract.
+
+AnalysisArtifact is the durable envelope that references versionable sub-artifacts. It should be introduced incrementally rather than requiring every component to exist immediately.
+
+Conceptual decomposition:
+
+AnalysisDefinition:
 
 - original question;
 - canonical plan;
-- plan fingerprint;
 - metric versions;
-- schema fingerprint;
-- relationship fingerprint;
-- SQL artifacts;
-- execution metadata;
-- ExecutedResult;
+- semantic fingerprint.
+
+SqlArtifact:
+
+- dialect;
+- SQL;
+- renderer version;
+- rendering warnings.
+
+ExecutionRecord:
+
+- execution context;
+- timestamps;
+- policy outcome;
+- runtime statistics.
+
+ResultArtifact:
+
+- result schema;
+- typed rows or governed external reference;
+- truncation;
+- result fingerprint.
+
+VisualizationArtifact:
+
 - VisualizationPlan;
-- InsightFacts;
-- narrative;
-- review decisions;
-- lineage;
-- rerun history.
+- selected visualization;
+- override history.
+
+InsightArtifact:
+
+- validated InsightFacts;
+- deterministic or constrained narrative.
+
+ReviewRecord:
+
+- checkpoints;
+- decisions;
+- reviewer;
+- timestamps.
+
+RerunComparison:
+
+- semantic;
+- definition;
+- structure;
+- result;
+- classification.
 
 This, not the SQL string, is the durable unit of analytical work.
 
@@ -570,6 +702,23 @@ Require:
 - explainable recommendation reason;
 - safe user override;
 - no unsupported chart guessing.
+
+Minimum first VisualizationPlan slice after ExecutedResult:
+
+- stat card: no grouping plus one scalar result;
+- bar chart: one categorical grouping plus one measure plus safe category count;
+- line chart: one ordered date grouping plus one measure plus acceptable period continuity;
+- table: deterministic fallback when no safe visual recommendation exists.
+
+Example safety gates:
+
+- excessive category count;
+- irregular time gaps;
+- truncated result;
+- insufficient rows;
+- incompatible result shape.
+
+Visualization can proceed in parallel with incremental AnalysisArtifact work once ExecutedResult exists. This direction does not promise every chart type.
 
 ## 16. Explanation Direction
 
@@ -596,6 +745,30 @@ shareOfTotal: 31.4
 ```
 
 The narrative layer may verbalize validated facts only.
+
+The first explanation sequence is:
+
+InsightFact computation -> deterministic narrative templates -> validation -> optional constrained LLM narrative later.
+
+The first explanation version must not require an LLM.
+
+Initial deterministic InsightFact families:
+
+- top category;
+- bottom category;
+- share of total;
+- rank;
+- missing-data warning;
+- insufficient-data warning.
+
+Future LLM safeguards:
+
+- every numerical claim must map to a validated fact;
+- causal wording must be rejected unless supported by an explicitly validated causal-analysis fact type;
+- unsupported categories and comparisons reject the narrative;
+- deterministic template output remains the safe fallback.
+
+This direction does not prescribe a brittle implementation such as a simple word blocklist as the final architecture.
 
 No raw result-row hallucination.
 
@@ -635,6 +808,19 @@ Conclusion:
 
 > FiltraQueri cannot safely determine why the result changed.
 
+Reproducibility safeguards:
+
+- fingerprints must be versioned;
+- the FiltraQueri engine version should be recorded;
+- metric dependency changes must propagate into derived metric fingerprints;
+- timestamps and reviewer identities must not enter semantic fingerprints;
+- full result rows should not be stored by default;
+- governed row persistence must follow execution and privacy policy;
+- result fingerprints must not become a covert channel for sensitive data;
+- where exact source snapshots are unavailable, comparison may be unclassifiable.
+
+Fingerprint design must balance determinism, comparison usefulness, privacy, storage, and cross-environment safety. This document does not prescribe one final result-fingerprint algorithm.
+
 ## 18. User Experience Principles
 
 Principles:
@@ -654,61 +840,149 @@ Principles:
 
 ## 19. Roadmap
 
+The roadmap is capability-driven rather than date-driven.
+
 Current completion:
 
 PS-8c -> explicit natural-language multi-filter AND grounding -> committed and pushed as `fe8c321`.
 
-Next:
+### Phase 0 - Direction and documentation hygiene
 
-Documentation -> authoritative product direction -> read-only documentation inventory -> document classification and cleanup.
+- authoritative strategy;
+- documentation inventory;
+- classification;
+- contradiction resolution;
+- document index.
 
-Dialect foundation:
+### Phase 1 - Dialect-neutral rendering foundation
 
-PS-9a -> dialect-neutral renderer registry -> RenderRequest -> SqlArtifact -> DuckDB implementation -> preview/execution separation -> zero DuckDB regression.
+PS-9a-i - Renderer abstraction:
 
-PS-9b -> PostgreSQL renderer -> prove dialect abstraction.
+- SqlDialectId;
+- SqlDialectRenderer interface or registry;
+- SqlArtifact contract;
+- renderer-version identity;
+- DuckDB adapter;
+- compatibility wrapper for existing calls;
+- zero byte-level DuckDB regression.
 
-Semantic governance:
+PS-9a-ii - Rendering context and preview/execution separation:
 
-PS-M1 -> metric-definition contract.
+- RenderRequest;
+- dialect capability reporting;
+- preview/export dialect selection;
+- connection-bound execution dialect;
+- execution-artifact selection;
+- explicit Previewing versus Run target UX contract;
+- no second dialect yet.
 
-PS-M2 -> validation and compatibility.
+PS-9b - PostgreSQL renderer:
 
-PS-M3 -> deterministic identity and versioning.
+- prove rendering portability;
+- preserve PostgreSQL as the second dialect;
+- do not imply real PostgreSQL execution before PS-Exec.
 
-PS-M4 -> registry resolution and approval state.
+PS-Exec - Execution policy and governed connection contract:
 
-PS-M5 -> canonical plan integration and metric fingerprints.
+- ExecutionConnection identity;
+- authentication context;
+- authorization and allowed schemas/tables;
+- read-only enforcement;
+- row-level security context;
+- PII restrictions;
+- timeout;
+- row and resource limits;
+- cancellation;
+- query audit record;
+- execution-policy readiness and blockers.
 
-Result and reproducibility foundation:
+PS-Exec must precede execution against real PostgreSQL, Oracle, or other production connections. Preview capability does not grant execution permission. No real connected-database execution should bypass PS-Exec.
 
-ExecutedResult contract -> result schema -> typed rows -> result profiling -> execution metadata -> result fingerprints.
+Parallel date-foundation slices:
 
-AnalysisArtifact -> semantic fingerprints -> schema fingerprints -> relationship fingerprints -> metric fingerprints -> execution lineage -> rerun history.
+- PS-8d - relative-date policy and canonical contract: anchor-date policy, timezone policy, resolved date-window identity, deterministic boundaries, and reproducibility metadata before grounding/rendering slices. This does not immediately promise full natural-language execution.
+- PS-8e - inclusive single-date operators such as `on_or_before` and `on_or_after`; exact naming and compatibility are subject to contract audit.
 
-User-visible answer path:
+OR/NOT expression trees do not belong in PS-8d or PS-8e.
 
-VisualizationPlan -> readiness -> capability -> safe chart recommendation -> user override.
+Completion gate:
 
-PS-9c -> Oracle renderer.
+- DuckDB byte-exact regression;
+- PostgreSQL byte-exact renderer coverage;
+- execution remains governed and cannot bypass PS-Exec.
 
-Rerun comparison -> semantic diff -> metric-definition diff -> schema/relationship diff -> result diff -> honest classified explanation.
+### Phase 2 - Executed-answer foundation
 
-InsightFact -> deterministic fact computation -> constrained narrative generation -> factual validation.
+- ExecutedResult;
+- result profiling;
+- PS-Q1 structural quality;
+- PS-Q4 initial execution-result quality;
+- minimum VisualizationPlan;
+- initial user-visible chart path.
 
-Guided intelligence:
+Completion gate:
 
-InvestigationPlan -> supported paths -> unavailable-data gaps -> analyst approval -> coordinated execution -> combined findings.
+- question;
+- plan;
+- SQL;
+- governed DuckDB execution;
+- dialect-neutral result;
+- safe visual or table;
+- visible warnings.
 
-Data-quality and review:
+### Phase 3 - Governed metrics
 
-DataQualityAssessment -> analytical impact.
+- PS-M1 - metric-definition contract;
+- PS-M2 - validation and compatibility;
+- PS-M3 - deterministic identity and versioning;
+- PS-M4 - registry resolution and approval state;
+- PS-M5 - canonical plan integration and metric fingerprints;
+- PS-Q2 semantic quality.
 
-ReviewCheckpoint -> risk-based human confirmation.
+Completion gate:
 
-ReusableAnalysisWorkflow -> portable, governed, repeatable analytical processes.
+- approved versioned metric definitions;
+- deterministic metric fingerprints;
+- plan integration;
+- portability across DuckDB and PostgreSQL rendering.
 
-Continued SQL depth:
+### Phase 4 - Durable analytical artifacts
+
+- incremental AnalysisArtifact;
+- AnalysisDefinition;
+- ExecutionRecord;
+- ResultArtifact;
+- VisualizationArtifact;
+- InsightFact;
+- deterministic narrative;
+- rerun comparison.
+
+Completion gate:
+
+- saved analysis roundtrip;
+- rerun comparison produces one honest classification;
+- narrative contains only validated facts.
+
+### Phase 5 - Guided intelligence and enterprise workflows
+
+- InvestigationPlan;
+- PS-Q3 statistical quality;
+- ReviewCheckpoint and ReviewRecord;
+- ReusableAnalysisWorkflow;
+- PS-9c Oracle;
+- optional constrained LLM narrative;
+- governed publication through Reports;
+- reusable patterns through Templates.
+
+Completion gate:
+
+- analyst can approve grounded investigation paths;
+- unavailable-data gaps are explicit;
+- execution is policy-governed;
+- results can be reviewed and published;
+- Oracle validates dialect abstraction.
+
+### Phase 6+ - SQL depth driven by observed need
 
 - relative dates;
 - inclusive date operators;
@@ -719,6 +993,34 @@ Continued SQL depth:
 - filtered aggregates;
 - datetime/timezone semantics;
 - additional dialects.
+
+### Templates and Reports Direction
+
+Browse Templates should evolve toward canonical reusable analytical patterns, optional metric requirements, relationship requirements, readiness checks, and later ReusableAnalysisWorkflow backing. Permanent templates remain immutable. User adaptation creates a session or saved instance.
+
+Browse Reports should evolve toward published governed AnalysisArtifacts with stored plan and metric versions, execution lineage, visualization, validated findings, rerun state, and publication and review metadata.
+
+This document does not implement or redesign these surfaces.
+
+### Release Milestones
+
+M1 - Dialect-neutral SQL foundation: same canonical plan, byte-identical DuckDB, architecture ready for more dialects.
+
+M2 - Two-dialect proof: same plan renders to DuckDB and PostgreSQL.
+
+M3 - Executed-answer foundation: users can ask, execute safely, inspect results, and receive a safe chart or table.
+
+M4 - Governed metrics: definitions are stable, versioned, and reusable.
+
+M5 - Durable analysis artifact: analyses can be saved, shared, and reopened with lineage.
+
+M6 - Rerun comparison: FiltraQueri can explain whether definition, structure, result, or comparability changed.
+
+M7 - Guided investigation: broad questions become grounded analyst-approved investigation paths.
+
+M8 - Enterprise governed workflow: execution, review, publication, templates, and reusable workflows operate under policy.
+
+No release dates are implied.
 
 ## 20. Explicit Non-Goals for the Direction Document
 
@@ -734,6 +1036,8 @@ This document does not:
 - authorize deleting older documents before inventory;
 - change production behavior by itself.
 
+The customer-facing statements in this document describe the intended end-state product. They must not be used as claims of currently shipped functionality until the supporting arcs exist, including governed execution, ExecutedResult, visualization, validated explanation, durable artifacts, and rerun comparison. The statements remain product direction.
+
 ## 21. Document Governance
 
 Changes to this document require explicit product-direction approval.
@@ -745,6 +1049,16 @@ Architecture changes that conflict with this doctrine require a recorded decisio
 Older documents may remain for historical context but must not silently override this document.
 
 Documentation inventory will determine which files are authoritative, supporting, historical, superseded, duplicate, temporary, or need revision.
+
+Every future PS, UX, metric, execution, visualization, explanation, artifact, or workflow audit must include this question:
+
+Does this change conflict with `FILTRAQUERI_PRODUCT_DIRECTION.md`?
+
+If yes:
+
+- the conflict must be resolved;
+- an explicit architectural decision must be recorded;
+- this strategy document must be updated only with approved product-direction changes.
 
 ## 22. Final Summary
 
