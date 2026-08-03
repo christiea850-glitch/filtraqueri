@@ -17,6 +17,7 @@ import {
   isCanonicalBusinessSqlDateRangeValue,
   isCanonicalBusinessSqlDateValue,
   normalizeMetricAndMeasures,
+  resolveBusinessSqlFilterCombinator,
 } from "./businessSqlQueryPlan";
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
 import { evaluateBusinessSqlFilterCompatibility } from "./businessSqlFilterCompatibility";
@@ -460,13 +461,14 @@ const joinedTablesForRendering = (
   return tables;
 };
 
-const renderWhere = (
+const isBusinessSqlFilterRecord = (filter: unknown): filter is BusinessSqlFilter =>
+  Boolean(filter && typeof filter === "object" && !Array.isArray(filter));
+
+const renderBusinessSqlFilterExpression = (
   integrated: BusinessSqlQueryPlanJoinResolution,
-  filters: readonly BusinessSqlFilter[],
+  filter: unknown,
 ): string | null => {
-  if (filters.length === 0) return null;
-  if (filters.length > 1) return null;
-  const filter = filters[0];
+  if (!isBusinessSqlFilterRecord(filter)) return null;
   if (filter.target?.kind !== "field") return null;
   if (!evaluateBusinessSqlFilterCompatibility({ filter }).compatible) return null;
   const target = filter.target;
@@ -475,35 +477,48 @@ const renderWhere = (
   if (!joinedTables || !joinedTables.has(target.table)) return null;
 
   const fieldExpression = qualified(target.table, target.field);
-  if (filter.operator === "is_null") return `WHERE ${fieldExpression} IS NULL`;
-  if (filter.operator === "is_not_null") return `WHERE ${fieldExpression} IS NOT NULL`;
+  if (filter.operator === "is_null") return `${fieldExpression} IS NULL`;
+  if (filter.operator === "is_not_null") return `${fieldExpression} IS NOT NULL`;
   if (!filter.comparisonValue) return null;
   if (filter.operator === "between") {
     const literal = filter.comparisonValue.kind === "range" && filter.comparisonValue.valueKind === "date"
       ? renderSqlDateRangeLiteral(filter.comparisonValue)
       : renderSqlRangeLiteral(filter.comparisonValue);
     if (!literal) return null;
-    return `WHERE ${fieldExpression} BETWEEN ${literal.lower} AND ${literal.upper}`;
+    return `${fieldExpression} BETWEEN ${literal.lower} AND ${literal.upper}`;
   }
   if (filter.comparisonValue.kind === "range") return null;
   if (filter.operator === "before" || filter.operator === "after") {
     const literal = renderSqlDateLiteral(filter.comparisonValue);
     if (!literal) return null;
-    return `WHERE ${fieldExpression} ${filter.operator === "before" ? "<" : ">"} ${literal}`;
+    return `${fieldExpression} ${filter.operator === "before" ? "<" : ">"} ${literal}`;
   }
   if (filter.comparisonValue.kind === "date") return null;
   if (filter.operator === "in" || filter.operator === "not_in") {
     const literal = renderSqlSetLiteral(filter.comparisonValue);
     if (!literal) return null;
-    return `WHERE ${fieldExpression} ${filter.operator === "in" ? "IN" : "NOT IN"} ${literal}`;
+    return `${fieldExpression} ${filter.operator === "in" ? "IN" : "NOT IN"} ${literal}`;
   }
   const literal = renderSqlLiteral(filter.comparisonValue);
   if (!literal) return null;
-  if (filter.operator === "contains") return `WHERE contains(${fieldExpression}, ${literal})`;
-  if (filter.operator === "starts_with") return `WHERE starts_with(${fieldExpression}, ${literal})`;
-  if (filter.operator === "ends_with") return `WHERE ends_with(${fieldExpression}, ${literal})`;
+  if (filter.operator === "contains") return `contains(${fieldExpression}, ${literal})`;
+  if (filter.operator === "starts_with") return `starts_with(${fieldExpression}, ${literal})`;
+  if (filter.operator === "ends_with") return `ends_with(${fieldExpression}, ${literal})`;
   const operator = filter.operator ? rowFilterComparisonOperatorSql[filter.operator] : null;
-  return operator ? `WHERE ${fieldExpression} ${operator} ${literal}` : null;
+  return operator ? `${fieldExpression} ${operator} ${literal}` : null;
+};
+
+const renderWhere = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+  filters: readonly unknown[],
+): string | null => {
+  if (filters.length === 0) return null;
+  if (resolveBusinessSqlFilterCombinator(integrated.plan) !== "and") return null;
+  const expressions = filters.map((filter) =>
+    renderBusinessSqlFilterExpression(integrated, filter),
+  );
+  if (expressions.some((expression) => expression === null)) return null;
+  return `WHERE ${expressions.join("\n  AND ")}`;
 };
 
 const renderHaving = (

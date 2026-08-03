@@ -292,6 +292,11 @@ const fixtures = [
     exportName: "runBusinessSqlMultiFilterContractFixtures",
   },
   {
+    label: "Business SQL multi-filter rendering",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlMultiFilterRendering.test.ts",
+    exportName: "runBusinessSqlMultiFilterRenderingFixtures",
+  },
+  {
     label: "Explicit row-filter grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitRowFilterGrounding.test.ts",
     exportName: "runExplicitRowFilterGroundingFixtures",

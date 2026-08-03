@@ -556,7 +556,7 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "multiple filters are renderer-incapable without assuming logical composition",
+    name: "multiple filters render deterministic AND composition",
     assert: () => {
       const plan = planWithFilters([
         filterFor(),
@@ -565,10 +565,13 @@ const fixtures: Fixture[] = [
       const capability = evaluateBusinessSqlRendererCapability(plan);
       const rendered = renderBusinessSqlQueryPlan(plan);
       return [
-        ...(capability.reasonCodes.includes("multiple_row_filters_not_supported")
+        ...(capability.capable
           ? []
-          : ["Expected multiple-row-filter renderer reason."]),
-        ...(!rendered.rendered && rendered.sql === null ? [] : ["Multiple filters must produce no SQL."]),
+          : ["Expected multiple-row-filter AND renderer capability."]),
+        ...(rendered.rendered &&
+        rendered.sql?.includes(`WHERE "operations"."status" = 'active'\n  AND "operations"."priority" <> 'low'`)
+          ? []
+          : ["Multiple filters must render authored AND SQL."]),
       ];
     },
   },

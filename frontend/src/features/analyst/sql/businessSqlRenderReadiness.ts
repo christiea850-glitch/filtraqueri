@@ -50,7 +50,7 @@ export function evaluateBusinessSqlRenderReadiness(
   const reasons: string[] = [];
   const warnings: string[] = [];
   const fieldProjectionOnly =
-    (normalizedPlan.filters || []).length === 1 &&
+    (normalizedPlan.filters || []).length >= 1 &&
     normalizedPlan.measures.length === 0 &&
     normalizedPlan.derivedMeasures.length === 0 &&
     normalizedPlan.aggregateResultConditions.length === 0 &&
@@ -261,7 +261,6 @@ export function evaluateBusinessSqlRenderReadiness(
     derivedMeasureReasonCodes.length > 0 ||
     filterReasonCodes.length > 0 ||
     plan.joinPath.status === "missing" ||
-    rendererCapability.reasonCodes.includes("multiple_row_filters_not_supported") ||
     plan.renderer.status === "blocked" ||
     plan.warnings.some((warning) => warning.severity === "blocking");
   const status: BusinessSqlRenderReadinessStatus =

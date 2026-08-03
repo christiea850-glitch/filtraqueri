@@ -14,6 +14,9 @@ export type BusinessSqlFilterGroupContractReason =
 
 const NULLARY_OPERATORS = new Set(["is_null", "is_not_null"]);
 
+const isBusinessSqlFilterRecord = (filter: unknown): filter is BusinessSqlFilter =>
+  Boolean(filter && typeof filter === "object" && !Array.isArray(filter));
+
 const hasCanonicalFieldTarget = (filter: BusinessSqlFilter): boolean =>
   filter.target?.kind === "field";
 
@@ -37,6 +40,10 @@ export const evaluateBusinessSqlFilterGroupContract = (
   const multiFilterGroup = filters.length >= 2;
 
   for (const filter of filters) {
+    if (!isBusinessSqlFilterRecord(filter)) {
+      reasonCodes.push("row_filter_target_invalid");
+      continue;
+    }
     if (multiFilterGroup && !hasCanonicalFieldTarget(filter)) {
       reasonCodes.push("row_filter_target_invalid");
     }

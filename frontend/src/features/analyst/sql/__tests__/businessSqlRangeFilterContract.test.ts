@@ -396,7 +396,7 @@ const fixtures: Fixture[] = [
     return capability.capable && !(capability.reasonCodes as readonly string[]).includes("row_filter_range_rendering_not_supported") ? [] : ["Expected range renderer capability."];
   } },
   { name: "invalid range is structurally blocked", assert: () => readinessFor(basePlan(filterFor({ comparisonValue: rangeValue(10, 1) }))).status === "blocked" ? [] : ["Expected invalid range blocked."] },
-  { name: "multiple filters remain incapable", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected multiple filter refusal."] },
+  { name: "multiple filters become capable", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).capable ? [] : ["Expected multiple filter capability."] },
   { name: "renderer emits deterministic BETWEEN SQL", assert: () => {
     const result = renderBusinessSqlQueryPlan(fieldProjectionPlan(validRangeFilter()));
     return result.sql === expectedRangeSql && result.rendered ? [] : ["Expected exact BETWEEN SQL."];
@@ -536,7 +536,7 @@ const fixtures: Fixture[] = [
     const legacyPlan = basePlan(null, { filters: [{ kind: "custom", table: "orders", field: "order_amount", value: "100 to 500", label: "Legacy text" }] });
     return evaluateBusinessSqlRendererCapability(legacyPlan).reasonCodes.includes("row_filter_legacy_semantics_not_renderable") ? [] : ["Expected legacy reason."]; 
   } },
-  { name: "multiple-filter reason remains unchanged", assert: () => evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected multiple filter reason."] },
+  { name: "multiple-filter AND capability has no unsupported reason", assert: () => !evaluateBusinessSqlRendererCapability(basePlan(validRangeFilter(), { filters: [validRangeFilter(), filterFor({ field: "discount" })] })).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected no multiple filter reason."] },
   { name: "canonical target-conflict reason remains unchanged", assert: () => compatibilityFor({ ...validRangeFilter(), field: "discount" }).reasonCodes.includes("row_filter_target_conflict") ? [] : ["Expected target conflict reason."] },
   { name: "removed set-rendering reason is absent from active vocabulary", assert: () => {
     const capability = evaluateBusinessSqlRendererCapability(basePlan(filterFor({ field: "status", fieldInferredType: "categorical", operator: "in", comparisonValue: setValue("string", ["active"]) })));

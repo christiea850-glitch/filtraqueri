@@ -436,9 +436,10 @@ const fixtures: Fixture[] = [
       ? []
       : ["Expected natural-language date legacy reason."];
   } },
-  { name: "multiple date filters remain unsupported", assert: () => {
+  { name: "multiple date filters become capable",
+  assert: () => {
     const capability = evaluateBusinessSqlRendererCapability(basePlan(null, { filters: [filterFor(), filterFor({ operator: "after" })] }));
-    return capability.reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected multiple-filter reason."];
+    return capability.capable ? [] : ["Expected multiple-filter capability."];
   } },
   { name: "identical date filters share filterId", assert: () => filterFor({ comparisonValue: dateValue("2026-01-01") }).filterId === filterFor({ comparisonValue: dateValue("2026-01-01") }).filterId ? [] : ["Expected stable date ID."] },
   { name: "changing date changes filterId", assert: () => filterFor({ comparisonValue: dateValue("2026-01-01") }).filterId !== filterFor({ comparisonValue: dateValue("2026-01-02") }).filterId ? [] : ["Expected date ID change."] },

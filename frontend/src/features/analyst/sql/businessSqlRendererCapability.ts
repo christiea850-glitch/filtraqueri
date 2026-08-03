@@ -1,6 +1,7 @@
 import {
   getBusinessSqlAggregateResultConditionTarget,
   normalizeMetricAndMeasures,
+  resolveBusinessSqlFilterCombinator,
   type BusinessSqlFilter,
   type BusinessSqlQueryPlan,
 } from "./businessSqlQueryPlan";
@@ -41,7 +42,11 @@ const RENDERABLE_DERIVED_MEASURE_OPERATORS = new Set([
 const hasRenderableAlias = (value: string | undefined): value is string =>
   Boolean(value && value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value));
 
-const isCanonicalRenderableFilter = (filter: BusinessSqlFilter): boolean =>
+const isBusinessSqlFilterRecord = (filter: unknown): filter is BusinessSqlFilter =>
+  Boolean(filter && typeof filter === "object" && !Array.isArray(filter));
+
+const isCanonicalRenderableFilter = (filter: unknown): boolean =>
+  isBusinessSqlFilterRecord(filter) &&
   filter.target?.kind === "field" &&
   Boolean(filter.operator) &&
   (filter.operator === "is_null" ||
@@ -57,7 +62,7 @@ export function evaluateBusinessSqlRendererCapability(
   const derivedMeasures = normalized.derivedMeasures || [];
   const rowFilterCount = (normalized.filters || []).length;
   const fieldProjectionOnly =
-    rowFilterCount === 1 &&
+    rowFilterCount >= 1 &&
     normalized.measures.length === 0 &&
     derivedMeasures.length === 0 &&
     normalized.aggregateResultConditions.length === 0 &&
@@ -105,16 +110,17 @@ export function evaluateBusinessSqlRendererCapability(
     reasonCodes.push("aggregate_condition_multiple_not_supported");
   }
 
-  if (rowFilterCount > 1) {
+  if (rowFilterCount > 0 && resolveBusinessSqlFilterCombinator(normalized) !== "and") {
     reasonCodes.push("multiple_row_filters_not_supported");
-  } else if (rowFilterCount === 1) {
-    const filter = normalized.filters[0];
-    if (!isCanonicalRenderableFilter(filter)) {
-      reasonCodes.push(
-        filter.target?.kind === "field"
-          ? "row_filter_rendering_not_supported"
-          : "row_filter_legacy_semantics_not_renderable",
-      );
+  } else {
+    for (const filter of normalized.filters || []) {
+      if (!isCanonicalRenderableFilter(filter)) {
+        reasonCodes.push(
+          isBusinessSqlFilterRecord(filter) && filter.target?.kind === "field"
+            ? "row_filter_rendering_not_supported"
+            : "row_filter_legacy_semantics_not_renderable",
+        );
+      }
     }
   }
 

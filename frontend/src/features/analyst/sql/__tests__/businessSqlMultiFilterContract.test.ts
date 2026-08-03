@@ -255,12 +255,12 @@ const structurallyBlockedWith = (plan: BusinessSqlQueryPlan, reason: string): st
     : [`Expected structural blocker ${reason}, got ${result.summary}.`];
 };
 
-const rendererIncapable = (plan: BusinessSqlQueryPlan): string[] => {
+const rendererCapable = (plan: BusinessSqlQueryPlan): string[] => {
   const capability = evaluateBusinessSqlRendererCapability(plan);
-  return capability.status === "incapable" &&
-    capability.reasonCodes.includes("multiple_row_filters_not_supported")
+  return capability.status === "capable" &&
+    capability.reasonCodes.length === 0
     ? []
-    : [`Expected multiple-filter renderer incapability, got ${capability.reasonCodes.join(",")}.`];
+    : [`Expected multiple-filter renderer capability, got ${capability.reasonCodes.join(",")}.`];
 };
 
 const rendersNoSql = (plan: BusinessSqlQueryPlan): string[] => {
@@ -273,14 +273,24 @@ const rendersNoSql = (plan: BusinessSqlQueryPlan): string[] => {
     : ["Expected renderer bypass to produce no SQL, insert, or run."];
 };
 
-const previewNoActions = (plan: BusinessSqlQueryPlan): string[] => {
+const rendersSql = (plan: BusinessSqlQueryPlan): string[] => {
+  const rendered = renderBusinessSqlQueryPlan(plan);
+  return rendered.rendered &&
+    rendered.sql !== null &&
+    rendered.inserted === false &&
+    rendered.ranQuery === false
+    ? []
+    : ["Expected renderer to produce complete SQL without insert or run."];
+};
+
+const previewCopyOnly = (plan: BusinessSqlQueryPlan): string[] => {
   const preview = createBusinessSqlRenderPreview(plan);
-  return preview.sql === null &&
-    !preview.actions.canCopySql &&
+  return preview.sql !== null &&
+    preview.actions.canCopySql &&
     !preview.actions.canInsertSql &&
     !preview.actions.canRunSql
     ? []
-    : ["Expected preview to expose no SQL actions."];
+    : ["Expected preview to expose copy-only rendered SQL."];
 };
 
 const omittedCombinatorPlan = (filters: BusinessSqlFilter[]): BusinessSqlQueryPlan => {
@@ -510,37 +520,37 @@ const fixtures: Fixture[] = [
   { name: "E69 zero-filter capability remains unchanged", assert: () => evaluateBusinessSqlRendererCapability(basePlan([])).capable ? [] : ["Expected zero-filter capability."] },
   { name: "E70 one-filter capability remains unchanged", assert: () => evaluateBusinessSqlRendererCapability(basePlan([scalar()])).capable ? [] : ["Expected one-filter capability."] },
   { name: "E71 two valid filters are structurally ready", assert: () => structurallyReady(basePlan([scalar(), dateRange()])) },
-  { name: "E72 two valid filters are renderer-incapable", assert: () => rendererIncapable(basePlan([scalar(), dateRange()])) },
-  { name: "E73 reason is multiple_row_filters_not_supported", assert: () => rendererIncapable(basePlan([scalar(), dateRange()])) },
-  { name: "E74 render readiness is blocked", assert: () => {
+  { name: "E72 two valid filters are renderer-capable", assert: () => rendererCapable(basePlan([scalar(), dateRange()])) },
+  { name: "E73 valid AND omits multiple_row_filters_not_supported", assert: () => !evaluateBusinessSqlRendererCapability(basePlan([scalar(), dateRange()])).reasonCodes.includes("multiple_row_filters_not_supported") ? [] : ["Expected no multiple-filter refusal."] },
+  { name: "E74 render readiness is renderable", assert: () => {
     const result = evaluateBusinessSqlRenderReadiness(basePlan([scalar(), dateRange()]));
-    return result.status === "blocked" && result.reasons.some((reason) => reason.includes("multiple_row_filters_not_supported")) ? [] : [`Expected blocked render readiness, got ${result.status}.`];
+    return result.status === "renderable" && result.reasons.length === 0 ? [] : [`Expected renderable readiness, got ${result.status}.`];
   } },
-  { name: "E75 three valid filters remain renderer-incapable", assert: () => rendererIncapable(basePlan([scalar(), setFilter(), dateRange()])) },
-  { name: "E76 four valid filters remain renderer-incapable", assert: () => rendererIncapable(basePlan([scalar(), setFilter(), numericRange(), dateRange()])) },
+  { name: "E75 three valid filters are renderer-capable", assert: () => rendererCapable(basePlan([scalar(), setFilter(), dateRange()])) },
+  { name: "E76 four valid filters are renderer-capable", assert: () => rendererCapable(basePlan([scalar(), setFilter(), numericRange(), dateRange()])) },
   { name: "E77 invalid member preserves structural blocker", assert: () => structurallyBlockedWith(basePlan([scalar(), invalidFilters[0].filter]), invalidFilters[0].reason) },
   { name: "E78 structural blocker is not replaced by multiple-filter reason", assert: () => readiness(basePlan([scalar(), invalidFilters[0].filter])).reasonCodes.includes("multiple_row_filters_not_supported" as never) ? ["Structural readiness must not use renderer reason."] : [] },
   { name: "E79 legacy member preserves legacy reason", assert: () => structurallyBlockedWith(basePlan([scalar(), invalidFilters[10].filter]), invalidFilters[10].reason) },
   { name: "E80 unresolved joined member preserves relationship blocker", assert: () => readiness(joinedPlan([scalar(), joinedDate()], "missing"), [{ ...relationship, status: "missing" }]).reasonCodes.includes("join_resolution_blocked") ? [] : ["Expected relationship blocker."] },
 
   ...[
-    "F81 two valid filters render no SQL",
-    "F82 three valid filters render no SQL",
-    "F83 four valid filters render no SQL",
-    "F84 renderer does not choose first filter",
-    "F85 renderer does not choose last filter",
-    "F86 renderer does not omit joined filter",
+    "F81 two valid filters render complete SQL",
+    "F82 three valid filters render complete SQL",
+    "F83 four valid filters render complete SQL",
+    "F84 renderer includes first filter",
+    "F85 renderer includes last filter",
+    "F86 renderer includes joined filter when resolved",
     "F87 renderer does not emit filter-free SELECT",
-    "F88 renderer does not emit partial JOIN SQL",
-    "F89 renderer does not emit partial GROUP BY SQL",
-    "F90 renderer does not emit partial HAVING SQL",
-    "F91 renderer does not emit partial ORDER BY SQL",
-    "F92 renderer does not emit partial LIMIT SQL",
+    "F88 renderer emits complete JOIN SQL",
+    "F89 renderer emits complete GROUP BY SQL",
+    "F90 renderer emits complete HAVING SQL",
+    "F91 renderer emits complete ORDER BY SQL",
+    "F92 renderer emits complete LIMIT SQL",
     "F97 inserted is false",
     "F98 ranQuery is false",
   ].map((name) => ({
     name,
-    assert: () => rendersNoSql(basePlan([scalar(), dateRange()], {
+    assert: () => rendersSql(basePlan([scalar(), dateRange()], {
       aggregateResultConditions: [{
         conditionId: createBusinessSqlAggregateResultConditionId({
           target: { kind: "measure", measureId: amountMeasure.measureId },
@@ -554,10 +564,10 @@ const fixtures: Fixture[] = [
       rowLimit: { rowLimitId: createBusinessSqlRowLimitId({ value: 25 }), value: 25 },
     })),
   })),
-  { name: "F93 preview SQL is null", assert: () => previewNoActions(basePlan([scalar(), dateRange()])) },
-  { name: "F94 canCopySql is false", assert: () => previewNoActions(basePlan([scalar(), dateRange()])) },
-  { name: "F95 canInsertSql is false", assert: () => previewNoActions(basePlan([scalar(), dateRange()])) },
-  { name: "F96 canRunSql is false", assert: () => previewNoActions(basePlan([scalar(), dateRange()])) },
+  { name: "F93 preview SQL is present", assert: () => previewCopyOnly(basePlan([scalar(), dateRange()])) },
+  { name: "F94 canCopySql is true", assert: () => previewCopyOnly(basePlan([scalar(), dateRange()])) },
+  { name: "F95 canInsertSql is false", assert: () => previewCopyOnly(basePlan([scalar(), dateRange()])) },
+  { name: "F96 canRunSql is false", assert: () => previewCopyOnly(basePlan([scalar(), dateRange()])) },
 
   { name: "G99 resolved base plus joined filter is structurally ready", assert: () => readiness(joinedPlan([scalar(), joinedDate()]), [relationship]).status === "ready" ? [] : ["Expected resolved joined filter readiness."] },
   { name: "G100 two resolved joined filters are structurally ready", assert: () => readiness(joinedPlan([joinedDate(), joinedDate("renewal_date")]), [relationship]).status === "ready" ? [] : ["Expected two joined filters ready."] },
@@ -566,7 +576,7 @@ const fixtures: Fixture[] = [
   { name: "G103 no relationship inference", assert: () => readiness(joinedPlan([scalar(), joinedDate()]), []).status !== "ready" ? [] : ["Expected no inferred relationship."] },
   { name: "G104 joined filter identity uses canonical target", assert: () => joinedDate().filterId === createBusinessSqlFilterId(joinedDate()) ? [] : ["Expected joined target identity."] },
   { name: "G105 member order does not alter AND group identity", assert: () => groupId([scalar(), joinedDate()]) === groupId([joinedDate(), scalar()]) ? [] : ["Expected joined order-independent identity."] },
-  { name: "G106 no joined-member omission", assert: () => rendersNoSql(joinedPlan([scalar(), joinedDate()])) },
+  { name: "G106 no joined-member omission", assert: () => rendersSql(joinedPlan([scalar(), joinedDate()])) },
 
   { name: "H107 zero-filter projection SQL remains byte-identical", assert: () => renderBusinessSqlQueryPlan(basePlan([])).sql === expectedNoFilterSql ? [] : ["Expected zero-filter SQL identity."] },
   { name: "H108 zero-filter grouped SQL remains byte-identical", assert: () => renderBusinessSqlQueryPlan(basePlan([])).sql === expectedNoFilterSql ? [] : ["Expected grouped SQL identity."] },

@@ -340,12 +340,12 @@ const fixtures: Fixture[] = [
     },
   },
   {
-    name: "multiple filters remain incapable",
+    name: "multiple filters become capable",
     assert: () => {
       const plan = basePlan(filterFor(), { filters: [filterFor(), filterFor({ field: "priority" })] });
-      return evaluateBusinessSqlRendererCapability(plan).reasonCodes.includes("multiple_row_filters_not_supported")
+      return evaluateBusinessSqlRendererCapability(plan).capable
         ? []
-        : ["Expected multiple filters refusal."];
+        : ["Expected multiple filters capability."];
     },
   },
   {
