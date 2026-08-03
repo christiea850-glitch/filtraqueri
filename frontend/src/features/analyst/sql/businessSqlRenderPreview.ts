@@ -1,7 +1,13 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
 import type { BusinessSqlClarificationDecisionProvenance } from "./businessSqlPreviewProvenance";
-import { renderBusinessSqlQueryPlan } from "./businessSqlRenderer";
+import {
+  createBusinessSqlPreviewRenderRequest,
+  renderBusinessSqlQueryPlanArtifact,
+  type BusinessSqlRenderResult,
+  type BusinessSqlRendererDialectId,
+  type SqlArtifact,
+} from "./businessSqlRenderer";
 import {
   createBusinessSqlRendererPreviewUiModel,
   type BusinessSqlRendererPreviewUiModel,
@@ -14,6 +20,8 @@ export type BusinessSqlRenderPreview = {
   sql: string | null;
   planId: string;
   rendererTarget: "duckdb";
+  renderRequestId?: string;
+  sqlArtifact?: SqlArtifact;
   guidanceDialect?: SqlDialectId;
   reasons: string[];
   warnings: string[];
@@ -46,9 +54,29 @@ export function createBusinessSqlRenderPreview(
   plan: BusinessSqlQueryPlan,
   options: {
     clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
+    previewDialect?: BusinessSqlRendererDialectId;
   } = {},
 ): BusinessSqlRenderPreview {
-  const renderResult = renderBusinessSqlQueryPlan(plan);
+  const renderRequest = createBusinessSqlPreviewRenderRequest(
+    plan,
+    options.previewDialect || "duckdb",
+  );
+  const artifact = renderBusinessSqlQueryPlanArtifact(plan, renderRequest);
+  const renderResult: BusinessSqlRenderResult = {
+    status: artifact.status,
+    rendered: artifact.rendered,
+    sql: artifact.sql,
+    reasonCode: artifact.reasonCode,
+    reasons: [...artifact.reasons],
+    blockers: [...artifact.blockers],
+    warnings: [...artifact.warnings],
+    planId: artifact.planId,
+    rendererTarget: artifact.dialect,
+    executionPayload: null,
+    inserted: false,
+    ranQuery: false,
+    summary: artifact.summary,
+  };
   const rendererPreviewUiModel = createBusinessSqlRendererPreviewUiModel(renderResult);
   const status: BusinessSqlRenderPreview["status"] =
     renderResult.status === "rendered"
@@ -65,6 +93,8 @@ export function createBusinessSqlRenderPreview(
     sql,
     planId: plan.id,
     rendererTarget: "duckdb",
+    renderRequestId: renderRequest.requestId,
+    sqlArtifact: artifact,
     guidanceDialect: plan.renderer.selectedGuidanceDialect,
     reasons: [...renderResult.reasons],
     warnings: [...renderResult.warnings],

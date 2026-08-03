@@ -355,7 +355,7 @@ const createPreview = (
   rendererSummary,
 });
 
-const stablePrimitiveId = (
+export const stablePrimitiveId = (
   prefix: string,
   parts: ReadonlyArray<string | number | boolean | null | undefined>,
 ): string =>

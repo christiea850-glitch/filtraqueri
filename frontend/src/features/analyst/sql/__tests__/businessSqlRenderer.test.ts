@@ -30,8 +30,14 @@ import {
   type BusinessSqlQueryPlan,
 } from "../businessSqlQueryPlan";
 import {
+  BUSINESS_SQL_DUCKDB_RENDERER_ID,
   BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+  DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+  createBusinessSqlArtifactId,
+  createBusinessSqlExecutionRenderRequest,
+  evaluateBusinessSqlDialectRendererCapability,
   getBusinessSqlDialectRenderer,
+  renderBusinessSqlQueryPlanArtifact,
   renderBusinessSqlArtifactFromRenderability,
   renderBusinessSqlFromRenderability,
   type BusinessSqlRenderResult,
@@ -792,6 +798,9 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
       const renderer = getBusinessSqlDialectRenderer("duckdb");
       return [
         ...(renderer.dialect === "duckdb" ? [] : ["Expected DuckDB dialect identity."]),
+        ...(renderer.rendererId === BUSINESS_SQL_DUCKDB_RENDERER_ID
+          ? []
+          : ["Expected DuckDB renderer id."]),
         ...(renderer.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
           ? []
           : ["Expected stable DuckDB renderer version identity."]),
@@ -808,9 +817,16 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
       });
       return [
         ...(artifact.dialect === "duckdb" ? [] : ["Expected DuckDB SqlArtifact dialect."]),
+        ...(artifact.rendererId === BUSINESS_SQL_DUCKDB_RENDERER_ID
+          ? []
+          : ["Expected SqlArtifact renderer id."]),
         ...(artifact.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
           ? []
           : ["Expected SqlArtifact renderer version."]),
+        ...(artifact.renderPurpose === "preview" ? [] : ["Expected preview render purpose."]),
+        ...(artifact.requestId.startsWith("business-sql-render-request:")
+          ? []
+          : ["Expected deterministic render request id."]),
         ...(artifact.sql === result.sql ? [] : ["Expected SqlArtifact SQL to equal legacy renderer SQL."]),
         ...(artifact.rendered === result.rendered ? [] : ["Expected SqlArtifact rendered flag equality."]),
         ...(artifact.status === result.status ? [] : ["Expected SqlArtifact status equality."]),
@@ -867,6 +883,118 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
       deterministicArtifactFirst.rendererVersion === deterministicArtifactSecond.rendererVersion
         ? []
         : ["Expected deterministic SqlArtifact identity."],
+  },
+  {
+    name: "renderer version participates in SqlArtifact identity",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const changedVersionId = createBusinessSqlArtifactId({
+        planId: deterministicArtifactFirst.planId,
+        dialect: deterministicArtifactFirst.dialect,
+        rendererId: deterministicArtifactFirst.rendererId,
+        rendererVersion: `${deterministicArtifactFirst.rendererVersion}:changed`,
+        renderPurpose: deterministicArtifactFirst.renderPurpose,
+        rendererConfigurationId: deterministicArtifactFirst.rendererConfigurationId,
+        sql: deterministicArtifactFirst.sql,
+        reasonCode: deterministicArtifactFirst.reasonCode,
+      });
+      return changedVersionId !== deterministicArtifactFirst.artifactId
+        ? []
+        : ["Expected renderer version changes to change artifact identity."];
+    },
+  },
+  {
+    name: "DuckDB renderer capability is reported per requested dialect",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const capability = evaluateBusinessSqlDialectRendererCapability({
+        integrated: ordersPerCustomer,
+        renderability: renderabilityFor(ordersPerCustomer),
+      });
+      return [
+        ...(capability.dialect === "duckdb" ? [] : ["Expected DuckDB capability dialect."]),
+        ...(capability.rendererId === BUSINESS_SQL_DUCKDB_RENDERER_ID
+          ? []
+          : ["Expected capability renderer id."]),
+        ...(capability.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
+          ? []
+          : ["Expected capability renderer version."]),
+        ...(capability.capable && capability.status === "capable"
+          ? []
+          : ["Expected capable DuckDB renderer report."]),
+        ...(capability.metadataOnly ? [] : ["Capability report must be metadata only."]),
+      ];
+    },
+  },
+  {
+    name: "preview and execution render requests are distinct without granting execution",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const executionRequest = createBusinessSqlExecutionRenderRequest({
+        plan: ordersPerCustomer.plan,
+        executionTarget: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+      });
+      const executionArtifact = renderBusinessSqlArtifactFromRenderability({
+        integrated: ordersPerCustomer,
+        renderability: renderabilityFor(ordersPerCustomer),
+        request: executionRequest,
+      });
+      return [
+        ...(executionRequest.purpose === "execution" ? [] : ["Expected execution purpose."]),
+        ...(executionRequest.dialect === DEFAULT_BUSINESS_SQL_EXECUTION_TARGET.dialect
+          ? []
+          : ["Expected execution request dialect from execution target."]),
+        ...(!executionRequest.executionPermissionGranted
+          ? []
+          : ["Render request must not grant execution permission."]),
+        ...(!executionRequest.containsExecutionCredentials
+          ? []
+          : ["Render request must not contain credentials."]),
+        ...(!executionRequest.containsRenderedSql
+          ? []
+          : ["Render request must not contain rendered SQL."]),
+        ...(!executionRequest.containsResultRows
+          ? []
+          : ["Render request must not contain result rows."]),
+        ...(!executionRequest.rawPromptReinterpreted
+          ? []
+          : ["Render request must not reinterpret raw prompt text."]),
+        ...(executionArtifact.renderPurpose === "execution"
+          ? []
+          : ["Expected execution artifact purpose."]),
+        ...(executionArtifact.sql === deterministicArtifactFirst.sql
+          ? []
+          : ["Expected DuckDB SQL bytes to remain identical across purposes."]),
+        ...(executionArtifact.artifactId !== deterministicArtifactFirst.artifactId
+          ? []
+          : ["Expected preview and execution artifacts to have distinct identities."]),
+        ...(!executionArtifact.inserted && !executionArtifact.ranQuery
+          ? []
+          : ["Execution artifact rendering must not insert or run SQL."]),
+      ];
+    },
+  },
+  {
+    name: "render request identity is deterministic and plan identity remains unchanged",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const first = createBusinessSqlExecutionRenderRequest({
+        plan: ordersPerCustomer.plan,
+        executionTarget: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+      });
+      const second = createBusinessSqlExecutionRenderRequest({
+        plan: ordersPerCustomer.plan,
+        executionTarget: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+      });
+      const beforePlanId = ordersPerCustomer.plan.id;
+      renderBusinessSqlQueryPlanArtifact(ordersPerCustomer.plan, first);
+      return [
+        ...(first.requestId === second.requestId
+          ? []
+          : ["Expected deterministic render request identity."]),
+        ...(ordersPerCustomer.plan.id === beforePlanId ? [] : ["Plan identity must not change."]),
+      ];
+    },
   },
 ];
 

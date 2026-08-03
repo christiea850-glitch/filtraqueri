@@ -2,7 +2,6 @@ import {
   evaluateBusinessSqlRenderability,
   type BusinessSqlRenderabilityGate,
 } from "./businessSqlRenderabilityGate";
-import type { SqlDialectId } from "../../sqlIntelligence";
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlDerivedMeasure,
@@ -30,140 +29,57 @@ import type {
   BusinessSqlIntegratedReadiness,
   BusinessSqlQueryPlanJoinResolution,
 } from "./businessSqlQueryPlanJoinResolution";
+import {
+  createBusinessSqlPreviewRenderRequest,
+  type BusinessSqlRenderRequest,
+} from "./businessSqlRenderRequest";
+import {
+  renderResultFromSqlArtifact,
+  sqlArtifactFromRenderResult,
+  type BusinessSqlDialectRenderer,
+  type BusinessSqlRenderResult,
+  type BusinessSqlRendererDialectId,
+  type BusinessSqlRendererReasonCode,
+  type RenderBusinessSqlInput,
+  type SqlArtifact,
+} from "./businessSqlRendererContracts";
 
-export type BusinessSqlRendererReasonCode =
-  | "rendered"
-  | "renderability_not_renderable"
-  | "readiness_not_ready"
-  | "renderer_target_not_duckdb"
-  | "join_resolution_unresolved"
-  | "relationship_review_required"
-  | "renderer_capability_incapable"
-  | "unsupported_plan_shape"
-  | "incomplete_plan_metadata"
-  | "unsafe_sql";
-
-export type BusinessSqlRenderResult = {
-  status: "rendered" | "needs_review" | "blocked";
-  rendered: boolean;
-  sql: string | null;
-  reasonCode: BusinessSqlRendererReasonCode;
-  reasons: string[];
-  blockers: string[];
-  warnings: string[];
-  planId: string;
-  rendererTarget: "duckdb";
-  executionPayload: null;
-  inserted: false;
-  ranQuery: false;
-  summary: string;
-};
-
-export type RenderBusinessSqlInput = {
-  integrated: BusinessSqlQueryPlanJoinResolution;
-  renderability?: BusinessSqlRenderabilityGate;
-};
-
-export type BusinessSqlRendererDialectId = Extract<SqlDialectId, "duckdb">;
-
-export type SqlArtifact = {
-  artifactId: string;
-  dialect: BusinessSqlRendererDialectId;
-  sql: string | null;
-  rendererVersion: string;
-  status: BusinessSqlRenderResult["status"];
-  rendered: boolean;
-  reasonCode: BusinessSqlRendererReasonCode;
-  reasons: string[];
-  blockers: string[];
-  warnings: string[];
-  planId: string;
-  executionPayload: null;
-  inserted: false;
-  ranQuery: false;
-  summary: string;
-};
-
-export type BusinessSqlDialectRenderer = {
-  dialect: BusinessSqlRendererDialectId;
-  rendererVersion: string;
-  render: (input: RenderBusinessSqlInput) => SqlArtifact;
-};
-
-export const BUSINESS_SQL_DUCKDB_RENDERER_VERSION =
-  "business-sql-duckdb-renderer:v1";
-
-const fingerprintSqlArtifact = ({
-  planId,
-  dialect,
-  rendererVersion,
-  sql,
-  reasonCode,
-}: {
-  planId: string;
-  dialect: BusinessSqlRendererDialectId;
-  rendererVersion: string;
-  sql: string | null;
-  reasonCode: BusinessSqlRendererReasonCode;
-}): string => {
-  const payload = [planId, dialect, rendererVersion, reasonCode, sql || ""].join("\n");
-  let hash = 0;
-  for (let index = 0; index < payload.length; index += 1) {
-    hash = (hash * 31 + payload.charCodeAt(index)) >>> 0;
-  }
-  return `sql-artifact:${dialect}:${payload.length}:${hash.toString(16).padStart(8, "0")}`;
-};
-
-const sqlArtifactFromRenderResult = (
-  result: BusinessSqlRenderResult,
-  rendererVersion: string,
-): SqlArtifact => {
-  const dialect = result.rendererTarget;
-  return {
-    artifactId: fingerprintSqlArtifact({
-      planId: result.planId,
-      dialect,
-      rendererVersion,
-      sql: result.sql,
-      reasonCode: result.reasonCode,
-    }),
-    dialect,
-    sql: result.sql,
-    rendererVersion,
-    status: result.status,
-    rendered: result.rendered,
-    reasonCode: result.reasonCode,
-    reasons: [...result.reasons],
-    blockers: [...result.blockers],
-    warnings: [...result.warnings],
-    planId: result.planId,
-    executionPayload: null,
-    inserted: false,
-    ranQuery: false,
-    summary: result.summary,
-  };
-};
-
-const renderResultFromSqlArtifact = (artifact: SqlArtifact): BusinessSqlRenderResult => ({
-  status: artifact.status,
-  rendered: artifact.rendered,
-  sql: artifact.sql,
-  reasonCode: artifact.reasonCode,
-  reasons: [...artifact.reasons],
-  blockers: [...artifact.blockers],
-  warnings: [...artifact.warnings],
-  planId: artifact.planId,
-  rendererTarget: artifact.dialect,
-  executionPayload: null,
-  inserted: false,
-  ranQuery: false,
-  summary: artifact.summary,
-});
+export type {
+  BusinessSqlDialectCapability,
+  BusinessSqlDialectRenderer,
+  BusinessSqlRenderResult,
+  BusinessSqlRendererDialectId,
+  BusinessSqlRendererReasonCode,
+  RenderBusinessSqlInput,
+  SqlArtifact,
+} from "./businessSqlRendererContracts";
+export { createBusinessSqlArtifactId } from "./businessSqlRendererContracts";
+export type {
+  BusinessSqlExecutionTarget,
+  BusinessSqlRenderPurpose,
+  BusinessSqlRenderRequest,
+} from "./businessSqlRenderRequest";
+export {
+  createBusinessSqlExecutionRenderRequest,
+  createBusinessSqlPreviewRenderRequest,
+  createBusinessSqlRenderRequest,
+  createBusinessSqlRenderRequestId,
+  DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+} from "./businessSqlRenderRequest";
 
 type SqlSafetyValidation = {
   ok: boolean;
   reasons: string[];
 };
+
+export const BUSINESS_SQL_DUCKDB_RENDERER_ID = "business-sql-renderer:duckdb";
+
+// Renderer version policy: increment this value for byte-visible SQL emission
+// changes or behavior changes that alter artifact interpretation. Do not
+// increment for pure internal refactors that keep byte-identical output.
+// The version participates in SqlArtifact identity, never canonical plan identity.
+export const BUSINESS_SQL_DUCKDB_RENDERER_VERSION =
+  "business-sql-duckdb-renderer:v1";
 
 const hasText = (value: string | undefined): value is string =>
   Boolean(value && value.trim().length > 0);
@@ -938,14 +854,34 @@ function renderDuckDbBusinessSqlFromRenderability({
   return rendered(integrated, sql);
 }
 
+const requestForInput = (input: RenderBusinessSqlInput): BusinessSqlRenderRequest =>
+  input.request || createBusinessSqlPreviewRenderRequest(input.integrated.plan, "duckdb");
+
 const duckDbBusinessSqlRenderer: BusinessSqlDialectRenderer = {
   dialect: "duckdb",
+  rendererId: BUSINESS_SQL_DUCKDB_RENDERER_ID,
   rendererVersion: BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
-  render: (input) =>
-    sqlArtifactFromRenderResult(
-      renderDuckDbBusinessSqlFromRenderability(input),
-      BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
-    ),
+  render: (input) => {
+    const request = requestForInput(input);
+    return sqlArtifactFromRenderResult({
+      result: renderDuckDbBusinessSqlFromRenderability(input),
+      request,
+      rendererId: BUSINESS_SQL_DUCKDB_RENDERER_ID,
+      rendererVersion: BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+    });
+  },
+  evaluateCapability: (input) => {
+    const capability = evaluateBusinessSqlRendererCapability(input.integrated.plan);
+    return {
+      dialect: "duckdb",
+      rendererId: BUSINESS_SQL_DUCKDB_RENDERER_ID,
+      rendererVersion: BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+      capable: capability.capable,
+      status: capability.status,
+      reasonCodes: [...capability.reasonCodes],
+      metadataOnly: true,
+    };
+  },
 };
 
 const businessSqlRendererRegistry: Record<
@@ -965,7 +901,16 @@ export function renderBusinessSqlArtifactFromRenderability(
   input: RenderBusinessSqlInput,
   dialect: BusinessSqlRendererDialectId = "duckdb",
 ): SqlArtifact {
-  return getBusinessSqlDialectRenderer(dialect).render(input);
+  const request = input.request || createBusinessSqlPreviewRenderRequest(input.integrated.plan, dialect);
+  return getBusinessSqlDialectRenderer(request.dialect).render({ ...input, request });
+}
+
+export function evaluateBusinessSqlDialectRendererCapability(
+  input: RenderBusinessSqlInput,
+  dialect: BusinessSqlRendererDialectId = "duckdb",
+) {
+  const request = input.request || createBusinessSqlPreviewRenderRequest(input.integrated.plan, dialect);
+  return getBusinessSqlDialectRenderer(request.dialect).evaluateCapability({ ...input, request });
 }
 
 const joinResolutionFromPlan = (
@@ -1071,6 +1016,16 @@ export function renderBusinessSqlQueryPlan(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRenderResult {
   return renderBusinessSqlFromRenderability({ integrated: integratedFromPlan(plan) });
+}
+
+export function renderBusinessSqlQueryPlanArtifact(
+  plan: BusinessSqlQueryPlan,
+  request: BusinessSqlRenderRequest = createBusinessSqlPreviewRenderRequest(plan, "duckdb"),
+): SqlArtifact {
+  return renderBusinessSqlArtifactFromRenderability({
+    integrated: integratedFromPlan(plan),
+    request,
+  });
 }
 
 export function renderBusinessSqlFromRenderability(
