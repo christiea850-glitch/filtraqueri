@@ -2,6 +2,7 @@ import {
   evaluateBusinessSqlRenderability,
   type BusinessSqlRenderabilityGate,
 } from "./businessSqlRenderabilityGate";
+import type { SqlDialectId } from "../../sqlIntelligence";
 import type {
   BusinessSqlAggregateComparisonOperator,
   BusinessSqlDerivedMeasure,
@@ -62,6 +63,102 @@ export type RenderBusinessSqlInput = {
   integrated: BusinessSqlQueryPlanJoinResolution;
   renderability?: BusinessSqlRenderabilityGate;
 };
+
+export type BusinessSqlRendererDialectId = Extract<SqlDialectId, "duckdb">;
+
+export type SqlArtifact = {
+  artifactId: string;
+  dialect: BusinessSqlRendererDialectId;
+  sql: string | null;
+  rendererVersion: string;
+  status: BusinessSqlRenderResult["status"];
+  rendered: boolean;
+  reasonCode: BusinessSqlRendererReasonCode;
+  reasons: string[];
+  blockers: string[];
+  warnings: string[];
+  planId: string;
+  executionPayload: null;
+  inserted: false;
+  ranQuery: false;
+  summary: string;
+};
+
+export type BusinessSqlDialectRenderer = {
+  dialect: BusinessSqlRendererDialectId;
+  rendererVersion: string;
+  render: (input: RenderBusinessSqlInput) => SqlArtifact;
+};
+
+export const BUSINESS_SQL_DUCKDB_RENDERER_VERSION =
+  "business-sql-duckdb-renderer:v1";
+
+const fingerprintSqlArtifact = ({
+  planId,
+  dialect,
+  rendererVersion,
+  sql,
+  reasonCode,
+}: {
+  planId: string;
+  dialect: BusinessSqlRendererDialectId;
+  rendererVersion: string;
+  sql: string | null;
+  reasonCode: BusinessSqlRendererReasonCode;
+}): string => {
+  const payload = [planId, dialect, rendererVersion, reasonCode, sql || ""].join("\n");
+  let hash = 0;
+  for (let index = 0; index < payload.length; index += 1) {
+    hash = (hash * 31 + payload.charCodeAt(index)) >>> 0;
+  }
+  return `sql-artifact:${dialect}:${payload.length}:${hash.toString(16).padStart(8, "0")}`;
+};
+
+const sqlArtifactFromRenderResult = (
+  result: BusinessSqlRenderResult,
+  rendererVersion: string,
+): SqlArtifact => {
+  const dialect = result.rendererTarget;
+  return {
+    artifactId: fingerprintSqlArtifact({
+      planId: result.planId,
+      dialect,
+      rendererVersion,
+      sql: result.sql,
+      reasonCode: result.reasonCode,
+    }),
+    dialect,
+    sql: result.sql,
+    rendererVersion,
+    status: result.status,
+    rendered: result.rendered,
+    reasonCode: result.reasonCode,
+    reasons: [...result.reasons],
+    blockers: [...result.blockers],
+    warnings: [...result.warnings],
+    planId: result.planId,
+    executionPayload: null,
+    inserted: false,
+    ranQuery: false,
+    summary: result.summary,
+  };
+};
+
+const renderResultFromSqlArtifact = (artifact: SqlArtifact): BusinessSqlRenderResult => ({
+  status: artifact.status,
+  rendered: artifact.rendered,
+  sql: artifact.sql,
+  reasonCode: artifact.reasonCode,
+  reasons: [...artifact.reasons],
+  blockers: [...artifact.blockers],
+  warnings: [...artifact.warnings],
+  planId: artifact.planId,
+  rendererTarget: artifact.dialect,
+  executionPayload: null,
+  inserted: false,
+  ranQuery: false,
+  summary: artifact.summary,
+});
 
 type SqlSafetyValidation = {
   ok: boolean;
@@ -591,7 +688,7 @@ const statusForRefusal = (
 ): "needs_review" | "blocked" =>
   renderability.status === "blocked" ? "blocked" : "needs_review";
 
-export function renderBusinessSqlFromRenderability({
+function renderDuckDbBusinessSqlFromRenderability({
   integrated,
   renderability = evaluateBusinessSqlRenderability({ integrated }),
 }: RenderBusinessSqlInput): BusinessSqlRenderResult {
@@ -841,6 +938,36 @@ export function renderBusinessSqlFromRenderability({
   return rendered(integrated, sql);
 }
 
+const duckDbBusinessSqlRenderer: BusinessSqlDialectRenderer = {
+  dialect: "duckdb",
+  rendererVersion: BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+  render: (input) =>
+    sqlArtifactFromRenderResult(
+      renderDuckDbBusinessSqlFromRenderability(input),
+      BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+    ),
+};
+
+const businessSqlRendererRegistry: Record<
+  BusinessSqlRendererDialectId,
+  BusinessSqlDialectRenderer
+> = {
+  duckdb: duckDbBusinessSqlRenderer,
+};
+
+export function getBusinessSqlDialectRenderer(
+  dialect: BusinessSqlRendererDialectId,
+): BusinessSqlDialectRenderer {
+  return businessSqlRendererRegistry[dialect];
+}
+
+export function renderBusinessSqlArtifactFromRenderability(
+  input: RenderBusinessSqlInput,
+  dialect: BusinessSqlRendererDialectId = "duckdb",
+): SqlArtifact {
+  return getBusinessSqlDialectRenderer(dialect).render(input);
+}
+
 const joinResolutionFromPlan = (
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlJoinPathResolution => {
@@ -944,6 +1071,12 @@ export function renderBusinessSqlQueryPlan(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlRenderResult {
   return renderBusinessSqlFromRenderability({ integrated: integratedFromPlan(plan) });
+}
+
+export function renderBusinessSqlFromRenderability(
+  input: RenderBusinessSqlInput,
+): BusinessSqlRenderResult {
+  return renderResultFromSqlArtifact(renderBusinessSqlArtifactFromRenderability(input));
 }
 
 export function applyBusinessSqlRenderedSql(

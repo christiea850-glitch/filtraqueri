@@ -30,6 +30,9 @@ import {
   type BusinessSqlQueryPlan,
 } from "../businessSqlQueryPlan";
 import {
+  BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+  getBusinessSqlDialectRenderer,
+  renderBusinessSqlArtifactFromRenderability,
   renderBusinessSqlFromRenderability,
   type BusinessSqlRenderResult,
 } from "../businessSqlRenderer";
@@ -176,6 +179,14 @@ const forgedRenderableGate: BusinessSqlRenderabilityGate = {
 };
 const deterministicFirst = renderInput(ordersPerCustomer);
 const deterministicSecond = renderInput(ordersPerCustomer);
+const deterministicArtifactFirst = renderBusinessSqlArtifactFromRenderability({
+  integrated: ordersPerCustomer,
+  renderability: renderabilityFor(ordersPerCustomer),
+});
+const deterministicArtifactSecond = renderBusinessSqlArtifactFromRenderability({
+  integrated: ordersPerCustomer,
+  renderability: renderabilityFor(ordersPerCustomer),
+});
 
 const integratedFromPlan = (plan: BusinessSqlQueryPlan): BusinessSqlQueryPlanJoinResolution => ({
   plan,
@@ -773,6 +784,89 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
       deterministicFirst.summary === deterministicSecond.summary
         ? []
         : ["Expected deterministic rendered SQL and summary."],
+  },
+  {
+    name: "DuckDB renderer registry exposes stable dialect and version identity",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const renderer = getBusinessSqlDialectRenderer("duckdb");
+      return [
+        ...(renderer.dialect === "duckdb" ? [] : ["Expected DuckDB dialect identity."]),
+        ...(renderer.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
+          ? []
+          : ["Expected stable DuckDB renderer version identity."]),
+      ];
+    },
+  },
+  {
+    name: "SqlArtifact carries rendered SQL outside canonical plan metadata",
+    integrated: ordersPerCustomer,
+    assert: (result) => {
+      const artifact = renderBusinessSqlArtifactFromRenderability({
+        integrated: ordersPerCustomer,
+        renderability: renderabilityFor(ordersPerCustomer),
+      });
+      return [
+        ...(artifact.dialect === "duckdb" ? [] : ["Expected DuckDB SqlArtifact dialect."]),
+        ...(artifact.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
+          ? []
+          : ["Expected SqlArtifact renderer version."]),
+        ...(artifact.sql === result.sql ? [] : ["Expected SqlArtifact SQL to equal legacy renderer SQL."]),
+        ...(artifact.rendered === result.rendered ? [] : ["Expected SqlArtifact rendered flag equality."]),
+        ...(artifact.status === result.status ? [] : ["Expected SqlArtifact status equality."]),
+        ...(artifact.reasonCode === result.reasonCode ? [] : ["Expected SqlArtifact reason equality."]),
+        ...(ordersPerCustomer.plan.renderer.sql
+          ? ["Canonical plan renderer metadata must not receive rendered SQL."]
+          : []),
+      ];
+    },
+  },
+  {
+    name: "compatibility wrapper remains byte-identical to DuckDB SqlArtifact",
+    integrated: leasesByStatus,
+    assert: (result) => {
+      const artifact = renderBusinessSqlArtifactFromRenderability({
+        integrated: leasesByStatus,
+        renderability: renderabilityFor(leasesByStatus),
+      });
+      return [
+        ...(artifact.sql === result.sql ? [] : ["Expected wrapper SQL byte equality."]),
+        ...(artifact.summary === result.summary ? [] : ["Expected wrapper summary equality."]),
+        ...(artifact.warnings.join("|") === result.warnings.join("|")
+          ? []
+          : ["Expected wrapper warning equality."]),
+        ...(artifact.blockers.join("|") === result.blockers.join("|")
+          ? []
+          : ["Expected wrapper blocker equality."]),
+      ];
+    },
+  },
+  {
+    name: "rendering artifact does not mutate canonical plan identity or fields",
+    integrated: sumSalaryByDepartment,
+    assert: () => {
+      const before = JSON.stringify(sumSalaryByDepartment.plan);
+      const beforeId = sumSalaryByDepartment.plan.id;
+      renderBusinessSqlArtifactFromRenderability({
+        integrated: sumSalaryByDepartment,
+        renderability: renderabilityFor(sumSalaryByDepartment),
+      });
+      const after = JSON.stringify(sumSalaryByDepartment.plan);
+      return [
+        ...(sumSalaryByDepartment.plan.id === beforeId ? [] : ["Plan id must not change."]),
+        ...(after === before ? [] : ["Rendering artifact must not mutate canonical plan fields."]),
+      ];
+    },
+  },
+  {
+    name: "same input produces the same SqlArtifact identity",
+    integrated: ordersPerCustomer,
+    assert: () =>
+      deterministicArtifactFirst.artifactId === deterministicArtifactSecond.artifactId &&
+      deterministicArtifactFirst.sql === deterministicArtifactSecond.sql &&
+      deterministicArtifactFirst.rendererVersion === deterministicArtifactSecond.rendererVersion
+        ? []
+        : ["Expected deterministic SqlArtifact identity."],
   },
 ];
 
