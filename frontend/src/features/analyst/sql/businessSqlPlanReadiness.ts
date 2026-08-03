@@ -15,9 +15,9 @@ import {
 } from "./businessSqlDerivedMeasureCompatibility";
 import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCompatibility";
 import {
-  evaluateBusinessSqlFilterCompatibility,
-  type BusinessSqlFilterCompatibilityReason,
-} from "./businessSqlFilterCompatibility";
+  evaluateBusinessSqlFilterGroupContract,
+  type BusinessSqlFilterGroupContractReason,
+} from "./businessSqlFilterGroupContract";
 
 export type BusinessSqlPlanReadinessStatus = "ready" | "needs_review" | "blocked";
 
@@ -36,7 +36,7 @@ export type BusinessSqlPlanReadinessReasonCode =
   | "row_limit_invalid"
   | BusinessSqlDerivedMeasureCompatibilityReason
   | BusinessSqlAggregateResultConditionCompatibilityReason
-  | BusinessSqlFilterCompatibilityReason;
+  | BusinessSqlFilterGroupContractReason;
 
 export type BusinessSqlRendererEligibility = {
   eligible: boolean;
@@ -208,13 +208,16 @@ export function evaluateBusinessSqlPlanReadiness(
     }
   }
 
-  const filterReasonCodes = (plan.filters || []).flatMap((filter) =>
-    evaluateBusinessSqlFilterCompatibility({ filter }).reasonCodes,
-  );
+  const filterGroupContract = evaluateBusinessSqlFilterGroupContract(plan);
+  const filterReasonCodes = filterGroupContract.reasonCodes;
 
   if (filterReasonCodes.length > 0) {
     reasonCodes.push(...filterReasonCodes);
-    blockingReasons.push("One or more row-level filters are structurally invalid.");
+    blockingReasons.push(
+      filterReasonCodes.includes("row_filter_combinator_unsupported")
+        ? "Row-level filter combinator metadata is unsupported."
+        : "One or more row-level filters are structurally invalid.",
+    );
   }
 
   if (

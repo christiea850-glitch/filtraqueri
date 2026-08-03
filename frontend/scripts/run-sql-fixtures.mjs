@@ -287,6 +287,11 @@ const fixtures = [
     exportName: "runBusinessSqlDateRangeFilterRenderingFixtures",
   },
   {
+    label: "Business SQL multi-filter contract",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlMultiFilterContract.test.ts",
+    exportName: "runBusinessSqlMultiFilterContractFixtures",
+  },
+  {
     label: "Explicit row-filter grounding",
     modulePath: "/src/features/analyst/sql/__tests__/explicitRowFilterGrounding.test.ts",
     exportName: "runExplicitRowFilterGroundingFixtures",

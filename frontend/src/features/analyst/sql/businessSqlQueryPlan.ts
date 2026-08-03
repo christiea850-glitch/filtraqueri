@@ -14,6 +14,8 @@ export type BusinessSqlPlanStatus = "draft" | "resolved" | "blocked";
 
 export type BusinessSqlPlanSupportLevel = "supported" | "needs_review" | "blocked";
 
+export type BusinessSqlFilterCombinator = "and";
+
 export type BusinessSqlRendererStatus =
   | "not_rendered"
   | "renderable"
@@ -312,6 +314,7 @@ export type BusinessSqlQueryPlan = {
   derivedMeasures: BusinessSqlDerivedMeasure[];
   groupings: BusinessSqlGrouping[];
   filters: BusinessSqlFilter[];
+  filterCombinator?: BusinessSqlFilterCombinator;
   orderBy: BusinessSqlSort[];
   rowLimit: BusinessSqlRowLimit | null;
   aggregateResultConditions: BusinessSqlAggregateResultCondition[];
@@ -320,6 +323,12 @@ export type BusinessSqlQueryPlan = {
   warnings: BusinessSqlPlanWarning[];
   renderer: BusinessSqlRendererMetadata;
   preview: BusinessSqlPlanPreview;
+};
+
+export type BusinessSqlFilterGroup = {
+  combinator: BusinessSqlFilterCombinator;
+  filters: BusinessSqlFilter[];
+  filterGroupId: string;
 };
 
 const EMPTY_JOIN_PATH: BusinessSqlJoinPath = {
@@ -614,6 +623,51 @@ export const createBusinessSqlFilterId = (
   ]);
 };
 
+export const resolveBusinessSqlFilterCombinator = (
+  plan: Pick<BusinessSqlQueryPlan, "filterCombinator">,
+): BusinessSqlFilterCombinator | null =>
+  // Backward compatibility: older canonical plans do not carry this metadata.
+  // Absence is deterministic AND; every other runtime value must be exactly "and".
+  typeof plan.filterCombinator === "undefined"
+    ? "and"
+    : plan.filterCombinator === "and"
+      ? "and"
+      : null;
+
+export const createBusinessSqlFilterGroupId = ({
+  combinator,
+  filters,
+}: {
+  combinator: BusinessSqlFilterCombinator;
+  filters: readonly Pick<
+    BusinessSqlFilter,
+    "filterId" | "target" | "entity" | "table" | "field" | "operator" | "comparisonValue"
+  >[];
+}): string => {
+  const memberFilterIds = filters
+    .map((filter) => createBusinessSqlFilterId(filter))
+    .slice()
+    .sort();
+  return stablePrimitiveId("business-sql-filter-group", [
+    "row-filters",
+    combinator,
+    ...memberFilterIds,
+  ]);
+};
+
+export const createBusinessSqlFilterGroup = (
+  plan: Pick<BusinessSqlQueryPlan, "filterCombinator" | "filters">,
+): BusinessSqlFilterGroup | null => {
+  const combinator = resolveBusinessSqlFilterCombinator(plan);
+  if (!combinator) return null;
+  const filters = [...plan.filters];
+  return {
+    combinator,
+    filters,
+    filterGroupId: createBusinessSqlFilterGroupId({ combinator, filters }),
+  };
+};
+
 export const createBusinessSqlAggregateResultConditionId = (
   condition: Pick<
     BusinessSqlAggregateResultCondition,
@@ -779,6 +833,7 @@ export const createEmptyBusinessSqlQueryPlan = (): BusinessSqlQueryPlan => ({
   derivedMeasures: [],
   groupings: [],
   filters: [],
+  filterCombinator: "and",
   orderBy: [],
   rowLimit: null,
   aggregateResultConditions: [],
@@ -843,7 +898,9 @@ export const summarizeBusinessSqlQueryPlan = (plan: BusinessSqlQueryPlan): strin
       ? plan.groupings.map((group) => group.label).join(", ")
       : "no grouping";
   const filters =
-    plan.filters.length > 0
+    plan.filters.length > 1
+      ? `${plan.filters.length} row filters combined with AND`
+      : plan.filters.length > 0
       ? plan.filters.map((filter) => filter.label).join(", ")
       : "no filters";
   const joinPath =

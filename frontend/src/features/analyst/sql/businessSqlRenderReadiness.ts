@@ -7,7 +7,7 @@ import { evaluateBusinessSqlMeasureCompatibility } from "./businessSqlMeasureCom
 import { evaluateBusinessSqlRendererCapability } from "./businessSqlRendererCapability";
 import { evaluateBusinessSqlAggregateResultConditionCompatibility } from "./businessSqlAggregateResultConditionCompatibility";
 import { evaluateBusinessSqlDerivedMeasureCompatibility } from "./businessSqlDerivedMeasureCompatibility";
-import { evaluateBusinessSqlFilterCompatibility } from "./businessSqlFilterCompatibility";
+import { evaluateBusinessSqlFilterGroupContract } from "./businessSqlFilterGroupContract";
 
 export type BusinessSqlRenderReadinessStatus =
   | "renderable"
@@ -192,9 +192,7 @@ export function evaluateBusinessSqlRenderReadiness(
     }
   }
 
-  const filterReasonCodes = (normalizedPlan.filters || []).flatMap(
-    (filter) => evaluateBusinessSqlFilterCompatibility({ filter }).reasonCodes,
-  );
+  const filterReasonCodes = evaluateBusinessSqlFilterGroupContract(normalizedPlan).reasonCodes;
 
   if (filterReasonCodes.length > 0) {
     reasons.push(
@@ -263,6 +261,7 @@ export function evaluateBusinessSqlRenderReadiness(
     derivedMeasureReasonCodes.length > 0 ||
     filterReasonCodes.length > 0 ||
     plan.joinPath.status === "missing" ||
+    rendererCapability.reasonCodes.includes("multiple_row_filters_not_supported") ||
     plan.renderer.status === "blocked" ||
     plan.warnings.some((warning) => warning.severity === "blocking");
   const status: BusinessSqlRenderReadinessStatus =
