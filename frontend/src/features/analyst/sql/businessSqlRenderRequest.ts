@@ -1,14 +1,14 @@
 import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
 import { stablePrimitiveId } from "./businessSqlQueryPlan";
+import {
+  DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+  type BusinessSqlExecutionTarget,
+} from "./businessSqlExecutionTarget";
 import type { BusinessSqlRendererDialectId } from "./businessSqlRendererContracts";
 
 export type BusinessSqlRenderPurpose = "preview" | "export" | "execution";
 
-export type BusinessSqlExecutionTarget = {
-  id: string;
-  dialect: BusinessSqlRendererDialectId;
-  connectionKind: "local_duckdb";
-};
+export type { BusinessSqlExecutionTarget } from "./businessSqlExecutionTarget";
 
 export type BusinessSqlRenderRequest = {
   requestId: string;
@@ -61,6 +61,11 @@ export const createBusinessSqlRenderRequestId = ({
     executionTarget?.id,
     executionTarget?.dialect,
     executionTarget?.connectionKind,
+    executionTarget?.environment,
+    executionTarget?.dataSensitivity,
+    executionTarget?.readOnlyRequired,
+    executionTarget?.allowedExecutionMode,
+    executionTarget?.targetConfigurationId,
   ]);
 
 export const createBusinessSqlRenderRequest = ({
@@ -119,8 +124,4 @@ export const createBusinessSqlExecutionRenderRequest = ({
     executionTarget,
   });
 
-export const DEFAULT_BUSINESS_SQL_EXECUTION_TARGET: BusinessSqlExecutionTarget = {
-  id: "business-sql-execution-target:local-duckdb",
-  dialect: "duckdb",
-  connectionKind: "local_duckdb",
-};
+export { DEFAULT_BUSINESS_SQL_EXECUTION_TARGET };

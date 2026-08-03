@@ -1034,6 +1034,9 @@ export function renderBusinessSqlFromRenderability(
   return renderResultFromSqlArtifact(renderBusinessSqlArtifactFromRenderability(input));
 }
 
+// Legacy compatibility only: newer flows should keep rendered SQL in
+// RenderRequest/SqlArtifact lineage. Canonical analytical meaning must not
+// depend on rendered SQL or renderer status written back into plan.renderer.
 export function applyBusinessSqlRenderedSql(
   plan: BusinessSqlQueryPlan,
 ): BusinessSqlQueryPlan {

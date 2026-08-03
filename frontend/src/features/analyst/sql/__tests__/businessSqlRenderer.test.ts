@@ -32,7 +32,6 @@ import {
 import {
   BUSINESS_SQL_DUCKDB_RENDERER_ID,
   BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
-  DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
   createBusinessSqlArtifactId,
   createBusinessSqlExecutionRenderRequest,
   evaluateBusinessSqlDialectRendererCapability,
@@ -42,6 +41,26 @@ import {
   renderBusinessSqlFromRenderability,
   type BusinessSqlRenderResult,
 } from "../businessSqlRenderer";
+import {
+  DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+  createBusinessSqlExecutionTarget,
+  createBusinessSqlExecutionTargetId,
+} from "../businessSqlExecutionTarget";
+import {
+  createBusinessSqlExecutionRequest,
+  createBusinessSqlExecutionRequestId,
+  type BusinessSqlExecutionLimits,
+} from "../businessSqlExecutionRequest";
+import {
+  DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+  createBusinessSqlExecutionPolicy,
+  productionPolicyFor,
+} from "../businessSqlExecutionPolicy";
+import {
+  canExecuteBusinessSqlRequest,
+  evaluateBusinessSqlExecutionPolicy,
+} from "../businessSqlExecutionPolicyEvaluation";
+import { createBusinessSqlExecutionAuditRecord } from "../businessSqlExecutionAudit";
 import { evaluateBusinessSqlRendererCapability } from "../businessSqlRendererCapability";
 
 type RendererFixture = {
@@ -193,6 +212,49 @@ const deterministicArtifactSecond = renderBusinessSqlArtifactFromRenderability({
   integrated: ordersPerCustomer,
   renderability: renderabilityFor(ordersPerCustomer),
 });
+const executionRenderRequest = createBusinessSqlExecutionRenderRequest({
+  plan: ordersPerCustomer.plan,
+  executionTarget: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+});
+const executionArtifact = renderBusinessSqlArtifactFromRenderability({
+  integrated: ordersPerCustomer,
+  renderability: renderabilityFor(ordersPerCustomer),
+  request: executionRenderRequest,
+});
+const executionLimits: BusinessSqlExecutionLimits = {
+  maxReturnedRows: 1000,
+  maxExecutionMilliseconds: 30000,
+  truncationRequired: true,
+  cancellationSupported: true,
+  persistenceAllowed: false,
+};
+const executionAuditContext = {
+  auditRequired: true,
+  purpose: "fixture manual run",
+  metadataOnly: true as const,
+};
+const createdExecutionRequest = createBusinessSqlExecutionRequest({
+  renderRequest: executionRenderRequest,
+  artifact: executionArtifact,
+  target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+  requestedLimits: executionLimits,
+  requestedAuditContext: executionAuditContext,
+  manualTrigger: true,
+});
+const allowedExecutionEvaluation = createdExecutionRequest.request
+  ? evaluateBusinessSqlExecutionPolicy({
+      executionRequest: createdExecutionRequest.request,
+      artifact: executionArtifact,
+      target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+      policy: DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+      context: {
+        readOnlyEnforced: true,
+        sensitiveDataPolicyPresent: true,
+        auditContextPresent: true,
+        metadataOnly: true,
+      },
+    })
+  : null;
 
 const integratedFromPlan = (plan: BusinessSqlQueryPlan): BusinessSqlQueryPlanJoinResolution => ({
   plan,
@@ -993,6 +1055,320 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
           ? []
           : ["Expected deterministic render request identity."]),
         ...(ordersPerCustomer.plan.id === beforePlanId ? [] : ["Plan identity must not change."]),
+      ];
+    },
+  },
+  {
+    name: "execution target identity is deterministic and contains no live connection material",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const firstId = createBusinessSqlExecutionTargetId(DEFAULT_BUSINESS_SQL_EXECUTION_TARGET);
+      const equivalent = createBusinessSqlExecutionTarget({
+        dialect: "duckdb",
+        connectionKind: "local_duckdb",
+        environment: "local",
+        dataSensitivity: "internal",
+        readOnlyRequired: true,
+        allowedExecutionMode: "read_only_analytical",
+        targetConfigurationId: "business-sql-execution-target-config:local-duckdb",
+      });
+      return [
+        ...(firstId === createBusinessSqlExecutionTargetId(DEFAULT_BUSINESS_SQL_EXECUTION_TARGET)
+          ? []
+          : ["Expected deterministic target identity."]),
+        ...(equivalent.id === firstId ? [] : ["Expected equivalent target id."]),
+        ...(!DEFAULT_BUSINESS_SQL_EXECUTION_TARGET.containsCredentials
+          ? []
+          : ["Target must not contain credentials."]),
+        ...(!DEFAULT_BUSINESS_SQL_EXECUTION_TARGET.containsLiveClient
+          ? []
+          : ["Target must not contain a live client."]),
+        ...(!DEFAULT_BUSINESS_SQL_EXECUTION_TARGET.containsNetworkHandle
+          ? []
+          : ["Target must not contain a network handle."]),
+        ...(!DEFAULT_BUSINESS_SQL_EXECUTION_TARGET.grantsExecutionPermission
+          ? []
+          : ["Target must not grant execution permission."]),
+      ];
+    },
+  },
+  {
+    name: "execution request identity is deterministic and requires manual rendered execution artifact",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const missingManual = createBusinessSqlExecutionRequest({
+        renderRequest: executionRenderRequest,
+        artifact: executionArtifact,
+        target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        requestedLimits: executionLimits,
+        requestedAuditContext: executionAuditContext,
+        manualTrigger: false,
+      });
+      const previewArtifactRequest = createBusinessSqlExecutionRequest({
+        renderRequest: executionRenderRequest,
+        artifact: deterministicArtifactFirst,
+        target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        requestedLimits: executionLimits,
+        requestedAuditContext: executionAuditContext,
+        manualTrigger: true,
+      });
+      const expectedId = createdExecutionRequest.request
+        ? createBusinessSqlExecutionRequestId(createdExecutionRequest.request)
+        : null;
+      return [
+        ...(createdExecutionRequest.status === "created" && createdExecutionRequest.request
+          ? []
+          : ["Expected execution request to be created."]),
+        ...(createdExecutionRequest.request && expectedId === createdExecutionRequest.request.requestId
+          ? []
+          : ["Expected deterministic execution request id."]),
+        ...(createdExecutionRequest.request && !createdExecutionRequest.request.executionPermissionGranted
+          ? []
+          : ["Execution request itself must not grant permission."]),
+        ...(missingManual.status === "blocked" &&
+        missingManual.blockers.includes("manual_trigger_missing")
+          ? []
+          : ["Expected manual trigger blocker."]),
+        ...(previewArtifactRequest.status === "blocked" &&
+        previewArtifactRequest.blockers.includes("execution_artifact_required")
+          ? []
+          : ["Expected execution artifact requirement blocker."]),
+      ];
+    },
+  },
+  {
+    name: "execution policy blocks identity mismatches",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      if (!createdExecutionRequest.request) return ["Expected created execution request."];
+      const mismatchedArtifact = {
+        ...executionArtifact,
+        artifactId: `${executionArtifact.artifactId}:mismatch`,
+      };
+      const mismatchedTarget = {
+        ...DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        id: "business-sql-execution-target:mismatch",
+      };
+      const mismatchedDialectTarget = {
+        ...DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        id: "business-sql-execution-target:dialect-mismatch",
+      };
+      const artifactDialectMismatch = {
+        ...executionArtifact,
+        dialect: "postgres" as typeof executionArtifact.dialect,
+        artifactId: `${executionArtifact.artifactId}:dialect-mismatch`,
+      };
+      const artifactMismatchEvaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: createdExecutionRequest.request,
+        artifact: mismatchedArtifact,
+        target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        policy: DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+        context: { readOnlyEnforced: true, sensitiveDataPolicyPresent: true, auditContextPresent: true, metadataOnly: true },
+      });
+      const targetMismatchEvaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: createdExecutionRequest.request,
+        artifact: executionArtifact,
+        target: mismatchedTarget,
+        policy: DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+        context: { readOnlyEnforced: true, sensitiveDataPolicyPresent: true, auditContextPresent: true, metadataOnly: true },
+      });
+      const dialectMismatchEvaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: {
+          ...createdExecutionRequest.request,
+          dialect: "duckdb",
+        },
+        artifact: artifactDialectMismatch,
+        target: mismatchedDialectTarget,
+        policy: DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+        context: { readOnlyEnforced: true, sensitiveDataPolicyPresent: true, auditContextPresent: true, metadataOnly: true },
+      });
+      const planMismatchEvaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: {
+          ...createdExecutionRequest.request,
+          planId: "business-sql-plan:mismatch",
+        },
+        artifact: executionArtifact,
+        target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        policy: DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+        context: { readOnlyEnforced: true, sensitiveDataPolicyPresent: true, auditContextPresent: true, metadataOnly: true },
+      });
+      return [
+        ...(artifactMismatchEvaluation.blockers.includes("artifact_identity_mismatch")
+          ? []
+          : ["Expected artifact mismatch blocker."]),
+        ...(targetMismatchEvaluation.blockers.includes("target_identity_mismatch")
+          ? []
+          : ["Expected target mismatch blocker."]),
+        ...(dialectMismatchEvaluation.status === "blocked" ? [] : ["Expected dialect mismatch blocked."]),
+        ...(planMismatchEvaluation.blockers.includes("plan_identity_mismatch")
+          ? []
+          : ["Expected plan mismatch blocker."]),
+      ];
+    },
+  },
+  {
+    name: "execution policy fails closed for missing required governance inputs",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      if (!createdExecutionRequest.request) return ["Expected created execution request."];
+      const strictPolicy = createBusinessSqlExecutionPolicy({
+        ...DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+        authenticationRequired: true,
+        authorizationRequired: true,
+      });
+      const missingLimitsRequest = {
+        ...createdExecutionRequest.request,
+        requestedLimits: {
+          truncationRequired: true,
+          cancellationSupported: true,
+          persistenceAllowed: false,
+        },
+      };
+      const evaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: missingLimitsRequest,
+        artifact: executionArtifact,
+        target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        policy: strictPolicy,
+        context: { metadataOnly: true },
+      });
+      return [
+        ...(evaluation.status === "blocked" && !evaluation.allowed ? [] : ["Expected blocked evaluation."]),
+        ...(evaluation.blockers.includes("authentication_context_missing") ? [] : ["Expected auth blocker."]),
+        ...(evaluation.blockers.includes("authorization_context_missing") ? [] : ["Expected authorization blocker."]),
+        ...(evaluation.blockers.includes("read_only_not_enforced") ? [] : ["Expected read-only blocker."]),
+        ...(evaluation.blockers.includes("timeout_policy_missing") ? [] : ["Expected timeout blocker."]),
+        ...(evaluation.blockers.includes("result_limit_missing") ? [] : ["Expected result limit blocker."]),
+        ...(evaluation.blockers.includes("sensitive_data_policy_missing") ? [] : ["Expected sensitivity blocker."]),
+        ...(evaluation.blockers.includes("audit_logging_required") ? [] : ["Expected audit blocker."]),
+      ];
+    },
+  },
+  {
+    name: "allowed local analytical policy case remains metadata-only with no execution",
+    integrated: ordersPerCustomer,
+    assert: () => [
+      ...(allowedExecutionEvaluation?.status === "allowed" && allowedExecutionEvaluation.allowed
+        ? []
+        : ["Expected allowed local policy evaluation."]),
+      ...(allowedExecutionEvaluation?.blockers.length === 0 ? [] : ["Expected no blockers."]),
+      ...(allowedExecutionEvaluation?.metadataOnly ? [] : ["Expected metadata-only evaluation."]),
+      ...(!allowedExecutionEvaluation?.containsExecutionResult ? [] : ["Evaluation must not contain result."]),
+      ...(!allowedExecutionEvaluation?.containsCredentials ? [] : ["Evaluation must not contain credentials."]),
+      ...(!executionArtifact.inserted && !executionArtifact.ranQuery
+        ? []
+        : ["Artifact rendering must not insert or run SQL."]),
+    ],
+  },
+  {
+    name: "production target requires review before allowance",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      if (!createdExecutionRequest.request) return ["Expected created execution request."];
+      const productionTarget = createBusinessSqlExecutionTarget({
+        dialect: "duckdb",
+        connectionKind: "local_duckdb",
+        environment: "production",
+        dataSensitivity: "confidential",
+        readOnlyRequired: true,
+        allowedExecutionMode: "read_only_analytical",
+        targetConfigurationId: "business-sql-execution-target-config:prod-fixture",
+      });
+      const productionRequest = {
+        ...createdExecutionRequest.request,
+        executionTargetId: productionTarget.id,
+      };
+      const evaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: productionRequest,
+        artifact: executionArtifact,
+        target: productionTarget,
+        policy: productionPolicyFor(productionTarget),
+        context: {
+          authenticationContextPresent: true,
+          authorizationContextPresent: true,
+          readOnlyEnforced: true,
+          sensitiveDataPolicyPresent: true,
+          auditContextPresent: true,
+          rowLevelSecurityContextPresent: true,
+          metadataOnly: true,
+        },
+      });
+      return [
+        ...(evaluation.status === "needs_review" ? [] : ["Expected production review state."]),
+        ...(evaluation.warnings.includes("production_target") ? [] : ["Expected production warning."]),
+        ...(evaluation.warnings.includes("production_review_required")
+          ? []
+          : ["Expected production review warning."]),
+        ...(!evaluation.allowed ? [] : ["Production review state must not be allowed."]),
+      ];
+    },
+  },
+  {
+    name: "manual run gate only opens for allowed policy evaluation",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const blockedEvaluation = evaluateBusinessSqlExecutionPolicy({
+        executionRequest: null,
+        artifact: deterministicArtifactFirst,
+        target: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
+        policy: DEFAULT_LOCAL_DUCKDB_BUSINESS_SQL_EXECUTION_POLICY,
+        context: { metadataOnly: true },
+      });
+      return [
+        ...(!canExecuteBusinessSqlRequest(null) ? [] : ["Preview readiness alone must not open gate."]),
+        ...(!canExecuteBusinessSqlRequest(blockedEvaluation) ? [] : ["Blocked evaluation must not open gate."]),
+        ...(canExecuteBusinessSqlRequest(allowedExecutionEvaluation)
+          ? []
+          : ["Allowed evaluation should open conceptual gate."]),
+      ];
+    },
+  },
+  {
+    name: "execution audit record captures evaluated policy lineage only",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      if (!createdExecutionRequest.request || !allowedExecutionEvaluation) {
+        return ["Expected created execution request and allowed evaluation."];
+      }
+      const audit = createBusinessSqlExecutionAuditRecord({
+        executionRequest: createdExecutionRequest.request,
+        evaluation: allowedExecutionEvaluation,
+        artifact: executionArtifact,
+      });
+      return [
+        ...(audit.lifecycle === "policy_evaluated" ? [] : ["Expected policy evaluated lifecycle."]),
+        ...(audit.executionRequestId === createdExecutionRequest.request.requestId
+          ? []
+          : ["Expected execution request lineage."]),
+        ...(audit.policyEvaluationId === allowedExecutionEvaluation.evaluationId
+          ? []
+          : ["Expected policy evaluation lineage."]),
+        ...(audit.artifactId === executionArtifact.artifactId ? [] : ["Expected artifact lineage."]),
+        ...(!audit.containsCredentials ? [] : ["Audit must not contain credentials."]),
+        ...(!audit.containsResultRows ? [] : ["Audit must not contain result rows."]),
+        ...(!audit.executionStarted && !audit.executionCompleted
+          ? []
+          : ["Audit record must not claim execution occurred."]),
+      ];
+    },
+  },
+  {
+    name: "execution governance contracts do not mutate canonical plan",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const before = JSON.stringify(ordersPerCustomer.plan);
+      const beforeId = ordersPerCustomer.plan.id;
+      createBusinessSqlExecutionTargetId(DEFAULT_BUSINESS_SQL_EXECUTION_TARGET);
+      if (createdExecutionRequest.request && allowedExecutionEvaluation) {
+        createBusinessSqlExecutionAuditRecord({
+          executionRequest: createdExecutionRequest.request,
+          evaluation: allowedExecutionEvaluation,
+          artifact: executionArtifact,
+        });
+      }
+      const after = JSON.stringify(ordersPerCustomer.plan);
+      return [
+        ...(ordersPerCustomer.plan.id === beforeId ? [] : ["Plan id must not change."]),
+        ...(after === before ? [] : ["Execution governance must not mutate plan."]),
       ];
     },
   },
