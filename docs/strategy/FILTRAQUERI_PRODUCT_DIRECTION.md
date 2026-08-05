@@ -133,6 +133,8 @@ Every downstream artifact derives from the canonical plan and executed result.
 
 No downstream layer may independently reinterpret the original question.
 
+Clarification is part of governed analytical planning. FiltraQueri analyzes with the user when business meaning is consequential, and accepted clarification updates one canonical analytical plan rather than creating a separate conversational source of truth.
+
 ## 8. Standing Product and Architectural Rules
 
 Doctrine-status legend:
@@ -152,6 +154,8 @@ Production behavior must be domain-neutral and derived from canonical contracts,
 Status: Enforced.
 
 The canonical analysis plan is the sole source of analytical meaning. SQL, visualization, explanation, export, execution, and rerun behavior derive from it.
+
+Conversational clarification must update the canonical plan through governed plan revisions. A user response does not change active analytical state merely because it was typed; it must be grounded, validated, presented as a proposed plan revision, and explicitly applied before it becomes active.
 
 ### Rule 3 - Dialect neutrality
 
@@ -209,6 +213,8 @@ The system must distinguish:
 Unsupported, ambiguous, or incomplete analyses must fail closed.
 
 No partial query, partial result, valid-subset fallback, or filter-free fallback may silently replace the requested analysis.
+
+Material unresolved clarification must block preview, insert, run, execution, and authoritative answer generation where applicable. Unsupported but understood intent must be preserved and marked blocked rather than silently simplified.
 
 ### Rule 7 - Visualization grounding
 
@@ -400,6 +406,59 @@ Reusable workflows should preserve:
 - explanation requirements;
 - execution and artifact history.
 
+### Rule 16 - Conversational clarification and metric governance
+
+Status: Principle and Planned: ConversationalClarification, PlanRevision, PlanElementDependencyGraph, and metric registry work in Phase 3.
+
+FiltraQueri analyzes with the user rather than silently guessing consequential business meaning. Clarification is governed analytical planning, not an unstructured chatbot state.
+
+Ask only when multiple reasonable interpretations could materially change the answer, meaning, safety, reproducibility, metric definition, population, time scope, grouping, comparison, filter, relationship, formula, or interpretation.
+
+Low-risk assumptions may be proposed visibly and remain editable without blocking unnecessarily. The experience should avoid becoming interrogative or excessively chatty.
+
+Definition authority levels:
+
+- governed;
+- user_defined;
+- provisional_proxy.
+
+FiltraQueri must never silently invent or promote a business-term definition as authoritative.
+
+Governed definitions come from approved organizational sources.
+
+User-defined definitions are explicitly supplied or selected by the user and remain scoped according to recorded governance.
+
+A provisional proxy may be proposed only when no governed definition is available and must require explicit acceptance. Accepting a provisional proxy for one investigation does not make it a governed organizational metric or authorize unrestricted reuse.
+
+If the required business meaning cannot be supported honestly, the analysis remains blocked.
+
+Definition authority must be intrinsic to the canonical MeasureDefinition or equivalent governed semantic definition, not UI-only metadata. Preserve authority, source, scope, limitations, acceptance provenance, revision identity, and reuse eligibility through canonical plans, SQL/query artifacts, execution provenance, results, charts and visualizations, explanations, saved analyses, exports, refresh/reopen flows, and persistence. Authority status must never be reconstructed from display labels.
+
+Every accepted clarification creates a new immutable canonical-plan revision. Preserve the previous value, proposed value, accepted value, actor/source, reason, triggering clarification, timestamp or version identity, affected elements, and active revision. Do not silently mutate or erase clarification history. Conversation history must not become a second hidden source of analytical truth.
+
+Every clarification-sensitive plan element must have a stable addressable identity. Dependencies between metrics, rankings, filters, comparisons, relationships, visualizations, explanations, and other downstream analytical elements must be explicitly represented.
+
+Dependency-aware invalidation must use a canonical plan-element dependency graph rather than UI state or hard-coded domain-specific conditions. The future contract must account for direct and transitive dependencies, edge types, invalidation reasons, stale, invalidated, and valid states, revalidation, revision lineage, and cycle prevention or detection. This graph is foundational from the first revision-capable implementation rather than something to retrofit later.
+
+Changing a resolved definition or plan element invalidates only dependent decisions. Preserve unrelated confirmed decisions when they remain valid. Revalidation is required before blocked downstream actions become available again. The user should be told what changed, what became stale or invalid, and what remained valid.
+
+Quick-choice clarification options are accelerators, not a closed form. Natural-language clarification responses may fill, revise, add, remove, or restructure plan elements. For example, a free-text answer may change a simple prior-period comparison into year-over-year analysis.
+
+Free-text answers must be grounded against metadata, governed definitions, supported analytical primitives, renderer capabilities, and execution readiness. If understood intent is unsupported, preserve it and block honestly.
+
+Clarification UX must support behaviors equivalent to:
+
+- explain this question;
+- show me an example;
+- why do you need this?;
+- I do not know;
+- recommend the safest supported option;
+- use our approved definition;
+- provide another definition;
+- stop or defer this part of the analysis.
+
+FiltraQueri should rephrase questions in plain language and, when useful, show examples grounded in the user's actual fields without implying that field presence establishes business meaning.
+
 ## 9. Explore and Investigation
 
 FiltraQueri previously had an Investigation tab. It was renamed to Explore to reduce interface heaviness and broaden the experience. Investigative capability was not abandoned. Explore remains the user-facing workspace. InvestigationPlan is the internal tool-independent contract for multi-step analysis.
@@ -517,6 +576,13 @@ A future metric definition should include:
 - metric identity;
 - canonical name;
 - business description;
+- definition authority: governed, user_defined, or provisional_proxy;
+- authority source;
+- authority scope;
+- limitations;
+- acceptance provenance;
+- revision identity;
+- reuse eligibility;
 - source entity;
 - source field or expression;
 - aggregation;
@@ -535,11 +601,14 @@ A future metric definition should include:
 - external semantic-layer source when imported;
 - semantic fingerprint.
 
+Definition authority is canonical semantic data. It must travel with the MeasureDefinition or equivalent governed definition through the canonical plan, rendered query artifacts, execution provenance, results, visualization, explanation, saved analysis, export, refresh, reopen, and persistence flows. It must not be inferred later from labels such as "approved" shown in the UI.
+
 Example:
 
 ```text
 Metric: Total revenue
 Version: 3
+Authority: governed
 Definition: SUM(orders.net_revenue)
 Required filter: orders.status = completed
 Default time field: orders.completed_date
@@ -555,7 +624,17 @@ Old analyses retain the metric version originally used.
 
 New analyses resolve to the current approved version unless explicitly configured otherwise.
 
+Clarification must consult governed metric definitions before proposing user-defined or provisional alternatives. The future metric registry is the authoritative source for approved reusable definitions.
+
+Intended sequence:
+
+Metric registry lookup -> materiality-gated clarification -> definition acceptance -> immutable plan revision -> dependency-aware readiness validation -> rendering -> execution-policy evaluation -> governed execution -> visualization -> explanation -> persistence.
+
+If no governed definition exists, FiltraQueri may ask the user to select or supply a scoped user-defined definition. A provisional proxy may be proposed only when no governed definition is available and the proxy can be represented honestly in the supported analytical contract. Explicit acceptance of a provisional proxy applies only to the recorded scope and does not promote it to an organizational metric.
+
 FiltraQueri should not initially replicate the full dbt Semantic Layer. It should support organizations with no semantic layer. Future imports may support dbt, Cube, LookML, Power BI semantic models, and other catalogs.
+
+This section defines planned governance direction. It does not claim that the metric registry, definition persistence, clarification state, or authority propagation is currently implemented.
 
 ## 13. Multi-Dialect Direction
 
@@ -630,7 +709,10 @@ AnalysisDefinition:
 
 - original question;
 - canonical plan;
+- active canonical-plan revision;
+- clarification revision lineage;
 - metric versions;
+- definition authority records;
 - semantic fingerprint.
 
 SqlArtifact:
@@ -675,6 +757,7 @@ ReviewRecord:
 RerunComparison:
 
 - semantic;
+- plan revision lineage;
 - definition;
 - structure;
 - result;
@@ -829,6 +912,9 @@ Principles:
 - plain-language explanations;
 - analyst control;
 - explicit assumptions;
+- materiality-gated clarification;
+- visible proposed plan revisions before acceptance;
+- explainable clarification questions;
 - visible blockers;
 - no silent fallback;
 - no automatic Insert;
@@ -930,8 +1016,15 @@ Completion gate:
 - safe visual or table;
 - visible warnings.
 
-### Phase 3 - Governed metrics
+### Phase 3 - Conversational clarification and metric governance foundation
 
+- PS-CMG1 - definition authority contract: governed, user_defined, provisional_proxy; source, scope, limitations, acceptance provenance, revision identity, and reuse eligibility;
+- PS-CMG2 - stable plan-element identities for clarification-sensitive metrics, filters, groupings, comparisons, rankings, relationships, visualizations, explanations, and downstream analytical elements;
+- PS-CMG3 - immutable canonical-plan revisions for accepted clarifications, including previous value, proposed value, accepted value, actor/source, reason, triggering clarification, timestamp or version identity, affected elements, and active revision;
+- PS-CMG4 - canonical plan-element dependency graph with direct and transitive dependencies, edge types, invalidation reasons, stale/invalidated/valid states, revalidation, revision lineage, and cycle prevention or detection;
+- PS-CMG5 - materiality-gated clarification state that blocks preview, insert, run, execution, and authoritative answer generation only when unresolved ambiguity materially affects meaning, safety, reproducibility, or supported output;
+- PS-CMG6 - provenance propagation through canonical plans, SQL/query artifacts, execution provenance, results, charts and visualizations, explanations, saved analyses, exports, refresh/reopen flows, and persistence;
+- PS-CMG7 - structural free-text clarification grounding against metadata, governed definitions, supported analytical primitives, renderer capabilities, and execution readiness;
 - PS-M1 - metric-definition contract;
 - PS-M2 - validation and compatibility;
 - PS-M3 - deterministic identity and versioning;
@@ -941,10 +1034,17 @@ Completion gate:
 
 Completion gate:
 
+- definition authority is canonical data, not UI metadata;
+- metric registry lookup precedes user-defined or provisional definition proposals;
+- accepted clarifications create immutable canonical-plan revisions;
+- dependency-aware invalidation preserves unrelated confirmed decisions;
+- material unresolved clarification blocks downstream actions honestly;
 - approved versioned metric definitions;
 - deterministic metric fingerprints;
 - plan integration;
 - portability across DuckDB and PostgreSQL rendering.
+
+Foundational contracts and governance work in this phase must precede rich conversational UI. Later prompts must not build clarification chat surfaces, static question scripts, or UX-only authority labels before canonical state, registry lookup, plan revision, dependency graph, invalidation/revalidation, and provenance foundations exist.
 
 ### Phase 4 - Durable analytical artifacts
 
@@ -966,6 +1066,7 @@ Completion gate:
 ### Phase 5 - Guided intelligence and enterprise workflows
 
 - InvestigationPlan;
+- rich conversational clarification UX built on Phase 3 canonical contracts, not before them;
 - PS-Q3 statistical quality;
 - ReviewCheckpoint and ReviewRecord;
 - ReusableAnalysisWorkflow;
@@ -996,9 +1097,9 @@ Completion gate:
 
 ### Templates and Reports Direction
 
-Browse Templates should evolve toward canonical reusable analytical patterns, optional metric requirements, relationship requirements, readiness checks, and later ReusableAnalysisWorkflow backing. Permanent templates remain immutable. User adaptation creates a session or saved instance.
+Browse Templates should evolve toward canonical reusable analytical patterns, optional metric requirements with recorded definition authority, relationship requirements, readiness checks, and later ReusableAnalysisWorkflow backing. Permanent templates remain immutable. User adaptation creates a session or saved instance.
 
-Browse Reports should evolve toward published governed AnalysisArtifacts with stored plan and metric versions, execution lineage, visualization, validated findings, rerun state, and publication and review metadata.
+Browse Reports should evolve toward published governed AnalysisArtifacts with stored plan revisions, metric versions, definition authority, execution lineage, visualization, validated findings, rerun state, and publication and review metadata.
 
 This document does not implement or redesign these surfaces.
 
@@ -1010,7 +1111,7 @@ M2 - Two-dialect proof: same plan renders to DuckDB and PostgreSQL.
 
 M3 - Executed-answer foundation: users can ask, execute safely, inspect results, and receive a safe chart or table.
 
-M4 - Governed metrics: definitions are stable, versioned, and reusable.
+M4 - Conversational clarification and governed metrics: material clarifications produce immutable canonical-plan revisions, definition authority is preserved as canonical data, and approved definitions are stable, versioned, and reusable.
 
 M5 - Durable analysis artifact: analyses can be saved, shared, and reopened with lineage.
 
@@ -1036,7 +1137,7 @@ This document does not:
 - authorize deleting older documents before inventory;
 - change production behavior by itself.
 
-The customer-facing statements in this document describe the intended end-state product. They must not be used as claims of currently shipped functionality until the supporting arcs exist, including governed execution, ExecutedResult, visualization, validated explanation, durable artifacts, and rerun comparison. The statements remain product direction.
+The customer-facing statements in this document describe the intended end-state product. They must not be used as claims of currently shipped functionality until the supporting arcs exist, including governed execution, ExecutedResult, visualization, validated explanation, durable artifacts, conversational clarification and metric governance foundations, and rerun comparison. The statements remain product direction.
 
 ## 21. Document Governance
 
@@ -1067,6 +1168,7 @@ FiltraQueri is not being built as a chatbot that happens to produce SQL.
 It is being built as a trustworthy analytical-answer system in which:
 
 - the canonical plan preserves meaning;
+- material clarifications revise the canonical plan under governance;
 - metric definitions are governed;
 - SQL is portable;
 - execution is controlled;
