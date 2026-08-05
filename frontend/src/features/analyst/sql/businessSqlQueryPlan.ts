@@ -1,5 +1,6 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SchemaColumn } from "../../dataset/datasetTypes";
+import type { BusinessSqlDefinitionAuthorityRecord } from "./businessSqlDefinitionAuthority";
 
 export type BusinessSqlPlanId = string;
 
@@ -63,6 +64,7 @@ export type BusinessSqlMeasure = {
   distinct: boolean;
   label: string;
   sqlAlias: string;
+  definitionAuthority?: BusinessSqlDefinitionAuthorityRecord;
 };
 
 export type BusinessSqlDerivedMeasureOperator =

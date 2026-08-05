@@ -227,6 +227,11 @@ const fixtures = [
     exportName: "runBusinessSqlQueryPlanFixtures",
   },
   {
+    label: "Business SQL definition authority",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlDefinitionAuthority.test.ts",
+    exportName: "runBusinessSqlDefinitionAuthorityFixtures",
+  },
+  {
     label: "Business SQL measure ambiguity",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlMeasureAmbiguity.test.ts",
     exportName: "runBusinessSqlMeasureAmbiguityFixtures",
