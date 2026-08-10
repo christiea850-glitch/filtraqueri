@@ -232,6 +232,11 @@ const fixtures = [
     exportName: "runBusinessSqlPlanElementIdentityFixtures",
   },
   {
+    label: "Business SQL plan revision lineage",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlPlanRevisionLineage.test.ts",
+    exportName: "runBusinessSqlPlanRevisionLineageFixtures",
+  },
+  {
     label: "Business SQL definition authority",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlDefinitionAuthority.test.ts",
     exportName: "runBusinessSqlDefinitionAuthorityFixtures",
