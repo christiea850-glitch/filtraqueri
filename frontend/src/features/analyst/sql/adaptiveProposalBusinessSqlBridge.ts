@@ -10,6 +10,9 @@ import type {
   ProposedMetric,
 } from "./adaptiveReportProposal";
 import {
+  attachBusinessSqlPlanElementIdentityManifest,
+} from "./businessSqlPlanElementIdentity";
+import {
   createBlockedBusinessSqlQueryPlan,
   createEmptyBusinessSqlQueryPlan,
   createBusinessSqlMeasureId,
@@ -323,6 +326,7 @@ const mapMeasures = (
     };
     const measure: BusinessSqlMeasure = {
       ...measureSeed,
+      planElementKey: metric.stableElementKey,
       measureId: createBusinessSqlMeasureId(measureSeed),
       fieldInferredType: metric.inferredType,
       label,
@@ -351,6 +355,7 @@ const mapGroupings = (proposal: AdaptiveReportProposal): BusinessSqlGrouping[] =
     .map((grouping) => {
       const entity = entityForTable(proposal.entities, grouping.tableName);
       return {
+        planElementKey: grouping.stableElementKey,
         entity: entity?.label || grouping.tableName || grouping.label,
         table: grouping.tableName || undefined,
         field: grouping.columnName || undefined,
@@ -388,6 +393,7 @@ const mapFilters = (
       }
       const entity = entityForTable(proposal.entities, target.table);
       const seed: BusinessSqlFilter = {
+        planElementKey: filter.stableElementKey,
         kind: "custom",
         target: {
           kind: "field",
@@ -434,6 +440,7 @@ const mapFilters = (
           ? "date_relative"
           : "custom";
     filters.push({
+      planElementKey: filter.stableElementKey,
       kind,
       entity: entity?.label,
       table: filter.tableName || undefined,
@@ -503,8 +510,9 @@ const mapOrderBy = (
           field: grouping?.columnName || undefined,
           table: grouping?.tableName || undefined,
           resolved: Boolean(grouping?.columnName && grouping?.tableName),
-        };
+    };
     orderBy.push({
+      planElementKey: sort.stableElementKey,
       sortId: createBusinessSqlSortId({ target, direction: sort.direction }),
       target,
       direction: sort.direction,
@@ -519,6 +527,7 @@ const mapRowLimit = (proposal: AdaptiveReportProposal): BusinessSqlRowLimit | nu
   if (!proposal.rowLimit) return null;
   const rowLimit = { value: proposal.rowLimit.value };
   return {
+    planElementKey: proposal.rowLimit.stableElementKey,
     ...rowLimit,
     rowLimitId: createBusinessSqlRowLimitId(rowLimit),
   };
@@ -556,6 +565,7 @@ const mapAggregateResultConditions = (
       };
       aggregateResultConditions.push({
         ...seed,
+        planElementKey: condition.stableElementKey,
         conditionId: createBusinessSqlAggregateResultConditionId(seed),
         label: condition.label,
       });
@@ -581,6 +591,7 @@ const mapAggregateResultConditions = (
     };
     aggregateResultConditions.push({
       ...seed,
+      planElementKey: condition.stableElementKey,
       conditionId: createBusinessSqlAggregateResultConditionId(seed),
       label: condition.label,
     });
@@ -624,6 +635,7 @@ const mapDerivedMeasures = (
     };
     const derivedMeasure = {
       ...seed,
+      planElementKey: proposed.stableElementKey,
       derivedMeasureId: createBusinessSqlDerivedMeasureId(seed),
       sqlAlias: proposed.sqlAlias,
       label: proposed.label,
@@ -670,6 +682,7 @@ const mapJoinNeeds = (
     const fromEntity = joinEntityLabel(proposal.entities, join.leftTable, join.leftEntity);
     const toEntity = joinEntityLabel(proposal.entities, join.rightTable, join.rightEntity);
     requirements.push({
+      planElementKey: join.stableElementKey,
       fromEntity,
       toEntity,
       required: true,
@@ -898,7 +911,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
     ...joinResult.issues,
     ...confidenceIssues,
   ];
-  const initialPlan: BusinessSqlQueryPlan = {
+  const initialPlan: BusinessSqlQueryPlan = attachBusinessSqlPlanElementIdentityManifest({
     ...createEmptyBusinessSqlQueryPlan(),
     id: `business-sql-plan:adaptive:${compactId(proposal.id)}`,
     kind: planKindFor(metricResult.metric, groupings, joinResult.joinPath),
@@ -930,7 +943,7 @@ export function createBusinessSqlPlanFromAdaptiveProposal({
       filterResult.filters,
       joinResult.joinPath,
     ),
-  };
+  });
 
   const joinedPlan = resolveBusinessSqlJoinPath({
     plan: initialPlan,

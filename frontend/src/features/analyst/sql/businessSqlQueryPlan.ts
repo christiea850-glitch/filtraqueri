@@ -1,6 +1,10 @@
 import type { SqlDialectId } from "../../sqlIntelligence";
 import type { SchemaColumn } from "../../dataset/datasetTypes";
 import type { BusinessSqlDefinitionAuthorityRecord } from "./businessSqlDefinitionAuthority";
+import type {
+  BusinessSqlPlanElementIdentity,
+  BusinessSqlPlanElementKey,
+} from "./businessSqlPlanElementIdentity";
 
 export type BusinessSqlPlanId = string;
 
@@ -55,6 +59,7 @@ export type BusinessSqlMetric = {
 };
 
 export type BusinessSqlMeasure = {
+  planElementKey?: BusinessSqlPlanElementKey;
   measureId: string;
   kind: BusinessSqlMeasureKind;
   entity?: string;
@@ -78,6 +83,7 @@ export type BusinessSqlDivisionPolicy = {
 };
 
 export type BusinessSqlDerivedMeasure = {
+  planElementKey?: BusinessSqlPlanElementKey;
   derivedMeasureId: string;
   operator: BusinessSqlDerivedMeasureOperator;
   leftMeasureId: string;
@@ -116,6 +122,7 @@ export type BusinessSqlSortTarget =
     };
 
 export type BusinessSqlSort = {
+  planElementKey?: BusinessSqlPlanElementKey;
   sortId: string;
   target: BusinessSqlSortTarget;
   direction: "asc" | "desc";
@@ -123,6 +130,7 @@ export type BusinessSqlSort = {
 };
 
 export type BusinessSqlRowLimit = {
+  planElementKey?: BusinessSqlPlanElementKey;
   rowLimitId: string;
   value: number;
 };
@@ -151,6 +159,7 @@ export type BusinessSqlAggregateResultConditionTarget =
     };
 
 export type BusinessSqlAggregateResultCondition = {
+  planElementKey?: BusinessSqlPlanElementKey;
   conditionId: string;
   operator: BusinessSqlAggregateComparisonOperator;
   comparisonValue: BusinessSqlAggregateComparisonValue;
@@ -160,6 +169,7 @@ export type BusinessSqlAggregateResultCondition = {
 };
 
 export type BusinessSqlGrouping = {
+  planElementKey?: BusinessSqlPlanElementKey;
   entity: string;
   table?: string;
   field?: string;
@@ -233,6 +243,7 @@ export type BusinessSqlFilterTarget =
     };
 
 export type BusinessSqlFilter = {
+  planElementKey?: BusinessSqlPlanElementKey;
   filterId?: string;
   kind: BusinessSqlFilterKind;
   target?: BusinessSqlFilterTarget;
@@ -249,6 +260,7 @@ export type BusinessSqlFilter = {
 };
 
 export type BusinessSqlJoinRequirement = {
+  planElementKey?: BusinessSqlPlanElementKey;
   fromEntity: string;
   toEntity: string;
   required: boolean;
@@ -306,6 +318,7 @@ export type BusinessSqlRendererMetadata = {
 
 export type BusinessSqlQueryPlan = {
   id: BusinessSqlPlanId;
+  elementIdentities?: BusinessSqlPlanElementIdentity[];
   kind: BusinessSqlPlanKind;
   status: BusinessSqlPlanStatus;
   support: BusinessSqlPlanSupportLevel;
@@ -417,6 +430,12 @@ const exactStringIdentity = (value: string): string =>
     .map((character) => character.codePointAt(0)?.toString(16).padStart(4, "0") || "")
     .join("");
 
+const hasBusinessSqlControlCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+
 const invalidSetMemberIdentity = (value: unknown): string => {
   if (value === null) return "null";
   if (Array.isArray(value)) return `array:${value.length}`;
@@ -460,7 +479,7 @@ const setComparisonIdentity = (
         invalidMembers.push(invalidSetMemberIdentity(value));
       }
     } else if (valueKind === "string") {
-      if (typeof value === "string" && value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value)) {
+      if (typeof value === "string" && value.trim().length > 0 && !hasBusinessSqlControlCharacter(value)) {
         validMembers.push(exactStringIdentity(value));
       } else {
         invalidMembers.push(invalidSetMemberIdentity(value));

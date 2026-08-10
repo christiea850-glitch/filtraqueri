@@ -50,6 +50,7 @@ export type ProposedEntity = {
 
 export type ProposedMetric = {
   id: string;
+  stableElementKey?: string;
   label: string;
   kind:
     | "count_rows"
@@ -69,6 +70,7 @@ export type ProposedMetric = {
 
 export type ProposedAggregateResultCondition = {
   id: string;
+  stableElementKey?: string;
   metricId?: string;
   target?:
     | {
@@ -88,6 +90,7 @@ export type ProposedAggregateResultCondition = {
 
 export type ProposedDerivedMeasure = {
   id: string;
+  stableElementKey?: string;
   operator: "subtract" | "divide" | "add" | "multiply";
   leftMetricId: string;
   rightMetricId: string;
@@ -102,6 +105,7 @@ export type ProposedDerivedMeasure = {
 
 export type ProposedGrouping = {
   id: string;
+  stableElementKey?: string;
   label: string;
   tableName: string | null;
   columnName: string | null;
@@ -110,6 +114,7 @@ export type ProposedGrouping = {
 
 export type ProposedFilter = {
   id: string;
+  stableElementKey?: string;
   label: string;
   tableName: string | null;
   columnName: string | null;
@@ -131,6 +136,7 @@ export type ProposedFilter = {
 
 export type ProposedJoinNeed = {
   id: string;
+  stableElementKey?: string;
   leftEntity: string;
   rightEntity: string;
   leftTable: string | null;
@@ -142,6 +148,7 @@ export type ProposedJoinNeed = {
 
 export type ProposedSort = {
   id: string;
+  stableElementKey?: string;
   label: string;
   target: "metric" | "grouping" | "derived_measure";
   targetId: string;
@@ -151,6 +158,7 @@ export type ProposedSort = {
 
 export type ProposedRowLimit = {
   id: string;
+  stableElementKey?: string;
   value: number;
   confidence: "high" | "medium" | "low";
 };
@@ -1168,10 +1176,28 @@ const ROW_FILTER_OPERATOR_PHRASES: readonly RowFilterOperatorPhrase[] = ([
   .slice()
   .sort((left, right) => right.phrase.length - left.phrase.length || left.phrase.localeCompare(right.phrase));
 
+const hasNaturalLanguageControlCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+
 const maskQuotedNaturalLanguageStrings = (value: string): string =>
-  value.replace(/"[^"\u0000-\u001f\u007f]*"|'[^'\u0000-\u001f\u007f]*'/g, (match) =>
-    " ".repeat(match.length),
+  value.replace(/"[^"]*"|'[^']*'/g, (match) =>
+    hasNaturalLanguageControlCharacter(match)
+      ? match
+      : " ".repeat(match.length),
   );
+
+const parseQuotedNaturalLanguageString = (
+  value: string,
+  quote: "'" | "\"",
+): string | null => {
+  if (!value.startsWith(quote) || !value.endsWith(quote) || value.length < 2) return null;
+  const inner = value.slice(1, -1);
+  if (inner.includes(quote) || hasNaturalLanguageControlCharacter(inner)) return null;
+  return inner;
+};
 
 const standaloneWhereMatches = (value: string): RegExpMatchArray[] =>
   [...value.matchAll(/\bwhere\b/gi)];
@@ -1355,10 +1381,10 @@ const textType = (value: SchemaColumn["inferred_type"] | undefined): boolean =>
 
 const parseNaturalLanguageStringValue = (value: string): BusinessSqlFilterComparisonValue | null => {
   const trimmed = trimNaturalLanguageValuePunctuation(value);
-  const doubleQuoted = trimmed.match(/^"([^"\u0000-\u001f\u007f]*)"$/);
-  if (doubleQuoted) return { kind: "string", value: doubleQuoted[1] };
-  const singleQuoted = trimmed.match(/^'([^'\u0000-\u001f\u007f]*)'$/);
-  if (singleQuoted) return { kind: "string", value: singleQuoted[1] };
+  const doubleQuoted = parseQuotedNaturalLanguageString(trimmed, "\"");
+  if (doubleQuoted !== null) return { kind: "string", value: doubleQuoted };
+  const singleQuoted = parseQuotedNaturalLanguageString(trimmed, "'");
+  if (singleQuoted !== null) return { kind: "string", value: singleQuoted };
   if (/^[A-Za-z0-9_-]+$/.test(trimmed)) return { kind: "string", value: trimmed };
   return null;
 };
@@ -1707,6 +1733,7 @@ const proposedMetricFromPhrase = (
   semanticColumns: readonly SemanticColumnHint[],
   strictNameMatch = false,
   requireGroundedCount = false,
+  stableElementKey?: string,
 ): ProposedMetric => {
   const normalizedPhrase = normalize(phrase);
   const suffixCountMatch = normalizedPhrase.match(/^(.+?)\s+count$/);
@@ -1735,6 +1762,7 @@ const proposedMetricFromPhrase = (
 
   return {
     id: `metric:${compactId(phrase)}`,
+    stableElementKey,
     label: phrase,
     kind,
     tableName: isSupportedExplicitMeasure
@@ -1766,6 +1794,7 @@ const proposeMetrics = (
         semanticColumns,
         true,
         requireGroundedCount,
+        "measure:formula-left",
       ),
       proposedMetricFromPhrase(
         explicitFormula.rightPhrase,
@@ -1773,6 +1802,7 @@ const proposeMetrics = (
         semanticColumns,
         true,
         requireGroundedCount,
+        "measure:formula-right",
       ),
     ];
   }
@@ -1797,6 +1827,7 @@ const proposeMetrics = (
     return [
       {
         id: "metric:count-rows",
+        stableElementKey: "measure:primary",
         label: "Count rows",
         kind: "count_rows",
         tableName: worksheets[0]?.tableName || null,
@@ -1808,7 +1839,14 @@ const proposeMetrics = (
   }
 
   return intent.metrics.map((metric) =>
-    proposedMetricFromPhrase(metric.replace(/_/g, " "), worksheets, semanticColumns),
+    proposedMetricFromPhrase(
+      metric.replace(/_/g, " "),
+      worksheets,
+      semanticColumns,
+      false,
+      false,
+      intent.metrics.length === 1 ? "measure:primary" : undefined,
+    ),
   );
 };
 
@@ -1830,6 +1868,7 @@ const proposeSorts = (
   return [
     {
       id: `sort:${compactId(targetMetric.id)}:${intent.analysisPath.orderDirection}`,
+      stableElementKey: "ranking:primary-sort",
       label: `Sort by ${targetMetric.label}`,
       target: "metric",
       targetId: targetMetric.id,
@@ -1873,6 +1912,7 @@ const defaultAggregateSortFor = ({
   return [
     {
       id: `sort:${compactId(metric.id)}:desc`,
+      stableElementKey: "ranking:primary-sort",
       label: `Sort by ${metric.label}`,
       target: "metric",
       targetId: metric.id,
@@ -1896,6 +1936,7 @@ const proposeDerivedSorts = (
   return [
     {
       id: `sort:derived-measure:${compactId(derivedMeasure.id)}:${ranking.direction}`,
+      stableElementKey: "ranking:primary-sort",
       label: `Sort by ${derivedMeasure.label || derivedMeasure.sqlAlias}`,
       target: "derived_measure",
       targetId: derivedMeasure.id,
@@ -1910,6 +1951,7 @@ const proposeRowLimit = (intent: BusinessIntent): ProposedRowLimit | null => {
   if (!value) return null;
   return {
     id: `row-limit:${value}`,
+    stableElementKey: "ranking:row-limit",
     value,
     confidence: "high",
   };
@@ -1959,6 +2001,10 @@ const proposeGroupings = (
         ]);
     return {
       id: `grouping:${compactId(grouping)}`,
+      stableElementKey:
+        groupingConcepts.length === 1
+          ? "grouping:primary"
+          : undefined,
       label: grouping,
       tableName: column?.worksheet.tableName || null,
       columnName: column?.column.name || null,
@@ -1998,6 +2044,7 @@ const proposeDerivedMeasures = (
     {
       ...seed,
       id: createProposedDerivedMeasureId(seed),
+      stableElementKey: "measure:derived-primary",
       sqlAlias: createBusinessSqlMeasureAlias(label),
       label,
       evidence: explicitFormula.evidence,
@@ -2030,6 +2077,7 @@ const proposeAggregateResultConditions = ({
     return [
       {
         id: `aggregate-condition:derived-measure:${compactId(derivedMeasure.id)}:${threshold.operator}:${threshold.comparisonValue.value}`,
+        stableElementKey: "comparison:primary-threshold",
         target: {
           kind: "derived_measure",
           derivedMeasureId: derivedMeasure.id,
@@ -2064,6 +2112,7 @@ const proposeAggregateResultConditions = ({
   return [
     {
       id: `aggregate-condition:${compactId(metric.id)}:${threshold.operator}:${threshold.comparisonValue.value}`,
+      stableElementKey: "comparison:primary-threshold",
       metricId: metric.id,
       target: { kind: "metric", metricId: metric.id },
       operator: threshold.operator,
@@ -2163,6 +2212,7 @@ const unsupportedRowFilter = (
   shell: Extract<RowFilterShell, { status: "unsupported" }>,
 ): ProposedFilter => ({
   id: `filter:row-filter:${compactId(shell.reason)}`,
+  stableElementKey: "filter:explicit-row",
   label: "Row-filter semantics",
   tableName: null,
   columnName: null,
@@ -2174,11 +2224,13 @@ const unsupportedRowFilter = (
 const proposedCanonicalRowFilter = (
   shell: Extract<RowFilterShell, { status: "detected" }>,
   worksheets: readonly WorksheetInput[],
+  stableElementKey = "filter:explicit-row",
 ): ProposedFilter => {
   const matches = matchingRowFilterFields(shell.fieldPhrase, worksheets);
   if (matches.length !== 1) {
     return {
       id: `filter:row-filter:${matches.length === 0 ? "missing-field" : "ambiguous-field"}`,
+      stableElementKey,
       label: "Row-filter semantics",
       tableName: null,
       columnName: null,
@@ -2194,6 +2246,7 @@ const proposedCanonicalRowFilter = (
   if (comparisonValue === null) {
     return {
       id: "filter:row-filter:incompatible-value",
+      stableElementKey,
       label: "Row-filter semantics",
       tableName: bound.worksheet.tableName,
       columnName: bound.column.name,
@@ -2217,6 +2270,7 @@ const proposedCanonicalRowFilter = (
   };
   return {
     id: createProposedRowFilterId(seed),
+    stableElementKey,
     label: `${bound.column.name} ${shell.evidence}`,
     tableName: bound.worksheet.tableName,
     columnName: bound.column.name,
@@ -2288,6 +2342,7 @@ const proposeFilters = (
     ) {
       filters.push({
         id: "filter:row-filter:aggregate-date-threshold",
+        stableElementKey: "filter:explicit-row",
         label: "Row-filter semantics",
         tableName: null,
         columnName: null,
@@ -2297,7 +2352,11 @@ const proposeFilters = (
       });
     } else if (!hasDerivedThresholdShell && aggregateResultConditions.length === 0 && !hasAggregateThresholdShell) {
       const canonicalCandidates = rowFilterShells.shells.map((shell) =>
-        proposedCanonicalRowFilter(shell, worksheets),
+        proposedCanonicalRowFilter(
+          shell,
+          worksheets,
+          rowFilterShells.shells.length === 1 ? "filter:explicit-row" : undefined,
+        ),
       );
       if (canonicalCandidates.every((filter) => filter.semantics === "canonical" && filter.executable === true)) {
         filters.push(...canonicalCandidates);
@@ -2320,6 +2379,7 @@ const proposeFilters = (
   if (promptHasAny(legacyPrompt, ["status", "active", "inactive", "open", "closed", "current"])) {
     filters.push({
       id: "filter:status-semantics",
+      stableElementKey: "filter:status-semantics",
       label: "Status/current semantics",
       tableName: statusColumn?.worksheet.tableName || null,
       columnName: statusColumn?.column.name || null,
@@ -2345,6 +2405,7 @@ const proposeFilters = (
   ) {
     filters.push({
       id: "filter:date-semantics",
+      stableElementKey: "filter:date-window",
       label: "Date-window semantics",
       tableName: dateColumn?.worksheet.tableName || null,
       columnName: dateColumn?.column.name || null,
@@ -2362,6 +2423,7 @@ const proposeFilters = (
     });
     filters.push({
       id: "filter:business-condition-semantics",
+      stableElementKey: "filter:business-condition",
       label: "Business condition semantics",
       tableName: conditionColumn?.worksheet.tableName || null,
       columnName: conditionColumn?.column.name || null,
@@ -2436,6 +2498,7 @@ const proposeJoinNeeds = (
     return [
       {
         id: "join:not-required",
+        stableElementKey: "relationship:not-required",
         leftEntity: boundEntities[0]?.label || "single entity",
         rightEntity: "",
         leftTable: boundEntities[0]?.tableName || null,
@@ -2467,6 +2530,7 @@ const proposeJoinNeeds = (
         : "missing";
     needs.push({
       id: `join:${compactId(left.label)}:${compactId(right.label)}`,
+      stableElementKey: joinPairs.length === 1 ? "relationship:primary" : undefined,
       leftEntity: left.label,
       rightEntity: right.label,
       leftTable: left.tableName,
