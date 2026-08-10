@@ -1,4 +1,8 @@
-import type { CleanPrepareStep } from "../useCleanPrepareStep";
+import {
+  cleanPrepareSteps,
+  useCleanPrepareStep,
+  type CleanPrepareStep,
+} from "../useCleanPrepareStep";
 import {
   getPrepareBackDestination,
   getPrepareBackHash,
@@ -272,6 +276,27 @@ export const runPrepareBackNavigationFixtures = (): PrepareBackNavigationFixture
         "Switching away from Structural fixes should not rewrite local structural state.",
       ),
     ),
+    fixture("Clean Prepare hook exposes the expected local step order", () => [
+      ...expect(cleanPrepareSteps.join("|") === "review|decide|apply", "Hook should preserve review/decide/apply steps."),
+    ]),
+    fixture("Clean Prepare hook owns local state without hash history behavior", () => {
+      const source = `${useCleanPrepareStep}`;
+      const bannedTokens = [
+        "location.hash",
+        "window.location",
+        "globalThis.location",
+        "history.",
+        "replaceState",
+        "pushState",
+        "hashchange",
+        "popstate",
+        "addEventListener",
+        "removeEventListener",
+      ];
+      return bannedTokens.flatMap((token) =>
+        expect(!source.includes(token), `Hook should not contain ${token}.`),
+      );
+    }),
     fixture("back-navigation helper has no storage, SQL, network, or time side effects", () => {
       const source =
         `${getPrepareBackDestination}` +
