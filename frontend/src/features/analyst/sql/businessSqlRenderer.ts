@@ -73,6 +73,7 @@ type SqlSafetyValidation = {
 };
 
 export const BUSINESS_SQL_DUCKDB_RENDERER_ID = "business-sql-renderer:duckdb";
+export const BUSINESS_SQL_POSTGRESQL_RENDERER_ID = "business-sql-renderer:postgresql";
 
 // Renderer version policy: increment this value for byte-visible SQL emission
 // changes or behavior changes that alter artifact interpretation. Do not
@@ -80,12 +81,47 @@ export const BUSINESS_SQL_DUCKDB_RENDERER_ID = "business-sql-renderer:duckdb";
 // The version participates in SqlArtifact identity, never canonical plan identity.
 export const BUSINESS_SQL_DUCKDB_RENDERER_VERSION =
   "business-sql-duckdb-renderer:v1";
+export const BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION =
+  "business-sql-postgresql-renderer:v1";
+
+type BusinessSqlDialectRenderingConfig = {
+  dialect: BusinessSqlRendererDialectId;
+  rendererId: string;
+  rendererVersion: string;
+  textContains: (fieldExpression: string, literal: string) => string;
+  textStartsWith: (fieldExpression: string, literal: string) => string;
+  textEndsWith: (fieldExpression: string, literal: string) => string;
+};
+
+const DUCKDB_RENDERING_CONFIG: BusinessSqlDialectRenderingConfig = {
+  dialect: "duckdb",
+  rendererId: BUSINESS_SQL_DUCKDB_RENDERER_ID,
+  rendererVersion: BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+  textContains: (fieldExpression, literal) => `contains(${fieldExpression}, ${literal})`,
+  textStartsWith: (fieldExpression, literal) => `starts_with(${fieldExpression}, ${literal})`,
+  textEndsWith: (fieldExpression, literal) => `ends_with(${fieldExpression}, ${literal})`,
+};
+
+const POSTGRESQL_RENDERING_CONFIG: BusinessSqlDialectRenderingConfig = {
+  dialect: "postgresql",
+  rendererId: BUSINESS_SQL_POSTGRESQL_RENDERER_ID,
+  rendererVersion: BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION,
+  textContains: (fieldExpression, literal) => `POSITION(${literal} IN ${fieldExpression}) > 0`,
+  textStartsWith: (fieldExpression, literal) => `POSITION(${literal} IN ${fieldExpression}) = 1`,
+  textEndsWith: (fieldExpression, literal) => `RIGHT(${fieldExpression}, CHAR_LENGTH(${literal})) = ${literal}`,
+};
 
 const hasText = (value: string | undefined): value is string =>
   Boolean(value && value.trim().length > 0);
 
 const uniqueStrings = (values: readonly string[]): string[] =>
   Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+
+const hasControlCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
 
 const quoteIdentifier = (identifier: string): string =>
   `"${identifier.replace(/"/g, '""')}"`;
@@ -94,20 +130,21 @@ const qualified = (table: string, field: string): string =>
   `${quoteIdentifier(table)}.${quoteIdentifier(field)}`;
 
 const isValidIdentifier = (identifier: string | undefined): identifier is string =>
-  hasText(identifier) && !/[\u0000-\u001f\u007f]/.test(identifier);
+  hasText(identifier) && !hasControlCharacter(identifier);
 
 const summaryFor = (
   planId: string,
   status: BusinessSqlRenderResult["status"],
   reasonCode: BusinessSqlRendererReasonCode,
   sql: string | null,
+  dialect: BusinessSqlRendererDialectId,
 ): string =>
   [
     `plan=${planId}`,
     `status=${status}`,
     `rendered=${status === "rendered"}`,
     `reason=${reasonCode}`,
-    "target=duckdb",
+    `target=${dialect}`,
     `sql=${sql ? "present" : "none"}`,
     "execution=false",
     "insert=false",
@@ -120,12 +157,14 @@ const refused = ({
   status,
   reasons,
   warnings,
+  dialect,
 }: {
   integrated: BusinessSqlQueryPlanJoinResolution;
   reasonCode: Exclude<BusinessSqlRendererReasonCode, "rendered">;
   status: "needs_review" | "blocked";
   reasons: readonly string[];
   warnings?: readonly string[];
+  dialect: BusinessSqlRendererDialectId;
 }): BusinessSqlRenderResult => {
   const blockers = status === "blocked" ? uniqueStrings(reasons) : [];
   return {
@@ -137,17 +176,18 @@ const refused = ({
     blockers,
     warnings: uniqueStrings(warnings || integrated.warnings),
     planId: integrated.plan.id,
-    rendererTarget: "duckdb",
+    rendererTarget: dialect,
     executionPayload: null,
     inserted: false,
     ranQuery: false,
-    summary: summaryFor(integrated.plan.id, status, reasonCode, null),
+    summary: summaryFor(integrated.plan.id, status, reasonCode, null, dialect),
   };
 };
 
 const rendered = (
   integrated: BusinessSqlQueryPlanJoinResolution,
   sql: string,
+  dialect: BusinessSqlRendererDialectId,
 ): BusinessSqlRenderResult => ({
   status: "rendered",
   rendered: true,
@@ -157,11 +197,11 @@ const rendered = (
   blockers: [],
   warnings: uniqueStrings(integrated.warnings),
   planId: integrated.plan.id,
-  rendererTarget: "duckdb",
+  rendererTarget: dialect,
   executionPayload: null,
   inserted: false,
   ranQuery: false,
-  summary: summaryFor(integrated.plan.id, "rendered", "rendered", sql),
+  summary: summaryFor(integrated.plan.id, "rendered", "rendered", sql, dialect),
 });
 
 const groupingExpressions = (plan: BusinessSqlQueryPlan): Array<{
@@ -480,6 +520,7 @@ const isBusinessSqlFilterRecord = (filter: unknown): filter is BusinessSqlFilter
 const renderBusinessSqlFilterExpression = (
   integrated: BusinessSqlQueryPlanJoinResolution,
   filter: unknown,
+  config: BusinessSqlDialectRenderingConfig,
 ): string | null => {
   if (!isBusinessSqlFilterRecord(filter)) return null;
   if (filter.target?.kind !== "field") return null;
@@ -514,9 +555,9 @@ const renderBusinessSqlFilterExpression = (
   }
   const literal = renderSqlLiteral(filter.comparisonValue);
   if (!literal) return null;
-  if (filter.operator === "contains") return `contains(${fieldExpression}, ${literal})`;
-  if (filter.operator === "starts_with") return `starts_with(${fieldExpression}, ${literal})`;
-  if (filter.operator === "ends_with") return `ends_with(${fieldExpression}, ${literal})`;
+  if (filter.operator === "contains") return config.textContains(fieldExpression, literal);
+  if (filter.operator === "starts_with") return config.textStartsWith(fieldExpression, literal);
+  if (filter.operator === "ends_with") return config.textEndsWith(fieldExpression, literal);
   const operator = filter.operator ? rowFilterComparisonOperatorSql[filter.operator] : null;
   return operator ? `${fieldExpression} ${operator} ${literal}` : null;
 };
@@ -524,11 +565,12 @@ const renderBusinessSqlFilterExpression = (
 const renderWhere = (
   integrated: BusinessSqlQueryPlanJoinResolution,
   filters: readonly unknown[],
+  config: BusinessSqlDialectRenderingConfig,
 ): string | null => {
   if (filters.length === 0) return null;
   if (resolveBusinessSqlFilterCombinator(integrated.plan) !== "and") return null;
   const expressions = filters.map((filter) =>
-    renderBusinessSqlFilterExpression(integrated, filter),
+    renderBusinessSqlFilterExpression(integrated, filter, config),
   );
   if (expressions.some((expression) => expression === null)) return null;
   return `WHERE ${expressions.join("\n  AND ")}`;
@@ -604,10 +646,22 @@ const statusForRefusal = (
 ): "needs_review" | "blocked" =>
   renderability.status === "blocked" ? "blocked" : "needs_review";
 
-function renderDuckDbBusinessSqlFromRenderability({
+function renderConfiguredBusinessSqlFromRenderability({
   integrated,
-  renderability = evaluateBusinessSqlRenderability({ integrated }),
-}: RenderBusinessSqlInput): BusinessSqlRenderResult {
+  renderability: inputRenderability,
+  config,
+}: RenderBusinessSqlInput & {
+  config: BusinessSqlDialectRenderingConfig;
+}): BusinessSqlRenderResult {
+  const evaluatedRenderability = inputRenderability || evaluateBusinessSqlRenderability({ integrated });
+  const renderability: BusinessSqlRenderabilityGate = {
+    ...evaluatedRenderability,
+    rendererTarget: {
+      targetDialect: config.dialect,
+      metadataOnly: true,
+    },
+  };
+
   if (!renderability.renderable || renderability.status !== "renderable") {
     return refused({
       integrated,
@@ -619,6 +673,7 @@ function renderDuckDbBusinessSqlFromRenderability({
         `Renderability status is ${renderability.status}.`,
       ],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -632,16 +687,23 @@ function renderDuckDbBusinessSqlFromRenderability({
         `Integrated readiness is ${integrated.readiness}.`,
       ],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
-  if (renderability.rendererTarget.targetDialect !== "duckdb") {
+  if (renderability.rendererTarget.targetDialect !== config.dialect) {
     return refused({
       integrated,
-      reasonCode: "renderer_target_not_duckdb",
+      reasonCode:
+        config.dialect === "duckdb"
+          ? "renderer_target_not_duckdb"
+          : "renderer_target_dialect_mismatch",
       status: "blocked",
-      reasons: [`Renderer target ${renderability.rendererTarget.targetDialect} is not DuckDB.`],
+      reasons: [
+        `Renderer target ${renderability.rendererTarget.targetDialect} does not match ${config.dialect}.`,
+      ],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -658,6 +720,7 @@ function renderDuckDbBusinessSqlFromRenderability({
         ...integrated.joinResolution.warnings,
       ],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -668,6 +731,7 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "needs_review",
       reasons: ["One or more required relationships still need review."],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -678,6 +742,7 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "blocked",
       reasons: ["One or more required relationships are blocked."],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -690,23 +755,14 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "needs_review",
       reasons: capability.reasonCodes.map((reason) => `Renderer capability is incapable: ${reason}.`),
       warnings: renderability.warnings,
-    });
-  }
-
-  if (plan.renderer.targetDialect !== "duckdb") {
-    return refused({
-      integrated,
-      reasonCode: "renderer_target_not_duckdb",
-      status: "blocked",
-      reasons: [`Plan renderer target ${plan.renderer.targetDialect} is not DuckDB.`],
-      warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
   const normalizedPlan = normalizeMetricAndMeasures(plan);
   const groupings = groupingExpressions(plan);
   const fromAndJoins = renderFromAndJoins(integrated);
-  const where = renderWhere(integrated, normalizedPlan.filters || []);
+  const where = renderWhere(integrated, normalizedPlan.filters || [], config);
   const requiresWhere = (normalizedPlan.filters || []).length > 0;
   const fieldProjectionOnly =
     normalizedPlan.measures.length === 0 &&
@@ -723,6 +779,7 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "needs_review",
       reasons: ["Plan contains row-level filters that cannot be rendered as deterministic WHERE."],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -741,6 +798,7 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "needs_review",
       reasons: ["Plan shape is not supported by the deterministic renderer yet."],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -788,6 +846,7 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "needs_review",
       reasons: ["Plan metadata is incomplete for deterministic DuckDB rendering."],
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
@@ -800,11 +859,12 @@ function renderDuckDbBusinessSqlFromRenderability({
       return `  ${grouping.expression} AS ${quoteIdentifier(grouping.alias)}${suffix}`;
     });
     const tailClauses = [where, limit].filter((clause): clause is string => Boolean(clause));
+    const terminalClauses =
+      tailClauses.length > 0 ? [fromAndJoins, ...appendTerminalClause(tailClauses)] : [`${fromAndJoins};`];
     const sql = [
       "SELECT",
       ...projectionLines,
-      fromAndJoins,
-      ...appendTerminalClause(tailClauses),
+      ...terminalClauses,
     ].join("\n");
     const safety = validateSelectOnlySql(sql);
     if (!safety.ok) {
@@ -814,9 +874,10 @@ function renderDuckDbBusinessSqlFromRenderability({
         status: "blocked",
         reasons: safety.reasons,
         warnings: renderability.warnings,
+        dialect: config.dialect,
       });
     }
-    return rendered(integrated, sql);
+    return rendered(integrated, sql, config.dialect);
   }
 
   const groupBy = `GROUP BY ${groupings.map((grouping) => grouping.expression).join(", ")}`;
@@ -848,10 +909,11 @@ function renderDuckDbBusinessSqlFromRenderability({
       status: "blocked",
       reasons: safety.reasons,
       warnings: renderability.warnings,
+      dialect: config.dialect,
     });
   }
 
-  return rendered(integrated, sql);
+  return rendered(integrated, sql, config.dialect);
 }
 
 const requestForInput = (input: RenderBusinessSqlInput): BusinessSqlRenderRequest =>
@@ -864,7 +926,10 @@ const duckDbBusinessSqlRenderer: BusinessSqlDialectRenderer = {
   render: (input) => {
     const request = requestForInput(input);
     return sqlArtifactFromRenderResult({
-      result: renderDuckDbBusinessSqlFromRenderability(input),
+      result: renderConfiguredBusinessSqlFromRenderability({
+        ...input,
+        config: DUCKDB_RENDERING_CONFIG,
+      }),
       request,
       rendererId: BUSINESS_SQL_DUCKDB_RENDERER_ID,
       rendererVersion: BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
@@ -884,17 +949,50 @@ const duckDbBusinessSqlRenderer: BusinessSqlDialectRenderer = {
   },
 };
 
+const postgreSqlBusinessSqlRenderer: BusinessSqlDialectRenderer = {
+  dialect: "postgresql",
+  rendererId: BUSINESS_SQL_POSTGRESQL_RENDERER_ID,
+  rendererVersion: BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION,
+  render: (input) => {
+    const request = requestForInput(input);
+    return sqlArtifactFromRenderResult({
+      result: renderConfiguredBusinessSqlFromRenderability({
+        ...input,
+        config: POSTGRESQL_RENDERING_CONFIG,
+      }),
+      request,
+      rendererId: BUSINESS_SQL_POSTGRESQL_RENDERER_ID,
+      rendererVersion: BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION,
+    });
+  },
+  evaluateCapability: (input) => {
+    const capability = evaluateBusinessSqlRendererCapability(input.integrated.plan);
+    return {
+      dialect: "postgresql",
+      rendererId: BUSINESS_SQL_POSTGRESQL_RENDERER_ID,
+      rendererVersion: BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION,
+      capable: capability.capable,
+      status: capability.status,
+      reasonCodes: [...capability.reasonCodes],
+      metadataOnly: true,
+    };
+  },
+};
+
 const businessSqlRendererRegistry: Record<
   BusinessSqlRendererDialectId,
   BusinessSqlDialectRenderer
 > = {
   duckdb: duckDbBusinessSqlRenderer,
+  postgresql: postgreSqlBusinessSqlRenderer,
 };
 
 export function getBusinessSqlDialectRenderer(
-  dialect: BusinessSqlRendererDialectId,
-): BusinessSqlDialectRenderer {
-  return businessSqlRendererRegistry[dialect];
+  dialect: BusinessSqlRendererDialectId | string,
+): BusinessSqlDialectRenderer | null {
+  return Object.prototype.hasOwnProperty.call(businessSqlRendererRegistry, dialect)
+    ? businessSqlRendererRegistry[dialect as BusinessSqlRendererDialectId]
+    : null;
 }
 
 export function renderBusinessSqlArtifactFromRenderability(
@@ -902,7 +1000,23 @@ export function renderBusinessSqlArtifactFromRenderability(
   dialect: BusinessSqlRendererDialectId = "duckdb",
 ): SqlArtifact {
   const request = input.request || createBusinessSqlPreviewRenderRequest(input.integrated.plan, dialect);
-  return getBusinessSqlDialectRenderer(request.dialect).render({ ...input, request });
+  const renderer = getBusinessSqlDialectRenderer(request.dialect);
+  if (!renderer) {
+    const requestedDialect = request.dialect as BusinessSqlRendererDialectId;
+    return sqlArtifactFromRenderResult({
+      result: refused({
+        integrated: input.integrated,
+        reasonCode: "renderer_not_registered",
+        status: "blocked",
+        reasons: [`Renderer dialect ${request.dialect} is not registered.`],
+        dialect: requestedDialect,
+      }),
+      request,
+      rendererId: "business-sql-renderer:unregistered",
+      rendererVersion: "business-sql-renderer:unregistered",
+    });
+  }
+  return renderer.render({ ...input, request });
 }
 
 export function evaluateBusinessSqlDialectRendererCapability(
@@ -910,7 +1024,19 @@ export function evaluateBusinessSqlDialectRendererCapability(
   dialect: BusinessSqlRendererDialectId = "duckdb",
 ) {
   const request = input.request || createBusinessSqlPreviewRenderRequest(input.integrated.plan, dialect);
-  return getBusinessSqlDialectRenderer(request.dialect).evaluateCapability({ ...input, request });
+  const renderer = getBusinessSqlDialectRenderer(request.dialect);
+  if (!renderer) {
+    return {
+      dialect: request.dialect,
+      rendererId: "business-sql-renderer:unregistered",
+      rendererVersion: "business-sql-renderer:unregistered",
+      capable: false,
+      status: "incapable" as const,
+      reasonCodes: ["renderer_not_registered"],
+      metadataOnly: true as const,
+    };
+  }
+  return renderer.evaluateCapability({ ...input, request });
 }
 
 const joinResolutionFromPlan = (

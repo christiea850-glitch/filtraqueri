@@ -39,8 +39,14 @@ const RENDERABLE_DERIVED_MEASURE_OPERATORS = new Set([
   "divide",
 ]);
 
+const hasControlCharacter = (value: string): boolean =>
+  Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
+
 const hasRenderableAlias = (value: string | undefined): value is string =>
-  Boolean(value && value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value));
+  Boolean(value && value.trim().length > 0 && !hasControlCharacter(value));
 
 const isBusinessSqlFilterRecord = (filter: unknown): filter is BusinessSqlFilter =>
   Boolean(filter && typeof filter === "object" && !Array.isArray(filter));
@@ -62,7 +68,6 @@ export function evaluateBusinessSqlRendererCapability(
   const derivedMeasures = normalized.derivedMeasures || [];
   const rowFilterCount = (normalized.filters || []).length;
   const fieldProjectionOnly =
-    rowFilterCount >= 1 &&
     normalized.measures.length === 0 &&
     derivedMeasures.length === 0 &&
     normalized.aggregateResultConditions.length === 0 &&

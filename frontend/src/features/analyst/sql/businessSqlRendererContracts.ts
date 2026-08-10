@@ -4,13 +4,15 @@ import { stablePrimitiveId } from "./businessSqlQueryPlan";
 import type { BusinessSqlQueryPlanJoinResolution } from "./businessSqlQueryPlanJoinResolution";
 import type { BusinessSqlRenderRequest } from "./businessSqlRenderRequest";
 
-export type BusinessSqlRendererDialectId = Extract<SqlDialectId, "duckdb">;
+export type BusinessSqlRendererDialectId = Extract<SqlDialectId, "duckdb" | "postgresql">;
 
 export type BusinessSqlRendererReasonCode =
   | "rendered"
   | "renderability_not_renderable"
   | "readiness_not_ready"
+  | "renderer_target_dialect_mismatch"
   | "renderer_target_not_duckdb"
+  | "renderer_not_registered"
   | "join_resolution_unresolved"
   | "relationship_review_required"
   | "renderer_capability_incapable"
@@ -27,7 +29,7 @@ export type BusinessSqlRenderResult = {
   blockers: string[];
   warnings: string[];
   planId: string;
-  rendererTarget: "duckdb";
+  rendererTarget: BusinessSqlRendererDialectId;
   executionPayload: null;
   inserted: false;
   ranQuery: false;

@@ -25,6 +25,7 @@ import {
   createBusinessSqlMeasureAlias,
   createBusinessSqlRowLimitId,
   createEmptyBusinessSqlQueryPlan,
+  type BusinessSqlFilterOperator,
   type BusinessSqlMeasure,
   type BusinessSqlMeasureKind,
   type BusinessSqlQueryPlan,
@@ -32,13 +33,17 @@ import {
 import {
   BUSINESS_SQL_DUCKDB_RENDERER_ID,
   BUSINESS_SQL_DUCKDB_RENDERER_VERSION,
+  BUSINESS_SQL_POSTGRESQL_RENDERER_ID,
+  BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION,
   createBusinessSqlArtifactId,
   createBusinessSqlExecutionRenderRequest,
+  createBusinessSqlPreviewRenderRequest,
   evaluateBusinessSqlDialectRendererCapability,
   getBusinessSqlDialectRenderer,
   renderBusinessSqlQueryPlanArtifact,
   renderBusinessSqlArtifactFromRenderability,
   renderBusinessSqlFromRenderability,
+  type BusinessSqlRenderRequest,
   type BusinessSqlRenderResult,
 } from "../businessSqlRenderer";
 import {
@@ -212,6 +217,20 @@ const deterministicArtifactSecond = renderBusinessSqlArtifactFromRenderability({
   integrated: ordersPerCustomer,
   renderability: renderabilityFor(ordersPerCustomer),
 });
+const deterministicPostgreSqlArtifactFirst = renderBusinessSqlArtifactFromRenderability(
+  {
+    integrated: ordersPerCustomer,
+    renderability: renderabilityFor(ordersPerCustomer),
+  },
+  "postgresql",
+);
+const deterministicPostgreSqlArtifactSecond = renderBusinessSqlArtifactFromRenderability(
+  {
+    integrated: ordersPerCustomer,
+    renderability: renderabilityFor(ordersPerCustomer),
+  },
+  "postgresql",
+);
 const executionRenderRequest = createBusinessSqlExecutionRenderRequest({
   plan: ordersPerCustomer.plan,
   executionTarget: DEFAULT_BUSINESS_SQL_EXECUTION_TARGET,
@@ -380,6 +399,271 @@ const aggregatePlan = (
   };
 };
 
+const projectionOnlyPlan = integratedFromPlan({
+  ...createEmptyBusinessSqlQueryPlan(),
+  id: "business-sql-plan:postgresql:projection-only",
+  kind: "single_table_count_grouping",
+  status: "resolved",
+  support: "supported",
+  entities: [
+    { entity: "employees", table: "employees", required: true, role: "source" },
+  ],
+  groupings: [
+    { entity: "employees", table: "employees", field: "department", label: "department" },
+  ],
+});
+
+const filteredPostgreSqlPlan = (() => {
+  const plan = aggregatePlan("sum");
+  return integratedFromPlan({
+    ...plan,
+    id: "business-sql-plan:postgresql:filtered-salary",
+    filters: [
+      {
+        filterId: "business-sql-filter:employees:active",
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: "employees",
+          table: "employees",
+          field: "active",
+          fieldInferredType: "boolean",
+          resolved: true,
+        },
+        operator: "equals",
+        comparisonValue: { kind: "boolean", value: true },
+        label: "active employees",
+      },
+      {
+        filterId: "business-sql-filter:employees:terminated-at-null",
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: "employees",
+          table: "employees",
+          field: "terminated_at",
+          fieldInferredType: "date",
+          resolved: true,
+        },
+        operator: "is_null",
+        label: "no termination date",
+      },
+    ],
+    filterCombinator: "and",
+  });
+})();
+
+const numericRangePostgreSqlPlan = (() => {
+  const plan = aggregatePlan("sum");
+  return integratedFromPlan({
+    ...plan,
+    id: "business-sql-plan:postgresql:numeric-range",
+    filters: [
+      {
+        filterId: "business-sql-filter:employees:salary-range",
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: "employees",
+          table: "employees",
+          field: "salary",
+          fieldInferredType: "numeric",
+          resolved: true,
+        },
+        operator: "between",
+        comparisonValue: {
+          kind: "range",
+          valueKind: "number",
+          lower: 50000,
+          upper: 120000,
+          lowerInclusive: true,
+          upperInclusive: true,
+        },
+        label: "salary range",
+      },
+    ],
+    filterCombinator: "and",
+  });
+})();
+
+const dateRangePostgreSqlPlan = (() => {
+  const plan = aggregatePlan("sum");
+  return integratedFromPlan({
+    ...plan,
+    id: "business-sql-plan:postgresql:date-range",
+    filters: [
+      {
+        filterId: "business-sql-filter:employees:hire-date-range",
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: "employees",
+          table: "employees",
+          field: "hire_date",
+          fieldInferredType: "date",
+          resolved: true,
+        },
+        operator: "between",
+        comparisonValue: {
+          kind: "range",
+          valueKind: "date",
+          lower: "2026-01-01",
+          upper: "2026-12-31",
+          lowerInclusive: true,
+          upperInclusive: true,
+        },
+        label: "hire date range",
+      },
+    ],
+    filterCombinator: "and",
+  });
+})();
+
+const havingPostgreSqlPlan = (() => {
+  const plan = aggregatePlan("sum");
+  return integratedFromPlan({
+    ...plan,
+    id: "business-sql-plan:postgresql:having",
+    aggregateResultConditions: [
+      {
+        conditionId: "business-sql-aggregate-condition:salary-threshold",
+        target: { kind: "measure", measureId: plan.measures[0].measureId },
+        operator: "greater_than",
+        comparisonValue: { kind: "number", value: 100000 },
+        label: "salary total above threshold",
+      },
+    ],
+  });
+})();
+
+const countDistinctPostgreSqlPlan = (() => {
+  const measureSeed = {
+    kind: "count_distinct" as const,
+    entity: "employees",
+    table: "employees",
+    field: "employee_id",
+    distinct: true,
+  };
+  const measure: BusinessSqlMeasure = {
+    ...measureSeed,
+    measureId: createBusinessSqlMeasureId(measureSeed),
+    fieldInferredType: "text",
+    label: "Distinct employees",
+    sqlAlias: "distinct_employees",
+  };
+  return integratedFromPlan({
+    ...createEmptyBusinessSqlQueryPlan(),
+    id: "business-sql-plan:postgresql:count-distinct",
+    kind: "single_table_count_grouping",
+    status: "resolved",
+    support: "supported",
+    entities: [
+      { entity: "employees", table: "employees", required: true, role: "source" },
+    ],
+    measures: [measure],
+    groupings: [
+      { entity: "employees", table: "employees", field: "department", label: "department" },
+    ],
+  });
+})();
+
+const textContainsPostgreSqlPlan = (() => {
+  const plan = aggregatePlan("sum");
+  return integratedFromPlan({
+    ...plan,
+    id: "business-sql-plan:postgresql:text-contains",
+    filters: [
+      {
+        filterId: "business-sql-filter:employees:department-contains",
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: "employees",
+          table: "employees",
+          field: "department",
+          fieldInferredType: "categorical",
+          resolved: true,
+        },
+        operator: "contains",
+        comparisonValue: { kind: "string", value: "Ops" },
+        label: "department contains Ops",
+      },
+    ],
+    filterCombinator: "and",
+  });
+})();
+
+const textMatchingPostgreSqlPlan = ({
+  operator,
+  value,
+  id,
+}: {
+  operator: Extract<BusinessSqlFilterOperator, "contains" | "starts_with" | "ends_with">;
+  value: string;
+  id: string;
+}) => {
+  const plan = aggregatePlan("sum");
+  return integratedFromPlan({
+    ...plan,
+    id,
+    filters: [
+      {
+        filterId: `business-sql-filter:employees:department:${operator}:${id}`,
+        kind: "custom",
+        target: {
+          kind: "field",
+          entity: "employees",
+          table: "employees",
+          field: "department",
+          fieldInferredType: "categorical",
+          resolved: true,
+        },
+        operator,
+        comparisonValue: { kind: "string", value },
+        label: `department ${operator} ${value}`,
+      },
+    ],
+    filterCombinator: "and",
+  });
+};
+
+const underscoreTextPostgreSqlPlan = textMatchingPostgreSqlPlan({
+  operator: "contains",
+  value: "admin_test",
+  id: "business-sql-plan:postgresql:text-contains-underscore",
+});
+const percentTextPostgreSqlPlan = textMatchingPostgreSqlPlan({
+  operator: "starts_with",
+  value: "growth%",
+  id: "business-sql-plan:postgresql:text-starts-with-percent",
+});
+const backslashTextPostgreSqlPlan = textMatchingPostgreSqlPlan({
+  operator: "ends_with",
+  value: "path\\root",
+  id: "business-sql-plan:postgresql:text-ends-with-backslash",
+});
+const apostropheTextPostgreSqlPlan = textMatchingPostgreSqlPlan({
+  operator: "contains",
+  value: "O'Brien",
+  id: "business-sql-plan:postgresql:text-contains-apostrophe",
+});
+
+const joinedFieldPostgreSqlPlan: BusinessSqlQueryPlanJoinResolution = {
+  ...ordersPerCustomer,
+  plan: {
+    ...ordersPerCustomer.plan,
+    id: "business-sql-plan:postgresql:joined-field",
+    groupings: [
+      {
+        entity: "orders",
+        table: "orders",
+        field: "status",
+        label: "order_status",
+      },
+    ],
+  },
+};
+
 const sumSalaryByDepartment = integratedFromPlan(aggregatePlan("sum"));
 const averageSalaryByDepartment = integratedFromPlan(aggregatePlan("average"));
 const minimumSalaryByDepartment = integratedFromPlan(aggregatePlan("minimum"));
@@ -509,6 +793,36 @@ const assertNoPromptText = (
   return sql.toLowerCase().includes(prompt.toLowerCase())
     ? ["Rendered SQL must not contain raw prompt text."]
     : [];
+};
+
+const postgreSqlArtifactFor = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+  request = createBusinessSqlPreviewRenderRequest(integrated.plan, "postgresql"),
+) =>
+  renderBusinessSqlArtifactFromRenderability({
+    integrated,
+    renderability: renderabilityFor(integrated),
+    request,
+  });
+
+const expectPostgreSqlSql = (
+  integrated: BusinessSqlQueryPlanJoinResolution,
+  expectedSql: string,
+): string[] => {
+  const artifact = postgreSqlArtifactFor(integrated);
+  return [
+    ...(artifact.dialect === "postgresql" ? [] : ["Expected PostgreSQL artifact dialect."]),
+    ...(artifact.rendererId === BUSINESS_SQL_POSTGRESQL_RENDERER_ID
+      ? []
+      : ["Expected PostgreSQL renderer id."]),
+    ...(artifact.rendererVersion === BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION
+      ? []
+      : ["Expected PostgreSQL renderer version."]),
+    ...(artifact.sql === expectedSql
+      ? []
+      : [`Expected PostgreSQL SQL bytes:\n${expectedSql}\nActual:\n${artifact.sql || "<null>"}`]),
+    ...assertSelectOnly(artifact.sql),
+  ];
 };
 
 export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
@@ -825,9 +1139,14 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
     assert: (result) => expectRefused(result, "unsupported_plan_shape"),
   },
   {
-    name: "non-DuckDB renderer target refuses to render",
+    name: "legacy plan renderer target metadata does not override render request dialect",
     integrated: nonDuckDbPlan,
-    assert: (result) => expectRefused(result, "renderer_target_not_duckdb"),
+    assert: (result) => [
+      ...expectRendered(result, ['FROM "leases"', 'COUNT(*) AS "count_leases"']),
+      ...(result.rendererTarget === "duckdb"
+        ? []
+        : ["Expected request/default renderer dialect to control rendering."]),
+    ],
   },
   {
     name: "unresolved join refuses even with forged renderable gate",
@@ -859,13 +1178,458 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
     assert: () => {
       const renderer = getBusinessSqlDialectRenderer("duckdb");
       return [
-        ...(renderer.dialect === "duckdb" ? [] : ["Expected DuckDB dialect identity."]),
-        ...(renderer.rendererId === BUSINESS_SQL_DUCKDB_RENDERER_ID
+        ...(renderer?.dialect === "duckdb" ? [] : ["Expected DuckDB dialect identity."]),
+        ...(renderer?.rendererId === BUSINESS_SQL_DUCKDB_RENDERER_ID
           ? []
           : ["Expected DuckDB renderer id."]),
-        ...(renderer.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
+        ...(renderer?.rendererVersion === BUSINESS_SQL_DUCKDB_RENDERER_VERSION
           ? []
           : ["Expected stable DuckDB renderer version identity."]),
+      ];
+    },
+  },
+  {
+    name: "renderer registry resolves DuckDB and PostgreSQL independently",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const duckDbRenderer = getBusinessSqlDialectRenderer("duckdb");
+      const postgreSqlRenderer = getBusinessSqlDialectRenderer("postgresql");
+      return [
+        ...(duckDbRenderer?.dialect === "duckdb" ? [] : ["Expected DuckDB renderer."]),
+        ...(postgreSqlRenderer?.dialect === "postgresql" ? [] : ["Expected PostgreSQL renderer."]),
+        ...(duckDbRenderer?.rendererId !== postgreSqlRenderer?.rendererId
+          ? []
+          : ["Expected distinct renderer ids."]),
+        ...(duckDbRenderer?.rendererVersion !== postgreSqlRenderer?.rendererVersion
+          ? []
+          : ["Expected distinct renderer versions."]),
+      ];
+    },
+  },
+  {
+    name: "unknown renderer lookup fails closed",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const renderer = getBusinessSqlDialectRenderer("oracle");
+      return renderer === null ? [] : ["Expected unknown renderer lookup to return null."];
+    },
+  },
+  {
+    name: "unknown renderer artifact request fails closed without DuckDB fallback",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const forgedRequest = {
+        ...createBusinessSqlPreviewRenderRequest(ordersPerCustomer.plan, "duckdb"),
+        dialect: "oracle",
+      } as unknown as BusinessSqlRenderRequest;
+      const artifact = renderBusinessSqlArtifactFromRenderability({
+        integrated: ordersPerCustomer,
+        renderability: renderabilityFor(ordersPerCustomer),
+        request: forgedRequest,
+      });
+      return [
+        ...(!artifact.rendered && artifact.status === "blocked" && artifact.sql === null
+          ? []
+          : ["Expected unknown renderer artifact to be blocked with no SQL."]),
+        ...(artifact.reasonCode === "renderer_not_registered"
+          ? []
+          : ["Expected renderer_not_registered reason code."]),
+        ...(artifact.rendererId === "business-sql-renderer:unregistered"
+          ? []
+          : ["Expected unregistered renderer id."]),
+        ...(artifact.rendererVersion === "business-sql-renderer:unregistered"
+          ? []
+          : ["Expected unregistered renderer version."]),
+        ...(artifact.dialect === ("oracle" as typeof artifact.dialect)
+          ? []
+          : ["Expected artifact to preserve the unregistered requested dialect."]),
+        ...(artifact.sql !== deterministicArtifactFirst.sql
+          ? []
+          : ["Unknown renderer must not fall back to DuckDB SQL."]),
+      ];
+    },
+  },
+  {
+    name: "PostgreSQL artifact identifies dialect renderer and version",
+    integrated: ordersPerCustomer,
+    assert: () => [
+      ...(deterministicPostgreSqlArtifactFirst.dialect === "postgresql"
+        ? []
+        : ["Expected PostgreSQL artifact dialect."]),
+      ...(deterministicPostgreSqlArtifactFirst.rendererId === BUSINESS_SQL_POSTGRESQL_RENDERER_ID
+        ? []
+        : ["Expected PostgreSQL renderer id."]),
+      ...(deterministicPostgreSqlArtifactFirst.rendererVersion === BUSINESS_SQL_POSTGRESQL_RENDERER_VERSION
+        ? []
+        : ["Expected PostgreSQL renderer version."]),
+      ...(deterministicPostgreSqlArtifactFirst.dialect !== deterministicArtifactFirst.dialect
+        ? []
+        : ["PostgreSQL artifact must not be mislabeled as DuckDB."]),
+    ],
+  },
+  {
+    name: "identical PostgreSQL render requests produce byte-identical SQL and artifact identity",
+    integrated: ordersPerCustomer,
+    assert: () => [
+      ...(deterministicPostgreSqlArtifactFirst.sql === deterministicPostgreSqlArtifactSecond.sql
+        ? []
+        : ["Expected deterministic PostgreSQL SQL bytes."]),
+      ...(deterministicPostgreSqlArtifactFirst.artifactId === deterministicPostgreSqlArtifactSecond.artifactId
+        ? []
+        : ["Expected deterministic PostgreSQL artifact identity."]),
+    ],
+  },
+  {
+    name: "preview and execution PostgreSQL requests remain separate and metadata-only",
+    integrated: ordersPerCustomer,
+    assert: () => {
+      const postgreSqlTarget = createBusinessSqlExecutionTarget({
+        dialect: "postgresql",
+        connectionKind: "metadata_postgresql",
+        environment: "development",
+        dataSensitivity: "internal",
+        readOnlyRequired: true,
+        allowedExecutionMode: "read_only_analytical",
+        targetConfigurationId: "business-sql-execution-target-config:postgresql-metadata",
+      });
+      const previewRequest = createBusinessSqlPreviewRenderRequest(ordersPerCustomer.plan, "postgresql");
+      const executionRequest = createBusinessSqlExecutionRenderRequest({
+        plan: ordersPerCustomer.plan,
+        executionTarget: postgreSqlTarget,
+      });
+      const previewArtifact = postgreSqlArtifactFor(ordersPerCustomer, previewRequest);
+      const executionArtifact = postgreSqlArtifactFor(ordersPerCustomer, executionRequest);
+      return [
+        ...(previewRequest.purpose === "preview" ? [] : ["Expected preview purpose."]),
+        ...(executionRequest.purpose === "execution" ? [] : ["Expected execution purpose."]),
+        ...(previewRequest.requestId !== executionRequest.requestId
+          ? []
+          : ["Expected distinct PostgreSQL request identities."]),
+        ...(!previewRequest.containsRenderedSql && !executionRequest.containsRenderedSql
+          ? []
+          : ["Render requests must not contain SQL."]),
+        ...(!previewRequest.containsExecutionCredentials && !executionRequest.containsExecutionCredentials
+          ? []
+          : ["Render requests must not contain credentials."]),
+        ...(!previewRequest.containsResultRows && !executionRequest.containsResultRows
+          ? []
+          : ["Render requests must not contain result rows."]),
+        ...(!previewRequest.executionPermissionGranted && !executionRequest.executionPermissionGranted
+          ? []
+          : ["Render requests must not grant execution permission."]),
+        ...(previewArtifact.renderPurpose === "preview" && executionArtifact.renderPurpose === "execution"
+          ? []
+          : ["Expected artifact purposes to preserve request purpose."]),
+        ...(previewArtifact.sql === executionArtifact.sql
+          ? []
+          : ["Expected PostgreSQL SQL bytes to be stable across render purposes."]),
+        ...(previewArtifact.artifactId !== executionArtifact.artifactId
+          ? []
+          : ["Expected preview and execution PostgreSQL artifacts to have distinct identities."]),
+        ...(!executionArtifact.inserted && !executionArtifact.ranQuery
+          ? []
+          : ["PostgreSQL rendering must not insert or run SQL."]),
+        ...(!postgreSqlTarget.containsCredentials &&
+        !postgreSqlTarget.containsLiveClient &&
+        !postgreSqlTarget.containsNetworkHandle &&
+        !postgreSqlTarget.grantsExecutionPermission
+          ? []
+          : ["PostgreSQL metadata target must not contain live execution material."]),
+      ];
+    },
+  },
+  {
+    name: "PostgreSQL simple projection renders byte-exact SQL",
+    integrated: projectionOnlyPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        projectionOnlyPlan,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department"',
+          'FROM "employees";',
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL aggregate measure with grouping renders byte-exact SQL",
+    integrated: sumSalaryByDepartment,
+    assert: () =>
+      expectPostgreSqlSql(
+        sumSalaryByDepartment,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department",',
+          '  SUM("employees"."salary") AS "total_salary_expenditure"',
+          'FROM "employees"',
+          'GROUP BY "employees"."department"',
+          'ORDER BY "total_salary_expenditure" DESC',
+          "LIMIT 5;",
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL join rendering uses canonical join path",
+    integrated: ordersPerCustomer,
+    assert: () =>
+      expectPostgreSqlSql(
+        ordersPerCustomer,
+        [
+          "SELECT",
+          '  "customers"."customer_id" AS "customer",',
+          '  COUNT(*) AS "count_orders"',
+          'FROM "customers"',
+          'JOIN "orders" ON "customers"."customer_id" = "orders"."customer_id"',
+          'GROUP BY "customers"."customer_id";',
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL joined-field query renders byte-exact SQL",
+    integrated: joinedFieldPostgreSqlPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        joinedFieldPostgreSqlPlan,
+        [
+          "SELECT",
+          '  "orders"."status" AS "order_status",',
+          '  COUNT(*) AS "count_orders"',
+          'FROM "customers"',
+          'JOIN "orders" ON "customers"."customer_id" = "orders"."customer_id"',
+          'GROUP BY "orders"."status";',
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL multiple filters render with AND including null and boolean filters",
+    integrated: filteredPostgreSqlPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        filteredPostgreSqlPlan,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department",',
+          '  SUM("employees"."salary") AS "total_salary_expenditure"',
+          'FROM "employees"',
+          'WHERE "employees"."active" = TRUE',
+          '  AND "employees"."terminated_at" IS NULL',
+          'GROUP BY "employees"."department"',
+          'ORDER BY "total_salary_expenditure" DESC',
+          "LIMIT 5;",
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL numeric range renders byte-exact SQL",
+    integrated: numericRangePostgreSqlPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        numericRangePostgreSqlPlan,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department",',
+          '  SUM("employees"."salary") AS "total_salary_expenditure"',
+          'FROM "employees"',
+          'WHERE "employees"."salary" BETWEEN 50000 AND 120000',
+          'GROUP BY "employees"."department"',
+          'ORDER BY "total_salary_expenditure" DESC',
+          "LIMIT 5;",
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL date range renders typed date literals",
+    integrated: dateRangePostgreSqlPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        dateRangePostgreSqlPlan,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department",',
+          '  SUM("employees"."salary") AS "total_salary_expenditure"',
+          'FROM "employees"',
+          'WHERE "employees"."hire_date" BETWEEN DATE \'2026-01-01\' AND DATE \'2026-12-31\'',
+          'GROUP BY "employees"."department"',
+          'ORDER BY "total_salary_expenditure" DESC',
+          "LIMIT 5;",
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL aggregate condition renders HAVING",
+    integrated: havingPostgreSqlPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        havingPostgreSqlPlan,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department",',
+          '  SUM("employees"."salary") AS "total_salary_expenditure"',
+          'FROM "employees"',
+          'GROUP BY "employees"."department"',
+          'HAVING SUM("employees"."salary") > 100000',
+          'ORDER BY "total_salary_expenditure" DESC',
+          "LIMIT 5;",
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL count distinct renders byte-exact SQL",
+    integrated: countDistinctPostgreSqlPlan,
+    assert: () =>
+      expectPostgreSqlSql(
+        countDistinctPostgreSqlPlan,
+        [
+          "SELECT",
+          '  "employees"."department" AS "department",',
+          '  COUNT(DISTINCT "employees"."employee_id") AS "distinct_employees"',
+          'FROM "employees"',
+          'GROUP BY "employees"."department";',
+        ].join("\n"),
+      ),
+  },
+  {
+    name: "PostgreSQL text contains uses literal POSITION semantics",
+    integrated: textContainsPostgreSqlPlan,
+    assert: () => {
+      const artifact = postgreSqlArtifactFor(textContainsPostgreSqlPlan);
+      return [
+        ...expectPostgreSqlSql(
+          textContainsPostgreSqlPlan,
+          [
+            "SELECT",
+            '  "employees"."department" AS "department",',
+            '  SUM("employees"."salary") AS "total_salary_expenditure"',
+            'FROM "employees"',
+            'WHERE POSITION(\'Ops\' IN "employees"."department") > 0',
+            'GROUP BY "employees"."department"',
+            'ORDER BY "total_salary_expenditure" DESC',
+            "LIMIT 5;",
+          ].join("\n"),
+        ),
+        ...(artifact.sql && !artifact.sql.includes("contains(") && !artifact.sql.includes(" LIKE ")
+          ? []
+          : ["PostgreSQL must not fall back to DuckDB contains() or LIKE matching."]),
+      ];
+    },
+  },
+  {
+    name: "PostgreSQL text contains treats underscore as a literal character",
+    integrated: underscoreTextPostgreSqlPlan,
+    assert: () => {
+      const first = postgreSqlArtifactFor(underscoreTextPostgreSqlPlan);
+      const second = postgreSqlArtifactFor(underscoreTextPostgreSqlPlan);
+      return [
+        ...expectPostgreSqlSql(
+          underscoreTextPostgreSqlPlan,
+          [
+            "SELECT",
+            '  "employees"."department" AS "department",',
+            '  SUM("employees"."salary") AS "total_salary_expenditure"',
+            'FROM "employees"',
+            'WHERE POSITION(\'admin_test\' IN "employees"."department") > 0',
+            'GROUP BY "employees"."department"',
+            'ORDER BY "total_salary_expenditure" DESC',
+            "LIMIT 5;",
+          ].join("\n"),
+        ),
+        ...(first.sql === second.sql && first.artifactId === second.artifactId
+          ? []
+          : ["Expected repeated underscore text rendering to be deterministic."]),
+      ];
+    },
+  },
+  {
+    name: "PostgreSQL text starts_with treats percent as a literal character",
+    integrated: percentTextPostgreSqlPlan,
+    assert: () => {
+      const first = postgreSqlArtifactFor(percentTextPostgreSqlPlan);
+      const second = postgreSqlArtifactFor(percentTextPostgreSqlPlan);
+      return [
+        ...expectPostgreSqlSql(
+          percentTextPostgreSqlPlan,
+          [
+            "SELECT",
+            '  "employees"."department" AS "department",',
+            '  SUM("employees"."salary") AS "total_salary_expenditure"',
+            'FROM "employees"',
+            'WHERE POSITION(\'growth%\' IN "employees"."department") = 1',
+            'GROUP BY "employees"."department"',
+            'ORDER BY "total_salary_expenditure" DESC',
+            "LIMIT 5;",
+          ].join("\n"),
+        ),
+        ...(first.sql === second.sql && first.artifactId === second.artifactId
+          ? []
+          : ["Expected repeated percent text rendering to be deterministic."]),
+      ];
+    },
+  },
+  {
+    name: "PostgreSQL text ends_with treats backslash as a literal character",
+    integrated: backslashTextPostgreSqlPlan,
+    assert: () => {
+      const first = postgreSqlArtifactFor(backslashTextPostgreSqlPlan);
+      const second = postgreSqlArtifactFor(backslashTextPostgreSqlPlan);
+      return [
+        ...expectPostgreSqlSql(
+          backslashTextPostgreSqlPlan,
+          [
+            "SELECT",
+            '  "employees"."department" AS "department",',
+            '  SUM("employees"."salary") AS "total_salary_expenditure"',
+            'FROM "employees"',
+            'WHERE RIGHT("employees"."department", CHAR_LENGTH(\'path\\root\')) = \'path\\root\'',
+            'GROUP BY "employees"."department"',
+            'ORDER BY "total_salary_expenditure" DESC',
+            "LIMIT 5;",
+          ].join("\n"),
+        ),
+        ...(first.sql === second.sql && first.artifactId === second.artifactId
+          ? []
+          : ["Expected repeated backslash text rendering to be deterministic."]),
+      ];
+    },
+  },
+  {
+    name: "PostgreSQL text contains preserves apostrophe escaping",
+    integrated: apostropheTextPostgreSqlPlan,
+    assert: () => {
+      const first = postgreSqlArtifactFor(apostropheTextPostgreSqlPlan);
+      const second = postgreSqlArtifactFor(apostropheTextPostgreSqlPlan);
+      return [
+        ...expectPostgreSqlSql(
+          apostropheTextPostgreSqlPlan,
+          [
+            "SELECT",
+            '  "employees"."department" AS "department",',
+            '  SUM("employees"."salary") AS "total_salary_expenditure"',
+            'FROM "employees"',
+            'WHERE POSITION(\'O\'\'Brien\' IN "employees"."department") > 0',
+            'GROUP BY "employees"."department"',
+            'ORDER BY "total_salary_expenditure" DESC',
+            "LIMIT 5;",
+          ].join("\n"),
+        ),
+        ...(first.sql === second.sql && first.artifactId === second.artifactId
+          ? []
+          : ["Expected repeated apostrophe text rendering to be deterministic."]),
+      ];
+    },
+  },
+  {
+    name: "unsupported PostgreSQL capability fails closed",
+    integrated: multiMeasurePlan,
+    assert: () => {
+      const artifact = postgreSqlArtifactFor(multiMeasurePlan);
+      return [
+        ...(!artifact.rendered && artifact.status === "needs_review"
+          ? []
+          : ["Expected unsupported PostgreSQL capability to fail closed."]),
+        ...(artifact.reasonCode === "renderer_capability_incapable"
+          ? []
+          : ["Expected renderer capability refusal."]),
+        ...(artifact.dialect === "postgresql" ? [] : ["Expected PostgreSQL refusal artifact."]),
       ];
     },
   },
@@ -1155,7 +1919,7 @@ export const BUSINESS_SQL_RENDERER_FIXTURES: RendererFixture[] = [
       };
       const artifactDialectMismatch = {
         ...executionArtifact,
-        dialect: "postgres" as typeof executionArtifact.dialect,
+        dialect: "postgresql" as typeof executionArtifact.dialect,
         artifactId: `${executionArtifact.artifactId}:dialect-mismatch`,
       };
       const artifactMismatchEvaluation = evaluateBusinessSqlExecutionPolicy({

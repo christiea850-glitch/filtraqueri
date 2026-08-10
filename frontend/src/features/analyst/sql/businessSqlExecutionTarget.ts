@@ -3,7 +3,7 @@ import type { BusinessSqlRendererDialectId } from "./businessSqlRendererContract
 
 export type BusinessSqlExecutionEnvironment = "local" | "development" | "staging" | "production";
 export type BusinessSqlDataSensitivity = "public" | "internal" | "confidential" | "restricted";
-export type BusinessSqlExecutionConnectionKind = "local_duckdb";
+export type BusinessSqlExecutionConnectionKind = "local_duckdb" | "metadata_postgresql";
 export type BusinessSqlExecutionMode = "read_only_analytical";
 
 export type BusinessSqlExecutionTarget = {

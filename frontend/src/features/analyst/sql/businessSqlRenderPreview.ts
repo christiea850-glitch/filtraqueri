@@ -19,7 +19,7 @@ export type BusinessSqlRenderPreview = {
   body: string;
   sql: string | null;
   planId: string;
-  rendererTarget: "duckdb";
+  rendererTarget: BusinessSqlRendererDialectId;
   renderRequestId?: string;
   sqlArtifact?: SqlArtifact;
   guidanceDialect?: SqlDialectId;
@@ -92,7 +92,7 @@ export function createBusinessSqlRenderPreview(
     body: bodyForStatus(status),
     sql,
     planId: plan.id,
-    rendererTarget: "duckdb",
+    rendererTarget: artifact.dialect,
     renderRequestId: renderRequest.requestId,
     sqlArtifact: artifact,
     guidanceDialect: plan.renderer.selectedGuidanceDialect,

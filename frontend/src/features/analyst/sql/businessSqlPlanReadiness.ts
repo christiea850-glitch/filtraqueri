@@ -96,7 +96,6 @@ export function evaluateBusinessSqlPlanReadiness(
   const blockingReasons: string[] = [];
   const reviewReasons: string[] = [];
   const fieldProjectionOnly =
-    (plan.filters || []).length >= 1 &&
     normalizedPlan.measures.length === 0 &&
     (normalizedPlan.derivedMeasures || []).length === 0 &&
     (normalizedPlan.aggregateResultConditions || []).length === 0 &&

@@ -1,4 +1,4 @@
-export type SqlDialectId = "duckdb" | "mariadb" | "oracle";
+export type SqlDialectId = "duckdb" | "mariadb" | "oracle" | "postgresql";
 
 export type SqlIdentifierQuoteStyle = {
   opening: string;

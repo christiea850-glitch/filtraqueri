@@ -173,17 +173,9 @@ export const BUSINESS_SQL_RENDERER_PREVIEW_UI_ADAPTER_FIXTURES: RendererPreviewU
     assert: (model) => expectNoSql(model, "unsupported"),
   },
   {
-    name: "non-DuckDB refusal shows target blocker without SQL",
+    name: "legacy renderer target metadata does not block request-owned preview",
     result: renderResultFor(nonDuckDb),
-    assert: (model) => [
-      ...expectNoSql(model, "blocked"),
-      ...(model.reasonCode === "renderer_target_not_duckdb"
-        ? []
-        : [`Expected non-DuckDB reason code, got ${model.reasonCode}.`]),
-      ...(model.blockers.some((blocker) => /oracle|not DuckDB/i.test(blocker))
-        ? []
-        : ["Expected target blocker to mention non-DuckDB target."]),
-    ],
+    assert: (model) => expectRendered(model, 'FROM "leases"'),
   },
   {
     name: "UI model includes not executed not inserted and Run Query manual safety labels",
