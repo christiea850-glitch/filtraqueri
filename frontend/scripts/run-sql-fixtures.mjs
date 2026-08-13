@@ -237,6 +237,11 @@ const fixtures = [
     exportName: "runBusinessSqlPlanRevisionLineageFixtures",
   },
   {
+    label: "Business SQL plan dependency impact",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlPlanDependencyImpact.test.ts",
+    exportName: "runBusinessSqlPlanDependencyImpactFixtures",
+  },
+  {
     label: "Business SQL definition authority",
     modulePath: "/src/features/analyst/sql/__tests__/businessSqlDefinitionAuthority.test.ts",
     exportName: "runBusinessSqlDefinitionAuthorityFixtures",
