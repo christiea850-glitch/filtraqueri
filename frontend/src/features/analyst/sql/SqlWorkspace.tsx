@@ -39,6 +39,10 @@ import {
   type SqlRelationshipReviewModel,
 } from "./sqlRelationshipReview";
 import { createSqlResultProvenanceViewModel } from "./sqlResultProvenance";
+import {
+  deriveSqlExecutionDisplayStatus,
+  type SqlExecutionDisplayStatusModel,
+} from "./sqlExecutionDisplayStatus";
 import { formatSqlWorksheetScopeSummary } from "./sqlWorksheetScopeAdapter";
 import useSqlWorkspace from "./useSqlWorkspace";
 
@@ -132,11 +136,13 @@ const createRelationshipReviewProgressSummary = (
 
 function SqlFocusedResultPreview({
   previewResult,
+  executionDisplayStatus,
   currentTaskPrompt,
   currentSqlDraft,
   onBack,
 }: {
   previewResult: SqlPreviewResult;
+  executionDisplayStatus: SqlExecutionDisplayStatusModel;
   currentTaskPrompt: string;
   currentSqlDraft: string;
   onBack: () => void;
@@ -225,6 +231,10 @@ function SqlFocusedResultPreview({
     rowNumber: rowIndex + 1,
     rowHeaderClassName: "dataset-preview-rownum",
   }));
+  const zeroRowResultMessage =
+    executionDisplayStatus.status === "stale"
+      ? "Last run returned 0 rows, but the SQL or data source has changed. Run again to refresh."
+      : "Query ran successfully and returned 0 rows.";
 
   return (
     <section className="sql-result-page" aria-label="SQL result preview">
@@ -235,6 +245,12 @@ function SqlFocusedResultPreview({
         <div>
           <p className="section-label">Analyst SQL</p>
           <h2>Result Preview</h2>
+          <p
+            className={`sql-execution-display-status is-${executionDisplayStatus.status}`}
+            aria-label="SQL execution status"
+          >
+            {executionDisplayStatus.label}: {executionDisplayStatus.description}
+          </p>
           <div className="sql-result-provenance" aria-label="Result provenance">
             <p>{provenance.summaryText}</p>
             {provenance.sourceText ? <p>{provenance.sourceText}</p> : null}
@@ -283,7 +299,7 @@ function SqlFocusedResultPreview({
           rowNumberHeader="#"
           rowNumberHeaderClassName="dataset-preview-rownum"
           rowNumberColumnWidth={52}
-          emptyRowContent={hasRows ? undefined : "The query returned no rows."}
+          emptyRowContent={hasRows ? undefined : zeroRowResultMessage}
           renderCell={(row, column) => {
             const framedValue = frameResultValue({
               value: row.values[column.key],
@@ -783,6 +799,27 @@ function SqlWorkspace({
     onQuestionHandoffConsumed,
   });
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
+  const executionDisplayStatus = useMemo(
+    () =>
+      deriveSqlExecutionDisplayStatus({
+        editorStatus,
+        previewResult,
+        currentContext: dataset
+          ? {
+              exactSql: editor.value,
+              datasetId: dataset.dataset_id,
+              worksheetId: activeTabSourceContext.worksheetId,
+            }
+          : null,
+      }),
+    [
+      activeTabSourceContext.worksheetId,
+      dataset,
+      editor.value,
+      editorStatus,
+      previewResult,
+    ],
+  );
   // Option C - Drive the command-bar source label from the active SQL tab's
   // resolved context instead of falling back to the global active worksheet.
   // The schema rail (right) and command bar (top) now both reflect the
@@ -1064,6 +1101,7 @@ function SqlWorkspace({
       <section className="sql-workspace-v2 sql-workspace-preview-mode" aria-label="SQL workspace">
         <SqlFocusedResultPreview
           previewResult={previewResult}
+          executionDisplayStatus={executionDisplayStatus}
           currentTaskPrompt={sqlTabs.taskPrompt}
           currentSqlDraft={editor.value}
           onBack={() => setFocusedView("editor")}
@@ -1111,6 +1149,7 @@ function SqlWorkspace({
           dataset={dataset}
           editor={editor}
           executionStatus={editorStatus}
+          executionDisplayStatus={executionDisplayStatus}
           characterCount={characterCount}
           canRunQuery={Boolean(dataset)}
           canOpenResultPreview={canOpenResultPreview}
@@ -1248,6 +1287,7 @@ function SqlWorkspace({
           dataset={dataset}
           editor={editor}
           executionStatus={editorStatus}
+          executionDisplayStatus={executionDisplayStatus}
           characterCount={characterCount}
           canRunQuery={Boolean(dataset)}
           canOpenResultPreview={canOpenResultPreview}

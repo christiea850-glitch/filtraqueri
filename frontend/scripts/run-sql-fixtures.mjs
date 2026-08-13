@@ -127,6 +127,11 @@ const fixtures = [
     exportName: "runSqlExecutionIdentityFixtures",
   },
   {
+    label: "SQL execution display status",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlExecutionDisplayStatus.test.ts",
+    exportName: "runSqlExecutionDisplayStatusFixtures",
+  },
+  {
     label: "SQL workspace preview result",
     modulePath: "/src/features/analyst/sql/__tests__/useSqlWorkspacePreviewResult.test.ts",
     exportName: "runSqlWorkspacePreviewFixtures",

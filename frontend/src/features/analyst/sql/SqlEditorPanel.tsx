@@ -76,10 +76,12 @@ import type {
   SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
 import type { SqlWorkspaceTabSource } from "./sqlTabsTypes";
+import type { SqlExecutionDisplayStatusModel } from "./sqlExecutionDisplayStatus";
 
 type SqlEditorPanelProps = {
   editor: SqlEditorInterface;
   executionStatus: SqlExecutionStatus;
+  executionDisplayStatus: SqlExecutionDisplayStatusModel;
   characterCount: number;
   canRunQuery: boolean;
   canOpenResultPreview: boolean;
@@ -340,6 +342,7 @@ function SqlExecutionErrorDock({
 function SqlEditorPanel({
   editor,
   executionStatus,
+  executionDisplayStatus,
   characterCount,
   canRunQuery,
   canOpenResultPreview,
@@ -1746,6 +1749,13 @@ function SqlEditorPanel({
 
       <div className="sql-editor-footer">
         <span>{statusLabels[executionStatus]}</span>
+        <span
+          className={`sql-execution-display-status is-${executionDisplayStatus.status}`}
+          aria-label="SQL execution status"
+          title={executionDisplayStatus.description}
+        >
+          {executionDisplayStatus.label}: {executionDisplayStatus.description}
+        </span>
         <span>{characterCount.toLocaleString()} characters</span>
       </div>
 

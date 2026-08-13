@@ -536,11 +536,21 @@
 .sql-editor-footer {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   margin-top: 8px;
   color: #64748b;
   font-size: 12px;
   font-weight: 750;
+}
+
+.sql-execution-display-status {
+  min-width: 0;
+  overflow: hidden;
+  color: #334155;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sql-draft-list {

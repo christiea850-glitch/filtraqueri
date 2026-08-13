@@ -1,12 +1,37 @@
 import { frameResultValue, labelResultColumns } from "./resultLabeling";
+import {
+  getSqlExecutionDisplayStatusCopy,
+  type SqlExecutionDisplayStatus,
+} from "./sqlExecutionDisplayStatus";
 import type { SqlPreviewResult } from "./sqlTypes";
 
 type SqlPreviewGridProps = {
   previewResult: SqlPreviewResult;
+  executionDisplayStatus?: SqlExecutionDisplayStatus;
 };
 
-function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
-  const hasRows = previewResult.rows.length > 0 && previewResult.columns.length > 0;
+function SqlPreviewGrid({
+  previewResult,
+  executionDisplayStatus = previewResult.executionIdentity ? "current" : "not_run",
+}: SqlPreviewGridProps) {
+  const hasColumns = previewResult.columns.length > 0;
+  const hasRows = previewResult.rows.length > 0;
+  const hasExecutedResult = Boolean(previewResult.executionIdentity);
+  const statusCopy = getSqlExecutionDisplayStatusCopy(executionDisplayStatus);
+  const isFailed = executionDisplayStatus === "failed" || Boolean(previewResult.errorInsight);
+  const isRunning = executionDisplayStatus === "running";
+  const isStale = executionDisplayStatus === "stale";
+  const isZeroRowSuccess = hasExecutedResult && hasColumns && !hasRows && !isFailed && !isRunning;
+  const emptyTitle = isZeroRowSuccess
+    ? isStale
+      ? "Last run returned 0 rows"
+      : "Query ran successfully"
+    : statusCopy.label;
+  const emptyMessage = isZeroRowSuccess
+    ? isStale
+      ? "Last run returned 0 rows, but the SQL or data source has changed. Run again to refresh."
+      : "Query ran successfully and returned 0 rows."
+    : statusCopy.description;
   const labeledColumns = labelResultColumns({
     columns: previewResult.columns,
     taskPrompt: previewResult.executedQuestion?.taskPrompt,
@@ -77,9 +102,9 @@ function SqlPreviewGrid({ previewResult }: SqlPreviewGridProps) {
         </div>
       ) : (
         <div className="empty-state compact-empty">
-          <p className="section-label">No execution</p>
-          <h2>Execution not connected yet</h2>
-          <p>No results yet.</p>
+          <p className="section-label">{statusCopy.label}</p>
+          <h2>{emptyTitle}</h2>
+          <p>{emptyMessage}</p>
         </div>
       )}
     </section>
