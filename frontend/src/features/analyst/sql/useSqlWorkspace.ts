@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatasetMetadata } from "../../dataset/datasetTypes";
 import { executeWorkspaceQuery } from "../../execution/executeWorkspaceQuery";
 import type { WorkspaceExecutionResult } from "../../execution/workspaceExecutionTypes";
@@ -32,6 +32,7 @@ import {
   createSqlErrorPreviewResult,
   createSqlSuccessPreviewResult,
 } from "./sqlPreviewResultAdapter";
+import { createSqlExecutionIdentity } from "./sqlExecutionIdentity";
 import type {
   SqlEditorInterface,
   SqlExecutionStatus,
@@ -80,6 +81,16 @@ const getTabSourceTableLabel = (tab: {
   tab.sourceType === "cleaned_working_copy"
     ? tab.cleanedTableName || tab.tableName || "cleaned copy"
     : tab.originalTableName || tab.tableName || null;
+
+let sqlExecutionRequestSequence = 0;
+
+const createLiveSqlExecutionRequestId = () => {
+  sqlExecutionRequestSequence += 1;
+  const randomSegment =
+    globalThis.crypto?.randomUUID?.() ||
+    Math.random().toString(36).slice(2);
+  return `sql-run:${sqlExecutionRequestSequence}:${randomSegment}`;
+};
 
 function useSqlWorkspace(
   dataset: DatasetMetadata | null,
@@ -132,6 +143,8 @@ function useSqlWorkspace(
     syncActiveDialect,
     setActiveEditorStatus,
     setActivePreviewResult,
+    setTabEditorStatus,
+    setTabPreviewResult,
     setActiveTabSelectedScope,
     applyActiveTabScope,
     setActiveTabTaskPrompt,
@@ -150,9 +163,34 @@ function useSqlWorkspace(
   const selectedDialect = activeTab.dialect;
   const editorStatus = activeTab.editorStatus;
   const previewResult = activeTab.previewResult;
+  const latestRunByTabRef = useRef(new Map<string, string>());
+  const mountedRef = useRef(true);
+  const activeTabIdRef = useRef(tabsState.activeTabId);
+  const tabsStateRef = useRef(tabsState);
   const consumedQuestionHandoffIdsRef = useRef(new Set<string>());
   const questionHandoff = runtimeContext.questionHandoff;
   const onQuestionHandoffConsumed = runtimeContext.onQuestionHandoffConsumed;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    latestRunByTabRef.current.clear();
+  }, [dataset?.dataset_id, dataset?.workbook_metadata?.workbookId]);
+
+  useEffect(() => {
+    activeTabIdRef.current = tabsState.activeTabId;
+    tabsStateRef.current = tabsState;
+  }, [tabsState]);
+
+  const isLatestRunForTab = (requestId: string, tabId: string) =>
+    mountedRef.current &&
+    tabsStateRef.current.tabs.some((tab) => tab.id === tabId) &&
+    latestRunByTabRef.current.get(tabId) === requestId;
 
   // Option C — Resolve the active tab's source context once and reuse it for
   // every UI / intelligence surface (schema rail, command bar, templates,
@@ -237,6 +275,10 @@ function useSqlWorkspace(
     return preview.canConvert ? preview : null;
   }, [selectedDialect, sqlDraft]);
   const characterCount = sqlDraft.trim().length;
+  const closeSqlTab = useCallback((tabId: string) => {
+    latestRunByTabRef.current.delete(tabId);
+    closeTab(tabId);
+  }, [closeTab]);
   const sqlTabs = useMemo<SqlWorkspaceTabsInterface>(() => {
     const canCloseTabs = tabsState.tabs.length > 1;
 
@@ -264,12 +306,12 @@ function useSqlWorkspace(
       })),
       onNewTab: createTab,
       onSwitchTab: switchTab,
-      onCloseTab: closeTab,
+      onCloseTab: closeSqlTab,
     };
   }, [
     activeTab,
     applyActiveTabScope,
-    closeTab,
+    closeSqlTab,
     createTab,
     markActiveTabTemplate,
     setActiveTabSelectedScope,
@@ -589,6 +631,14 @@ function useSqlWorkspace(
       return;
     }
 
+    const requestId = createLiveSqlExecutionRequestId();
+    const activeTabIdAtRun = tabsState.activeTabId;
+    const executionIdentity = createSqlExecutionIdentity({
+      requestId,
+      exactSql: trimmedSql,
+      datasetId: dataset.dataset_id,
+      worksheetId: activeTabSourceContext.worksheetId,
+    });
     const executedQuestion = createExecutedQuestionSnapshot({
       taskPrompt: activeTab.taskPrompt || "",
       sqlAtRun: trimmedSql,
@@ -602,12 +652,14 @@ function useSqlWorkspace(
           : undefined,
     });
 
-    setActiveEditorStatus("running");
-    setActivePreviewResult({
+    latestRunByTabRef.current.set(activeTabIdAtRun, requestId);
+    setTabEditorStatus(activeTabIdAtRun, "running");
+    setTabPreviewResult(activeTabIdAtRun, {
       columns: [],
       rows: [],
       message: createPreviewMessage("running"),
       errorInsight: null,
+      executionIdentity,
     });
 
     try {
@@ -624,12 +676,22 @@ function useSqlWorkspace(
         },
       });
 
-      setActiveEditorStatus("success");
-      setActivePreviewResult(createSqlSuccessPreviewResult(executionResult, executedQuestion));
-      onExecutionResult?.(executionResult);
+      if (!isLatestRunForTab(requestId, activeTabIdAtRun)) return;
+
+      setTabEditorStatus(activeTabIdAtRun, "success");
+      setTabPreviewResult(
+        activeTabIdAtRun,
+        createSqlSuccessPreviewResult(executionResult, executedQuestion, executionIdentity),
+      );
+      if (activeTabIdRef.current === activeTabIdAtRun) {
+        onExecutionResult?.(executionResult);
+      }
     } catch (error) {
-      setActiveEditorStatus("error");
-      setActivePreviewResult(
+      if (!isLatestRunForTab(requestId, activeTabIdAtRun)) return;
+
+      setTabEditorStatus(activeTabIdAtRun, "error");
+      setTabPreviewResult(
+        activeTabIdAtRun,
         createSqlErrorPreviewResult({
           error,
           sqlText: trimmedSql,
@@ -638,6 +700,7 @@ function useSqlWorkspace(
           activeTabSourceContext,
           appliedScopeSelections: activeTab.appliedScopeSelections || [],
           executedQuestion,
+          executionIdentity,
         }),
       );
     }

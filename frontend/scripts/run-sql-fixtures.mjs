@@ -122,6 +122,11 @@ const fixtures = [
     exportName: "runSqlResultProvenanceFixtures",
   },
   {
+    label: "SQL execution identity",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlExecutionIdentity.test.ts",
+    exportName: "runSqlExecutionIdentityFixtures",
+  },
+  {
     label: "SQL workspace preview result",
     modulePath: "/src/features/analyst/sql/__tests__/useSqlWorkspacePreviewResult.test.ts",
     exportName: "runSqlWorkspacePreviewFixtures",

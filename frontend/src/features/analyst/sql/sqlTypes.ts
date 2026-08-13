@@ -13,6 +13,7 @@ import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
 import type { BusinessIntent } from "./businessIntentGrounding";
 import type { SqlBusinessQuestionShape } from "./sqlBusinessQuestionShape";
 import type { BusinessSqlClarificationDecisionProvenance } from "./businessSqlPreviewProvenance";
+import type { SqlExecutionIdentity } from "./sqlExecutionIdentity";
 
 export type SqlExecutionStatus =
   | "idle"
@@ -36,6 +37,7 @@ export type SqlPreviewResult = {
   message: string;
   errorInsight?: SqlExecutionErrorInsight | null;
   executedQuestion?: ExecutedQuestionSnapshot;
+  executionIdentity?: SqlExecutionIdentity;
 };
 
 export type ExecutedQuestionSnapshot = {

@@ -6,6 +6,7 @@ import { detectBusinessIntent } from "./businessIntentGrounding";
 import { classifySqlBusinessQuestion } from "./sqlBusinessQuestionShape";
 import { formatSqlExecutionError } from "./sqlErrorFormatter";
 import type { SqlTabSourceContext } from "./resolveSqlTabSourceContext";
+import type { SqlExecutionIdentity } from "./sqlExecutionIdentity";
 import type { ExecutedQuestionSnapshot, SqlPreviewResult } from "./sqlTypes";
 
 const uniqueDefined = (values: Array<string | null | undefined>) =>
@@ -106,6 +107,7 @@ export function createExecutedQuestionSnapshot({
 export function createSqlSuccessPreviewResult(
   executionResult: WorkspaceExecutionResult,
   executedQuestion?: ExecutedQuestionSnapshot,
+  executionIdentity?: SqlExecutionIdentity,
 ): SqlPreviewResult {
   return {
     columns: executionResult.outputVisibleColumns,
@@ -113,6 +115,7 @@ export function createSqlSuccessPreviewResult(
     message: executionResult.sql?.message || "Query completed.",
     errorInsight: null,
     ...(executedQuestion ? { executedQuestion: { ...executedQuestion } } : {}),
+    ...(executionIdentity ? { executionIdentity: { ...executionIdentity } } : {}),
   };
 }
 
@@ -124,6 +127,7 @@ export function createSqlErrorPreviewResult({
   activeTabSourceContext,
   appliedScopeSelections,
   executedQuestion,
+  executionIdentity,
 }: {
   error: unknown;
   sqlText: string;
@@ -132,6 +136,7 @@ export function createSqlErrorPreviewResult({
   activeTabSourceContext: SqlTabSourceContext;
   appliedScopeSelections: AnalysisScopeSelection[];
   executedQuestion?: ExecutedQuestionSnapshot;
+  executionIdentity?: SqlExecutionIdentity;
 }): SqlPreviewResult {
   const rawMessage = error instanceof Error ? error.message : "Query failed.";
   const errorInsight = formatSqlExecutionError({
@@ -152,5 +157,6 @@ export function createSqlErrorPreviewResult({
     message: errorInsight.title,
     errorInsight,
     ...(executedQuestion ? { executedQuestion: { ...executedQuestion } } : {}),
+    ...(executionIdentity ? { executionIdentity: { ...executionIdentity } } : {}),
   };
 }

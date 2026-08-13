@@ -170,6 +170,22 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     }));
   }, [commitTabsState]);
 
+  const updateTabById = useCallback((
+    tabId: string,
+    updater: (tab: SqlWorkspaceTab) => SqlWorkspaceTab,
+  ) => {
+    commitTabsState((currentState) =>
+      currentState.tabs.some((tab) => tab.id === tabId)
+        ? {
+            ...currentState,
+            tabs: currentState.tabs.map((tab) =>
+              tab.id === tabId ? updater(tab) : tab,
+            ),
+          }
+        : currentState,
+    );
+  }, [commitTabsState]);
+
   const setActiveSqlDraft = useCallback((sqlDraft: string) => {
     updateActiveTab((tab) => ({
       ...tab,
@@ -203,6 +219,20 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
       previewResult,
     }));
   }, [updateActiveTab]);
+
+  const setTabEditorStatus = useCallback((tabId: string, editorStatus: SqlExecutionStatus) => {
+    updateTabById(tabId, (tab) => ({
+      ...tab,
+      editorStatus,
+    }));
+  }, [updateTabById]);
+
+  const setTabPreviewResult = useCallback((tabId: string, previewResult: SqlPreviewResult) => {
+    updateTabById(tabId, (tab) => ({
+      ...tab,
+      previewResult,
+    }));
+  }, [updateTabById]);
 
   const setActiveTabSelectedScope = useCallback((selections: AnalysisScopeSelection[]) => {
     updateActiveTab((tab) => ({
@@ -365,6 +395,8 @@ function useSqlWorkspaceTabs(seed: SqlWorkspaceTabSeed) {
     syncActiveDialect,
     setActiveEditorStatus,
     setActivePreviewResult,
+    setTabEditorStatus,
+    setTabPreviewResult,
     setActiveTabSelectedScope,
     applyActiveTabScope,
     setActiveTabTaskPrompt,
