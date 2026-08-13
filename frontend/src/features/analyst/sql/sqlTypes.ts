@@ -49,6 +49,15 @@ export type ExecutedQuestionSnapshot = {
   clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
 };
 
+export type SqlQuestionHandoff = {
+  id: string;
+  source: "home";
+  question: string;
+  datasetId: string;
+  worksheetId: string | null;
+  createdAt: string;
+};
+
 export type SqlSuggestion = {
   id: string;
   label: string;

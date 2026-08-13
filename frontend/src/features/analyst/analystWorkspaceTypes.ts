@@ -4,6 +4,7 @@ import type { WorkspaceExecutionResult } from "../execution/workspaceExecutionTy
 import type { SqlWorkspaceMetadataSnapshot } from "../sqlWorkspacePersistence";
 import type { AnalysisScopeSelection } from "../workbook";
 import type { SqlAssistantMode } from "./sql/SqlAssistantPanel";
+import type { SqlQuestionHandoff } from "./sql/sqlTypes";
 
 export type AnalystNavigationContext = {
   sqlAssistantOrigin?: "sql-context-task-assist";
@@ -22,6 +23,8 @@ export type AnalystWorkspaceRenderContext = {
   requestedSqlAssistantMode?: SqlAssistantMode | null;
   onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
   sqlAssistantOrigin?: AnalystNavigationContext["sqlAssistantOrigin"];
+  questionHandoff?: SqlQuestionHandoff | null;
+  onQuestionHandoffConsumed?: (handoffId: string) => void;
 };
 
 export type AnalystAiCapabilityFlags = {

@@ -86,6 +86,8 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
       onAnalysisScopeSelectionsChange,
       onAnalystViewChange,
       onSqlAssistantModeChange,
+      questionHandoff,
+      onQuestionHandoffConsumed,
     }) =>
       createElement(SqlWorkspace, {
         dataset,
@@ -98,6 +100,8 @@ export const analystWorkspaceRegistry: AnalystWorkspaceDefinition[] = [
         onAnalysisScopeSelectionsChange,
         onAnalystViewChange,
         onSqlAssistantModeChange,
+        questionHandoff,
+        onQuestionHandoffConsumed,
       }),
   },
   {

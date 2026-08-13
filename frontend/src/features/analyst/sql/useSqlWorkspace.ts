@@ -36,6 +36,7 @@ import type {
   SqlEditorInterface,
   SqlExecutionStatus,
   SqlPreviewResult,
+  SqlQuestionHandoff,
   SqlQueryDraft,
   SqlWorkspaceTabsInterface,
 } from "./sqlTypes";
@@ -87,6 +88,8 @@ function useSqlWorkspace(
   onMetadataChange?: (metadata: SqlWorkspaceMetadataSnapshot) => void,
   runtimeContext: {
     businessSqlPreviewInsertProvenance?: BusinessSqlPreviewInsertProvenance | null;
+    questionHandoff?: SqlQuestionHandoff | null;
+    onQuestionHandoffConsumed?: (handoffId: string) => void;
   } = {},
 ) {
   const normalizedMetadata = useMemo(
@@ -147,6 +150,9 @@ function useSqlWorkspace(
   const selectedDialect = activeTab.dialect;
   const editorStatus = activeTab.editorStatus;
   const previewResult = activeTab.previewResult;
+  const consumedQuestionHandoffIdsRef = useRef(new Set<string>());
+  const questionHandoff = runtimeContext.questionHandoff;
+  const onQuestionHandoffConsumed = runtimeContext.onQuestionHandoffConsumed;
 
   // Option C — Resolve the active tab's source context once and reuse it for
   // every UI / intelligence surface (schema rail, command bar, templates,
@@ -383,6 +389,48 @@ function useSqlWorkspace(
       clearExecutionError();
     }
   };
+
+  useEffect(() => {
+    const handoff = questionHandoff;
+    if (!handoff || consumedQuestionHandoffIdsRef.current.has(handoff.id)) return;
+
+    const consume = () => {
+      consumedQuestionHandoffIdsRef.current.add(handoff.id);
+      onQuestionHandoffConsumed?.(handoff.id);
+    };
+    const activeWorksheetId =
+      activeTabSourceContext.worksheetId ||
+      dataset?.workbook_metadata?.activeAnalysisSource?.worksheetId ||
+      dataset?.workbook_metadata?.activeWorksheetId ||
+      null;
+
+    if (
+      !dataset ||
+      handoff.datasetId !== dataset.dataset_id ||
+      (handoff.worksheetId && activeWorksheetId !== handoff.worksheetId)
+    ) {
+      consume();
+      return;
+    }
+
+    const question = handoff.question.trim();
+    if (!question) {
+      consume();
+      return;
+    }
+
+    if (!activeTab.taskPrompt?.trim()) {
+      setActiveTabTaskPrompt(question);
+    }
+    consume();
+  }, [
+    activeTab.taskPrompt,
+    activeTabSourceContext.worksheetId,
+    dataset,
+    onQuestionHandoffConsumed,
+    questionHandoff,
+    setActiveTabTaskPrompt,
+  ]);
 
   const applyDraftConversion = () => {
     if (!draftConversionPreview?.canConvert) return;

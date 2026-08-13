@@ -76,6 +76,7 @@ type UploadPanelProps = {
   continueLabel?: string;
   onFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
   onContinue?: () => void;
+  onAskQuestion?: (question: string) => void;
   onRecentDatasetClick?: (datasetId: string) => void;
   onSuggestionSelect?: (intent: HumanIntent) => void;
 };
@@ -89,6 +90,7 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
       recentDatasets = [],
       onFileChange,
       onContinue,
+      onAskQuestion,
       onRecentDatasetClick,
       onSuggestionSelect,
     },
@@ -137,7 +139,7 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
     ];
     const datasetLabel = dataset?.original_filename || dataset?.table_name || null;
     const hasRecentHistory = usefulRecentDatasets.length > 0;
-    const askEnabled = Boolean(dataset && onContinue);
+    const askEnabled = Boolean(dataset && (onAskQuestion || onContinue));
     const askCanSubmit = askEnabled && askPrompt.trim().length > 0;
     const showSuggestions = Boolean(dataset && onSuggestionSelect);
 
@@ -166,7 +168,15 @@ const UploadPanel = forwardRef<HTMLInputElement, UploadPanelProps>(
               aria-label="Ask FiltraQueri"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (askCanSubmit) onContinue?.();
+                const question = askPrompt.trim();
+                if (askCanSubmit && question) {
+                  if (onAskQuestion) {
+                    onAskQuestion(question);
+                  } else {
+                    onContinue?.();
+                  }
+                  return;
+                }
               }}
             >
               <div className="home-ask-control">

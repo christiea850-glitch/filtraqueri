@@ -31,7 +31,7 @@ import {
   removeSqlConfirmedRelationship,
   type SqlRelationshipConfirmationState,
 } from "./sqlRelationshipConfirmation";
-import type { SqlPreviewResult, SqlQueryDraft } from "./sqlTypes";
+import type { SqlPreviewResult, SqlQueryDraft, SqlQuestionHandoff } from "./sqlTypes";
 import { frameResultValue, labelResultColumns } from "./resultLabeling";
 import { createResultNarration } from "./resultNarration";
 import {
@@ -53,6 +53,8 @@ type SqlWorkspaceProps = {
   onAnalysisScopeSelectionsChange?: (selections: AnalysisScopeSelection[]) => void;
   onAnalystViewChange?: (view: ActiveView, context?: AnalystNavigationContext) => void;
   onSqlAssistantModeChange?: (mode: SqlAssistantMode | null) => void;
+  questionHandoff?: SqlQuestionHandoff | null;
+  onQuestionHandoffConsumed?: (handoffId: string) => void;
 };
 
 type BottomTab = "guidance";
@@ -730,6 +732,8 @@ function SqlWorkspace({
   isSwitchingWorksheet,
   onAnalystViewChange,
   onSqlAssistantModeChange,
+  questionHandoff,
+  onQuestionHandoffConsumed,
 }: SqlWorkspaceProps) {
   const [isRailCollapsed, setIsRailCollapsed] = useState(false);
   const [isContextOpen, setIsContextOpen] = useState(false);
@@ -775,6 +779,8 @@ function SqlWorkspace({
     activeTabSourceContext,
   } = useSqlWorkspace(dataset, onExecutionResult, metadata, onMetadataChange, {
     businessSqlPreviewInsertProvenance,
+    questionHandoff,
+    onQuestionHandoffConsumed,
   });
   const canOpenResultPreview = editorStatus === "success" && previewResult.columns.length > 0;
   // Option C - Drive the command-bar source label from the active SQL tab's

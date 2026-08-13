@@ -22,6 +22,7 @@ import {
 } from "./features/analyst/analystWorkspaceHelpers";
 import { analystWorkspaceRegistry } from "./features/analyst/analystWorkspaceRegistry";
 import type { AnalystNavigationContext } from "./features/analyst/analystWorkspaceTypes";
+import type { SqlQuestionHandoff } from "./features/analyst/sql/sqlTypes";
 import type { SqlAssistantMode } from "./features/analyst/sql/SqlAssistantPanel";
 import type {
   ActiveView,
@@ -168,6 +169,8 @@ function App() {
     useState<SqlAssistantMode | null>(null);
   const [sqlAssistantOrigin, setSqlAssistantOrigin] =
     useState<AnalystNavigationContext["sqlAssistantOrigin"]>();
+  const [homeAskQuestionHandoff, setHomeAskQuestionHandoff] =
+    useState<SqlQuestionHandoff | null>(null);
   const [analysisScopeSelections, setAnalysisScopeSelections] = useState<
     AnalysisScopeSelection[]
   >([]);
@@ -488,6 +491,37 @@ function App() {
     setWorkspaceMode("analyst");
     updateDatasetSessionView("sqlWorkspace");
   }, [dataset, setWorkspaceMode, updateDatasetSessionView]);
+
+  const handleHomeAskQuestion = useCallback(
+    (question: string) => {
+      const trimmedQuestion = question.trim();
+      if (!dataset || !trimmedQuestion) return;
+      const activeWorksheetId =
+        dataset.workbook_metadata?.activeAnalysisSource?.worksheetId ||
+        dataset.workbook_metadata?.activeWorksheetId ||
+        null;
+
+      setHomeAskQuestionHandoff({
+        id: `home-ask:${dataset.dataset_id}:${Date.now()}`,
+        source: "home",
+        question: trimmedQuestion,
+        datasetId: dataset.dataset_id,
+        worksheetId: activeWorksheetId,
+        createdAt: new Date().toISOString(),
+      });
+      setWorkspaceMode("analyst");
+      setRequestedSqlAssistantMode(null);
+      setSqlAssistantOrigin(undefined);
+      updateDatasetSessionView("sqlWorkspace");
+    },
+    [dataset, setWorkspaceMode, updateDatasetSessionView],
+  );
+
+  const consumeHomeAskQuestionHandoff = useCallback((handoffId: string) => {
+    setHomeAskQuestionHandoff((currentHandoff) =>
+      currentHandoff?.id === handoffId ? null : currentHandoff,
+    );
+  }, []);
 
   const {
     isFiltering,
@@ -1285,6 +1319,7 @@ function App() {
         continueLabel={activeResultModel ? "Review results" : "Review data"}
         onFileChange={handleFileUpload}
         onContinue={() => updateDatasetSessionView(activeResultModel ? "results" : "dataset")}
+        onAskQuestion={handleHomeAskQuestion}
         onRecentDatasetClick={activateRecentDataset}
         onSuggestionSelect={selectHumanIntent}
       />
@@ -1554,6 +1589,8 @@ function App() {
     requestedSqlAssistantMode,
     onSqlAssistantModeChange: setRequestedSqlAssistantMode,
     sqlAssistantOrigin,
+    questionHandoff: homeAskQuestionHandoff,
+    onQuestionHandoffConsumed: consumeHomeAskQuestionHandoff,
 
     onExecutionResult: (executionResult) => {
       const coordinationResult = coordinateExecutionResult({
