@@ -1,0 +1,345 @@
+{
+  "vectorSetVersion": "worksheet-source-a1-parity-golden-vectors:v1",
+  "a1Source": "frontend/src/features/workbook/worksheetSourceRevision.ts",
+  "vectors": [
+    {
+      "name": "empty-object",
+      "prefix": "canonical-fixture",
+      "payload": {},
+      "expectedCanonical": "{}",
+      "expectedFingerprint": "canonical-fixture:2:5465b825"
+    },
+    {
+      "name": "nested-reordered-object-keys",
+      "prefix": "canonical-fixture",
+      "payload": { "z": { "b": 2, "a": 1 }, "a": true },
+      "expectedCanonical": "{\"a\":true,\"z\":{\"a\":1,\"b\":2}}",
+      "expectedFingerprint": "canonical-fixture:28:6ebceefe"
+    },
+    {
+      "name": "array-order-preserved-a",
+      "prefix": "canonical-fixture",
+      "payload": ["a", "b", "c"],
+      "expectedCanonical": "[\"a\",\"b\",\"c\"]",
+      "expectedFingerprint": "canonical-fixture:13:5818a909"
+    },
+    {
+      "name": "array-order-preserved-b",
+      "prefix": "canonical-fixture",
+      "payload": ["c", "b", "a"],
+      "expectedCanonical": "[\"c\",\"b\",\"a\"]",
+      "expectedFingerprint": "canonical-fixture:13:72f98f09"
+    },
+    {
+      "name": "null-value",
+      "prefix": "canonical-fixture",
+      "payload": null,
+      "expectedCanonical": "null",
+      "expectedFingerprint": "canonical-fixture:4:77074ba4"
+    },
+    {
+      "name": "boolean-values",
+      "prefix": "canonical-fixture",
+      "payload": { "t": true, "f": false },
+      "expectedCanonical": "{\"f\":false,\"t\":true}",
+      "expectedFingerprint": "canonical-fixture:20:58d37c00"
+    },
+    {
+      "name": "empty-and-escaped-strings",
+      "prefix": "canonical-fixture",
+      "payload": {
+        "empty": "",
+        "escaped": "quote \" backslash \\ tab \t newline \n control \u0001"
+      },
+      "expectedCanonical": "{\"empty\":\"\",\"escaped\":\"quote \\\" backslash \\\\ tab \\t newline \\n control \\u0001\"}",
+      "expectedFingerprint": "canonical-fixture:79:ef62a681"
+    },
+    {
+      "name": "plain-ascii",
+      "prefix": "canonical-fixture",
+      "payload": "plain ascii text",
+      "expectedCanonical": "\"plain ascii text\"",
+      "expectedFingerprint": "canonical-fixture:18:9986119f"
+    },
+    {
+      "name": "non-ascii-text",
+      "prefix": "canonical-fixture",
+      "payload": "Akwaaba Ghana: caf\u00e9",
+      "expectedCanonical": "\"Akwaaba Ghana: caf\u00e9\"",
+      "expectedFingerprint": "canonical-fixture:21:20d98875"
+    },
+    {
+      "name": "unicode-outside-bmp",
+      "prefix": "canonical-fixture",
+      "payload": "emoji \ud83d\ude00 value",
+      "expectedCanonical": "\"emoji \ud83d\ude00 value\"",
+      "expectedFingerprint": "canonical-fixture:16:6ca95b07"
+    },
+    {
+      "name": "integer-zero",
+      "prefix": "canonical-fixture",
+      "payload": 0,
+      "expectedCanonical": "0",
+      "expectedFingerprint": "canonical-fixture:1:350ca8af"
+    },
+    {
+      "name": "positive-and-negative-integers",
+      "prefix": "canonical-fixture",
+      "payload": { "positive": 42, "negative": -7 },
+      "expectedCanonical": "{\"negative\":-7,\"positive\":42}",
+      "expectedFingerprint": "canonical-fixture:29:a8ee137b"
+    },
+    {
+      "name": "integral-floating-point",
+      "prefix": "canonical-fixture",
+      "payload": 1.0,
+      "expectedCanonical": "1",
+      "expectedFingerprint": "canonical-fixture:1:340ca71c"
+    },
+    {
+      "name": "ordinary-decimal-ratios",
+      "prefix": "canonical-fixture",
+      "payload": { "low": 0.125, "high": 0.96 },
+      "expectedCanonical": "{\"high\":0.96,\"low\":0.125}",
+      "expectedFingerprint": "canonical-fixture:25:f5170f60"
+    },
+    {
+      "name": "small-number-threshold-fixed",
+      "prefix": "canonical-fixture",
+      "payload": 0.000001,
+      "expectedCanonical": "0.000001",
+      "expectedFingerprint": "canonical-fixture:8:4ff86a68"
+    },
+    {
+      "name": "small-number-threshold-exponent",
+      "prefix": "canonical-fixture",
+      "payload": 0.0000001,
+      "expectedCanonical": "1e-7",
+      "expectedFingerprint": "canonical-fixture:4:5228e5cf"
+    },
+    {
+      "name": "large-number-threshold-fixed",
+      "prefix": "canonical-fixture",
+      "payload": 1e20,
+      "expectedCanonical": "100000000000000000000",
+      "expectedFingerprint": "canonical-fixture:21:f96a3a1c"
+    },
+    {
+      "name": "large-number-threshold-exponent",
+      "prefix": "canonical-fixture",
+      "payload": 1e21,
+      "expectedCanonical": "1e+21",
+      "expectedFingerprint": "canonical-fixture:5:b6a7b1f5"
+    },
+    {
+      "name": "original-worksheet-source-identity-payload",
+      "prefix": "worksheet-source",
+      "payload": {
+        "version": "worksheet-source-identity:v1",
+        "datasetId": "dataset:alpha",
+        "workbookId": "workbook:alpha",
+        "worksheetId": "worksheet:primary",
+        "sourceKind": "original",
+        "cleanedLineageId": null
+      },
+      "expectedCanonical": "{\"cleanedLineageId\":null,\"datasetId\":\"dataset:alpha\",\"sourceKind\":\"original\",\"version\":\"worksheet-source-identity:v1\",\"workbookId\":\"workbook:alpha\",\"worksheetId\":\"worksheet:primary\"}",
+      "expectedFingerprint": "worksheet-source:182:db1ef819"
+    },
+    {
+      "name": "cleaned-worksheet-source-identity-payload",
+      "prefix": "worksheet-source",
+      "payload": {
+        "version": "worksheet-source-identity:v1",
+        "datasetId": "dataset:alpha",
+        "workbookId": "workbook:alpha",
+        "worksheetId": "worksheet:primary",
+        "sourceKind": "cleaned_working_copy",
+        "cleanedLineageId": "cleaned-lineage:one"
+      },
+      "expectedCanonical": "{\"cleanedLineageId\":\"cleaned-lineage:one\",\"datasetId\":\"dataset:alpha\",\"sourceKind\":\"cleaned_working_copy\",\"version\":\"worksheet-source-identity:v1\",\"workbookId\":\"workbook:alpha\",\"worksheetId\":\"worksheet:primary\"}",
+      "expectedFingerprint": "worksheet-source:211:69b5e7cf"
+    },
+    {
+      "name": "structural-schema-payload-ordered-columns",
+      "prefix": "worksheet-structural-schema",
+      "payload": {
+        "version": "worksheet-structural-schema-fingerprint:v1",
+        "columns": [
+          {
+            "columnId": "col:a",
+            "ordinal": 0,
+            "name": "alpha_id",
+            "physicalType": "INTEGER",
+            "logicalType": "number",
+            "nullable": false
+          },
+          {
+            "columnId": "col:b",
+            "ordinal": 1,
+            "name": "beta_label",
+            "physicalType": "VARCHAR",
+            "logicalType": "text",
+            "nullable": true
+          }
+        ]
+      },
+      "expectedCanonical": "{\"columns\":[{\"columnId\":\"col:a\",\"logicalType\":\"number\",\"name\":\"alpha_id\",\"nullable\":false,\"ordinal\":0,\"physicalType\":\"INTEGER\"},{\"columnId\":\"col:b\",\"logicalType\":\"text\",\"name\":\"beta_label\",\"nullable\":true,\"ordinal\":1,\"physicalType\":\"VARCHAR\"}],\"version\":\"worksheet-structural-schema-fingerprint:v1\"}",
+      "expectedFingerprint": "worksheet-structural-schema:299:919e7409"
+    },
+    {
+      "name": "same-object-keys-different-insertion-order",
+      "prefix": "canonical-fixture",
+      "payload": { "b": 2, "a": 1, "c": { "y": false, "x": null } },
+      "expectedCanonical": "{\"a\":1,\"b\":2,\"c\":{\"x\":null,\"y\":false}}",
+      "expectedFingerprint": "canonical-fixture:38:c70b4ad5"
+    },
+    {
+      "name": "source-revision-materialization-v1",
+      "prefix": "worksheet-source-revision",
+      "payload": {
+        "version": "worksheet-source-revision:v1",
+        "sourceIdentity": {
+          "version": "worksheet-source-identity:v1",
+          "datasetId": "dataset:alpha",
+          "workbookId": "workbook:alpha",
+          "worksheetId": "worksheet:primary",
+          "sourceKind": "original",
+          "cleanedLineageId": null,
+          "sourceId": "worksheet-source:182:db1ef819"
+        },
+        "tableName": "ws_alpha",
+        "structuralSchemaFingerprint": {
+          "version": "worksheet-structural-schema-fingerprint:v1",
+          "fingerprint": "worksheet-structural-schema:299:919e7409",
+          "columns": [
+            {
+              "columnId": "col:a",
+              "ordinal": 0,
+              "name": "alpha_id",
+              "physicalType": "INTEGER",
+              "logicalType": "number",
+              "nullable": false
+            },
+            {
+              "columnId": "col:b",
+              "ordinal": 1,
+              "name": "beta_label",
+              "physicalType": "VARCHAR",
+              "logicalType": "text",
+              "nullable": true
+            }
+          ]
+        },
+        "materializationFingerprint": "materialization:alpha:v1",
+        "transformationLineageId": null
+      },
+      "expectedCanonical": "{\"materializationFingerprint\":\"materialization:alpha:v1\",\"sourceIdentity\":{\"cleanedLineageId\":null,\"datasetId\":\"dataset:alpha\",\"sourceId\":\"worksheet-source:182:db1ef819\",\"sourceKind\":\"original\",\"version\":\"worksheet-source-identity:v1\",\"workbookId\":\"workbook:alpha\",\"worksheetId\":\"worksheet:primary\"},\"structuralSchemaFingerprint\":{\"columns\":[{\"columnId\":\"col:a\",\"logicalType\":\"number\",\"name\":\"alpha_id\",\"nullable\":false,\"ordinal\":0,\"physicalType\":\"INTEGER\"},{\"columnId\":\"col:b\",\"logicalType\":\"text\",\"name\":\"beta_label\",\"nullable\":true,\"ordinal\":1,\"physicalType\":\"VARCHAR\"}],\"fingerprint\":\"worksheet-structural-schema:299:919e7409\",\"version\":\"worksheet-structural-schema-fingerprint:v1\"},\"tableName\":\"ws_alpha\",\"transformationLineageId\":null,\"version\":\"worksheet-source-revision:v1\"}",
+      "expectedFingerprint": "worksheet-source-revision:782:29fe6ce5"
+    },
+    {
+      "name": "source-revision-materialization-v2",
+      "prefix": "worksheet-source-revision",
+      "payload": {
+        "version": "worksheet-source-revision:v1",
+        "sourceIdentity": {
+          "version": "worksheet-source-identity:v1",
+          "datasetId": "dataset:alpha",
+          "workbookId": "workbook:alpha",
+          "worksheetId": "worksheet:primary",
+          "sourceKind": "original",
+          "cleanedLineageId": null,
+          "sourceId": "worksheet-source:182:db1ef819"
+        },
+        "tableName": "ws_alpha",
+        "structuralSchemaFingerprint": {
+          "version": "worksheet-structural-schema-fingerprint:v1",
+          "fingerprint": "worksheet-structural-schema:299:919e7409",
+          "columns": [
+            {
+              "columnId": "col:a",
+              "ordinal": 0,
+              "name": "alpha_id",
+              "physicalType": "INTEGER",
+              "logicalType": "number",
+              "nullable": false
+            },
+            {
+              "columnId": "col:b",
+              "ordinal": 1,
+              "name": "beta_label",
+              "physicalType": "VARCHAR",
+              "logicalType": "text",
+              "nullable": true
+            }
+          ]
+        },
+        "materializationFingerprint": "materialization:alpha:v2",
+        "transformationLineageId": null
+      },
+      "expectedCanonical": "{\"materializationFingerprint\":\"materialization:alpha:v2\",\"sourceIdentity\":{\"cleanedLineageId\":null,\"datasetId\":\"dataset:alpha\",\"sourceId\":\"worksheet-source:182:db1ef819\",\"sourceKind\":\"original\",\"version\":\"worksheet-source-identity:v1\",\"workbookId\":\"workbook:alpha\",\"worksheetId\":\"worksheet:primary\"},\"structuralSchemaFingerprint\":{\"columns\":[{\"columnId\":\"col:a\",\"logicalType\":\"number\",\"name\":\"alpha_id\",\"nullable\":false,\"ordinal\":0,\"physicalType\":\"INTEGER\"},{\"columnId\":\"col:b\",\"logicalType\":\"text\",\"name\":\"beta_label\",\"nullable\":true,\"ordinal\":1,\"physicalType\":\"VARCHAR\"}],\"fingerprint\":\"worksheet-structural-schema:299:919e7409\",\"version\":\"worksheet-structural-schema-fingerprint:v1\"},\"tableName\":\"ws_alpha\",\"transformationLineageId\":null,\"version\":\"worksheet-source-revision:v1\"}",
+      "expectedFingerprint": "worksheet-source-revision:782:3b4634ee"
+    },
+    {
+      "name": "relationship-evidence-payload-v1",
+      "prefix": "relationship-evidence",
+      "payload": {
+        "version": "relationship-evidence-fingerprint:v1",
+        "evidence": {
+          "rowCount": 10,
+          "nullCount": 1,
+          "distinctCount": 9,
+          "uniquenessRatio": 0.9,
+          "cardinalityEvidence": "one_to_one",
+          "candidateKeyEvidence": "mostly_unique",
+          "overlapPolicyId": "sampled-overlap:v1",
+          "sampledOverlapRatio": 0.8,
+          "sampledOverlapCount": 8
+        }
+      },
+      "expectedCanonical": "{\"evidence\":{\"candidateKeyEvidence\":\"mostly_unique\",\"cardinalityEvidence\":\"one_to_one\",\"distinctCount\":9,\"nullCount\":1,\"overlapPolicyId\":\"sampled-overlap:v1\",\"rowCount\":10,\"sampledOverlapCount\":8,\"sampledOverlapRatio\":0.8,\"uniquenessRatio\":0.9},\"version\":\"relationship-evidence-fingerprint:v1\"}",
+      "expectedFingerprint": "relationship-evidence:294:519bf6af"
+    },
+    {
+      "name": "relationship-evidence-payload-v2",
+      "prefix": "relationship-evidence",
+      "payload": {
+        "version": "relationship-evidence-fingerprint:v1",
+        "evidence": {
+          "rowCount": 10,
+          "nullCount": 2,
+          "distinctCount": 8,
+          "uniquenessRatio": 0.8,
+          "cardinalityEvidence": "one_to_one",
+          "candidateKeyEvidence": "mostly_unique",
+          "overlapPolicyId": "sampled-overlap:v1",
+          "sampledOverlapRatio": 0.8,
+          "sampledOverlapCount": 8
+        }
+      },
+      "expectedCanonical": "{\"evidence\":{\"candidateKeyEvidence\":\"mostly_unique\",\"cardinalityEvidence\":\"one_to_one\",\"distinctCount\":8,\"nullCount\":2,\"overlapPolicyId\":\"sampled-overlap:v1\",\"rowCount\":10,\"sampledOverlapCount\":8,\"sampledOverlapRatio\":0.8,\"uniquenessRatio\":0.8},\"version\":\"relationship-evidence-fingerprint:v1\"}",
+      "expectedFingerprint": "relationship-evidence:294:d41a24e0"
+    },
+    {
+      "name": "endpoint-signature-payload",
+      "prefix": "relationship-endpoint",
+      "payload": {
+        "version": "relationship-endpoint-signature:v1",
+        "sourceRevisionId": "worksheet-source-revision:782:29fe6ce5",
+        "sourceId": "worksheet-source:182:db1ef819",
+        "datasetId": "dataset:alpha",
+        "workbookId": "workbook:alpha",
+        "worksheetId": "worksheet:primary",
+        "sourceKind": "original",
+        "tableName": "ws_alpha",
+        "structuralSchemaFingerprint": "worksheet-structural-schema:299:919e7409",
+        "columnId": "col:a",
+        "columnName": "alpha_id",
+        "columnOrdinal": 0,
+        "physicalType": "INTEGER",
+        "logicalType": "number"
+      },
+      "expectedCanonical": "{\"columnId\":\"col:a\",\"columnName\":\"alpha_id\",\"columnOrdinal\":0,\"datasetId\":\"dataset:alpha\",\"logicalType\":\"number\",\"physicalType\":\"INTEGER\",\"sourceId\":\"worksheet-source:182:db1ef819\",\"sourceKind\":\"original\",\"sourceRevisionId\":\"worksheet-source-revision:782:29fe6ce5\",\"structuralSchemaFingerprint\":\"worksheet-structural-schema:299:919e7409\",\"tableName\":\"ws_alpha\",\"version\":\"relationship-endpoint-signature:v1\",\"workbookId\":\"workbook:alpha\",\"worksheetId\":\"worksheet:primary\"}",
+      "expectedFingerprint": "relationship-endpoint:472:6095a283"
+    }
+  ]
+}
