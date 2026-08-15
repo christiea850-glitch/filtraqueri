@@ -142,6 +142,21 @@ const fixtures = [
     exportName: "runSqlRelationshipConfirmationFixtures",
   },
   {
+    label: "Worksheet source revision contract",
+    modulePath: "/src/features/workbook/__tests__/worksheetSourceRevision.test.ts",
+    exportName: "runWorksheetSourceRevisionFixtures",
+  },
+  {
+    label: "SQL applied source manifest contract",
+    modulePath: "/src/features/analyst/sql/__tests__/sqlAppliedSourceManifest.test.ts",
+    exportName: "runSqlAppliedSourceManifestFixtures",
+  },
+  {
+    label: "Relationship source validation contract",
+    modulePath: "/src/features/analyst/sql/__tests__/relationshipSourceValidation.test.ts",
+    exportName: "runRelationshipSourceValidationFixtures",
+  },
+  {
     label: "LLM privacy modes",
     modulePath: "/src/features/analyst/llm/__tests__/llmPrivacyModes.test.ts",
     exportName: "runLlmPrivacyModeFixtures",
