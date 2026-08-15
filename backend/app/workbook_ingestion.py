@@ -23,6 +23,7 @@ from .workbook_models import (
     WorksheetTableMapping,
 )
 from .workbook_relationships import profile_relationship_candidates
+from .workbook_source_registry import create_original_source_registry
 
 
 MAX_WORKBOOK_FILE_BYTES = 25 * 1024 * 1024
@@ -1201,6 +1202,14 @@ def ingest_workbook(
         updated_at=datetime.now(timezone.utc).isoformat(),
     )
 
+    workbook_metadata_payload = workbook_metadata.model_dump(by_alias=True)
+    workbook_metadata_payload["source_registry"] = create_original_source_registry(
+        dataset_id=dataset_id,
+        workbook_id=dataset_id,
+        uploaded_file_path=path,
+        worksheets=worksheets,
+    )
+
     return {
         "preview": preview[:MAX_PREVIEW_ROWS],
         "active_table_name": ACTIVE_TABLE_NAME,
@@ -1208,5 +1217,5 @@ def ingest_workbook(
         "schema": active_schema,
         "row_count": active_row_count,
         "column_count": active_column_count,
-        "workbook_metadata": workbook_metadata.model_dump(by_alias=True),
+        "workbook_metadata": workbook_metadata_payload,
     }

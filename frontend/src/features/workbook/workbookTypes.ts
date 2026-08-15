@@ -253,7 +253,10 @@ export type WorkbookIngestionProfile = {
   profilingStrategy: "metadata-only" | "sampled" | "full";
 };
 
+export type WorkbookSourceRegistry = Record<string, unknown>;
+
 export type WorkbookMetadata = {
+  [key: string]: unknown;
   workbookId: WorkbookId;
   workspaceId: string | null;
   name: string;
@@ -267,6 +270,7 @@ export type WorkbookMetadata = {
   tableMappings: WorksheetTableMapping[];
   relationshipCandidates: WorksheetRelationshipCandidate[];
   acceptedRelationshipContracts: AcceptedRelationshipContract[];
+  sourceRegistry?: WorkbookSourceRegistry | null;
   ingestionProfile: WorkbookIngestionProfile;
   normalization: {
     version: number;

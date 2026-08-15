@@ -147,6 +147,11 @@ const fixtures = [
     exportName: "runWorksheetSourceRevisionFixtures",
   },
   {
+    label: "Workbook source registry metadata preservation",
+    modulePath: "/src/features/workbook/__tests__/workbookSourceRegistryMetadata.test.ts",
+    exportName: "runWorkbookSourceRegistryMetadataFixtures",
+  },
+  {
     label: "SQL applied source manifest contract",
     modulePath: "/src/features/analyst/sql/__tests__/sqlAppliedSourceManifest.test.ts",
     exportName: "runSqlAppliedSourceManifestFixtures",

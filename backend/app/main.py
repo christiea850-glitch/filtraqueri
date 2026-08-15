@@ -6,8 +6,10 @@ import csv
 import io
 import json
 import math
+import os
 import re
 import shutil
+import tempfile
 
 import duckdb
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -32,6 +34,7 @@ from .workbook_cleaning_contract import (
 from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_missing_value_apply import apply_missing_value_decisions_to_cleaned_copy
 from .workbook_original_layout import extract_original_workbook_layout
+from .workbook_source_registry import validate_source_registry
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STORAGE_DIR = BASE_DIR / "storage"
@@ -483,6 +486,10 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
     normalized_metadata["accepted_relationship_contracts"] = (
         validate_relationship_contracts(normalized_metadata)
     )
+    if "source_registry" in value:
+        normalized_metadata["source_registry"] = validate_source_registry(
+            value.get("source_registry")
+        )
     return normalized_metadata
 
 
@@ -573,8 +580,34 @@ def save_workspace_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
             status_code=500,
             detail="Workspace manifest could not be serialized safely.",
         ) from error
-    path.write_text(manifest_json, encoding="utf-8")
+    atomic_write_text(path, manifest_json)
     return manifest
+
+
+def atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(content)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, path)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def read_workspace_manifest(
@@ -1834,8 +1867,8 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
     if workbook_metadata:
         metadata["workbook_metadata"] = workbook_metadata
 
-    dataset_sessions[dataset_id] = metadata
     workspace_manifest = save_workspace_manifest(create_workspace_manifest(metadata))
+    dataset_sessions[dataset_id] = metadata
 
     return {
         "dataset": metadata,
@@ -2004,7 +2037,7 @@ def delete_dataset(dataset_id: str) -> dict[str, Any]:
                 manifest_path.unlink(missing_ok=True)
                 removed_artifacts.append(f"manifest:{manifest_path.stem}")
             else:
-                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                atomic_write_text(manifest_path, json.dumps(manifest))
                 removed_artifacts.append(f"manifest_update:{manifest_path.stem}")
         except OSError:
             pass

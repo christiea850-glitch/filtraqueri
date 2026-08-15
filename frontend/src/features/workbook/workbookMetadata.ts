@@ -4,6 +4,7 @@ import type {
   AcceptedRelationshipContract,
   CleanedWorkingCopy,
   WorkbookAnalysisSource,
+  WorkbookSourceRegistry,
   WorksheetMetadata,
   WorksheetRelationshipCandidate,
   WorksheetTemplateStructureEvidence,
@@ -33,6 +34,22 @@ const readArray = <T = unknown>(value: unknown): T[] => (Array.isArray(value) ? 
 
 const readObject = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+const normalizeSourceRegistry = (value: unknown): WorkbookSourceRegistry | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const registry = JSON.parse(JSON.stringify(value)) as WorkbookSourceRegistry;
+  if (registry.version !== "workbook-source-registry:v1") {
+    return {
+      ...registry,
+      status: "invalid",
+      readiness: {
+        ready: false,
+        reason_codes: ["source_registry_version_unsupported"],
+      },
+    };
+  }
+  return registry;
+};
 
 const templateStructureEvidenceTypes = new Set<WorksheetTemplateStructureEvidenceType>([
   "repeated_header",
@@ -182,6 +199,7 @@ export const normalizeWorkbookMetadata = (
       : worksheetIds[0] || null;
 
   return {
+    ...workbook,
     workbookId,
     workspaceId: workbook.workspaceId || null,
     name: workbook.name?.trim() || workbook.sourceFile?.originalFilename || "Untitled workbook",
@@ -205,6 +223,7 @@ export const normalizeWorkbookMetadata = (
     })),
     relationshipCandidates: workbook.relationshipCandidates || [],
     acceptedRelationshipContracts: workbook.acceptedRelationshipContracts || [],
+    sourceRegistry: workbook.sourceRegistry || null,
     ingestionProfile: {
       ...DEFAULT_WORKBOOK_INGESTION_PROFILE,
       ...workbook.ingestionProfile,
@@ -562,6 +581,7 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
     .filter((copy): copy is CleanedWorkingCopy => Boolean(copy));
 
   return normalizeWorkbookMetadata({
+    ...workbook,
     workbookId,
     workspaceId:
       typeof (workbook.workspaceId ?? workbook.workspace_id) === "string"
@@ -622,6 +642,7 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
           contract.sourceColumnName &&
           contract.targetColumnName,
       ),
+    sourceRegistry: normalizeSourceRegistry(workbook.sourceRegistry ?? workbook.source_registry),
     ingestionProfile: DEFAULT_WORKBOOK_INGESTION_PROFILE,
     normalization: {
       version: readNumber(normalization.version, WORKBOOK_METADATA_NORMALIZATION_VERSION),
