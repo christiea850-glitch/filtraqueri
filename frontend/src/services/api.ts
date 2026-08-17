@@ -52,6 +52,33 @@ export type RelationshipReviewRequest = {
   notes?: string;
 };
 
+export type SourceAwareRelationshipReviewRequest = {
+  version: "relationship-review-source-aware:v1";
+  candidate_id: string;
+  review_status: "accepted";
+  expected_relationship_review_state_revision: string;
+  expected_candidate_revision_id: string;
+  expected_source_revision_id: string;
+  expected_target_revision_id: string;
+  expected_source_endpoint_signature_id: string;
+  expected_target_endpoint_signature_id: string;
+  expected_relationship_evidence_fingerprint: string;
+  notes?: string;
+};
+
+export type SourceAwareRelationshipReviewResponse = {
+  dataset: UploadResponse["dataset"];
+  candidate: WorksheetRelationshipCandidate;
+  summary: {
+    total: number;
+    pending: number;
+    accepted: number;
+    dismissed: number;
+  };
+  workbook_metadata: unknown;
+  source_authority: Record<string, unknown>;
+};
+
 export type RelationshipContractDiagnostic = {
   diagnostic_id: string;
   contract_id: string;
@@ -723,6 +750,23 @@ export async function reviewWorkbookRelationship(
       body: JSON.stringify(request),
     },
     "Relationship review could not be saved.",
+  );
+}
+
+export async function reviewWorkbookRelationshipWithSourceAuthority(
+  datasetId: string,
+  request: SourceAwareRelationshipReviewRequest,
+) {
+  return requestJson<SourceAwareRelationshipReviewResponse>(
+    `${API_BASE_URL}/datasets/${datasetId}/workbook/relationship-review`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    },
+    "Source-aware relationship review could not be saved.",
   );
 }
 

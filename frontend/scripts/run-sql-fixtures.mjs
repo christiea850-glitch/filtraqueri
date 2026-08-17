@@ -152,6 +152,11 @@ const fixtures = [
     exportName: "runWorkbookSourceRegistryMetadataFixtures",
   },
   {
+    label: "Workbook relationship source-review metadata preservation",
+    modulePath: "/src/features/workbook/__tests__/workbookRelationshipSourceReviewMetadata.test.ts",
+    exportName: "runWorkbookRelationshipSourceReviewMetadataFixtures",
+  },
+  {
     label: "SQL applied source manifest contract",
     modulePath: "/src/features/analyst/sql/__tests__/sqlAppliedSourceManifest.test.ts",
     exportName: "runSqlAppliedSourceManifestFixtures",

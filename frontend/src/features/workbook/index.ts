@@ -32,6 +32,8 @@ export {
 export type {
   AcceptedRelationshipContract,
   CleanedWorkingCopy,
+  RelationshipAcceptanceHistory,
+  RelationshipSourceValidationLedger,
   MissingValueColumnDecision,
   MissingValueColumnStrategy,
   MissingValueWorksheetStrategy,

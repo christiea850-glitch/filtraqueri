@@ -4,6 +4,8 @@ import type {
   AcceptedRelationshipContract,
   CleanedWorkingCopy,
   WorkbookAnalysisSource,
+  RelationshipAcceptanceHistory,
+  RelationshipSourceValidationLedger,
   WorkbookSourceRegistry,
   WorksheetMetadata,
   WorksheetRelationshipCandidate,
@@ -49,6 +51,42 @@ const normalizeSourceRegistry = (value: unknown): WorkbookSourceRegistry | null 
     };
   }
   return registry;
+};
+
+const normalizeRelationshipSourceValidationLedger = (
+  value: unknown,
+): RelationshipSourceValidationLedger | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const ledger = JSON.parse(JSON.stringify(value)) as RelationshipSourceValidationLedger;
+  if (ledger.version !== "relationship-source-validation-ledger:v1") {
+    return {
+      ...ledger,
+      status: "invalid",
+      readiness: {
+        ready: false,
+        reason_codes: ["relationship_validation_ledger_version_unsupported"],
+      },
+    };
+  }
+  return ledger;
+};
+
+const normalizeRelationshipAcceptanceHistory = (
+  value: unknown,
+): RelationshipAcceptanceHistory | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const history = JSON.parse(JSON.stringify(value)) as RelationshipAcceptanceHistory;
+  if (history.version !== "relationship-source-acceptance-history:v1") {
+    return {
+      ...history,
+      status: "invalid",
+      readiness: {
+        ready: false,
+        reason_codes: ["relationship_acceptance_history_version_unsupported"],
+      },
+    };
+  }
+  return history;
 };
 
 const templateStructureEvidenceTypes = new Set<WorksheetTemplateStructureEvidenceType>([
@@ -224,6 +262,9 @@ export const normalizeWorkbookMetadata = (
     relationshipCandidates: workbook.relationshipCandidates || [],
     acceptedRelationshipContracts: workbook.acceptedRelationshipContracts || [],
     sourceRegistry: workbook.sourceRegistry || null,
+    relationshipSourceValidationLedger: workbook.relationshipSourceValidationLedger || null,
+    relationshipAcceptanceHistory: workbook.relationshipAcceptanceHistory || null,
+    relationshipReviewStateRevision: workbook.relationshipReviewStateRevision || null,
     ingestionProfile: {
       ...DEFAULT_WORKBOOK_INGESTION_PROFILE,
       ...workbook.ingestionProfile,
@@ -643,6 +684,21 @@ export const normalizeUnknownWorkbookMetadata = (value: unknown): WorkbookMetada
           contract.targetColumnName,
       ),
     sourceRegistry: normalizeSourceRegistry(workbook.sourceRegistry ?? workbook.source_registry),
+    relationshipSourceValidationLedger: normalizeRelationshipSourceValidationLedger(
+      workbook.relationshipSourceValidationLedger ??
+        workbook.relationship_source_validation_ledger,
+    ),
+    relationshipAcceptanceHistory: normalizeRelationshipAcceptanceHistory(
+      workbook.relationshipAcceptanceHistory ?? workbook.relationship_acceptance_history,
+    ),
+    relationshipReviewStateRevision:
+      typeof (
+        workbook.relationshipReviewStateRevision ??
+        workbook.relationship_review_state_revision
+      ) === "string"
+        ? ((workbook.relationshipReviewStateRevision ??
+            workbook.relationship_review_state_revision) as string)
+        : null,
     ingestionProfile: DEFAULT_WORKBOOK_INGESTION_PROFILE,
     normalization: {
       version: readNumber(normalization.version, WORKBOOK_METADATA_NORMALIZATION_VERSION),

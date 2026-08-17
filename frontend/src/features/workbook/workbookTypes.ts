@@ -254,6 +254,8 @@ export type WorkbookIngestionProfile = {
 };
 
 export type WorkbookSourceRegistry = Record<string, unknown>;
+export type RelationshipSourceValidationLedger = Record<string, unknown>;
+export type RelationshipAcceptanceHistory = Record<string, unknown>;
 
 export type WorkbookMetadata = {
   [key: string]: unknown;
@@ -271,6 +273,9 @@ export type WorkbookMetadata = {
   relationshipCandidates: WorksheetRelationshipCandidate[];
   acceptedRelationshipContracts: AcceptedRelationshipContract[];
   sourceRegistry?: WorkbookSourceRegistry | null;
+  relationshipSourceValidationLedger?: RelationshipSourceValidationLedger | null;
+  relationshipAcceptanceHistory?: RelationshipAcceptanceHistory | null;
+  relationshipReviewStateRevision?: string | null;
   ingestionProfile: WorkbookIngestionProfile;
   normalization: {
     version: number;

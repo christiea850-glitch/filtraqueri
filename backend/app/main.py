@@ -1,3 +1,6 @@
+from collections import OrderedDict
+from contextlib import contextmanager
+from copy import deepcopy
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -10,6 +13,8 @@ import os
 import re
 import shutil
 import tempfile
+import threading
+import time
 
 import duckdb
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -35,6 +40,18 @@ from .workbook_cleaning_preview import build_cleaning_recipe_preview
 from .workbook_missing_value_apply import apply_missing_value_decisions_to_cleaned_copy
 from .workbook_original_layout import extract_original_workbook_layout
 from .workbook_source_registry import validate_source_registry
+from .workbook_relationship_source_review import (
+    SOURCE_AWARE_EXPECTATION_FIELDS,
+    SOURCE_AWARE_RELATIONSHIP_REVIEW_REQUEST_VERSION,
+    RelationshipSourceReviewError,
+    append_acceptance_record,
+    append_validation_record,
+    compare_source_aware_expectations,
+    create_candidate_authority,
+    normalize_relationship_acceptance_history,
+    normalize_relationship_source_validation_ledger,
+    relationship_review_state_revision,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STORAGE_DIR = BASE_DIR / "storage"
@@ -78,6 +95,168 @@ app.add_middleware(
 )
 
 dataset_sessions: dict[str, dict[str, Any]] = {}
+
+
+class RelationshipReviewLockEntry:
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.references = 0
+        self.last_used = time.monotonic()
+
+
+relationship_review_locks: OrderedDict[str, RelationshipReviewLockEntry] = OrderedDict()
+relationship_review_locks_guard = threading.Lock()
+relationship_review_tokens: OrderedDict[str, str] = OrderedDict()
+relationship_review_tokens_guard = threading.Lock()
+MAX_RELATIONSHIP_REVIEW_LOCKS = 128
+MAX_RELATIONSHIP_REVIEW_TOKENS = 512
+RELATIONSHIP_REVIEW_LOCK_TIMEOUT_SECONDS = 5
+
+
+def prune_idle_relationship_review_locks() -> None:
+    while len(relationship_review_locks) > MAX_RELATIONSHIP_REVIEW_LOCKS:
+        idle_key = next(
+            (
+                key
+                for key, entry in relationship_review_locks.items()
+                if entry.references == 0 and not entry.lock.locked()
+            ),
+            None,
+        )
+        if idle_key is None:
+            return
+        relationship_review_locks.pop(idle_key, None)
+
+
+@contextmanager
+def relationship_review_lock(dataset_id: str):
+    with relationship_review_locks_guard:
+        entry = relationship_review_locks.get(dataset_id)
+        if entry is None:
+            entry = RelationshipReviewLockEntry()
+            relationship_review_locks[dataset_id] = entry
+        entry.references += 1
+        entry.last_used = time.monotonic()
+        relationship_review_locks.move_to_end(dataset_id)
+        prune_idle_relationship_review_locks()
+    try:
+        with entry.lock:
+            yield
+    finally:
+        with relationship_review_locks_guard:
+            entry.references = max(0, entry.references - 1)
+            entry.last_used = time.monotonic()
+            relationship_review_locks.move_to_end(dataset_id)
+            prune_idle_relationship_review_locks()
+
+
+def reserve_relationship_review_token(dataset_id: str, candidate_id: str, revision: str) -> str:
+    token = f"{dataset_id}:{candidate_id}:{revision}"
+    with relationship_review_tokens_guard:
+        status = relationship_review_tokens.get(token)
+        if status in {"in_progress", "consumed"}:
+            raise RelationshipSourceReviewError(
+                409,
+                "relationship_review_state_stale",
+            )
+        relationship_review_tokens[token] = "in_progress"
+        relationship_review_tokens.move_to_end(token)
+        while len(relationship_review_tokens) > MAX_RELATIONSHIP_REVIEW_TOKENS:
+            relationship_review_tokens.popitem(last=False)
+    return token
+
+
+def complete_relationship_review_token(token: str) -> None:
+    with relationship_review_tokens_guard:
+        if token in relationship_review_tokens:
+            relationship_review_tokens[token] = "consumed"
+            relationship_review_tokens.move_to_end(token)
+
+
+def release_relationship_review_token(token: str) -> None:
+    with relationship_review_tokens_guard:
+        if relationship_review_tokens.get(token) == "in_progress":
+            relationship_review_tokens.pop(token, None)
+
+
+def relationship_review_cross_process_lock_path(dataset_id: str) -> Path:
+    safe_dataset_id = re.sub(r"[^A-Za-z0-9_-]", "_", dataset_id)
+    return MANIFESTS_DIR / f".relationship-review-{safe_dataset_id}.lock"
+
+
+@contextmanager
+def relationship_review_cross_process_lock(dataset_id: str):
+    path = relationship_review_cross_process_lock_path(dataset_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + RELATIONSHIP_REVIEW_LOCK_TIMEOUT_SECONDS
+    handle = None
+    locked = False
+    while not locked:
+        try:
+            path.touch(exist_ok=True)
+            if path.stat().st_size == 0:
+                with path.open("r+b") as initializer:
+                    initializer.write(b"\0")
+                    initializer.flush()
+                    os.fsync(initializer.fileno())
+            handle = path.open("r+b")
+            handle.seek(0)
+            if os.name == "nt":
+                try:
+                    import msvcrt
+                except ImportError as error:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"reason_code": "relationship_review_lock_unavailable"},
+                    ) from error
+                try:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    locked = True
+                except OSError:
+                    handle.close()
+                    handle = None
+            else:
+                try:
+                    import fcntl
+                except ImportError as error:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"reason_code": "relationship_review_lock_unavailable"},
+                    ) from error
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    locked = True
+                except OSError:
+                    handle.close()
+                    handle = None
+            if locked:
+                break
+            if time.monotonic() >= deadline:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"reason_code": "relationship_review_lock_unavailable"},
+                )
+            time.sleep(0.01)
+        except Exception:
+            if handle is not None and not locked:
+                handle.close()
+            raise
+    try:
+        yield
+    finally:
+        if handle is not None:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
 
 
 def workspace_manifest_path(workspace_id: str) -> Path:
@@ -489,6 +668,18 @@ def normalize_workbook_manifest_metadata(value: Any) -> dict[str, Any] | None:
     if "source_registry" in value:
         normalized_metadata["source_registry"] = validate_source_registry(
             value.get("source_registry")
+        )
+    if "relationship_source_validation_ledger" in value:
+        normalized_metadata["relationship_source_validation_ledger"] = (
+            normalize_relationship_source_validation_ledger(
+                value.get("relationship_source_validation_ledger")
+            )
+        )
+    if "relationship_acceptance_history" in value:
+        normalized_metadata["relationship_acceptance_history"] = (
+            normalize_relationship_acceptance_history(
+                value.get("relationship_acceptance_history")
+            )
         )
     return normalized_metadata
 
@@ -1241,9 +1432,17 @@ class WorkbookMissingValueApplyRequest(BaseModel):
 
 
 class WorkbookRelationshipReviewRequest(BaseModel):
+    version: str | None = None
     candidate_id: str = Field(..., min_length=1)
     review_status: str
     notes: str | None = None
+    expected_relationship_review_state_revision: str | None = None
+    expected_candidate_revision_id: str | None = None
+    expected_source_revision_id: str | None = None
+    expected_target_revision_id: str | None = None
+    expected_source_endpoint_signature_id: str | None = None
+    expected_target_endpoint_signature_id: str | None = None
+    expected_relationship_evidence_fingerprint: str | None = None
 
 
 class WorkspaceManifestUpdate(BaseModel):
@@ -1532,6 +1731,77 @@ def persist_dataset_manifest_metadata(metadata: dict[str, Any]) -> None:
                 workbook_metadata
             )
 
+    save_workspace_manifest(manifest)
+
+
+def load_latest_dataset_metadata_for_review(metadata: dict[str, Any]) -> dict[str, Any]:
+    workbook_metadata = metadata.get("workbook_metadata")
+    workspace_id = metadata.get("dataset_id")
+    if isinstance(workbook_metadata, dict):
+        workspace_id = workbook_metadata.get("workspace_id") or workspace_id
+    if not workspace_id:
+        return deepcopy(metadata)
+
+    path = workspace_manifest_path(str(workspace_id))
+    if not path.exists():
+        return deepcopy(metadata)
+    try:
+        manifest = normalize_workspace_manifest(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
+    except (OSError, json.JSONDecodeError):
+        return deepcopy(metadata)
+
+    latest = deepcopy(metadata)
+    for dataset_entry in manifest.get("datasets", []):
+        if not isinstance(dataset_entry, dict):
+            continue
+        if dataset_entry.get("dataset_id") != metadata.get("dataset_id"):
+            continue
+        latest["schema"] = dataset_entry.get("schema", latest.get("schema"))
+        latest["row_count"] = dataset_entry.get("row_count", latest.get("row_count"))
+        latest["column_count"] = dataset_entry.get(
+            "column_count",
+            latest.get("column_count"),
+        )
+        if isinstance(dataset_entry.get("workbook_metadata"), dict):
+            latest["workbook_metadata"] = dataset_entry["workbook_metadata"]
+        break
+    else:
+        if isinstance(manifest.get("workbook_metadata"), dict):
+            latest["workbook_metadata"] = manifest["workbook_metadata"]
+    return latest
+
+
+def persist_dataset_manifest_metadata_for_review(metadata: dict[str, Any]) -> None:
+    workspace_id = metadata.get("dataset_id")
+    workbook_metadata = metadata.get("workbook_metadata")
+    if isinstance(workbook_metadata, dict):
+        workspace_id = workbook_metadata.get("workspace_id") or workspace_id
+    if not workspace_id:
+        return
+
+    path = workspace_manifest_path(str(workspace_id))
+    if not path.exists():
+        return
+    manifest = normalize_workspace_manifest(json.loads(path.read_text(encoding="utf-8")))
+    manifest["active_dataset_id"] = metadata["dataset_id"]
+    if isinstance(workbook_metadata, dict):
+        manifest["workbook_metadata"] = normalize_workbook_manifest_metadata(
+            workbook_metadata
+        )
+    for dataset_entry in manifest.get("datasets", []):
+        if not isinstance(dataset_entry, dict):
+            continue
+        if dataset_entry.get("dataset_id") != metadata["dataset_id"]:
+            continue
+        dataset_entry["schema"] = metadata["schema"]
+        dataset_entry["row_count"] = metadata["row_count"]
+        dataset_entry["column_count"] = metadata["column_count"]
+        if isinstance(workbook_metadata, dict):
+            dataset_entry["workbook_metadata"] = normalize_workbook_manifest_metadata(
+                workbook_metadata
+            )
     save_workspace_manifest(manifest)
 
 
@@ -2787,6 +3057,272 @@ def review_workbook_relationship(
     dataset_id: str,
     request: WorkbookRelationshipReviewRequest,
 ) -> dict[str, Any]:
+    review_status = request.review_status
+    if review_status not in ("pending", "accepted", "dismissed"):
+        raise HTTPException(
+            status_code=400,
+            detail="Review status must be pending, accepted, or dismissed",
+        )
+    if request.version is not None and request.version != SOURCE_AWARE_RELATIONSHIP_REVIEW_REQUEST_VERSION:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason_code": "request_version_unsupported",
+                "supported_version": SOURCE_AWARE_RELATIONSHIP_REVIEW_REQUEST_VERSION,
+            },
+        )
+    if request.version == SOURCE_AWARE_RELATIONSHIP_REVIEW_REQUEST_VERSION:
+        missing_fields = [
+            field
+            for field in SOURCE_AWARE_EXPECTATION_FIELDS
+            if not getattr(request, field)
+        ]
+        if missing_fields:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "reason_code": "required_expectation_missing",
+                    "missing_fields": missing_fields,
+                },
+            )
+        if review_status != "accepted":
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "reason_code": "source_aware_review_status_unsupported",
+                    "supported_review_status": "accepted",
+                },
+            )
+        try:
+            source_aware_token = reserve_relationship_review_token(
+                dataset_id,
+                request.candidate_id,
+                str(request.expected_relationship_review_state_revision or ""),
+            )
+        except RelationshipSourceReviewError as error:
+            raise HTTPException(
+                status_code=error.status_code,
+                detail={"reason_code": error.reason_code},
+            ) from error
+    else:
+        source_aware_token = None
+
+    base_metadata = get_dataset_metadata(dataset_id)
+    if request.version == SOURCE_AWARE_RELATIONSHIP_REVIEW_REQUEST_VERSION:
+        try:
+            with relationship_review_cross_process_lock(dataset_id), relationship_review_lock(dataset_id):
+                latest_metadata = load_latest_dataset_metadata_for_review(base_metadata)
+                workbook_metadata = normalize_workbook_manifest_metadata(
+                    latest_metadata.get("workbook_metadata")
+                )
+                if not workbook_metadata:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Dataset does not contain workbook metadata",
+                    )
+                candidates = workbook_metadata.get("relationship_candidates")
+                if not isinstance(candidates, list):
+                    candidates = []
+                candidate_index = next(
+                    (
+                        index
+                        for index, candidate in enumerate(candidates)
+                        if isinstance(candidate, dict)
+                        and candidate.get("relationship_id") == request.candidate_id
+                    ),
+                    None,
+                )
+                if candidate_index is None:
+                    raise HTTPException(
+                        status_code=404,
+                        detail={"reason_code": "candidate_missing"},
+                    )
+                candidate = candidates[candidate_index]
+                try:
+                    with get_connection(dataset_id) as connection:
+                        authority = create_candidate_authority(
+                            connection=connection,
+                            workbook_metadata=workbook_metadata,
+                            candidate=candidate,
+                        )
+                    current_revision = relationship_review_state_revision(
+                        workbook_metadata,
+                        authority,
+                    )
+                    persisted_revision = workbook_metadata.get(
+                        "relationship_review_state_revision"
+                    )
+                    if (
+                        isinstance(persisted_revision, str)
+                        and persisted_revision
+                        and persisted_revision
+                        != request.expected_relationship_review_state_revision
+                    ):
+                        raise RelationshipSourceReviewError(
+                            409,
+                            "relationship_review_state_stale",
+                            authority={
+                                "relationship_review_state_revision": current_revision,
+                                **authority,
+                            },
+                        )
+                    existing_source_bound = (
+                        workbook_metadata.get("relationship_source_validation_ledger")
+                        if isinstance(
+                            workbook_metadata.get("relationship_source_validation_ledger"),
+                            dict,
+                        )
+                        else {}
+                    )
+                    existing_current = (
+                        existing_source_bound.get(
+                            "current_validation_by_relationship_id"
+                        )
+                        if isinstance(
+                            existing_source_bound.get(
+                                "current_validation_by_relationship_id"
+                            ),
+                            dict,
+                        )
+                        else {}
+                    )
+                    if existing_current.get(request.candidate_id):
+                        raise RelationshipSourceReviewError(
+                            409,
+                            "relationship_review_state_stale",
+                            authority={
+                                "relationship_review_state_revision": current_revision,
+                                **authority,
+                            },
+                        )
+                    compare_source_aware_expectations(
+                        request_values=request.model_dump(),
+                        current_state_revision=current_revision,
+                        candidate_authority=authority,
+                    )
+                except RelationshipSourceReviewError as error:
+                    detail = {
+                        "reason_code": error.reason_code,
+                        "relationship_review_state_revision": error.authority.get(
+                            "relationship_review_state_revision"
+                        ),
+                        "authority": {
+                            key: value
+                            for key, value in error.authority.items()
+                            if key != "validation"
+                        },
+                    }
+                    raise HTTPException(status_code=error.status_code, detail=detail) from error
+                except (duckdb.Error, ValueError) as error:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"reason_code": "evidence_missing_invalid"},
+                    ) from error
+
+                next_metadata = deepcopy(latest_metadata)
+                next_workbook_metadata = deepcopy(workbook_metadata)
+                next_candidates = list(next_workbook_metadata.get("relationship_candidates") or [])
+                next_candidate = deepcopy(next_candidates[candidate_index])
+                next_candidate["review_status"] = review_status
+                next_candidate["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+                next_candidate["reviewed_by"] = "local-workspace"
+                next_candidate["review_notes"] = (request.notes or "").strip()[:500] or None
+                next_candidates[candidate_index] = next_candidate
+                next_workbook_metadata["relationship_candidates"] = next_candidates
+                next_workbook_metadata = upsert_contract_for_candidate(
+                    next_workbook_metadata,
+                    next_candidate,
+                    review_status,
+                )
+                contracts = next_workbook_metadata.get("accepted_relationship_contracts") or []
+                contract = next(
+                    (
+                        item
+                        for item in contracts
+                        if isinstance(item, dict)
+                        and item.get("accepted_from_candidate_id") == request.candidate_id
+                    ),
+                    {},
+                )
+                ledger, validation_record_id = append_validation_record(
+                    next_workbook_metadata.get("relationship_source_validation_ledger"),
+                    authority["validation"],
+                )
+                history, acceptance_record_id = append_acceptance_record(
+                    next_workbook_metadata.get("relationship_acceptance_history"),
+                    relationship_id=request.candidate_id,
+                    review_status=review_status,
+                    validation=authority["validation"],
+                    contract_id=str(contract.get("contract_id") or ""),
+                )
+                next_workbook_metadata["relationship_source_validation_ledger"] = ledger
+                next_workbook_metadata["relationship_acceptance_history"] = history
+                current_source_bound_relationships = (
+                    next_workbook_metadata.get("current_source_bound_relationships")
+                    if isinstance(
+                        next_workbook_metadata.get("current_source_bound_relationships"),
+                        dict,
+                    )
+                    else {}
+                )
+                next_workbook_metadata["current_source_bound_relationships"] = {
+                    **current_source_bound_relationships,
+                    request.candidate_id: {
+                        "relationship_id": request.candidate_id,
+                        "validation_record_id": validation_record_id,
+                        "acceptance_record_id": acceptance_record_id,
+                        "validation_id": authority["validation"]["assessmentId"],
+                        "validation_identity": authority["validation"]["validationIdentity"],
+                        "contract_id": str(contract.get("contract_id") or ""),
+                        "source_blind": False,
+                    }
+                }
+                next_workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
+                next_metadata["workbook_metadata"] = next_workbook_metadata
+                try:
+                    next_revision = relationship_review_state_revision(
+                        next_workbook_metadata,
+                        authority,
+                    )
+                    next_workbook_metadata["relationship_review_state_revision"] = next_revision
+                    persist_dataset_manifest_metadata_for_review(next_metadata)
+                except (OSError, TypeError, ValueError, HTTPException) as error:
+                    if isinstance(error, HTTPException):
+                        raise
+                    raise HTTPException(
+                        status_code=500,
+                        detail={"reason_code": "persistence_failure"},
+                    ) from error
+                dataset_sessions[dataset_id] = next_metadata
+                complete_relationship_review_token(str(source_aware_token))
+                summary = {
+                    "total": len(next_candidates),
+                    "pending": sum(
+                        1
+                        for item in next_candidates
+                        if item.get("review_status", "pending") == "pending"
+                    ),
+                    "accepted": sum(
+                        1 for item in next_candidates if item.get("review_status") == "accepted"
+                    ),
+                    "dismissed": sum(
+                        1 for item in next_candidates if item.get("review_status") == "dismissed"
+                    ),
+                }
+                return {
+                    "dataset": next_metadata,
+                    "candidate": next_candidate,
+                    "summary": summary,
+                    "workbook_metadata": next_workbook_metadata,
+                    "source_authority": {
+                        **authority,
+                        "relationshipReviewStateRevision": next_revision,
+                    },
+                }
+        except Exception:
+            release_relationship_review_token(str(source_aware_token))
+            raise
+
     metadata = get_dataset_metadata(dataset_id)
     workbook_metadata = normalize_workbook_manifest_metadata(
         metadata.get("workbook_metadata")
@@ -2796,44 +3332,43 @@ def review_workbook_relationship(
             status_code=400, detail="Dataset does not contain workbook metadata"
         )
 
-    review_status = request.review_status
-    if review_status not in ("pending", "accepted", "dismissed"):
-        raise HTTPException(
-            status_code=400,
-            detail="Review status must be pending, accepted, or dismissed",
-        )
-
     candidates = workbook_metadata.get("relationship_candidates")
     if not isinstance(candidates, list):
         candidates = []
 
-    candidate = next(
+    candidate_index = next(
         (
-            candidate
-            for candidate in candidates
-            if candidate.get("relationship_id") == request.candidate_id
+            index
+            for index, candidate in enumerate(candidates)
+            if isinstance(candidate, dict)
+            and candidate.get("relationship_id") == request.candidate_id
         ),
         None,
     )
-    if not candidate:
+    if candidate_index is None:
         raise HTTPException(
             status_code=404, detail="Relationship candidate was not found"
         )
 
+    next_metadata = deepcopy(metadata)
+    workbook_metadata = deepcopy(workbook_metadata)
+    candidates = list(workbook_metadata.get("relationship_candidates") or [])
+    candidate = deepcopy(candidates[candidate_index])
     candidate["review_status"] = review_status
     candidate["reviewed_at"] = (
         datetime.now(timezone.utc).isoformat() if review_status != "pending" else None
     )
     candidate["reviewed_by"] = "local-workspace" if review_status != "pending" else None
     candidate["review_notes"] = (request.notes or "").strip()[:500] or None
+    candidates[candidate_index] = candidate
     workbook_metadata["relationship_candidates"] = candidates
     workbook_metadata = upsert_contract_for_candidate(
         workbook_metadata, candidate, review_status
     )
     workbook_metadata["updated_at"] = datetime.now(timezone.utc).isoformat()
-    metadata["workbook_metadata"] = workbook_metadata
-    dataset_sessions[dataset_id] = metadata
-    persist_dataset_manifest_metadata(metadata)
+    next_metadata["workbook_metadata"] = workbook_metadata
+    persist_dataset_manifest_metadata_for_review(next_metadata)
+    dataset_sessions[dataset_id] = next_metadata
 
     summary = {
         "total": len(candidates),
@@ -2851,7 +3386,7 @@ def review_workbook_relationship(
     }
 
     return {
-        "dataset": metadata,
+        "dataset": next_metadata,
         "candidate": candidate,
         "summary": summary,
         "workbook_metadata": workbook_metadata,
