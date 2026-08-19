@@ -6,16 +6,16 @@ import math
 
 import duckdb
 
-from backend.app.workbook_relationships import (
+from .workbook_relationships import (
     MAX_RELATIONSHIP_SAMPLE_VALUES,
     infer_relationship_type,
     quote_identifier,
     type_compatible,
 )
-from backend.app.workbook_source_contracts import (
+from .workbook_source_contracts import (
     create_deterministic_worksheet_source_fingerprint,
 )
-from backend.app.workbook_source_registry import (
+from .workbook_source_registry import (
     WORKBOOK_SOURCE_REGISTRY_VERSION,
     validate_source_registry,
 )

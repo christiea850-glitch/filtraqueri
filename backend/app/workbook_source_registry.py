@@ -8,11 +8,12 @@ fingerprints remain deterministic contract identities, not content integrity.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from backend.app.workbook_source_contracts import (
+from .workbook_source_contracts import (
     canonicalize_for_worksheet_source,
     create_deterministic_worksheet_source_fingerprint,
 )
@@ -153,6 +154,38 @@ def create_source_revision(
     }
 
 
+def _worksheet_field(worksheet: Any, field_name: str) -> Any:
+    if isinstance(worksheet, Mapping):
+        return worksheet.get(field_name)
+    return getattr(worksheet, field_name, None)
+
+
+def _extract_worksheet_schema(worksheet: Any) -> list[dict[str, Any]]:
+    if isinstance(worksheet, Mapping):
+        schema_value = worksheet.get("schema_")
+        if schema_value is None:
+            schema_value = worksheet.get("schema")
+    else:
+        schema_value = getattr(worksheet, "schema_", None)
+
+    if callable(schema_value):
+        raise ValueError("Worksheet schema field is callable.")
+    if not isinstance(schema_value, list):
+        raise ValueError("Worksheet schema field must be a list of column objects.")
+
+    schema: list[dict[str, Any]] = []
+    for column in schema_value:
+        if not isinstance(column, Mapping):
+            raise ValueError("Worksheet schema entries must be objects.")
+        schema.append(dict(column))
+
+    column_count = _worksheet_field(worksheet, "column_count")
+    if isinstance(column_count, int) and column_count > 0 and not schema:
+        raise ValueError("Ready worksheet has columns but no structural schema.")
+
+    return schema
+
+
 def create_original_source_registry(
     *,
     dataset_id: str,
@@ -166,15 +199,15 @@ def create_original_source_registry(
     current_revision_by_source_id: dict[str, str] = {}
 
     for worksheet in worksheets:
-        schema = list(getattr(worksheet, "schema_", None) or getattr(worksheet, "schema", []) or [])
-        if getattr(worksheet, "status", None) != "ready":
+        if _worksheet_field(worksheet, "status") != "ready":
             continue
-        worksheet_id = str(getattr(worksheet, "worksheet_id"))
+        schema = _extract_worksheet_schema(worksheet)
+        worksheet_id = str(_worksheet_field(worksheet, "worksheet_id"))
         worksheet_locator = {
             "workbookId": workbook_id,
             "worksheetId": worksheet_id,
-            "sheetName": str(getattr(worksheet, "sheet_name")),
-            "originalIndex": int(getattr(worksheet, "original_index")),
+            "sheetName": str(_worksheet_field(worksheet, "sheet_name")),
+            "originalIndex": int(_worksheet_field(worksheet, "original_index")),
         }
         source_identity = create_original_source_identity(
             dataset_id=dataset_id,
@@ -188,7 +221,7 @@ def create_original_source_registry(
         )
         revision = create_source_revision(
             source_identity=source_identity,
-            table_name=str(getattr(worksheet, "table_name")),
+            table_name=str(_worksheet_field(worksheet, "table_name")),
             structural_schema_fingerprint=structural_schema_fingerprint,
             materialization_fingerprint=materialization_fingerprint,
         )
@@ -200,7 +233,7 @@ def create_original_source_registry(
             "worksheet_id": worksheet_id,
             "source_kind": "original",
             "worksheet_locator": worksheet_locator,
-            "table_name": str(getattr(worksheet, "table_name")),
+            "table_name": str(_worksheet_field(worksheet, "table_name")),
         }
         revision_record = {
             "revision": revision,
@@ -210,7 +243,7 @@ def create_original_source_registry(
             "workbook_id": workbook_id,
             "worksheet_id": worksheet_id,
             "source_kind": "original",
-            "table_name": str(getattr(worksheet, "table_name")),
+            "table_name": str(_worksheet_field(worksheet, "table_name")),
             "worksheet_locator": worksheet_locator,
             "materialization_fingerprint": materialization_fingerprint,
             "structural_schema_fingerprint": structural_schema_fingerprint,

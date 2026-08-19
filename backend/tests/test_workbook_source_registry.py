@@ -1,6 +1,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
+import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -10,6 +12,7 @@ from openpyxl import Workbook
 from backend.app import main
 from backend.app.main import app
 from backend.app.workbook_ingestion import ingest_workbook
+from backend.app.workbook_models import WorksheetMetadata, WorksheetNormalizationMetadata
 from backend.app.workbook_source_registry import (
     WORKBOOK_SOURCE_REGISTRY_VERSION,
     create_original_source_registry,
@@ -28,6 +31,29 @@ def write_workbook(path: Path, second_value: str = "two") -> None:
     second.append(["id", "description"])
     second.append([1, "secondary"])
     workbook.save(path)
+
+
+def worksheet_metadata(
+    *,
+    schema: list[dict],
+    worksheet_id: str = "dataset:worksheet:1",
+    column_count: int | None = None,
+) -> WorksheetMetadata:
+    return WorksheetMetadata(
+        worksheet_id=worksheet_id,
+        workbook_id="dataset",
+        sheet_name="Alpha",
+        display_name="Alpha",
+        table_name="worksheet_alpha",
+        original_index=0,
+        status="ready",
+        schema=schema,
+        row_count=2,
+        column_count=len(schema) if column_count is None else column_count,
+        visible_columns=[str(column.get("name")) for column in schema],
+        hidden_columns=[],
+        normalization=WorksheetNormalizationMetadata(normalized_at="2026-08-15T00:00:00+00:00"),
+    )
 
 
 class WorkbookSourceRegistryTests(unittest.TestCase):
@@ -69,10 +95,12 @@ class WorkbookSourceRegistryTests(unittest.TestCase):
         with TestClient(app) as client, workbook_path.open("rb") as handle:
             response = client.post(
                 "/datasets/upload",
+                headers={"Origin": "http://localhost:5173"},
                 files={"file": ("upload.xlsx", handle, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
             )
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("access-control-allow-origin"), "http://localhost:5173")
         payload = response.json()
         registry = payload["dataset"]["workbook_metadata"]["source_registry"]
         self.assertEqual(registry["version"], WORKBOOK_SOURCE_REGISTRY_VERSION)
@@ -89,6 +117,103 @@ class WorkbookSourceRegistryTests(unittest.TestCase):
             hydrated_once["workbook_metadata"]["source_registry"],
             hydrated_twice["workbook_metadata"]["source_registry"],
         )
+        self.assertEqual(registry, hydrated_once["workbook_metadata"]["source_registry"])
+
+    def test_upload_preflight_allows_frontend_development_origin(self) -> None:
+        with TestClient(app) as client:
+            response = client.options(
+                "/datasets/upload",
+                headers={
+                    "Origin": "http://localhost:5173",
+                    "Access-Control-Request-Method": "POST",
+                    "Access-Control-Request-Headers": "content-type",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("access-control-allow-origin"), "http://localhost:5173")
+        self.assertIn("POST", response.headers.get("access-control-allow-methods", ""))
+        self.assertIn("content-type", response.headers.get("access-control-allow-headers", "").lower())
+
+    def test_real_worksheet_model_schema_field_is_used_instead_of_pydantic_schema_method(self) -> None:
+        workbook_path = self.uploads / "model.xlsx"
+        write_workbook(workbook_path)
+        schema = [
+            {"name": "id", "type": "INTEGER", "inferred_type": "integer"},
+            {"name": "label", "type": "VARCHAR", "inferred_type": "text"},
+        ]
+        worksheet = worksheet_metadata(schema=schema)
+
+        registry = create_original_source_registry(
+            dataset_id="dataset",
+            workbook_id="dataset",
+            uploaded_file_path=workbook_path,
+            worksheets=[worksheet],
+        )
+
+        self.assertTrue(callable(getattr(worksheet, "schema")))
+        self.assertTrue(registry["readiness"]["ready"])
+        structural = registry["revisions"][0]["structural_schema_fingerprint"]
+        self.assertEqual([column["name"] for column in structural["columns"]], ["id", "label"])
+        self.assertEqual([column["ordinal"] for column in structural["columns"]], [0, 1])
+        self.assertEqual(structural["columns"][0]["physicalType"], "INTEGER")
+        rebuilt = create_original_source_registry(
+            dataset_id="dataset",
+            workbook_id="dataset",
+            uploaded_file_path=workbook_path,
+            worksheets=[worksheet],
+        )
+        self.assertEqual(registry, rebuilt)
+
+    def test_schema_extraction_rejects_callable_malformed_and_empty_ready_columns(self) -> None:
+        workbook_path = self.uploads / "malformed.xlsx"
+        write_workbook(workbook_path)
+        base = {
+            "worksheet_id": "dataset:worksheet:1",
+            "workbook_id": "dataset",
+            "sheet_name": "Alpha",
+            "display_name": "Alpha",
+            "table_name": "worksheet_alpha",
+            "original_index": 0,
+            "status": "ready",
+            "row_count": 1,
+            "column_count": 1,
+        }
+
+        for bad_schema in [lambda: [], {"name": "id"}, "id", [object()], []]:
+            with self.subTest(schema_type=type(bad_schema).__name__):
+                with self.assertRaises(ValueError):
+                    create_original_source_registry(
+                        dataset_id="dataset",
+                        workbook_id="dataset",
+                        uploaded_file_path=workbook_path,
+                        worksheets=[{**base, "schema": bad_schema}],
+                    )
+
+    def test_backend_package_imports_from_root_and_backend_directory(self) -> None:
+        import_checks = [
+            (Path(__file__).resolve().parents[2], "backend.app.main"),
+            (Path(__file__).resolve().parents[2], "backend.app.workbook_source_registry"),
+            (Path(__file__).resolve().parents[2], "backend.app.workbook_relationship_source_review"),
+            (Path(__file__).resolve().parents[1], "app.main"),
+            (Path(__file__).resolve().parents[1], "app.workbook_source_registry"),
+            (Path(__file__).resolve().parents[1], "app.workbook_relationship_source_review"),
+        ]
+
+        for cwd, module_name in import_checks:
+            with self.subTest(cwd=str(cwd), module_name=module_name):
+                result = subprocess.run(
+                    [sys.executable, "-c", f"import {module_name}"],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode,
+                    0,
+                    f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+                )
 
     def test_registry_creation_distinguishes_worksheets_and_materialization(self) -> None:
         first = self.ingest_fixture(dataset_id="dataset-one", second_value="two")
