@@ -1,7 +1,11 @@
 import {
   createSqlExecutionContextIdentity,
+  createCanonicalSqlExecutionIdentityV2,
+  createManualSqlExecutionIdentityV2,
   createSqlExecutionIdentity,
+  doSqlExecutionIdentityV2FingerprintsMatch,
   doesSqlExecutionIdentityMatchContext,
+  validateSqlExecutionIdentityV2,
 } from "../sqlExecutionIdentity";
 
 type FixtureResult = {
@@ -62,6 +66,69 @@ export function runSqlExecutionIdentityFixtures(): SqlExecutionIdentityFixtureRe
   });
   const frozenInputBefore = JSON.stringify(frozenInput);
   const frozenResult = createSqlExecutionIdentity(frozenInput);
+  const canonicalIdentity = createCanonicalSqlExecutionIdentityV2({
+    exactSql: "SELECT unit_id FROM units;",
+    dialect: "duckdb",
+    executionTargetId: "target:local-duckdb",
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    appliedSourceManifestFingerprint: "manifest:v2:1",
+    sourceRevisionIds: ["source-revision:2", "source-revision:1"],
+    structuralSchemaFingerprints: ["schema:2", "schema:1"],
+    validationAssessmentIds: ["assessment:2", "assessment:1"],
+    acceptanceRecordIds: ["acceptance:2", "acceptance:1"],
+    planId: "plan:1",
+    planRevisionId: "plan-revision:1",
+    rendererId: "renderer:duckdb",
+    rendererVersion: "renderer-version:1",
+    executionPolicyId: "policy:limited-preview",
+  });
+  const reorderedCanonicalIdentity = createCanonicalSqlExecutionIdentityV2({
+    exactSql: "SELECT unit_id FROM units;",
+    dialect: "duckdb",
+    executionTargetId: "target:local-duckdb",
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    appliedSourceManifestFingerprint: "manifest:v2:1",
+    sourceRevisionIds: ["source-revision:1", "source-revision:2"],
+    structuralSchemaFingerprints: ["schema:1", "schema:2"],
+    validationAssessmentIds: ["assessment:1", "assessment:2"],
+    acceptanceRecordIds: ["acceptance:1", "acceptance:2"],
+    planId: "plan:1",
+    planRevisionId: "plan-revision:1",
+    rendererId: "renderer:duckdb",
+    rendererVersion: "renderer-version:1",
+    executionPolicyId: "policy:limited-preview",
+  });
+  const manualIdentity = createManualSqlExecutionIdentityV2({
+    exactSql: "SELECT unit_id FROM units;",
+    dialect: "duckdb",
+    executionTargetId: "target:local-duckdb",
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    worksheetId: "worksheet:units",
+    tableName: "units",
+    executionPolicyId: "policy:limited-preview",
+  });
+  const canonicalWith = (overrides: Partial<Parameters<typeof createCanonicalSqlExecutionIdentityV2>[0]>) =>
+    createCanonicalSqlExecutionIdentityV2({
+      exactSql: "SELECT unit_id FROM units;",
+      dialect: "duckdb",
+      executionTargetId: "target:local-duckdb",
+      datasetId: "dataset:property",
+      workbookId: "workbook:property",
+      appliedSourceManifestFingerprint: "manifest:v2:1",
+      sourceRevisionIds: ["source-revision:1"],
+      structuralSchemaFingerprints: ["schema:1"],
+      validationAssessmentIds: ["assessment:1"],
+      acceptanceRecordIds: ["acceptance:1"],
+      planId: "plan:1",
+      planRevisionId: "plan-revision:1",
+      rendererId: "renderer:duckdb",
+      rendererVersion: "renderer-version:1",
+      executionPolicyId: "policy:limited-preview",
+      ...overrides,
+    });
 
   const fixtures: FixtureResult[] = [
     {
@@ -217,6 +284,176 @@ export function runSqlExecutionIdentityFixtures(): SqlExecutionIdentityFixtureRe
         true,
         "Request ID must not affect context matching.",
       ),
+      ok: false,
+    },
+    {
+      name: "v2 canonical identity is deterministic",
+      failureReasons: assertEqual(
+        canonicalIdentity.identityFingerprint,
+        createCanonicalSqlExecutionIdentityV2({
+          exactSql: "SELECT unit_id FROM units;",
+          dialect: "duckdb",
+          executionTargetId: "target:local-duckdb",
+          datasetId: "dataset:property",
+          workbookId: "workbook:property",
+          appliedSourceManifestFingerprint: "manifest:v2:1",
+          sourceRevisionIds: ["source-revision:2", "source-revision:1"],
+          structuralSchemaFingerprints: ["schema:2", "schema:1"],
+          validationAssessmentIds: ["assessment:2", "assessment:1"],
+          acceptanceRecordIds: ["acceptance:2", "acceptance:1"],
+          planId: "plan:1",
+          planRevisionId: "plan-revision:1",
+          rendererId: "renderer:duckdb",
+          rendererVersion: "renderer-version:1",
+          executionPolicyId: "policy:limited-preview",
+        }).identityFingerprint,
+        "Expected deterministic canonical identity.",
+      ),
+      ok: false,
+    },
+    {
+      name: "v2 manual identity is deterministic",
+      failureReasons: assertEqual(
+        manualIdentity.identityFingerprint,
+        createManualSqlExecutionIdentityV2({
+          exactSql: "SELECT unit_id FROM units;",
+          dialect: "duckdb",
+          executionTargetId: "target:local-duckdb",
+          datasetId: "dataset:property",
+          workbookId: "workbook:property",
+          worksheetId: "worksheet:units",
+          tableName: "units",
+          executionPolicyId: "policy:limited-preview",
+        }).identityFingerprint,
+        "Expected deterministic manual identity.",
+      ),
+      ok: false,
+    },
+    {
+      name: "v2 canonical and manual modes cannot share identity",
+      failureReasons: assertEqual(
+        canonicalIdentity.identityFingerprint === manualIdentity.identityFingerprint,
+        false,
+        "Expected mode-separated identity fingerprints.",
+      ),
+      ok: false,
+    },
+    {
+      name: "v2 array order does not alter canonical identity",
+      failureReasons: assertEqual(
+        canonicalIdentity.identityFingerprint,
+        reorderedCanonicalIdentity.identityFingerprint,
+        "Expected sorted canonical authority arrays.",
+      ),
+      ok: false,
+    },
+    {
+      name: "v2 canonical authority changes alter identity",
+      failureReasons: [
+        ...assertEqual(
+          doSqlExecutionIdentityV2FingerprintsMatch(canonicalWith({ exactSql: "SELECT 1;" }), canonicalWith({ exactSql: "SELECT 2;" })),
+          false,
+          "Expected SQL change to alter identity.",
+        ),
+        ...assertEqual(
+          canonicalWith({ appliedSourceManifestFingerprint: "manifest:v2:2" }).identityFingerprint === canonicalWith({}).identityFingerprint,
+          false,
+          "Expected manifest change to alter identity.",
+        ),
+        ...assertEqual(
+          canonicalWith({ sourceRevisionIds: ["source-revision:2"] }).identityFingerprint === canonicalWith({}).identityFingerprint,
+          false,
+          "Expected source revision change to alter identity.",
+        ),
+        ...assertEqual(
+          canonicalWith({ validationAssessmentIds: ["assessment:2"] }).identityFingerprint === canonicalWith({}).identityFingerprint,
+          false,
+          "Expected validation change to alter identity.",
+        ),
+        ...assertEqual(
+          canonicalWith({ acceptanceRecordIds: ["acceptance:2"] }).identityFingerprint === canonicalWith({}).identityFingerprint,
+          false,
+          "Expected acceptance change to alter identity.",
+        ),
+      ],
+      ok: false,
+    },
+    {
+      name: "v2 plan renderer dialect target and policy changes alter identity",
+      failureReasons: [
+        ...assertEqual(canonicalWith({ planRevisionId: "plan-revision:2" }).identityFingerprint === canonicalWith({}).identityFingerprint, false, "Expected plan revision change."),
+        ...assertEqual(canonicalWith({ rendererId: "renderer:other" }).identityFingerprint === canonicalWith({}).identityFingerprint, false, "Expected renderer change."),
+        ...assertEqual(canonicalWith({ dialect: "postgres" }).identityFingerprint === canonicalWith({}).identityFingerprint, false, "Expected dialect change."),
+        ...assertEqual(canonicalWith({ executionTargetId: "target:remote" }).identityFingerprint === canonicalWith({}).identityFingerprint, false, "Expected target change."),
+        ...assertEqual(canonicalWith({ executionPolicyId: "policy:full" }).identityFingerprint === canonicalWith({}).identityFingerprint, false, "Expected policy change."),
+      ],
+      ok: false,
+    },
+    {
+      name: "v2 ephemeral fields are excluded from identity",
+      failureReasons: [
+        ...assertEqual(
+          validateSqlExecutionIdentityV2({ ...canonicalIdentity, requestId: "run:1", tabId: "tab:1" }).status,
+          "valid",
+          "Expected ephemeral fields not to invalidate canonical identity.",
+        ),
+        ...assertEqual(
+          (
+            validateSqlExecutionIdentityV2({
+              ...canonicalIdentity,
+              requestId: "run:2",
+              tabId: "tab:2",
+              label: "Renamed",
+            }) as { status: "valid"; identity: typeof canonicalIdentity }
+          ).identity.identityFingerprint,
+          canonicalIdentity.identityFingerprint,
+          "Expected ephemeral fields not to alter deterministic identity.",
+        ),
+      ],
+      ok: false,
+    },
+    {
+      name: "v2 validation accepts supported identity and rejects tampering",
+      failureReasons: [
+        ...assertEqual(
+          validateSqlExecutionIdentityV2(canonicalIdentity).status,
+          "valid",
+          "Expected valid canonical identity.",
+        ),
+        ...assertEqual(
+          validateSqlExecutionIdentityV2({ ...canonicalIdentity, identityFingerprint: "tampered" }).reasonCodes[0],
+          "execution_identity_fingerprint_mismatch",
+          "Expected tampered fingerprint rejection.",
+        ),
+      ],
+      ok: false,
+    },
+    {
+      name: "v2 manual canonical-field forgery is rejected",
+      failureReasons: assertEqual(
+        validateSqlExecutionIdentityV2({
+          ...manualIdentity,
+          appliedSourceManifestFingerprint: "manifest:v2:forged",
+        }).reasonCodes[0],
+        "manual_canonical_authority_forbidden",
+        "Expected manual forgery block.",
+      ),
+      ok: false,
+    },
+    {
+      name: "v2 unsupported version and discriminant fail closed",
+      failureReasons: [
+        ...assertEqual(
+          validateSqlExecutionIdentityV2({ ...canonicalIdentity, version: "sql-execution-identity:v999" }).reasonCodes[0],
+          "execution_identity_unsupported",
+          "Expected unsupported version block.",
+        ),
+        ...assertEqual(
+          validateSqlExecutionIdentityV2({ ...canonicalIdentity, mode: "batch" }).reasonCodes[0],
+          "execution_mode_unsupported",
+          "Expected unsupported mode block.",
+        ),
+      ],
       ok: false,
     },
   ];

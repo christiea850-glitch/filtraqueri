@@ -1,14 +1,19 @@
 import {
   createOriginalWorksheetSourceIdentity,
   createCleanedWorksheetSourceIdentity,
+  createRelationshipEndpointSignature,
   createWorksheetSourceRevision,
   createWorksheetStructuralSchemaFingerprint,
 } from "../../../workbook/worksheetSourceRevision";
 import {
   createSqlAppliedSourceManifest,
+  createSqlAppliedSourceManifestV2,
   evaluateSqlAppliedSourceManifestReadiness,
+  evaluateSqlAppliedSourceManifestV2Readiness,
   validateSqlAppliedSourceManifestIntegrity,
+  validateSqlAppliedSourceManifestV2Integrity,
   type SqlAppliedSourceManifest,
+  type SqlAppliedSourceManifestV2,
 } from "../sqlAppliedSourceManifest";
 
 type FixtureResult = {
@@ -69,6 +74,16 @@ const revisionFor = ({
     tableName: worksheetId.replace("worksheet:", ""),
     structuralSchemaFingerprint: schema,
     materializationFingerprint,
+  });
+
+const endpointFor = (sourceRevision: ReturnType<typeof revisionFor>, columnName: string, ordinal: number) =>
+  createRelationshipEndpointSignature({
+    sourceRevision,
+    columnId: `col:${columnName}`,
+    columnName,
+    columnOrdinal: ordinal,
+    physicalType: "INTEGER",
+    logicalType: "number",
   });
 
 export function runSqlAppliedSourceManifestFixtures(): SqlAppliedSourceManifestFixtureReport {
@@ -203,6 +218,127 @@ export function runSqlAppliedSourceManifestFixtures(): SqlAppliedSourceManifestF
   });
   mutableBindings.push({ worksheetId: "worksheet:rents", sourceRevision: rentsRevision });
   unitsRevision.sourceIdentity.worksheetId = "worksheet:mutated";
+  const v2UnitsRevision = revisionFor({
+    worksheetId: "worksheet:units",
+    sourceKind: "original",
+    materializationFingerprint: "materialization:units:v1",
+  });
+  const v2RentsRevision = revisionFor({
+    worksheetId: "worksheet:rents",
+    sourceKind: "original",
+    materializationFingerprint: "materialization:rents:v1",
+  });
+  const v2ChangedUnitsRevision = revisionFor({
+    worksheetId: "worksheet:units",
+    sourceKind: "original",
+    materializationFingerprint: "materialization:units:v2",
+  });
+  const v2CleanedRevision = revisionFor({
+    worksheetId: "worksheet:units",
+    sourceKind: "cleaned_working_copy",
+    materializationFingerprint: "materialization:units:cleaned:v1",
+  });
+  const v2CleanedRentsRevision = revisionFor({
+    worksheetId: "worksheet:rents",
+    sourceKind: "cleaned_working_copy",
+    materializationFingerprint: "materialization:rents:cleaned:v1",
+  });
+  const unitsEndpoint = endpointFor(v2UnitsRevision, "unit_id", 0);
+  const rentsEndpoint = endpointFor(v2RentsRevision, "unit_id", 0);
+  const relationshipBinding = {
+    relationshipId: "relationship:units-rents",
+    direction: "directed" as const,
+    validationAssessmentId: "assessment:units-rents:v1",
+    validationIdentity: "validation:units-rents:v1",
+    acceptanceRecordId: "acceptance:units-rents:v1",
+    leftEndpoint: unitsEndpoint,
+    rightEndpoint: rentsEndpoint,
+  };
+  const sourceBindingFor = (sourceRevision: ReturnType<typeof revisionFor>) => ({
+    sourceId: sourceRevision.sourceIdentity.sourceId,
+    sourceKind: sourceRevision.sourceIdentity.sourceKind,
+    worksheetId: sourceRevision.sourceIdentity.worksheetId,
+    tableName: sourceRevision.tableName,
+    sourceRevisionId: sourceRevision.revisionId,
+    structuralSchemaFingerprint: sourceRevision.structuralSchemaFingerprint.fingerprint,
+  });
+  const singleSourceV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2UnitsRevision)],
+  });
+  const multiSourceV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2RentsRevision), sourceBindingFor(v2UnitsRevision)],
+    relationshipBindings: [relationshipBinding],
+  });
+  const reorderedMultiSourceV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2UnitsRevision), sourceBindingFor(v2RentsRevision)],
+    relationshipBindings: [relationshipBinding],
+  });
+  const renamedTableV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [{ ...sourceBindingFor(v2UnitsRevision), tableName: "renamed_units" }],
+  });
+  const changedRevisionV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2ChangedUnitsRevision)],
+  });
+  const changedStructuralV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [
+      {
+        ...sourceBindingFor(v2UnitsRevision),
+        structuralSchemaFingerprint: "worksheet-structural-schema:changed",
+      },
+    ],
+  });
+  const changedRelationshipV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2RentsRevision), sourceBindingFor(v2UnitsRevision)],
+    relationshipBindings: [{ ...relationshipBinding, acceptanceRecordId: "acceptance:units-rents:v2" }],
+  });
+  const missingEndpointV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2UnitsRevision)],
+    relationshipBindings: [relationshipBinding],
+  });
+  const missingRevisionV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [{ ...sourceBindingFor(v2UnitsRevision), sourceRevisionId: "" }],
+  });
+  const duplicateV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2UnitsRevision), sourceBindingFor(v2UnitsRevision)],
+  });
+  const conflictingV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [
+      sourceBindingFor(v2UnitsRevision),
+      { ...sourceBindingFor(v2UnitsRevision), sourceRevisionId: v2ChangedUnitsRevision.revisionId },
+    ],
+  });
+  const cleanedV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2CleanedRevision)],
+  });
+  const mixedV2 = createSqlAppliedSourceManifestV2({
+    datasetId: "dataset:property",
+    workbookId: "workbook:property",
+    sourceBindings: [sourceBindingFor(v2UnitsRevision), sourceBindingFor(v2CleanedRentsRevision)],
+  });
 
   const fixtures: FixtureResult[] = [
     {
@@ -491,6 +627,199 @@ export function runSqlAppliedSourceManifestFixtures(): SqlAppliedSourceManifestF
               ),
             ]
           : ["Expected reordered manifests to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 original single-source manifest is ready",
+      failureReasons:
+        singleSourceV2.status === "created"
+          ? assertEqual(
+              evaluateSqlAppliedSourceManifestV2Readiness({ manifest: singleSourceV2.manifest }).status,
+              "eligible",
+              "Expected V2 single-source manifest readiness.",
+            )
+          : ["Expected V2 single-source manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 multi-source manifest requires all relationship bindings",
+      failureReasons:
+        multiSourceV2.status === "created"
+          ? [
+              ...assertEqual(
+                evaluateSqlAppliedSourceManifestV2Readiness({
+                  manifest: multiSourceV2.manifest,
+                  requiredRelationshipIds: ["relationship:units-rents"],
+                }).status,
+                "eligible",
+                "Expected required relationship to be ready.",
+              ),
+              ...assertEqual(
+                evaluateSqlAppliedSourceManifestV2Readiness({
+                  manifest: multiSourceV2.manifest,
+                  requiredRelationshipIds: ["relationship:missing"],
+                }).reasonCodes[0],
+                "relationship_partial_eligibility_blocked",
+                "Expected missing relationship block.",
+              ),
+            ]
+          : ["Expected V2 multi-source manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 ordering is deterministic for sources and relationships",
+      failureReasons:
+        multiSourceV2.status === "created" && reorderedMultiSourceV2.status === "created"
+          ? assertEqual(
+              multiSourceV2.manifest.manifestFingerprint,
+              reorderedMultiSourceV2.manifest.manifestFingerprint,
+              "Expected V2 order-independent fingerprint.",
+            )
+          : ["Expected reordered V2 manifests to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 table rename metadata alone is not source authority",
+      failureReasons:
+        singleSourceV2.status === "created" && renamedTableV2.status === "created"
+          ? assertEqual(
+              singleSourceV2.manifest.manifestFingerprint,
+              renamedTableV2.manifest.manifestFingerprint,
+              "Expected table name to be excluded from V2 authority fingerprint.",
+            )
+          : ["Expected renamed V2 manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 source revision changes manifest fingerprint",
+      failureReasons:
+        singleSourceV2.status === "created" && changedRevisionV2.status === "created"
+          ? assertEqual(
+              singleSourceV2.manifest.manifestFingerprint === changedRevisionV2.manifest.manifestFingerprint,
+              false,
+              "Expected source revision change to alter V2 fingerprint.",
+            )
+          : ["Expected changed revision V2 manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 structural fingerprint changes manifest fingerprint",
+      failureReasons:
+        singleSourceV2.status === "created" && changedStructuralV2.status === "created"
+          ? assertEqual(
+              singleSourceV2.manifest.manifestFingerprint === changedStructuralV2.manifest.manifestFingerprint,
+              false,
+              "Expected structural change to alter V2 fingerprint.",
+            )
+          : ["Expected changed structural V2 manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 relationship validation or acceptance changes fingerprint",
+      failureReasons:
+        multiSourceV2.status === "created" && changedRelationshipV2.status === "created"
+          ? assertEqual(
+              multiSourceV2.manifest.manifestFingerprint === changedRelationshipV2.manifest.manifestFingerprint,
+              false,
+              "Expected relationship authority change to alter V2 fingerprint.",
+            )
+          : ["Expected changed relationship V2 manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 relationship endpoint absent from manifest blocks construction",
+      failureReasons:
+        missingEndpointV2.status === "invalid"
+          ? assertEqual(
+              missingEndpointV2.reasonCodes[0],
+              "relationship_validation_missing",
+              "Expected missing endpoint source block.",
+            )
+          : ["Expected missing endpoint V2 manifest to be invalid."],
+      ok: false,
+    },
+    {
+      name: "v2 missing source revision blocks construction",
+      failureReasons:
+        missingRevisionV2.status === "invalid"
+          ? assertEqual(
+              missingRevisionV2.reasonCodes[0],
+              "source_revision_missing",
+              "Expected missing revision reason.",
+            )
+          : ["Expected missing revision V2 manifest to be invalid."],
+      ok: false,
+    },
+    {
+      name: "v2 duplicate and conflicting source records fail closed",
+      failureReasons: [
+        ...assertEqual(
+          duplicateV2.status === "invalid" ? duplicateV2.reasonCodes[0] : "",
+          "manifest_binding_duplicate",
+          "Expected duplicate V2 binding reason.",
+        ),
+        ...assertEqual(
+          conflictingV2.status === "invalid" ? conflictingV2.reasonCodes[0] : "",
+          "manifest_binding_conflict",
+          "Expected conflicting V2 binding reason.",
+        ),
+      ],
+      ok: false,
+    },
+    {
+      name: "v2 cleaned and mixed source modes are represented but blocked",
+      failureReasons: [
+        ...assertEqual(
+          cleanedV2.status === "created"
+            ? evaluateSqlAppliedSourceManifestV2Readiness({ manifest: cleanedV2.manifest }).reasonCodes[0]
+            : "",
+          "unsupported_cleaned_source",
+          "Expected cleaned-only block.",
+        ),
+        ...assertEqual(
+          mixedV2.status === "created"
+            ? evaluateSqlAppliedSourceManifestV2Readiness({ manifest: mixedV2.manifest }).reasonCodes[0]
+            : "",
+          "unsupported_mixed_source",
+          "Expected mixed-source block.",
+        ),
+      ],
+      ok: false,
+    },
+    {
+      name: "v2 unsupported or malformed manifest fails closed",
+      failureReasons:
+        singleSourceV2.status === "created"
+          ? [
+              ...assertEqual(
+                validateSqlAppliedSourceManifestV2Integrity({
+                  ...singleSourceV2.manifest,
+                  version: "sql-applied-source-manifest:v999",
+                } as unknown as SqlAppliedSourceManifestV2).reasonCodes[0],
+                "applied_source_manifest_unsupported",
+                "Expected unsupported V2 version reason.",
+              ),
+              ...assertEqual(
+                validateSqlAppliedSourceManifestV2Integrity({
+                  ...singleSourceV2.manifest,
+                  manifestFingerprint: "tampered",
+                }).reasonCodes[0],
+                "manifest_fingerprint_mismatch",
+                "Expected V2 fingerprint mismatch.",
+              ),
+            ]
+          : ["Expected V2 manifest to be created."],
+      ok: false,
+    },
+    {
+      name: "v2 invalid manifest exposes no partial relationship payload",
+      failureReasons:
+        conflictingV2.status === "invalid"
+          ? [
+              ...assertEqual(conflictingV2.manifest, null, "Expected no partial V2 manifest."),
+              ...assertEqual(conflictingV2.reasonCodes.length > 0, true, "Expected V2 reasons."),
+            ]
+          : ["Expected conflicting V2 manifest to be invalid."],
       ok: false,
     },
   ];

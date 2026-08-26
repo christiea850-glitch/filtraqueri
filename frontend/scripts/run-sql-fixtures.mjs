@@ -167,6 +167,11 @@ const fixtures = [
     exportName: "runRelationshipSourceValidationFixtures",
   },
   {
+    label: "Source-aware relationship eligibility contract",
+    modulePath: "/src/features/analyst/sql/__tests__/sourceAwareRelationshipEligibility.test.ts",
+    exportName: "runSourceAwareRelationshipEligibilityFixtures",
+  },
+  {
     label: "LLM privacy modes",
     modulePath: "/src/features/analyst/llm/__tests__/llmPrivacyModes.test.ts",
     exportName: "runLlmPrivacyModeFixtures",
