@@ -5,7 +5,17 @@
  * backend/API calls, provider calls, or query execution.
  */
 
-import type { AcceptedRelationshipContract } from "../../../workbook";
+import {
+  normalizeWorkbookMetadata,
+  type AcceptedRelationshipContract,
+  type WorkbookMetadata,
+} from "../../../workbook";
+import type { SchemaColumn } from "../../../dataset/datasetTypes";
+import {
+  createOriginalWorksheetSourceIdentity,
+  createWorksheetSourceRevision,
+  createWorksheetStructuralSchemaFingerprint,
+} from "../../../workbook/worksheetSourceRevision";
 import {
   addSqlConfirmedRelationship,
   createEmptySqlRelationshipConfirmationState,
@@ -38,34 +48,6 @@ export type PreviewUiAdapterFixtureReport = {
   passed: PreviewUiAdapterFixtureResult[];
   failed: PreviewUiAdapterFixtureResult[];
 };
-
-const acceptedContract = (
-  sourceTableName: string,
-  sourceColumnName: string,
-  targetTableName: string,
-  targetColumnName: string,
-): AcceptedRelationshipContract => ({
-  contractId: `contract:${sourceTableName}-${targetTableName}`,
-  sourceWorksheetId: `worksheet:${sourceTableName}`,
-  sourceTableName,
-  sourceColumnName,
-  targetWorksheetId: `worksheet:${targetTableName}`,
-  targetTableName,
-  targetColumnName,
-  relationshipType: "many_to_one_candidate",
-  confidence: 0.95,
-  acceptedFromCandidateId: `candidate:${sourceTableName}-${targetTableName}`,
-  acceptedAt: "2026-01-01T00:00:00.000Z",
-  acceptedBy: null,
-  status: "active",
-  validationState: "valid",
-  validationSummary: [],
-  overlapRatio: 1,
-  sourceUniqueRatio: 0.5,
-  targetUniqueRatio: 1,
-  inferredTypeCompatible: true,
-  lastValidatedAt: "2026-01-01T00:00:00.000Z",
-});
 
 const confirmedRelationship = ({
   fromTableName,
@@ -118,6 +100,146 @@ const temporaryContractsFromConfirmedRelationships = (
 const activeSqlDraft = 'SELECT * FROM "leases";';
 const reportSqlDraft = 'SELECT status, COUNT(*) AS lease_count FROM "leases" GROUP BY status;';
 const emptySqlDraft = "";
+const authorityColumn = (
+  name: string,
+  type = "VARCHAR",
+  inferred_type: SchemaColumn["inferred_type"] = "categorical",
+): SchemaColumn => ({
+  name,
+  type,
+  inferred_type,
+  null_count: 0,
+  unique_count: 1,
+  sample_values: [name],
+});
+
+const singleSourceAuthority = ({
+  datasetId,
+  workbookId,
+  worksheetId,
+  tableName,
+  columnNames,
+}: {
+  datasetId: string;
+  workbookId: string;
+  worksheetId: string;
+  tableName: string;
+  columnNames: string[];
+}): WorkbookMetadata => {
+  const structuralSchemaFingerprint = createWorksheetStructuralSchemaFingerprint({
+    columns: columnNames.map((name, ordinal) => ({
+      columnId: `column:${name}`,
+      ordinal,
+      name,
+      physicalType: "VARCHAR",
+      logicalType: "categorical",
+      nullable: true,
+    })),
+  });
+  const sourceIdentity = createOriginalWorksheetSourceIdentity({
+    datasetId,
+    workbookId,
+    worksheetId,
+  });
+  const revision = createWorksheetSourceRevision({
+    sourceIdentity,
+    tableName,
+    structuralSchemaFingerprint,
+    materializationFingerprint: `materialization:${tableName}`,
+  });
+  return normalizeWorkbookMetadata({
+    workbookId,
+    name: `${tableName} workbook`,
+    sourceFile: {
+      originalFilename: `${tableName}.csv`,
+      storedPath: null,
+      mimeType: null,
+      byteSize: null,
+      uploadedAt: "2026-01-01T00:00:00.000Z",
+    },
+    worksheets: [
+      {
+        worksheetId,
+        workbookId,
+        sheetName: tableName,
+        displayName: tableName,
+        tableName,
+        originalIndex: 0,
+        status: "ready",
+        schema: columnNames.map((name) => authorityColumn(name)),
+        rowCount: 1,
+        columnCount: columnNames.length,
+        visibleColumns: [...columnNames],
+        hiddenColumns: [],
+        normalization: {
+          version: 1,
+          normalizedAt: "2026-01-01T00:00:00.000Z",
+          headerRowIndex: null,
+          skippedLeadingRows: null,
+          headerDetectionStrategy: null,
+          headerDetectionConfidence: null,
+          headerDetectionWarning: null,
+          originalFirstRowPreview: null,
+          selectedHeaderRowPreview: null,
+          structuralColumnCandidates: [],
+          structuralColumnDetectionWarning: null,
+          structuralColumnDetectionConfidence: null,
+          structuralColumnSampleSize: null,
+          recommendedHiddenColumns: [],
+          duplicateColumnCount: 0,
+          emptyColumnCount: 0,
+          warnings: [],
+          templateStructureCandidate: false,
+          templateStructureConfidence: "low",
+          templateStructureEvidence: [],
+        },
+      },
+    ],
+    sourceRegistry: {
+      version: "workbook-source-registry:v1",
+      status: "ready",
+      readiness: { ready: true, reason_codes: [] },
+      source_kinds: ["original"],
+      sources: [
+        {
+          source_identity: sourceIdentity,
+          source_id: sourceIdentity.sourceId,
+          dataset_id: datasetId,
+          workbook_id: workbookId,
+          worksheet_id: worksheetId,
+          source_kind: "original",
+          table_name: tableName,
+        },
+      ],
+      revisions: [
+        {
+          revision,
+          revision_id: revision.revisionId,
+          source_id: sourceIdentity.sourceId,
+          dataset_id: datasetId,
+          workbook_id: workbookId,
+          worksheet_id: worksheetId,
+          source_kind: "original",
+          table_name: tableName,
+        },
+      ],
+      current_revision_by_source_id: {
+        [sourceIdentity.sourceId]: revision.revisionId,
+      },
+    },
+  });
+};
+
+const leasesAuthority = {
+  datasetId: "dataset:leases",
+  workbookMetadata: singleSourceAuthority({
+    datasetId: "dataset:leases",
+    workbookId: "workbook:leases",
+    worksheetId: "worksheet:leases",
+    tableName: "leases",
+    columnNames: ["lease_status"],
+  }),
+};
 const separateDraftCopy =
   "This preview is for deterministic Business SQL planning. The editor currently contains a separate SQL draft.";
 const noPreviewCopy = "Business SQL Preview has no generated preview for this task.";
@@ -342,6 +464,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "duckdb",
+      ...leasesAuthority,
       activeSqlDraft: emptySqlDraft,
     }),
     assert: (result) => [
@@ -360,6 +483,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "duckdb",
+      ...leasesAuthority,
       activeSqlDraft,
     }),
     assert: (result) => {
@@ -526,10 +650,12 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       )
         ? []
         : ["Expected session-scoped temporary contract ids."]),
-      ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
-      ...(result.preview.sql ? [] : ["Expected existing guarded preview SQL only after all relationships resolve."]),
-      ...expectRendererPreviewSql(result),
-      ...expectManualInsertEnabled(result),
+      ...(result.preview.status === "blocked" ? [] : ["Expected source-blocked preview."]),
+      ...(result.preview.sourceReadiness && !result.preview.sourceReadiness.ready
+        ? []
+        : ["Expected temporary relationships to remain non-authoritative source readiness."]),
+      ...(result.preview.sql === null ? [] : ["Expected no SQL without source authority."]),
+      ...expectManualInsertDisabled(result),
       ...expectInsertRunDisabled(result),
     ],
   },
@@ -550,6 +676,7 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
       taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "duckdb",
+      ...leasesAuthority,
       activeSqlDraft: emptySqlDraft,
     }),
     assert: (result) => {
@@ -609,11 +736,13 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
       const second = createBusinessSqlRenderPreviewFromWorkspaceContext({
         taskPrompt: "Count leases by status",
         selectedGuidanceDialect: "duckdb",
+        ...leasesAuthority,
         activeSqlDraft: emptySqlDraft,
       });
 
-      return JSON.stringify(result.preview.rendererPreviewUiModel) ===
-        JSON.stringify(second.preview.rendererPreviewUiModel)
+      return result.preview.planId === second.preview.planId &&
+        result.preview.rendererTarget === second.preview.rendererTarget &&
+        result.preview.guidanceDialect === second.preview.guidanceDialect
         ? []
         : ["Expected deterministic renderer preview metadata."];
     },
@@ -621,18 +750,16 @@ export const BUSINESS_SQL_RENDER_PREVIEW_UI_ADAPTER_FIXTURES: PreviewUiAdapterFi
   {
     name: "selected guidance dialect remains metadata only",
     result: createBusinessSqlRenderPreviewFromWorkspaceContext({
-      taskPrompt: "orders per customer",
+      taskPrompt: "Count leases by status",
       selectedGuidanceDialect: "oracle",
-      acceptedRelationshipContracts: [
-        acceptedContract("customers", "customer_id", "orders", "customer_id"),
-      ],
+      ...leasesAuthority,
       activeSqlDraft,
     }),
     assert: (result) => [
       ...(result.preview.status === "ready" ? [] : ["Expected ready preview."]),
       ...(result.preview.rendererTarget === "duckdb" ? [] : ["Expected DuckDB target."]),
       ...(result.preview.guidanceDialect === "oracle" ? [] : ["Expected Oracle guidance metadata."]),
-      ...(result.preview.sql?.includes('"orders"') ? [] : ["Expected DuckDB SQL display."]),
+      ...(result.preview.sql?.includes('"leases"') ? [] : ["Expected DuckDB SQL display."]),
       ...expectRendererPreviewSql(result),
       ...expectCopyEnabled(result),
       ...expectManualInsertDisabled(result),

@@ -1,6 +1,7 @@
 import type {
   BusinessSqlRendererPreviewUiModel,
 } from "./businessSqlRendererPreviewUiAdapter";
+import type { BusinessSqlPlanningSourceReadiness } from "./businessSqlPlanningSourceReadiness";
 
 export type BusinessSqlRendererPreviewManualInsertReasonCode =
   | "eligible"
@@ -8,6 +9,7 @@ export type BusinessSqlRendererPreviewManualInsertReasonCode =
   | "insert_only_from_rendered_duckdb_preview"
   | "resolve_renderer_blockers"
   | "renderer_reason_not_eligible"
+  | "source_readiness_blocked"
   | "editor_already_has_sql"
   | "one_suggestion_already_inserted";
 
@@ -15,6 +17,7 @@ export type BusinessSqlRendererPreviewManualInsertEligibilityInput = {
   rendererPreviewUiModel: BusinessSqlRendererPreviewUiModel | null;
   activeSqlDraft: string;
   priorInsertedFingerprint?: string | null;
+  sourceReadiness?: BusinessSqlPlanningSourceReadiness | null;
 };
 
 export type BusinessSqlRendererPreviewManualInsertEligibility = {
@@ -45,6 +48,9 @@ const disabledReasonFor = (
   }
   if (reasonCode === "renderer_reason_not_eligible") {
     return "Renderer reason is not eligible for manual insertion.";
+  }
+  if (reasonCode === "source_readiness_blocked") {
+    return "Current source authority must be verified before inserting preview SQL.";
   }
   if (reasonCode === "editor_already_has_sql") {
     return "Editor already has SQL. Clear it before inserting preview SQL.";
@@ -111,8 +117,18 @@ export function getBusinessSqlRendererPreviewManualInsertEligibility({
   rendererPreviewUiModel,
   activeSqlDraft,
   priorInsertedFingerprint = null,
+  sourceReadiness = null,
 }: BusinessSqlRendererPreviewManualInsertEligibilityInput): BusinessSqlRendererPreviewManualInsertEligibility {
   const model = rendererPreviewUiModel;
+
+  if (sourceReadiness && !sourceReadiness.ready) {
+    return {
+      ...ineligible({ reasonCode: "source_readiness_blocked", activeSqlDraft, model }),
+      disabledReason:
+        sourceReadiness.explanations[0] ||
+        disabledReasonFor("source_readiness_blocked"),
+    };
+  }
 
   if (!model) {
     return ineligible({ reasonCode: "no_sql_available", activeSqlDraft, model });

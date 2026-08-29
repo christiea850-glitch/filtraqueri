@@ -276,6 +276,10 @@ export type BusinessSqlJoinEdge = {
   toTable?: string;
   toField?: string;
   relationship?: string;
+  relationshipAuthority?: {
+    relationshipId: string;
+    contractId: string;
+  };
   verified: boolean;
 };
 

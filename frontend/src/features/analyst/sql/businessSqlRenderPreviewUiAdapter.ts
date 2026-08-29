@@ -2,10 +2,12 @@ import type { SqlDialectId } from "../../sqlIntelligence";
 import type {
   AcceptedRelationshipContract,
   AnalysisScopeSelection,
+  WorkbookMetadata,
   WorksheetMetadata,
 } from "../../workbook";
 import { planBusinessSqlQueryRequest } from "./businessSqlQueryPlanner";
 import {
+  createSourceBlockedBusinessSqlRenderPreview,
   createBusinessSqlRenderPreview,
   type BusinessSqlRenderPreview,
 } from "./businessSqlRenderPreview";
@@ -13,6 +15,11 @@ import { detectBusinessIntent } from "./businessIntentGrounding";
 import { detectBusinessSqlMeasureAmbiguity } from "./businessSqlMeasureAmbiguity";
 import type { BusinessSqlMissingRelationship } from "./businessSqlJoinPathResolver";
 import type { SqlWorkspaceTabCreatedFrom } from "./sqlTabsTypes";
+import {
+  evaluateBusinessSqlPlanningSourceReadiness,
+  type BusinessSqlPlanningSourceReadiness,
+} from "./businessSqlPlanningSourceReadiness";
+import { evaluateBusinessSqlRenderReadiness } from "./businessSqlRenderReadiness";
 
 const BUSINESS_SQL_PREVIEW_SEPARATE_EDITOR_DRAFT_COPY =
   "This preview is for deterministic Business SQL planning. The editor currently contains a separate SQL draft.";
@@ -32,6 +39,8 @@ export type BusinessSqlRenderPreviewWorkspaceInput = {
     WorksheetMetadata,
     "worksheetId" | "displayName" | "sheetName" | "tableName" | "schema"
   >[];
+  datasetId?: string | null;
+  workbookMetadata?: WorkbookMetadata | null;
   acceptedRelationshipContracts?: readonly AcceptedRelationshipContract[];
   readyRelationshipContracts?: readonly AcceptedRelationshipContract[];
   missingRelationships?: readonly BusinessSqlMissingRelationship[];
@@ -67,6 +76,20 @@ export type BusinessSqlRenderPreviewManualInsertResult = {
   activeSqlDraft: string;
   reason: string | null;
 };
+
+const createMissingSourceAuthorityReadiness = (): Extract<
+  BusinessSqlPlanningSourceReadiness,
+  { ready: false }
+> => ({
+  ready: false,
+  status: "blocked",
+  reasonCodes: ["legacy_source_unverifiable"],
+  explanations: ["Legacy source state cannot be verified for generated SQL."],
+  manifest: null,
+  sourceMode: "unknown",
+  sourceBindings: [],
+  relationshipBindings: null,
+});
 
 export function getBusinessSqlRenderPreviewCopyState(
   preview: BusinessSqlRenderPreview,
@@ -106,6 +129,16 @@ export function getBusinessSqlRenderPreviewManualInsertState(
   preview: BusinessSqlRenderPreview,
   activeSqlDraft: string,
 ): BusinessSqlRenderPreviewManualInsertState {
+  if (preview.sourceReadiness && !preview.sourceReadiness.ready) {
+    return {
+      canManuallyInsertSqlPreview: false,
+      sql: null,
+      disabledReason:
+        preview.sourceReadiness.explanations[0] ||
+        "Current source authority must be verified before inserting preview SQL.",
+    };
+  }
+
   if (preview.status !== "ready") {
     return {
       canManuallyInsertSqlPreview: false,
@@ -204,6 +237,8 @@ export function createBusinessSqlRenderPreviewFromWorkspaceContext({
   missingRelationships = [],
   activeSqlDraft = "",
   activeSqlDraftSource = null,
+  datasetId = null,
+  workbookMetadata = null,
 }: BusinessSqlRenderPreviewWorkspaceInput): BusinessSqlRenderPreviewWorkspaceResult {
   const intent = detectBusinessIntent(taskPrompt);
   const measureAmbiguity = detectBusinessSqlMeasureAmbiguity({
@@ -247,8 +282,41 @@ export function createBusinessSqlRenderPreviewFromWorkspaceContext({
     missingRelationships,
   });
 
+  const renderReadiness = evaluateBusinessSqlRenderReadiness(plan);
+  if (renderReadiness.status !== "renderable") {
+    return {
+      preview: createBusinessSqlRenderPreview(plan),
+      activeSqlDraft,
+      activeSqlDraftSource,
+    };
+  }
+
+  const sourceReadiness =
+    datasetId && workbookMetadata
+      ? evaluateBusinessSqlPlanningSourceReadiness({
+        plan,
+        datasetId,
+        workbookMetadata,
+        appliedScopeSelections,
+      })
+      : createMissingSourceAuthorityReadiness();
+
+  if (!sourceReadiness.ready) {
+    return {
+      preview: createSourceBlockedBusinessSqlRenderPreview({
+        plan,
+        sourceReadiness,
+      }),
+      activeSqlDraft,
+      activeSqlDraftSource,
+    };
+  }
+
   return {
-    preview: createBusinessSqlRenderPreview(plan),
+    preview: {
+      ...createBusinessSqlRenderPreview(plan),
+      sourceReadiness,
+    },
     activeSqlDraft,
     activeSqlDraftSource,
   };

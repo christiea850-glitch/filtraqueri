@@ -162,6 +162,11 @@ const fixtures = [
     exportName: "runSqlAppliedSourceManifestFixtures",
   },
   {
+    label: "Business SQL planning source readiness",
+    modulePath: "/src/features/analyst/sql/__tests__/businessSqlPlanningSourceReadiness.test.ts",
+    exportName: "runBusinessSqlPlanningSourceReadinessFixtures",
+  },
+  {
     label: "Relationship source validation contract",
     modulePath: "/src/features/analyst/sql/__tests__/relationshipSourceValidation.test.ts",
     exportName: "runRelationshipSourceValidationFixtures",

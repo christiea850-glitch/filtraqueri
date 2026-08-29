@@ -11,6 +11,10 @@ import type { BusinessSqlRenderPreview } from "./businessSqlRenderPreview";
 import type { BusinessSqlQueryPlan } from "./businessSqlQueryPlan";
 import type { BusinessSqlRenderReadinessResult } from "./businessSqlRenderReadiness";
 import type { BusinessSqlMeasureClarificationDecision } from "./businessSqlMeasureAmbiguity";
+import {
+  evaluateBusinessSqlPlanningSourceReadiness,
+  type BusinessSqlPlanningSourceReadiness,
+} from "./businessSqlPlanningSourceReadiness";
 import { isBusinessSqlPreviewReadyRenderable } from "./AdaptiveProposalLlmConsentDisclosure";
 import {
   getAdaptiveProposalBusinessSqlPreviewHandoffAction,
@@ -40,6 +44,7 @@ export type BusinessSqlPlanCandidateViewModel = {
   readiness: BusinessSqlRenderReadinessResult | null;
   bridgeIssues: AdaptiveProposalBusinessSqlBridgeIssue[];
   previewHandoffAction: AdaptiveProposalBusinessSqlPreviewHandoffAction;
+  sourceReadiness: BusinessSqlPlanningSourceReadiness | null;
   details: BusinessSqlPlanCandidateDetail[];
   issues: string[];
   readinessStatus: string;
@@ -272,6 +277,14 @@ export const createBusinessSqlPlanCandidateViewModel = ({
   });
 
   if (result.state === "no_plan" && result.issues.length === 0) return null;
+  const sourceReadiness =
+    result.plan && dataset
+      ? evaluateBusinessSqlPlanningSourceReadiness({
+          plan: result.plan,
+          datasetId: dataset.dataset_id,
+          workbookMetadata: dataset.workbook_metadata || null,
+        })
+      : null;
 
   return {
     state: result.state,
@@ -298,7 +311,9 @@ export const createBusinessSqlPlanCandidateViewModel = ({
       activeSqlDraft,
       existingPreview: businessSqlRenderPreview,
       clarificationDecision: fallback.clarificationDecision,
+      sourceReadiness,
     }),
+    sourceReadiness,
     details: detailsFor(result),
     issues: issueMessagesFor(result.state, result.issues),
     readinessStatus: result.readiness?.status || "not evaluated",

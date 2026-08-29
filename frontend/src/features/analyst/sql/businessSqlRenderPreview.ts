@@ -12,6 +12,7 @@ import {
   createBusinessSqlRendererPreviewUiModel,
   type BusinessSqlRendererPreviewUiModel,
 } from "./businessSqlRendererPreviewUiAdapter";
+import type { BusinessSqlPlanningSourceReadiness } from "./businessSqlPlanningSourceReadiness";
 
 export type BusinessSqlRenderPreview = {
   status: "ready" | "needs_review" | "blocked";
@@ -27,6 +28,7 @@ export type BusinessSqlRenderPreview = {
   warnings: string[];
   clarificationDecision?: BusinessSqlClarificationDecisionProvenance;
   rendererPreviewUiModel?: BusinessSqlRendererPreviewUiModel;
+  sourceReadiness?: BusinessSqlPlanningSourceReadiness;
   actions: {
     canCopySql: boolean;
     canInsertSql: boolean;
@@ -109,6 +111,36 @@ export function createBusinessSqlRenderPreview(
     rendererPreviewUiModel,
     actions: {
       canCopySql: status === "ready" && Boolean(sql),
+      canInsertSql: false,
+      canRunSql: false,
+    },
+  };
+}
+
+export function createSourceBlockedBusinessSqlRenderPreview({
+  plan,
+  sourceReadiness,
+}: {
+  plan: BusinessSqlQueryPlan;
+  sourceReadiness: Extract<BusinessSqlPlanningSourceReadiness, { ready: false }>;
+}): BusinessSqlRenderPreview {
+  const reasons = sourceReadiness.reasonCodes.map((reason) => `Source readiness blocked: ${reason}.`);
+  return {
+    status: "blocked",
+    title: "SQL preview blocked",
+    body: "SQL cannot be previewed until current source authority is available.",
+    sql: null,
+    planId: plan.id,
+    rendererTarget: "duckdb",
+    guidanceDialect: plan.renderer.selectedGuidanceDialect,
+    reasons,
+    warnings: [
+      ...plan.warnings.map((warning) => warning.message),
+      ...sourceReadiness.explanations,
+    ],
+    sourceReadiness,
+    actions: {
+      canCopySql: false,
       canInsertSql: false,
       canRunSql: false,
     },

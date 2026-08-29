@@ -9,6 +9,10 @@ import type {
 } from "./adaptiveProposalBusinessSqlBridge";
 import type { BusinessSqlRenderReadinessResult } from "./businessSqlRenderReadiness";
 import type { BusinessSqlMeasureClarificationDecision } from "./businessSqlMeasureAmbiguity";
+import {
+  createSourceBlockedBusinessSqlRenderPreview,
+} from "./businessSqlRenderPreview";
+import type { BusinessSqlPlanningSourceReadiness } from "./businessSqlPlanningSourceReadiness";
 
 export type AdaptiveProposalBusinessSqlPreviewHandoffAction = {
   label: "Preview SQL from plan candidate";
@@ -24,6 +28,7 @@ export type AdaptiveProposalBusinessSqlPreviewHandoffInput = {
   activeSqlDraft: string;
   existingPreview: BusinessSqlRenderPreview | null;
   clarificationDecision?: BusinessSqlMeasureClarificationDecision | null;
+  sourceReadiness?: BusinessSqlPlanningSourceReadiness | null;
 };
 
 export type AdaptiveProposalBusinessSqlPreviewHandoffResult = {
@@ -54,7 +59,15 @@ export const getAdaptiveProposalBusinessSqlPreviewHandoffAction = ({
   issues,
   activeSqlDraft,
   existingPreview,
+  sourceReadiness,
 }: AdaptiveProposalBusinessSqlPreviewHandoffInput): AdaptiveProposalBusinessSqlPreviewHandoffAction => {
+  if (sourceReadiness && !sourceReadiness.ready) {
+    return action(
+      false,
+      sourceReadiness.explanations[0] ||
+        "Current source authority must be verified before preview.",
+    );
+  }
   if (candidateState !== "render_ready_plan") {
     return action(false, "SQL preview is available only for render-ready plan candidates.");
   }
@@ -98,10 +111,18 @@ export function createAdaptiveProposalBusinessSqlPreviewHandoff(
   const previewAction = getAdaptiveProposalBusinessSqlPreviewHandoffAction(input);
   return {
     preview:
-      previewAction.canPreview && input.plan
-        ? createBusinessSqlRenderPreview(input.plan, {
-            clarificationDecision: input.clarificationDecision || undefined,
+      input.sourceReadiness && !input.sourceReadiness.ready && input.plan
+        ? createSourceBlockedBusinessSqlRenderPreview({
+            plan: input.plan,
+            sourceReadiness: input.sourceReadiness,
           })
+        : previewAction.canPreview && input.plan
+          ? {
+              ...createBusinessSqlRenderPreview(input.plan, {
+                clarificationDecision: input.clarificationDecision || undefined,
+              }),
+              ...(input.sourceReadiness ? { sourceReadiness: input.sourceReadiness } : {}),
+            }
         : null,
     action: previewAction,
     noDirectRendererCallFromUi: true,

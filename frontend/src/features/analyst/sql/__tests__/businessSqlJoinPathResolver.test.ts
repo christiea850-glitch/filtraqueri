@@ -160,6 +160,18 @@ export const BUSINESS_SQL_JOIN_PATH_RESOLVER_FIXTURES: JoinPathResolverFixture[]
       if (plan.joinPath.edges[0]?.relationship !== "customer has orders") {
         failures.push("Expected the planner relationship label to be retained.");
       }
+      if (
+        plan.joinPath.edges[0]?.relationshipAuthority?.relationshipId !==
+        "candidate:contract:customers-orders"
+      ) {
+        failures.push("Expected authoritative relationship ID to come from acceptedFromCandidateId.");
+      }
+      if (
+        plan.joinPath.edges[0]?.relationshipAuthority?.contractId !==
+        "contract:customers-orders"
+      ) {
+        failures.push("Expected authoritative contract ID to be preserved.");
+      }
       return failures;
     },
   },

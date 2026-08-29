@@ -293,6 +293,10 @@ const edgeFromMatch = (
     toTable: reversed ? contract.sourceTableName : contract.targetTableName,
     toField: reversed ? contract.sourceColumnName : contract.targetColumnName,
     relationship: requirement.relationship || contract.contractId,
+    relationshipAuthority: {
+      relationshipId: contract.acceptedFromCandidateId,
+      contractId: contract.contractId,
+    },
     verified: true,
   };
 };

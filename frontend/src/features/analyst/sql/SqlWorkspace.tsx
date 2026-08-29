@@ -853,6 +853,8 @@ function SqlWorkspace({
         selectedScopeSelections: sqlTabs.selectedScopeSelections,
         appliedScopeSelections: sqlTabs.appliedScopeSelections,
         worksheets: dataset?.workbook_metadata?.worksheets || [],
+        datasetId: dataset?.dataset_id || null,
+        workbookMetadata: dataset?.workbook_metadata || null,
         acceptedRelationshipContracts:
           dataset?.workbook_metadata?.acceptedRelationshipContracts || [],
         readyRelationshipContracts: temporaryReadyRelationshipContracts,
@@ -860,8 +862,8 @@ function SqlWorkspace({
         activeSqlDraftSource: sqlTabs.activeTabCreatedFrom || undefined,
       }).preview,
     [
-      dataset?.workbook_metadata?.acceptedRelationshipContracts,
-      dataset?.workbook_metadata?.worksheets,
+      dataset?.workbook_metadata,
+      dataset?.dataset_id,
       editor.value,
       selectedDialect,
       sqlTabs.appliedScopeSelections,
@@ -888,6 +890,7 @@ function SqlWorkspace({
     [relationshipConfirmationState, relationshipReviewModel],
   );
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Existing reset behavior intentionally clears review-only state on dataset/workbook changes.
     setRelationshipConfirmationState(createEmptySqlRelationshipConfirmationState());
   }, [dataset?.dataset_id, dataset?.workbook_metadata?.workbookId]);
   useEffect(() => {
@@ -897,6 +900,7 @@ function SqlWorkspace({
       insertedAskRecommendationId !==
         `business-sql-renderer-preview:${businessSqlPreviewInsertProvenance.planId}`
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Existing provenance cleanup keeps stale insert banners from surviving tab changes.
       setBusinessSqlPreviewInsertProvenance(null);
       return;
     }

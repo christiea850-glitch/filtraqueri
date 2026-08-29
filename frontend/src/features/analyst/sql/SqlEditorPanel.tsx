@@ -404,6 +404,8 @@ function SqlEditorPanel({
     businessSqlCandidatePreview || businessSqlRenderPreview;
   const businessSqlRendererPreviewUiModel =
     effectiveBusinessSqlRenderPreview?.rendererPreviewUiModel || null;
+  const businessSqlSourceReadiness =
+    effectiveBusinessSqlRenderPreview?.sourceReadiness || null;
   const businessSqlPreviewDisplaySql = businessSqlRendererPreviewUiModel
     ? businessSqlRendererPreviewUiModel.displayStatus === "rendered"
       ? businessSqlRendererPreviewUiModel.sqlText
@@ -468,9 +470,15 @@ function SqlEditorPanel({
             rendererPreviewUiModel: businessSqlRendererPreviewUiModel,
             activeSqlDraft: editor.value,
             priorInsertedFingerprint: insertedAskRecommendationId,
+            sourceReadiness: businessSqlSourceReadiness,
           })
         : null,
-    [businessSqlRendererPreviewUiModel, editor.value, insertedAskRecommendationId],
+    [
+      businessSqlRendererPreviewUiModel,
+      businessSqlSourceReadiness,
+      editor.value,
+      insertedAskRecommendationId,
+    ],
   );
   const businessSqlPreviewEmptyState = useMemo(
     () =>
@@ -822,6 +830,7 @@ function SqlEditorPanel({
       activeSqlDraft: editor.value,
       existingPreview: effectiveBusinessSqlRenderPreview || null,
       clarificationDecision: businessSqlPlanCandidate.clarificationDecision,
+      sourceReadiness: businessSqlPlanCandidate.sourceReadiness,
     });
 
     if (!handoff.preview) return;
@@ -1227,6 +1236,7 @@ function SqlEditorPanel({
   ) : null;
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Existing disclosure behavior opens details when new blockers appear.
     if (shouldOpenPlanningDisclosure) setIsPlanningDisclosureOpen(true);
   }, [shouldOpenPlanningDisclosure]);
 
